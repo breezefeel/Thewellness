@@ -3,223 +3,390 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>힐스테이트 자이 계양 관리사 모집 공고 (3개월 계약직)</title>
+    <title>IFC 국제얼굴교정학회 - 작은 얼굴 만들기 관리사 모집</title>
     <style>
-        /* 기본 스타일 설정 */
-        body {
-            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background-color: #f4f7f6;
+        * {
             margin: 0;
-            padding: 20px;
-        }
-
-        /* 컨테이너 및 중앙 정렬 */
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        /* 제목 스타일 */
-        h1 {
-            color: #1a73e8; /* 구글 블루 계열 */
-            text-align: center;
-            font-size: 2.2em;
-            margin-bottom: 5px;
-            border-bottom: 3px solid #1a73e8;
-            padding-bottom: 10px;
-        }
-
-        h2 {
-            color: #0d47a1;
-            font-size: 1.5em;
-            margin-top: 30px;
-            padding-left: 10px;
-            border-left: 5px solid #ffc107; /* 강조색 */
-        }
-
-        /* 섹션별 스타일 */
-        .section {
-            margin-bottom: 30px;
-            padding: 15px;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-        }
-
-        /* 테이블 스타일 */
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-
-        th, td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: center;
-        }
-
-        th {
-            background-color: #f0f0f0;
-            color: #333;
-            font-weight: bold;
+            padding: 0;
+            box-sizing: border-box;
         }
         
-        /* 강조 텍스트 */
-        .highlight {
-            color: #d32f2f; /* 빨간색 계열 */
-            font-weight: bold;
+        body {
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+            padding: 40px 20px;
         }
-
-        .primary-text {
-            color: #1a73e8;
-            font-weight: bold;
+        
+        .poster {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
         }
-
-        /* 지원 정보 섹션 */
-        .apply-info {
+        
+        /* 헤더 */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 50px 40px;
             text-align: center;
-            background-color: #e3f2fd;
+            position: relative;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="40" fill="rgba(255,255,255,0.05)"/></svg>');
+            background-size: 100px 100px;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            margin-bottom: 15px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .title {
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            line-height: 1.3;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .subtitle {
+            font-size: 20px;
+            opacity: 0.95;
+            font-weight: 400;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* 바디 */
+        .content {
+            padding: 50px 40px;
+        }
+        
+        .tagline {
+            text-align: center;
+            font-size: 28px;
+            color: #667eea;
+            font-weight: 700;
+            margin-bottom: 40px;
+            line-height: 1.5;
             padding: 20px;
-            border-radius: 8px;
+            background: linear-gradient(120deg, #f5f7fa 0%, #e9ecef 100%);
+            border-radius: 15px;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        .job-list {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .job-item {
+            background: linear-gradient(120deg, #f8f9fa 0%, #e9ecef 50%);
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 5px solid #764ba2;
+            transition: all 0.3s ease;
+        }
+        
+        .job-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
+        }
+        
+        .job-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+        
+        .job-desc {
+            font-size: 15px;
+            color: #4a5568;
+            line-height: 1.6;
+        }
+        
+        .requirements {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+        
+        .req-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .req-list li {
+            padding: 12px 0;
+            padding-left: 30px;
+            position: relative;
+            font-size: 16px;
+            color: #2d3748;
+            line-height: 1.6;
+        }
+        
+        .req-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: 700;
+            font-size: 20px;
+        }
+        
+        .benefits {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            padding: 25px;
+            border-radius: 12px;
+        }
+        
+        .benefit-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .benefit-item {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .benefit-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .benefit-text {
+            font-size: 14px;
+            color: #4a5568;
+            font-weight: 600;
+        }
+        
+        .cta {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
             margin-top: 40px;
         }
-
-        .apply-info p {
-            font-size: 1.1em;
-            margin: 10px 0;
+        
+        .cta-title {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+        
+        .cta-info {
+            font-size: 18px;
+            margin-bottom: 10px;
+            opacity: 0.95;
+        }
+        
+        .footer {
+            background: #2d3748;
+            color: white;
+            padding: 30px 40px;
+            text-align: center;
+        }
+        
+        .footer-text {
+            font-size: 14px;
+            opacity: 0.8;
+            line-height: 1.8;
+        }
+        
+        .highlight {
+            background: linear-gradient(120deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+        }
+        
+        @media (max-width: 768px) {
+            .poster {
+                border-radius: 0;
+            }
+            
+            .header, .content {
+                padding: 30px 20px;
+            }
+            
+            .title {
+                font-size: 32px;
+            }
+            
+            .tagline {
+                font-size: 22px;
+            }
+            
+            .section-title {
+                font-size: 20px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>힐스테이트 자이 계양 피부관리사 모집<br>👑</h1>
-        <p style="text-align: center; font-size: 1.2em; color: #555; margin-bottom: 25px;">
-            <strong class="primary-text">&lt;작은 얼굴 만들기&gt; <br>3개월 계약직 관리사 채용</strong>
-        </p>
-
-        <div class="section">
-            <h2>1. 모집 개요 및 직무 소개</h2>
-            <table>
-                <tr>
-                    <th style="width: 25%;">계약 형태</th>
-                    <td><span class="highlight">3개월 계약직</span></td>
-                </tr>
-                <tr>
-                    <th>근무지</th>
-                    <td>인천 계양구 힐스테이트 자이 계양 커뮤니티</td>
-                </tr>
-                <tr>
-                    <th>담당 업무</th>
-                    <td>IFC 국제 얼굴교정학회 25분 프로그램 교육 후, 해당 프로그램 진행 및 고객 관리</td>
-                </tr>
-            </table>
-            <p style="margin-top: 15px; font-style: italic;">
-                **채용 장점:** 기본급 보장으로 소득 안정성 확보, 노력과 성과에 따라 월 실수령액이 크게 증가 (동종업계 대비 우수)
-            </p>
+    <div class="poster">
+        <!-- 헤더 -->
+        <div class="header">
+            <div class="logo">IFC 국제얼굴교정학회</div>
+            <h1 class="title">작은 얼굴 만들기<br>관리사 모집</h1>
+            <p class="subtitle">고객의 변화와 함께 성장하는 전문가로</p>
         </div>
-
-        <div class="section">
-            <h2>2. 급여 및 인센티브 안내</h2>
-            <p>기본급 보장과 함께 관리 고객 수에 따른 파격적인 인센티브를 지급합니다. </p>
+        
+        <!-- 콘텐츠 -->
+        <div class="content">
+            <!-- 태그라인 -->
+            <div class="tagline">
+                "체계적인 교육과 명확한 보상,<br>
+                3개월 후 당신은 IFC 공인 전문가입니다"
+            </div>
             
-            <h3>(1) 기본급 및 인센티브 구성</h3>
-            <table>
-                <tr>
-                    <th style="width: 25%;">구분</th>
-                    <th>내용</th>
-                </tr>
-                <tr>
-                    <th>기본급</th>
-                    <td>월 <span class="primary-text">2,156,880원</span> (주 40시간/월 174시간 출근 기준, 2025~2026년 최저임금+주휴수당 포함)</td>
-                </tr>
-                <tr>
-                    <th>인센티브</th>
-                    <td>월 관리 '고객 수'에 따라 추가 지급 (기본급과 별도)</td>
-                </tr>
-            </table>
-
-            <h3>(2) 인센티브 지급 구간 (40시간 근무 시 / 월 관리 고객 수 기준)</h3>
-            <table>
-                <tr>
-                    <th>구간</th>
-                    <th>월 관리 고객 수</th>
-                    <th>1건당 추가 지급액</th>
-                    <th>예상 월 총액 (세전)</th>
-                </tr>
-                <tr>
-                    <td>구간1</td>
-                    <td>174건 이하</td>
-                    <td>인센티브 없음</td>
-                    <td>2,156,880원</td>
-                </tr>
-                <tr>
-                    <td>구간2</td>
-                    <td>175건 ~ 217건</td>
-                    <td><span class="highlight">4,000원</span> </td>
-                    <td>2,940,880원 (예시: 196건)</td>
-                </tr>
-                <tr>
-                    <td>구간3</td>
-                    <td>218건 ~ 261건</td>
-                    <td><span class="highlight">5,000원</span></td>
-                    <td>3,356,880원 (예시: 240건)</td>
-                </tr>
-                <tr>
-                    <td>구간4</td>
-                    <td>262건 ~ 305건</td>
-                    <td><span class="highlight">6,000원</span></td>
-                    <td>3,986,880원 (예시: 305건)</td>
-                </tr>
-            </table>
-        </div>
-
-        <div class="section">
-            <h2>3. 근무 조건 및 지원 자격</h2>
+            <!-- 모집 분야 -->
+            <div class="section">
+                <h2 class="section-title">모집 개요</h2>
+                <div class="job-list">
+                    <div class="job-item">
+                        <div class="job-title">📍 포지션</div>
+                        <div class="job-desc">
+                            작은 얼굴 만들기 관리사<br>
+                            IFC 국제얼굴교정학회 25분 프로그램 진행 및 고객 관리
+                        </div>
+                    </div>
+                    
+                    <div class="job-item">
+                        <div class="job-title">🏢 근무지</div>
+                        <div class="job-desc">
+                            인천 계양구 힐스테이트 자이 계양 커뮤니티<br>
+                            (교육도 동일 장소에서 오프라인 진행)
+                        </div>
+                    </div>
+                    
+                    <div class="job-item">
+                        <div class="job-title">📅 일정</div>
+                        <div class="job-desc">
+                            교육: 11월 중 월·화·목·금 중 가능한 시간 (숙달 시까지)<br>
+                            근무 시작: 2025년 12월 1일
+                        </div>
+                    </div>
+                </div>
+            </div>
             
-            <h3>⏰ 근무 조건</h3>
-            <ul>
-                <li>**근무 시작:** 12월 1일부터</li>
-                <li>**준비 기간:** 11월 평일 저녁 8시~9시, 관리 프로그램 교육 및 참관</li>
-                <li>**근무 시간:** 주 40시간 (or 파트타임 가능)</li>
-                <li>**근무 형태:** 평일 오후/저녁, 주말 중 근무 시간 설정 가능</li>
-            </ul>
-
-            <h3>✅ 지원 자격 (필수)</h3>
-            <ul>
-                <li>**피부미용 관련 자격증** 소지자</li>
-                <li>유관 업무 **경력자**</li>                
-            </ul>
+            <!-- 자격 요건 -->
+            <div class="section">
+                <h2 class="section-title">지원 자격</h2>
+                <div class="requirements">
+                    <ul class="req-list">
+                        <li><strong>피부미용 관련 자격증</strong> 소지자 (필수)</li>
+                        <li><strong>유관 업무 경력자</strong> (필수)</li>
+                        <li><strong>인천 계양구 통근 가능자</strong> (필수)</li>
+                        <li>성과에 동기부여되는 분</li>
+                        <li>고객 응대 경험이 있는 분 (우대)</li>
+                        <li>물리치료 면허증 (우대)</li>
+                        <li>IFC 프로그램에 관심 있는 분 (우대)</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- 혜택 -->
+            <div class="section">
+                <h2 class="section-title">급여 및 혜택</h2>
+                <div class="benefits">
+                    <div class="benefit-grid">
+                        <div class="benefit-item">
+                            <div class="benefit-icon">💰</div>
+                            <div class="benefit-text">기본급<br>216만원 보장</div>
+                        </div>
+                        <div class="benefit-item">
+                            <div class="benefit-icon">📈</div>
+                            <div class="benefit-text">최대 급여<br>399만원</div>
+                        </div>
+                        <div class="benefit-item">
+                            <div class="benefit-icon">🎓</div>
+                            <div class="benefit-text">IFC 25분<br>프로그램 교육</div>
+                        </div>
+                        <div class="benefit-item">
+                            <div class="benefit-icon">⏰</div>
+                            <div class="benefit-text">유연한<br>근무 시간</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 근무 조건 -->
+            <div class="section">
+                <h2 class="section-title">근무 조건 상세</h2>
+                <div class="requirements">
+                    <ul class="req-list">
+                        <li><span class="highlight">근무 시간:</span> 주 40시간 (파트타임 협의 가능)</li>
+                        <li><span class="highlight">근무 시간대:</span> 오전 10시~오후 10시 사이 (본인 가능 시간)</li>
+                        <li><span class="highlight">인센티브:</span> 실적 구간에 따라 건당 3-6천원 적용</li>
+                        <li><span class="highlight">수습기간 후:</span> 정규직 전환 가능 (4대보험 적용)</li>
+                        <li><span class="highlight">추가 혜택:</span> IFC 교육 이수증 발급</li>
+                    </ul>
+                    <p style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 14px; color: #4a5568; line-height: 1.6;">
+                        ※ 파트타임 급여는 면접 시 상세 안내드립니다<br>
+                        ※ 회원을 많이 관리할 수 있는 시간대 근무 시 수입 증대 유리
+                    </p>
+                </div>
+            </div>
+            
+            <!-- CTA -->
+            <div class="cta">
+                <h3 class="cta-title">지원 방법</h3>
+                <p class="cta-info">📧 이메일: drbreezepark@gmail.com</p>
+                <p class="cta-info">📞 연락처: 010-2468-4596</p>
+                <p class="cta-info">📝 제출 서류: 이력서</p>
+                <p class="cta-info">📅 지원 마감: 2025년 11월 15일</p>
+                <p class="cta-info" style="margin-top: 20px; font-size: 16px;">
+                    * 서류 전형 합격자에 한해 개별 연락 드립니다
+                </p>
+            </div>
         </div>
-
-        <div class="apply-info">
-            <h2>4. 지원 방법 및 문의</h2>
-            <p style="color: #d32f2f; font-weight: bold; font-size: 1.2em;">
-                🚀 모집 마감일: <span class="highlight">25년 11월 15일</span>
-            </p>
-            <hr style="border-top: 1px solid #bbb; margin: 15px auto;">
-            <p>
-                1. 지원 방법: 이메일로 <strong class="primary-text">이력서 제출</strong>
-            </p>
-            <p style="font-size: 1.3em; margin-bottom: 20px;">
-                📧 이메일: <a href="mailto:drbreezepark@gmail.com" class="highlight">drbreezepark@gmail.com</a>
-            </p>
-            <p>
-                2. 채용 문의:
-            </p>
-            <p style="font-size: 1.3em;">
-                📞 연락처: <strong class="highlight">010-2468-4596</strong>
+        
+        <!-- 푸터 -->
+        <div class="footer">
+            <p class="footer-text">
+                IFC 국제얼굴교정학회<br>
+                International Face Correction Association<br>
+                근거 있는 희망을 전하는 전문가의 따뜻한 조언
             </p>
         </div>
-
     </div>
 </body>
 </html>
-
-
-

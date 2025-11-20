@@ -3,20 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IFC 국제얼굴교정학회 - 작은 얼굴 만들기 관리사 모집</title>
+    <title>IFC 국제얼굴교정학회 - 리:얼 작은얼굴 관리사 모집</title>
     <style>
+        /* 기본 스타일 유지 */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
             background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
             padding: 40px 20px;
         }
-        
+
         .poster {
             max-width: 800px;
             margin: 0 auto;
@@ -25,8 +26,65 @@
             overflow: hidden;
             box-shadow: 0 20px 60px rgba(0,0,0,0.15);
         }
+
+        /* 탭 메뉴 스타일 */
+        .tab-menu {
+            display: flex;
+            justify-content: center;
+            background-color: #f8f9fa;
+            border-bottom: 3px solid #667eea;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .tab-button {
+            padding: 15px 25px;
+            font-size: 18px;
+            font-weight: 700;
+            color: #4a5568;
+            background: none;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .tab-button:hover:not(.active) {
+            background-color: #e9ecef;
+        }
+
+        .tab-button.active {
+            color: #667eea;
+            background-color: white;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+        }
+
+        .tab-button.active::after {
+            content: '';
+            position: absolute;
+            bottom: -3px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: white; /* 탭 버튼 아래 보더를 덮음 */
+        }
         
-        /* 헤더 */
+        /* 탭 콘텐츠 숨기기/보이기 */
+        .tab-content {
+            display: none;
+            padding: 50px 40px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* 기존 페이지 스타일 재정의 (탭 콘텐츠 안으로 이동) */
+
+        /* 헤더 (모집 요약 페이지에만 적용) */
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -34,7 +92,7 @@
             text-align: center;
             position: relative;
         }
-        
+
         .header::before {
             content: '';
             position: absolute;
@@ -45,7 +103,7 @@
             background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="40" fill="rgba(255,255,255,0.05)"/></svg>');
             background-size: 100px 100px;
         }
-        
+
         .logo {
             font-size: 24px;
             font-weight: 700;
@@ -54,7 +112,7 @@
             position: relative;
             z-index: 1;
         }
-        
+
         .title {
             font-size: 42px;
             font-weight: 800;
@@ -63,7 +121,7 @@
             position: relative;
             z-index: 1;
         }
-        
+
         .subtitle {
             font-size: 20px;
             opacity: 0.95;
@@ -72,11 +130,22 @@
             z-index: 1;
         }
         
-        /* 바디 */
-        .content {
-            padding: 50px 40px;
+        /* 두 번째 페이지 헤더 스타일링 */
+        .header-2 {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            color: white;
+            padding: 30px 40px;
+            text-align: center;
         }
         
+        .title-2 {
+            font-size: 36px;
+            font-weight: 800;
+            line-height: 1.3;
+        }
+
+
+        /* 바디 */
         .tagline {
             text-align: center;
             font-size: 28px;
@@ -88,11 +157,11 @@
             background: linear-gradient(120deg, #f5f7fa 0%, #e9ecef 100%);
             border-radius: 15px;
         }
-        
+
         .section {
             margin-bottom: 40px;
         }
-        
+
         .section-title {
             font-size: 24px;
             font-weight: 700;
@@ -101,12 +170,12 @@
             padding-bottom: 10px;
             border-bottom: 3px solid #667eea;
         }
-        
+
         .job-list {
             display: grid;
             gap: 15px;
         }
-        
+
         .job-item {
             background: linear-gradient(120deg, #f8f9fa 0%, #e9ecef 50%);
             padding: 20px;
@@ -114,37 +183,37 @@
             border-left: 5px solid #764ba2;
             transition: all 0.3s ease;
         }
-        
+
         .job-item:hover {
             transform: translateX(5px);
             box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
         }
-        
+
         .job-title {
             font-size: 20px;
             font-weight: 700;
             color: #667eea;
             margin-bottom: 8px;
         }
-        
+
         .job-desc {
             font-size: 15px;
             color: #4a5568;
             line-height: 1.6;
         }
-        
+
         .requirements {
             background: #f8f9fa;
             padding: 25px;
             border-radius: 12px;
             margin-bottom: 30px;
         }
-        
+
         .req-list {
             list-style: none;
             padding-left: 0;
         }
-        
+
         .req-list li {
             padding: 12px 0;
             padding-left: 30px;
@@ -153,7 +222,7 @@
             color: #2d3748;
             line-height: 1.6;
         }
-        
+
         .req-list li::before {
             content: '✓';
             position: absolute;
@@ -163,19 +232,94 @@
             font-size: 20px;
         }
         
+        /* 급여 시뮬레이션 테이블 스타일 */
+        .salary-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        
+        .salary-table th, .salary-table td {
+            padding: 15px;
+            text-align: left;
+            border: 1px solid #e9ecef;
+        }
+        
+        .salary-table thead th {
+            background-color: #667eea;
+            color: white;
+            font-weight: 700;
+            font-size: 18px;
+            border: none;
+        }
+
+        .salary-table tbody tr:nth-child(odd) {
+            background-color: #f8f9fa;
+        }
+        
+        .salary-table tbody td strong {
+            color: #764ba2;
+        }
+        
+        .salary-table .simul-title {
+            background-color: #e9ecef;
+            font-weight: 700;
+            color: #2d3748;
+            text-align: center;
+            font-size: 16px;
+            padding: 10px;
+        }
+        
+        .salary-section {
+            background: #ffffff;
+            border: 1px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .salary-section h3 {
+            font-size: 20px;
+            color: #764ba2;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 5px;
+        }
+        
+        .salary-section p {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #4a5568;
+            margin-bottom: 5px;
+        }
+        
+        .salary-section strong {
+            color: #2d3748;
+        }
+        
+        .salary-section .highlight-salary {
+            color: #d63384;
+            font-weight: 700;
+        }
+
+
         .benefits {
             background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
             padding: 25px;
             border-radius: 12px;
         }
-        
+
         .benefit-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
             margin-top: 20px;
         }
-        
+
         .benefit-item {
             background: white;
             padding: 20px;
@@ -183,18 +327,18 @@
             text-align: center;
             box-shadow: 0 2px 10px rgba(0,0,0,0.05);
         }
-        
+
         .benefit-icon {
             font-size: 32px;
             margin-bottom: 10px;
         }
-        
+
         .benefit-text {
             font-size: 14px;
             color: #4a5568;
             font-weight: 600;
         }
-        
+
         .cta {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -203,32 +347,32 @@
             text-align: center;
             margin-top: 40px;
         }
-        
+
         .cta-title {
             font-size: 28px;
             font-weight: 700;
             margin-bottom: 20px;
         }
-        
+
         .cta-info {
             font-size: 18px;
             margin-bottom: 10px;
             opacity: 0.95;
         }
-        
+
         .footer {
             background: #2d3748;
             color: white;
             padding: 30px 40px;
             text-align: center;
         }
-        
+
         .footer-text {
             font-size: 14px;
             opacity: 0.8;
             line-height: 1.8;
         }
-        
+
         .highlight {
             background: linear-gradient(120deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
@@ -237,77 +381,94 @@
             font-weight: 700;
         }
         
+        .note {
+            font-size: 14px;
+            color: #4a5568;
+            padding: 15px;
+            background: #f8f9fa;
+            border-left: 4px solid #764ba2;
+            border-radius: 8px;
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+
         @media (max-width: 768px) {
             .poster {
                 border-radius: 0;
             }
-            
-            .header, .content {
+
+            .header, .tab-content {
                 padding: 30px 20px;
             }
-            
+
             .title {
                 font-size: 32px;
             }
-            
+
             .tagline {
                 font-size: 22px;
             }
-            
+
             .section-title {
                 font-size: 20px;
+            }
+            
+            .tab-button {
+                padding: 12px 15px;
+                font-size: 16px;
             }
         }
     </style>
 </head>
 <body>
     <div class="poster">
-        <!-- 헤더 -->
         <div class="header">
             <div class="logo">IFC 국제얼굴교정학회</div>
-            <h1 class="title">작은 얼굴 만들기<br>관리사 모집</h1>
+            <h1 class="title">Re:Al 작은얼굴 관리사 모집</h1>
             <p class="subtitle">고객의 변화와 함께 성장하는 전문가로</p>
         </div>
         
-        <!-- 콘텐츠 -->
-        <div class="content">
-            <!-- 태그라인 -->
+        <div class="tab-menu">
+            <button class="tab-button active" onclick="openTab(event, 'summary')">모집 요약</button>
+            <button class="tab-button" onclick="openTab(event, 'salary')">급여 상세</button>
+        </div>
+
+        <div id="summary" class="tab-content active">
+            
             <div class="tagline">
                 "체계적인 교육과 명확한 보상,<br>
                 3개월 후 당신은 IFC 공인 전문가입니다"
             </div>
-            
-            <!-- 모집 분야 -->
+
             <div class="section">
                 <h2 class="section-title">모집 개요</h2>
                 <div class="job-list">
                     <div class="job-item">
                         <div class="job-title">📍 포지션</div>
                         <div class="job-desc">
-                            작은 얼굴 만들기 관리사<br>
-                            IFC 국제얼굴교정학회 25분 프로그램 진행 및 고객 관리
+                            리:얼 작은얼굴 관리사<br>
+                            IFC 국제얼굴교정학회 프로그램 진행 및 고객 관리
                         </div>
                     </div>
-                    
+
                     <div class="job-item">
                         <div class="job-title">🏢 근무지</div>
                         <div class="job-desc">
-                            인천 계양구 힐스테이트 자이 계양 커뮤니티<br>
-                            (교육도 동일 장소에서 오프라인 진행)
+                            인천 계양구 힐스테이트 자이 계양 커뮤니티<br>                            
+                            인천 1호선 작전역에서 3분 거리
                         </div>
                     </div>
-                    
+
                     <div class="job-item">
                         <div class="job-title">📅 일정</div>
-                        <div class="job-desc">
-                            교육: 11월 중 월·화·목·금 중 가능한 시간 (숙달 시까지)<br>
-                            근무 시작: 2025년 12월 1일
+                        <div class="job-desc">                            
+                            근무 시작: 2025년 12월 1일<br>
+                            프로그램 교육: 11월 월·화·목·금 중 가능한 시간 (숙달 시까지)
                         </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- 자격 요건 -->
+
             <div class="section">
                 <h2 class="section-title">지원 자격</h2>
                 <div class="requirements">
@@ -322,8 +483,7 @@
                     </ul>
                 </div>
             </div>
-            
-            <!-- 혜택 -->
+
             <div class="section">
                 <h2 class="section-title">급여 및 혜택</h2>
                 <div class="benefits">
@@ -338,7 +498,7 @@
                         </div>
                         <div class="benefit-item">
                             <div class="benefit-icon">🎓</div>
-                            <div class="benefit-text">IFC 25분<br>프로그램 교육</div>
+                            <div class="benefit-text">IFC 페이스 프로그램<br>교육</div>
                         </div>
                         <div class="benefit-item">
                             <div class="benefit-icon">⏰</div>
@@ -347,8 +507,7 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- 근무 조건 -->
+
             <div class="section">
                 <h2 class="section-title">근무 조건 상세</h2>
                 <div class="requirements">
@@ -365,8 +524,7 @@
                     </p>
                 </div>
             </div>
-            
-            <!-- CTA -->
+
             <div class="cta">
                 <h3 class="cta-title">지원 방법</h3>
                 <p class="cta-info">📧 이메일: drbreezepark@gmail.com</p>
@@ -378,8 +536,119 @@
                 </p>
             </div>
         </div>
+
+        <div id="salary" class="tab-content">
+            <div class="header-2">
+                <h1 class="title-2">💸 관리사 급여 상세 분석<br>고성과에 따른 명확한 보상</h1>
+            </div>
+            
+            <div class="section">
+                <h2 class="section-title">인센티브 단가 및 구간 기준</h2> <h4>(주 40시간/월 174시간 기준)</h4><br>
+                <table class="salary-table">
+                    <thead>
+                        <tr>
+                            <th>구간</th>
+                            <th>월 관리 건수</th>
+                            <th>인센티브 단가 (건당)</th>
+                            <th>주당 관리 시간</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>구간1</td>
+                            <td>174건 이하</td>
+                            <td>인센티브 없음</td>
+                            <td>20시간 이하</td>
+                        </tr>
+                        <tr>
+                            <td>구간2</td>
+                            <td>175건 ~ 232건</td>
+                            <td><strong>3,000원 ~ 4,000원</strong></td>
+                            <td>20시간 이상</td>
+                        </tr>
+                        <tr>
+                            <td>구간3</td>
+                            <td>233건 ~ 290건</td>
+                            <td><strong>4,000원 ~ 5,000원</strong></td>
+                            <td>27시간 이상</td>
+                        </tr>
+                        <tr>
+                            <td>구간4</td>
+                            <td>291건 ~ 348건</td>
+                            <td><strong>5,000원 ~ 6,000원</strong></td>
+                            <td>33시간 이상</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="note">
+                    <strong>인센티브 단가 기준:</strong><br>
+                    - 신입/일반 직원: 구간별 일반 인센으로 시작 (예: 구간2의 3,000원)<br>                    
+                    → 구간3을 3개월 이상 유지 시, 경력 인센 적용.<br>
+                    - 경력직/우수 직원: 구간3 2회 달성 시, 경력 인센 적용 (예: 구간2의 4,000원)<br><br>
+                    ※ 건수는 정상가 및 이벤트가 회원 대상. (체험 회원은 건수에 포함 안됨)
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">월 예상 급여 시뮬레이션 (세전/세후)</h2>
+
+                <div class="salary-section">
+                    <h3>✅ 구간1 (174건 이하, 기본급)</h3>
+                    <p>월 예상 관리 건수: <strong>170건</strong> (인센티브 없음)</p>
+                    <p>기본급: 2,156,880원</p>
+                    <p>4대보험(근로자 부담): 약 195,000원</p>
+                    <p><strong>✨ 월 실수령액: 약 1,961,880원</strong></p>
+                </div>
+
+                <div class="salary-section">
+                    <h3>✅ 구간2 (175~232건, 인센티브 3~4,000원)</h3>
+                    <p class="simul-title"><strong>[관리 건수 예시: 220건]</strong></p><br>
+                    <p><strong>[일반 직원 (인센 3,000원)]</strong></p>
+                    <p>기본급 + 인센티브 (220건 × 3,000원): 2,156,880원 + 660,000원 = 2,816,880원</p>
+                    <p>4대보험 공제: 약 263,580원</p>
+                    <p><strong>✨ 월 실수령액: 약 2,553,300원</strong></p>
+                    
+                    <p style="margin-top: 15px;"><strong>[경력직 직원 (인센 4,000원)]</strong></p>
+                    <p>기본급 + 인센티브 (220건 × 4,000원): 2,156,880원 + 880,000원 = 3,036,880원</p>
+                    <p>4대보험 공제: 약 284,450원</p>
+                    <p><strong>✨ 월 실수령액: 약 2,752,430원</strong></p>
+                </div>
+                
+                <div class="salary-section">
+                    <h3>✅ 구간3 (233~290건, 인센티브 4~5,000원)</h3>
+                    <p class="simul-title"><strong>[관리 건수 예시: 270건]</strong></p><br>
+                    <p><strong>[일반 직원 (인센 4,000원)]</strong></p>
+                    <p>기본급 + 인센티브 (270건 × 4,000원): 2,156,880원 + 1,080,000원 = 3,236,880원</p>
+                    <p>4대보험 공제: 약 305,270원</p>
+                    <p><strong>✨ 월 실수령액: 약 2,931,610원</strong></p>
+                    
+                    <p style="margin-top: 15px;"><strong>[경력직 직원 (인센 5,000원)]</strong></p>
+                    <p>기본급 + 인센티브 (270건 × 5,000원): 2,156,880원 + 1,350,000원 = 3,506,880원</p>
+                    <p>4대보험 공제: 약 330,650원</p>
+                    <p><strong>✨ 월 실수령액: 약 3,176,230원</strong></p>
+                </div>
+
+                <div class="salary-section">
+                    <h3>✅ 구간4 (291~348건, 인센티브 5~6,000원)</h3>
+                    <p class="simul-title"><strong>[관리 건수 예시: 305건]</strong></p><br>
+                    <p><strong>[일반 직원 (인센 5,000원)]</strong></p>
+                    <p>기본급 + 인센티브 (305건 × 5,000원): 2,156,880원 + 1,525,000원 = 3,681,880원</p>
+                    <p>4대보험 공제: 약 345,098원</p>
+                    <p><strong>✨ 월 실수령액: 약 3,336,782원</strong></p>
+                    
+                    <p style="margin-top: 15px;"><strong>[경력직 직원 (인센 6,000원)]</strong></p>
+                    <p>기본급 + 인센티브 (305건 × 6,000원): 2,156,880원 + 1,830,000원 = 3,986,880원</p>
+                    <p>4대보험 공제: 약 370,000원</p>
+                    <p><strong>✨ 월 실수령액: 약 3,616,880원</strong></p>
+                </div>
+            </div>
+            
+            <div class="note" style="border-left-color: #667eea;">
+                ※ 상기 급여는 세전 금액에 4대 보험 (국민연금, 건강보험, 고용보험, 산재보험) 근로자 부담분을 공제한 예상 실수령액입니다.<br>
+                ※ 파트타임의 급여 체계는 면접 시 별도 안내됩니다.
+            </div>
+        </div>
         
-        <!-- 푸터 -->
         <div class="footer">
             <p class="footer-text">
                 IFC 국제얼굴교정학회<br>
@@ -388,5 +657,38 @@
             </p>
         </div>
     </div>
+
+    <script>
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+
+            // 모든 탭 내용(tabcontent) 숨기기
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+                tabcontent[i].classList.remove("active");
+            }
+
+            // 모든 탭 버튼(tab-button)에서 active 클래스 제거
+            tablinks = document.getElementsByClassName("tab-button");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].classList.remove("active");
+            }
+
+            // 선택된 탭 내용(tabcontent) 보이기
+            document.getElementById(tabName).style.display = "block";
+            document.getElementById(tabName).classList.add("active");
+            
+            // 선택된 탭 버튼(tab-button)에 active 클래스 추가
+            evt.currentTarget.classList.add("active");
+        }
+
+        // 페이지 로드 시 '모집 요약' 탭을 기본으로 활성화
+        document.addEventListener("DOMContentLoaded", function() {
+            // 초기 로딩 시 openTab을 수동으로 호출하여 active 클래스를 설정하고 내용을 표시합니다.
+            // (첫 번째 버튼과 첫 번째 콘텐츠가 이미 HTML에서 active로 설정되어 있으므로, 이 부분은 생략하거나 필요에 따라 조정 가능)
+            // openTab(null, 'summary');
+        });
+    </script>
 </body>
 </html>

@@ -1,694 +1,1069 @@
 <!DOCTYPE html>
+
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IFC 국제얼굴교정학회 - 리:얼 작은얼굴 관리사 모집</title>
-    <style>
-        /* 기본 스타일 유지 */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>힐링트리 콘텐츠 플래너</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Noto Sans KR', sans-serif; background: #F8F7F4; color: #1A1A1A; min-height: 100vh; }
 
-        body {
-            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
-            padding: 40px 20px;
-        }
+/* ── Top bar ── */
+.topbar {
+background: #1A1A1A;
+padding: 14px 20px;
+display: flex; align-items: center; justify-content: space-between;
+position: sticky; top: 0; z-index: 100;
+}
+.topbar-left { display: flex; align-items: center; gap: 10px; }
+.logo-icon { font-size: 20px; }
+.logo-text { color: #fff; font-weight: 700; font-size: 15px; letter-spacing: -.3px; }
+.logo-sub { color: #9CA3AF; font-size: 11px; margin-top: 1px; }
+.topbar-right { display: flex; gap: 8px; align-items: center; }
+.api-badge {
+font-size: 11px; padding: 5px 10px; border-radius: 6px;
+border: 1px solid #3A3A3A; color: #9CA3AF; background: none;
+cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 5px;
+}
+.api-badge:hover { border-color: #2DD4BF; color: #2DD4BF; }
+.api-dot { width: 6px; height: 6px; border-radius: 50%; background: #EF4444; }
+.api-dot.on { background: #2DD4BF; }
+.btn-add {
+background: #2DD4BF; color: #1A1A1A; border: none; border-radius: 6px;
+padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+font-family: inherit;
+}
 
-        .poster {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-        }
+/* ── Category tabs ── */
+.cat-tabs-wrap {
+background: #1A1A1A;
+border-top: 1px solid #2A2A2A;
+overflow-x: auto;
+-webkit-overflow-scrolling: touch;
+}
+.cat-tabs-wrap::-webkit-scrollbar { display: none; }
+.cat-tabs {
+display: flex; padding: 0 12px; gap: 4px; min-width: max-content;
+}
+.cat-tab {
+padding: 10px 14px; border: none; background: none;
+color: #6B6B6B; font-size: 12px; font-weight: 600;
+cursor: pointer; font-family: inherit; white-space: nowrap;
+border-bottom: 2px solid transparent;
+transition: all 0.15s; display: flex; align-items: center; gap: 5px;
+}
+.cat-tab:hover { color: #D0D0D0; }
+.cat-tab.active { color: #2DD4BF; border-bottom-color: #2DD4BF; }
 
-        /* 탭 메뉴 스타일 */
-        .tab-menu {
-            display: flex;
-            justify-content: center;
-            background-color: #f8f9fa;
-            border-bottom: 3px solid #667eea;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
+/* ── Alert banner ── */
+.alert-banner {
+margin: 14px 16px 0;
+background: linear-gradient(135deg, #2DD4BF, #0EA5E9);
+border-radius: 12px; padding: 14px 16px;
+display: flex; align-items: center; justify-content: space-between;
+cursor: pointer;
+}
+.alert-banner-text { color: #fff; }
+.alert-banner-title { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+.alert-banner-topic { font-size: 14px; font-weight: 600; }
+.alert-banner-meta { font-size: 11px; opacity: 0.75; margin-top: 2px; }
+.alert-banner-arrow { color: #fff; font-size: 20px; }
 
-        .tab-button {
-            padding: 15px 25px;
-            font-size: 18px;
-            font-weight: 700;
-            color: #4a5568;
-            background: none;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-        }
+/* ── Stats row ── */
+.stats-row { display: flex; gap: 8px; padding: 14px 16px 0; }
+.stat-card {
+flex: 1; background: #fff; border-radius: 10px; padding: 10px 8px;
+text-align: center; cursor: pointer;
+border: 2px solid #E5E7EB; transition: all 0.15s;
+}
+.stat-card.active { border-color: var(–sc, #6B7280); }
+.stat-num { font-size: 18px; font-weight: 800; color: var(–sc, #6B7280); }
+.stat-label { font-size: 10px; color: #9CA3AF; margin-top: 1px; }
 
-        .tab-button:hover:not(.active) {
-            background-color: #e9ecef;
-        }
+/* ── Search ── */
+.search-wrap { padding: 12px 16px 0; }
+.search-input {
+width: 100%; padding: 10px 14px; border-radius: 10px;
+border: 1.5px solid #E5E7EB; font-size: 13px; outline: none;
+background: #fff; font-family: inherit;
+}
+.search-input:focus { border-color: #2DD4BF; }
 
-        .tab-button.active {
-            color: #667eea;
-            background-color: white;
-            box-shadow: 0 -4px 10px rgba(0,0,0,0.05);
-            border-top-left-radius: 10px;
-            border-top-right-radius: 10px;
-        }
+/* ── Cards ── */
+.cards-wrap { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
 
-        .tab-button.active::after {
-            content: '';
-            position: absolute;
-            bottom: -3px;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background-color: white; /* 탭 버튼 아래 보더를 덮음 */
-        }
-        
-        /* 탭 콘텐츠 숨기기/보이기 */
-        .tab-content {
-            display: none;
-            padding: 50px 40px;
-        }
-        
-        .tab-content.active {
-            display: block;
-        }
-        
-        /* 기존 페이지 스타일 재정의 (탭 콘텐츠 안으로 이동) */
+/* Recommended section */
+.rec-section-title {
+font-size: 12px; font-weight: 700; color: #9CA3AF;
+letter-spacing: .5px; padding: 4px 0 8px;
+display: flex; align-items: center; gap: 6px;
+}
+.rec-divider { height: 1px; background: #E5E7EB; margin: 6px 0 14px; }
 
-        /* 헤더 (모집 요약 페이지에만 적용) */
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 50px 40px;
-            text-align: center;
-            position: relative;
-        }
+.draft-card {
+background: #fff; border-radius: 12px; padding: 14px 16px;
+cursor: pointer; border: 1.5px solid #E5E7EB;
+transition: all 0.15s; position: relative; overflow: hidden;
+}
+.draft-card::before {
+content: ‘’; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+background: var(–cc, #2DD4BF);
+}
+.draft-card:hover { border-color: var(–cc, #2DD4BF); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+.draft-card.published { opacity: 0.55; }
+.draft-card.recommended { border-color: #F59E0B; }
+.draft-card.recommended::before { background: #F59E0B; }
 
-        .header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="40" fill="rgba(255,255,255,0.05)"/></svg>');
-            background-size: 100px 100px;
-        }
+.card-badges { display: flex; gap: 5px; margin-bottom: 8px; flex-wrap: wrap; }
+.badge {
+font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700;
+}
+.badge-aud { background: rgba(45,212,191,0.12); color: #0F766E; }
+.badge-rec { background: #FEF3C7; color: #D97706; }
+.badge-pub { background: #F3F4F6; color: #9CA3AF; }
+.badge-gen { background: #DBEAFE; color: #2563EB; }
 
-        .logo {
-            font-size: 24px;
-            font-weight: 700;
-            letter-spacing: 2px;
-            margin-bottom: 15px;
-            position: relative;
-            z-index: 1;
-        }
+.card-topic { font-weight: 700; font-size: 14px; color: #1A1A1A; margin-bottom: 5px; line-height: 1.45; }
+.card-angle { font-size: 12px; color: #9CA3AF; line-height: 1.55; }
+.card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.card-date { font-size: 11px; color: #C0C0C0; }
+.card-arrow { font-size: 15px; color: #C0C0C0; transition: transform 0.15s; }
+.draft-card:hover .card-arrow { transform: translateX(3px); color: #1A1A1A; }
 
-        .title {
-            font-size: 42px;
-            font-weight: 800;
-            margin-bottom: 20px;
-            line-height: 1.3;
-            position: relative;
-            z-index: 1;
-        }
+/* ── Detail overlay ── */
+.detail-overlay {
+display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+z-index: 200; backdrop-filter: blur(4px);
+}
+.detail-overlay.open { display: block; }
+.detail-sheet {
+position: fixed; bottom: 0; left: 0; right: 0;
+background: #fff; border-radius: 20px 20px 0 0;
+max-height: 90vh; display: flex; flex-direction: column;
+transform: translateY(100%); transition: transform 0.3s;
+z-index: 201;
+}
+.detail-sheet.open { transform: translateY(0); }
+.sheet-handle { width: 40px; height: 4px; background: #E5E7EB; border-radius: 2px; margin: 12px auto 0; }
+.sheet-header {
+padding: 14px 20px 12px; border-bottom: 1px solid #F3F4F6;
+display: flex; align-items: flex-start; gap: 12px;
+}
+.sheet-close {
+background: #F3F4F6; border: none; border-radius: 8px;
+width: 30px; height: 30px; font-size: 14px; cursor: pointer;
+flex-shrink: 0; margin-top: 2px;
+}
+.sheet-title { font-weight: 700; font-size: 14px; line-height: 1.45; flex: 1; }
+.sheet-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+.sheet-actions {
+padding: 12px 20px 24px; border-top: 1px solid #F3F4F6;
+display: flex; gap: 8px;
+}
 
-        .subtitle {
-            font-size: 20px;
-            opacity: 0.95;
-            font-weight: 400;
-            position: relative;
-            z-index: 1;
-        }
-        
-        /* 두 번째 페이지 헤더 스타일링 */
-        .header-2 {
-            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-            color: white;
-            padding: 30px 40px;
-            text-align: center;
-        }
-        
-        .title-2 {
-            font-size: 36px;
-            font-weight: 800;
-            line-height: 1.3;
-        }
+/* Tabs inside sheet */
+.sheet-tabs {
+display: flex; gap: 4px; background: #F3F4F6; border-radius: 10px;
+padding: 4px; margin-bottom: 16px;
+}
+.sheet-tab {
+flex: 1; padding: 8px; border: none; background: none;
+border-radius: 7px; font-size: 12px; font-weight: 700;
+cursor: pointer; color: #9CA3AF; font-family: inherit; transition: all .15s;
+}
+.sheet-tab.active { background: #fff; color: #1A1A1A; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 
+/* Content blocks */
+.cb { margin-bottom: 14px; }
+.cb-label {
+font-size: 10px; font-weight: 700; color: #9CA3AF; letter-spacing: .8px;
+text-transform: uppercase; margin-bottom: 6px;
+display: flex; align-items: center; justify-content: space-between;
+}
+.copy-btn {
+font-size: 10px; font-weight: 700; color: #9CA3AF; background: none;
+border: 1px solid #E5E7EB; border-radius: 4px; padding: 2px 8px; cursor: pointer;
+font-family: inherit; transition: all .15s;
+}
+.copy-btn:hover { border-color: #2DD4BF; color: #2DD4BF; }
+.copy-btn.copied { border-color: #16A34A; color: #16A34A; }
+.cb-box {
+background: #F8F7F4; border-radius: 10px; padding: 12px 14px;
+font-size: 13px; line-height: 1.75; color: #374151; white-space: pre-wrap;
+}
+.cb-title { font-size: 15px; font-weight: 700; color: #1A1A1A; }
+.outline-item {
+padding: 7px 0; border-bottom: 1px solid #F3F4F6;
+font-size: 13px; color: #374151; display: flex; gap: 8px;
+}
+.outline-item:last-child { border-bottom: none; }
+.outline-num { color: #2DD4BF; font-weight: 800; min-width: 18px; }
+.carousel-item {
+background: #F8F7F4; border-radius: 8px; padding: 10px 12px;
+margin-bottom: 6px; display: flex; gap: 10px;
+}
+.slide-badge {
+background: #F59E0B; color: #fff; border-radius: 4px;
+padding: 1px 7px; font-size: 10px; font-weight: 800; height: fit-content; margin-top: 2px;
+}
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { background: #F3F4F6; border-radius: 6px; padding: 4px 10px; font-size: 12px; color: #6B7280; }
 
-        /* 바디 */
-        .tagline {
-            text-align: center;
-            font-size: 28px;
-            color: #667eea;
-            font-weight: 700;
-            margin-bottom: 40px;
-            line-height: 1.5;
-            padding: 20px;
-            background: linear-gradient(120deg, #f5f7fa 0%, #e9ecef 100%);
-            border-radius: 15px;
-        }
+/* Action buttons */
+.btn-gen-big {
+flex: 1; background: linear-gradient(135deg, #2DD4BF, #0EA5E9);
+color: #fff; border: none; border-radius: 12px; padding: 13px;
+font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit;
+}
+.btn-gen-big:disabled { opacity: .5; cursor: not-allowed; }
+.btn-pub {
+background: #16A34A; color: #fff; border: none; border-radius: 12px;
+padding: 13px 16px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.btn-regen {
+background: #F3F4F6; color: #6B7280; border: none; border-radius: 12px;
+padding: 13px 16px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.btn-regen:hover { background: #E5E7EB; }
 
-        .section {
-            margin-bottom: 40px;
-        }
+/* Loading */
+.loading-wrap { text-align: center; padding: 40px 20px; }
+.spinner { width: 36px; height: 36px; border: 3px solid #E5E7EB; border-top-color: #2DD4BF; border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 14px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 13px; color: #9CA3AF; line-height: 1.7; }
 
-        .section-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: #2d3748;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 3px solid #667eea;
-        }
+/* API Modal */
+.modal-overlay {
+display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+z-index: 300; align-items: center; justify-content: center;
+backdrop-filter: blur(6px);
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+background: #fff; border-radius: 20px; padding: 32px 28px;
+max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+.modal-logo { font-size: 28px; margin-bottom: 10px; }
+.modal-title { font-size: 20px; font-weight: 900; margin-bottom: 6px; }
+.modal-desc { font-size: 13px; color: #6B7280; line-height: 1.7; margin-bottom: 20px; }
+.modal-input {
+width: 100%; padding: 12px 14px; border-radius: 10px;
+border: 1.5px solid #E5E7EB; font-size: 13px; outline: none;
+font-family: monospace; margin-bottom: 8px;
+}
+.modal-input:focus { border-color: #2DD4BF; }
+.modal-hint { font-size: 11px; color: #9CA3AF; margin-bottom: 16px; }
+.modal-hint a { color: #2DD4BF; text-decoration: none; }
+.modal-btn {
+width: 100%; background: #1A1A1A; color: #fff; border: none;
+border-radius: 10px; padding: 14px; font-size: 14px; font-weight: 800;
+cursor: pointer; font-family: inherit;
+}
 
-        .job-list {
-            display: grid;
-            gap: 15px;
-        }
+/* Add form */
+.add-form { background: #fff; border-radius: 16px; padding: 20px; margin: 14px 16px; border: 1.5px solid #E5E7EB; }
+.form-title { font-weight: 800; font-size: 16px; margin-bottom: 18px; }
+.form-field { margin-bottom: 14px; }
+.form-label { font-size: 12px; font-weight: 700; color: #6B7280; margin-bottom: 6px; display: block; }
+.form-input, .form-select {
+width: 100%; padding: 10px 14px; border-radius: 10px;
+border: 1.5px solid #E5E7EB; font-size: 14px; outline: none;
+font-family: inherit; background: #fff;
+}
+.form-input:focus, .form-select:focus { border-color: #2DD4BF; }
+.aud-row { display: flex; gap: 8px; }
+.aud-btn {
+flex: 1; padding: 10px; border-radius: 10px; border: 2px solid #E5E7EB;
+background: #fff; font-weight: 700; font-size: 14px; cursor: pointer;
+font-family: inherit; color: #6B7280; transition: all .15s;
+}
+.aud-btn.active { border-color: #2DD4BF; background: #F0FDFA; color: #0F766E; }
+.btn-submit {
+width: 100%; background: #1A1A1A; color: #fff; border: none;
+border-radius: 12px; padding: 14px; font-size: 15px; font-weight: 800;
+cursor: pointer; font-family: inherit; margin-top: 6px;
+}
+.empty-note { text-align: center; padding: 40px 20px; color: #C0C0C0; font-size: 13px; }
 
-        .job-item {
-            background: linear-gradient(120deg, #f8f9fa 0%, #e9ecef 50%);
-            padding: 20px;
-            border-radius: 12px;
-            border-left: 5px solid #764ba2;
-            transition: all 0.3s ease;
-        }
+/* ── Prompt editor modal ── */
+.prompt-modal-overlay {
+display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+z-index: 300; align-items: flex-end; justify-content: center;
+backdrop-filter: blur(4px);
+}
+.prompt-modal-overlay.open { display: flex; }
+.prompt-modal {
+background: #fff; border-radius: 20px 20px 0 0;
+width: 100%; max-width: 600px; max-height: 92vh;
+display: flex; flex-direction: column;
+transform: translateY(100%); transition: transform 0.3s;
+}
+.prompt-modal.open { transform: translateY(0); }
+.prompt-modal-handle { width: 40px; height: 4px; background: #E5E7EB; border-radius: 2px; margin: 12px auto 0; flex-shrink: 0; }
+.prompt-modal-header {
+padding: 14px 20px 12px; border-bottom: 1px solid #F3F4F6;
+display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+.prompt-modal-title { font-weight: 800; font-size: 15px; flex: 1; }
+.prompt-modal-close {
+background: #F3F4F6; border: none; border-radius: 8px;
+width: 30px; height: 30px; font-size: 14px; cursor: pointer;
+}
+.prompt-modal-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+.prompt-tabs {
+display: flex; gap: 4px; background: #F3F4F6; border-radius: 10px;
+padding: 4px; margin-bottom: 16px;
+}
+.prompt-tab {
+flex: 1; padding: 8px; border: none; background: none;
+border-radius: 7px; font-size: 12px; font-weight: 700;
+cursor: pointer; color: #9CA3AF; font-family: inherit; transition: all .15s;
+}
+.prompt-tab.active { background: #fff; color: #1A1A1A; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.prompt-section { margin-bottom: 18px; }
+.prompt-section-label {
+font-size: 11px; font-weight: 700; color: #6B7280; margin-bottom: 6px;
+display: flex; align-items: center; justify-content: space-between;
+}
+.prompt-reset-btn {
+font-size: 10px; color: #9CA3AF; background: none; border: 1px solid #E5E7EB;
+border-radius: 4px; padding: 2px 7px; cursor: pointer; font-family: inherit;
+}
+.prompt-reset-btn:hover { border-color: #EF4444; color: #EF4444; }
+.prompt-textarea {
+width: 100%; min-height: 140px; padding: 12px 14px;
+border: 1.5px solid #E5E7EB; border-radius: 10px;
+font-size: 12px; line-height: 1.7; font-family: inherit;
+resize: vertical; outline: none; color: #374151; background: #FAFAFA;
+}
+.prompt-textarea:focus { border-color: #2DD4BF; background: #fff; }
+.prompt-hint {
+font-size: 11px; color: #9CA3AF; margin-top: 5px; line-height: 1.6;
+}
+.prompt-modal-footer {
+padding: 12px 20px 28px; border-top: 1px solid #F3F4F6;
+display: flex; gap: 8px; flex-shrink: 0;
+}
+.btn-save-prompt {
+flex: 1; background: #1A1A1A; color: #fff; border: none;
+border-radius: 12px; padding: 13px; font-size: 14px; font-weight: 800;
+cursor: pointer; font-family: inherit;
+}
+.btn-cancel-prompt {
+background: #F3F4F6; color: #6B7280; border: none; border-radius: 12px;
+padding: 13px 16px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
 
-        .job-item:hover {
-            transform: translateX(5px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2);
-        }
+/* 프롬프트 설정 버튼 (topbar) */
+.btn-prompt-settings {
+background: none; color: #9CA3AF; border: 1px solid #3A3A3A;
+border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer;
+font-family: inherit; transition: all .15s;
+}
+.btn-prompt-settings:hover { border-color: #F59E0B; color: #F59E0B; }
 
-        .job-title {
-            font-size: 20px;
-            font-weight: 700;
-            color: #667eea;
-            margin-bottom: 8px;
-        }
+@media (min-width: 640px) {
+.detail-sheet { max-width: 480px; left: 50%; right: auto; transform: translateX(-50%) translateY(100%); border-radius: 20px; bottom: 20px; }
+.detail-sheet.open { transform: translateX(-50%) translateY(0); }
+.prompt-modal { border-radius: 20px; max-width: 560px; bottom: 20px; }
+}
+</style>
 
-        .job-desc {
-            font-size: 15px;
-            color: #4a5568;
-            line-height: 1.6;
-        }
-
-        .requirements {
-            background: #f8f9fa;
-            padding: 25px;
-            border-radius: 12px;
-            margin-bottom: 30px;
-        }
-
-        .req-list {
-            list-style: none;
-            padding-left: 0;
-        }
-
-        .req-list li {
-            padding: 12px 0;
-            padding-left: 30px;
-            position: relative;
-            font-size: 16px;
-            color: #2d3748;
-            line-height: 1.6;
-        }
-
-        .req-list li::before {
-            content: '✓';
-            position: absolute;
-            left: 0;
-            color: #667eea;
-            font-weight: 700;
-            font-size: 20px;
-        }
-        
-        /* 급여 시뮬레이션 테이블 스타일 */
-        .salary-table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            border-radius: 15px;
-            overflow: hidden;
-        }
-        
-        .salary-table th, .salary-table td {
-            padding: 15px;
-            text-align: left;
-            border: 1px solid #e9ecef;
-        }
-        
-        .salary-table thead th {
-            background-color: #667eea;
-            color: white;
-            font-weight: 700;
-            font-size: 18px;
-            border: none;
-        }
-
-        .salary-table tbody tr:nth-child(odd) {
-            background-color: #f8f9fa;
-        }
-        
-        .salary-table tbody td strong {
-            color: #764ba2;
-        }
-        
-        .salary-table .simul-title {
-            background-color: #e9ecef;
-            font-weight: 700;
-            color: #2d3748;
-            text-align: center;
-            font-size: 16px;
-            padding: 10px;
-        }
-        
-        .salary-section {
-            background: #ffffff;
-            border: 1px solid #e9ecef;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-
-        .salary-section h3 {
-            font-size: 20px;
-            color: #764ba2;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #667eea;
-            padding-bottom: 5px;
-        }
-        
-        .salary-section p {
-            font-size: 16px;
-            line-height: 1.6;
-            color: #4a5568;
-            margin-bottom: 5px;
-        }
-        
-        .salary-section strong {
-            color: #2d3748;
-        }
-        
-        .salary-section .highlight-salary {
-            color: #d63384;
-            font-weight: 700;
-        }
-
-
-        .benefits {
-            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
-            padding: 25px;
-            border-radius: 12px;
-        }
-
-        .benefit-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .benefit-item {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        }
-
-        .benefit-icon {
-            font-size: 32px;
-            margin-bottom: 10px;
-        }
-
-        .benefit-text {
-            font-size: 14px;
-            color: #4a5568;
-            font-weight: 600;
-        }
-
-        .cta {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px;
-            border-radius: 15px;
-            text-align: center;
-            margin-top: 40px;
-        }
-
-        .cta-title {
-            font-size: 28px;
-            font-weight: 700;
-            margin-bottom: 20px;
-        }
-
-        .cta-info {
-            font-size: 18px;
-            margin-bottom: 10px;
-            opacity: 0.95;
-        }
-
-        .footer {
-            background: #2d3748;
-            color: white;
-            padding: 30px 40px;
-            text-align: center;
-        }
-
-        .footer-text {
-            font-size: 14px;
-            opacity: 0.8;
-            line-height: 1.8;
-        }
-
-        .highlight {
-            background: linear-gradient(120deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            font-weight: 700;
-        }
-        
-        .note {
-            font-size: 14px;
-            color: #4a5568;
-            padding: 15px;
-            background: #f8f9fa;
-            border-left: 4px solid #764ba2;
-            border-radius: 8px;
-            margin-top: 20px;
-            line-height: 1.6;
-        }
-
-        @media (max-width: 768px) {
-            .poster {
-                border-radius: 0;
-            }
-
-            .header, .tab-content {
-                padding: 30px 20px;
-            }
-
-            .title {
-                font-size: 32px;
-            }
-
-            .tagline {
-                font-size: 22px;
-            }
-
-            .section-title {
-                font-size: 20px;
-            }
-            
-            .tab-button {
-                padding: 12px 15px;
-                font-size: 16px;
-            }
-        }
-    </style>
 </head>
 <body>
-    <div class="poster">
-        <div class="header">
-            <div class="logo">IFC 국제얼굴교정학회</div>
-            <h1 class="title">Re:Al 작은얼굴 관리사 모집</h1>
-            <p class="subtitle">고객의 변화와 함께 성장하는 전문가로</p>
-        </div>
-        
-        <div class="tab-menu">
-            <button class="tab-button active" onclick="openTab(event, 'summary')">모집 요약</button>
-            <button class="tab-button" onclick="openTab(event, 'salary')">급여 상세</button>
-        </div>
 
-        <div id="summary" class="tab-content active">
-            
-            <div class="tagline">
-                "체계적인 교육과 명확한 보상,<br>
-                3개월 후 당신은 IFC 공인 전문가입니다"
-            </div>
+<!-- API Modal -->
 
-            <div class="section">
-                <h2 class="section-title">모집 개요</h2>
-                <div class="job-list">
-                    <div class="job-item">
-                        <div class="job-title">📍 포지션</div>
-                        <div class="job-desc">
-                            리:얼 작은얼굴 관리사<br>
-                            IFC 국제얼굴교정학회 프로그램 진행 및 고객 관리
-                        </div>
-                    </div>
+<div class="modal-overlay open" id="api-modal">
+  <div class="modal-box">
+    <div class="modal-logo">🌿</div>
+    <div class="modal-title">힐링트리 콘텐츠 플래너</div>
+    <div class="modal-desc">Anthropic API 키를 입력하면 Claude AI가 블로그 & 인스타 초안을 자동으로 만들어드려요. 키는 브라우저에만 저장돼요.</div>
+    <input class="modal-input" type="password" id="api-input" placeholder="sk-ant-..." />
+    <div class="modal-hint">🔗 <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>에서 발급받으세요</div>
+    <button class="modal-btn" onclick="saveKey()">시작하기 →</button>
+  </div>
+</div>
 
-                    <div class="job-item">
-                        <div class="job-title">🏢 근무지</div>
-                        <div class="job-desc">
-                            인천 계양구 힐스테이트 자이 계양 커뮤니티<br>                            
-                            인천 1호선 작전역에서 3분 거리
-                        </div>
-                    </div>
+<!-- Detail Overlay -->
 
-                    <div class="job-item">
-                        <div class="job-title">📅 일정</div>
-                        <div class="job-desc">                            
-                            근무 시작: 2025년 12월 1일<br>
-                            프로그램 교육: 11월 월·화·목·금 중 가능한 시간 (숙달 시까지)
-                        </div>
-                    </div>
-                </div>
-            </div>
+<div class="detail-overlay" id="detail-overlay" onclick="closeDetail(event)">
+  <div class="detail-sheet" id="detail-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <div class="sheet-title" id="sheet-title"></div>
+    </div>
+    <div class="sheet-body" id="sheet-body"></div>
+    <div class="sheet-actions" id="sheet-actions"></div>
+  </div>
+</div>
 
-            <div class="section">
-                <h2 class="section-title">지원 자격</h2>
-                <div class="requirements">
-                    <ul class="req-list">
-                        <li><strong>피부미용 관련 자격증</strong> 소지자 (필수)</li>
-                        <li><strong>유관 업무 경력자</strong> (필수)</li>
-                        <li><strong>인천 계양구 통근 가능자</strong> (필수)</li>
-                        <li>성과에 동기부여되는 분</li>
-                        <li>고객 응대 경험이 있는 분 (우대)</li>
-                        <li>물리치료 면허증 (우대)</li>
-                        <li>IFC 프로그램에 관심 있는 분 (우대)</li>
-                    </ul>
-                </div>
-            </div>
+<!-- Prompt Modal -->
 
-            <div class="section">
-                <h2 class="section-title">급여 및 혜택</h2>
-                <div class="benefits">
-                    <div class="benefit-grid">
-                        <div class="benefit-item">
-                            <div class="benefit-icon">💰</div>
-                            <div class="benefit-text">기본급<br>216만원 보장</div>
-                        </div>
-                        <div class="benefit-item">
-                            <div class="benefit-icon">📈</div>
-                            <div class="benefit-text">최대 급여<br>399만원</div>
-                        </div>
-                        <div class="benefit-item">
-                            <div class="benefit-icon">🎓</div>
-                            <div class="benefit-text">IFC 페이스 프로그램<br>교육</div>
-                        </div>
-                        <div class="benefit-item">
-                            <div class="benefit-icon">⏰</div>
-                            <div class="benefit-text">유연한<br>근무 시간</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+<div class="prompt-modal-overlay" id="prompt-modal-overlay" onclick="closePromptModal(event)">
+  <div class="prompt-modal" id="prompt-modal">
+    <div class="prompt-modal-handle"></div>
+    <div class="prompt-modal-header">
+      <button class="prompt-modal-close" onclick="closePromptModal()">✕</button>
+      <div class="prompt-modal-title" id="prompt-modal-title">⚙️ 프롬프트 설정</div>
+    </div>
+    <div class="prompt-modal-body" id="prompt-modal-body"></div>
+    <div class="prompt-modal-footer">
+      <button class="btn-cancel-prompt" onclick="closePromptModal()">취소</button>
+      <button class="btn-save-prompt" onclick="savePrompts()">저장하기</button>
+    </div>
+  </div>
+</div>
 
-            <div class="section">
-                <h2 class="section-title">근무 조건 상세</h2>
-                <div class="requirements">
-                    <ul class="req-list">
-                        <li><span class="highlight">근무 시간:</span> 주 40시간 (파트타임 협의 가능)</li>
-                        <li><span class="highlight">근무 시간대:</span> 오전 10시~오후 10시 사이 (본인 가능 시간)</li>
-                        <li><span class="highlight">인센티브:</span> 실적 구간에 따라 건당 3-6천원 적용</li>
-                        <li><span class="highlight">수습기간 후:</span> 정규직 전환 가능 (4대보험 적용)</li>
-                        <li><span class="highlight">추가 혜택:</span> IFC 교육 이수증 발급</li>
-                    </ul>
-                    <p style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 14px; color: #4a5568; line-height: 1.6;">
-                        ※ 파트타임 급여는 면접 시 상세 안내드립니다<br>
-                        ※ 회원을 많이 관리할 수 있는 시간대 근무 시 수입 증대 유리
-                    </p>
-                </div>
-            </div>
+<!-- Top bar -->
 
-            <div class="cta">
-                <h3 class="cta-title">지원 방법</h3>
-                <p class="cta-info">📧 이메일: drbreezepark@gmail.com</p>
-                <p class="cta-info">📞 연락처: 010-2468-4596</p>
-                <p class="cta-info">📝 제출 서류: 이력서</p>
-                <p class="cta-info">📅 지원 마감: 2025년 11월 15일</p>
-                <p class="cta-info" style="margin-top: 20px; font-size: 16px;">
-                    * 서류 전형 합격자에 한해 개별 연락 드립니다
-                </p>
-            </div>
-        </div>
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="logo-icon">🌿</span>
+    <div>
+      <div class="logo-text">힐링트리 콘텐츠 플래너</div>
+      <div class="logo-sub">미카닥 박준규 DC PT</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="api-badge" onclick="openApiModal()">
+      <span class="api-dot" id="api-dot"></span>
+      <span id="api-status">API 키 설정</span>
+    </button>
+    <button class="btn-prompt-settings" onclick="openPromptModal()">⚙️ 프롬프트</button>
+    <button class="btn-add" id="add-toggle-btn" onclick="toggleAdd()">+ 추가</button>
+  </div>
+</div>
 
-        <div id="salary" class="tab-content">
-            <div class="header-2">
-                <h1 class="title-2">💸 관리사 급여 상세 분석<br>고성과에 따른 명확한 보상</h1>
-            </div>
-            
-            <div class="section">
-                <h2 class="section-title">인센티브 단가 및 구간 기준</h2> <h4>(주 40시간/월 174시간 기준)</h4><br>
-                <table class="salary-table">
-                    <thead>
-                        <tr>
-                            <th>구간</th>
-                            <th>월 관리 건수</th>
-                            <th>인센티브 단가 (건당)</th>
-                            <th>주당 관리 시간</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>구간1</td>
-                            <td>174건 이하</td>
-                            <td>인센티브 없음</td>
-                            <td>20시간 이하</td>
-                        </tr>
-                        <tr>
-                            <td>구간2</td>
-                            <td>175건 ~ 232건</td>
-                            <td><strong>3,000원 ~ 4,000원</strong></td>
-                            <td>20시간 이상</td>
-                        </tr>
-                        <tr>
-                            <td>구간3</td>
-                            <td>233건 ~ 290건</td>
-                            <td><strong>4,000원 ~ 5,000원</strong></td>
-                            <td>27시간 이상</td>
-                        </tr>
-                        <tr>
-                            <td>구간4</td>
-                            <td>291건 ~ 348건</td>
-                            <td><strong>5,000원 ~ 6,000원</strong></td>
-                            <td>33시간 이상</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="note">
-                    <strong>인센티브 단가 기준:</strong><br>
-                    - 신입/일반 직원: 구간별 일반 인센으로 시작 (예: 구간2의 3,000원)<br>                    
-                    → 구간3을 3개월 이상 유지 시, 경력 인센 적용.<br>
-                    - 경력직/우수 직원: 구간3 2회 달성 시, 경력 인센 적용 (예: 구간2의 4,000원)<br><br>
-                    ※ 건수는 정상가 및 이벤트가 회원 대상. (체험 회원은 건수에 포함 안됨)
-                </div>
-            </div>
+<!-- Category tabs -->
 
-            <div class="section">
-                <h2 class="section-title">월 예상 급여 시뮬레이션 (세전/세후)</h2>
+<div class="cat-tabs-wrap">
+  <div class="cat-tabs" id="cat-tabs"></div>
+</div>
 
-                <div class="salary-section">
-                    <h3>✅ 구간1 (174건 이하, 기본급)</h3>
-                    <p>월 예상 관리 건수: <strong>170건</strong> (인센티브 없음)</p>
-                    <p>기본급: 2,156,880원</p>
-                    <p>4대보험(근로자 부담): 약 195,000원</p>
-                    <p><strong>✨ 월 실수령액: 약 1,961,880원</strong></p>
-                </div>
+<!-- Main content -->
 
-                <div class="salary-section">
-                    <h3>✅ 구간2 (175~232건, 인센티브 3~4,000원)</h3>
-                    <p class="simul-title"><strong>[관리 건수 예시: 220건]</strong></p><br>
-                    <p><strong>[일반 직원 (인센 3,000원)]</strong></p>
-                    <p>기본급 + 인센티브 (220건 × 3,000원): 2,156,880원 + 660,000원 = 2,816,880원</p>
-                    <p>4대보험 공제: 약 263,580원</p>
-                    <p><strong>✨ 월 실수령액: 약 2,553,300원</strong></p>
-                    
-                    <p style="margin-top: 15px;"><strong>[경력직 직원 (인센 4,000원)]</strong></p>
-                    <p>기본급 + 인센티브 (220건 × 4,000원): 2,156,880원 + 880,000원 = 3,036,880원</p>
-                    <p>4대보험 공제: 약 284,450원</p>
-                    <p><strong>✨ 월 실수령액: 약 2,752,430원</strong></p>
-                </div>
-                
-                <div class="salary-section">
-                    <h3>✅ 구간3 (233~290건, 인센티브 4~5,000원)</h3>
-                    <p class="simul-title"><strong>[관리 건수 예시: 270건]</strong></p><br>
-                    <p><strong>[일반 직원 (인센 4,000원)]</strong></p>
-                    <p>기본급 + 인센티브 (270건 × 4,000원): 2,156,880원 + 1,080,000원 = 3,236,880원</p>
-                    <p>4대보험 공제: 약 305,270원</p>
-                    <p><strong>✨ 월 실수령액: 약 2,931,610원</strong></p>
-                    
-                    <p style="margin-top: 15px;"><strong>[경력직 직원 (인센 5,000원)]</strong></p>
-                    <p>기본급 + 인센티브 (270건 × 5,000원): 2,156,880원 + 1,350,000원 = 3,506,880원</p>
-                    <p>4대보험 공제: 약 330,650원</p>
-                    <p><strong>✨ 월 실수령액: 약 3,176,230원</strong></p>
-                </div>
+<div id="main-content"></div>
 
-                <div class="salary-section">
-                    <h3>✅ 구간4 (291~348건, 인센티브 5~6,000원)</h3>
-                    <p class="simul-title"><strong>[관리 건수 예시: 305건]</strong></p><br>
-                    <p><strong>[일반 직원 (인센 5,000원)]</strong></p>
-                    <p>기본급 + 인센티브 (305건 × 5,000원): 2,156,880원 + 1,525,000원 = 3,681,880원</p>
-                    <p>4대보험 공제: 약 345,098원</p>
-                    <p><strong>✨ 월 실수령액: 약 3,336,782원</strong></p>
-                    
-                    <p style="margin-top: 15px;"><strong>[경력직 직원 (인센 6,000원)]</strong></p>
-                    <p>기본급 + 인센티브 (305건 × 6,000원): 2,156,880원 + 1,830,000원 = 3,986,880원</p>
-                    <p>4대보험 공제: 약 370,000원</p>
-                    <p><strong>✨ 월 실수령액: 약 3,616,880원</strong></p>
-                </div>
-            </div>
-            
-            <div class="note" style="border-left-color: #667eea;">
-                ※ 상기 급여는 세전 금액에 4대 보험 (국민연금, 건강보험, 고용보험, 산재보험) 근로자 부담분을 공제한 예상 실수령액입니다.<br>
-                ※ 파트타임의 급여 체계는 면접 시 별도 안내됩니다.
-            </div>
-        </div>
-        
-        <div class="footer">
-            <p class="footer-text">
-                IFC 국제얼굴교정학회<br>
-                International Face Correction Association<br>
-                근거 있는 희망을 전하는 전문가의 따뜻한 조언
-            </p>
-        </div>
+<script>
+const CATEGORIES = [
+  { id:0, icon:"🦴", name:"도수치료",       color:"#2DD4BF", audience:"일반인",
+    sub:"연부 치료 · 관절치료",
+    drafts:[
+      {id:"d0-0", topic:"허리가 뻐근한 이유, 근육만의 문제가 아닙니다",        angle:"관절 구조와 연부조직이 함께 만들어내는 통증 메커니즘 설명"},
+      {id:"d0-1", topic:"도수치료, 딱 소리 나야 효과 있는 거 아닌가요?",       angle:"관절치료의 원리와 소리의 의미 — 오해 해소 + 신뢰 구축"},
+      {id:"d0-2", topic:"치료 받고 나서 더 아픈 이유 4가지",                   angle:"호전 반응 vs 부작용 구분법으로 환자 불안 해소"},
+      {id:"d0-3", topic:"연부조직 치료, 어디까지 해야 효과가 날까요?",         angle:"근막·인대·건 각각의 치료 접근과 적절한 치료 횟수 가이드"},
+      {id:"d0-4", topic:"목·허리·어깨 중 가장 먼저 치료해야 할 곳은?",        angle:"연쇄 보상 패턴 설명으로 치료 순서의 중요성 강조"},
+    ]},
+  { id:1, icon:"🏃", name:"Re:Al 움직임",   color:"#7AF0C8", audience:"일반인",
+    sub:"패시브 스트레칭 · 기능운동 · 자세교정",
+    drafts:[
+      {id:"d1-0", topic:"스트레칭을 매일 해도 왜 몸이 안 풀릴까요?",           angle:"패시브 스트레칭의 올바른 방법과 잘못된 습관 교정"},
+      {id:"d1-1", topic:"운동 전 5분, 이것만 하면 부상이 없습니다",            angle:"기능적 워밍업 루틴 — 관절 가동성 + 신경계 활성화"},
+      {id:"d1-2", topic:"바른 자세, 오래 유지하면 오히려 독이 되는 이유",      angle:"정적 자세의 한계와 동적 자세 교정 개념 소개"},
+      {id:"d1-3", topic:"앉아서 일하는 당신을 위한 3분 루틴",                  angle:"재택·사무직을 위한 척추-고관절 기능운동 시퀀스"},
+      {id:"d1-4", topic:"걷기만 해도 자세가 교정된다, 가능한 이야기일까요?",   angle:"보행 패턴과 자세 교정의 연관성, 올바른 걷기 방법"},
+    ]},
+  { id:2, icon:"✨", name:"얼굴 관리",       color:"#F0C87A", audience:"일반인",
+    sub:"얼굴 교정 · 작은얼굴",
+    drafts:[
+      {id:"d2-0", topic:"셀카에서 한쪽 얼굴만 작아 보이는 진짜 이유",          angle:"안면비대칭의 원인 — 습관, 교합, 경추 연관성 설명"},
+      {id:"d2-1", topic:"얼굴 살이 빠지지 않는 이유, 다이어트 문제 아닙니다",  angle:"림프 순환 + 골격 구조로 설명하는 얼굴 윤곽 개선"},
+      {id:"d2-2", topic:"광대가 발달한 이유, 알고 보면 턱이 원인이었어요",     angle:"저작근과 얼굴 골격의 관계, 교정 접근 방향 설명"},
+      {id:"d2-3", topic:"얼굴 비대칭 교정, 몇 번 받으면 티가 날까요?",        angle:"실제 케이스 기반 치료 기간 안내 + 기대치 조율"},
+      {id:"d2-4", topic:"이중턱이 생기는 세 가지 구조적 이유",                 angle:"피부·지방·골격 요인을 분리해서 설명, 각각의 접근법"},
+    ]},
+  { id:3, icon:"🩺", name:"CMT 전문가 교육", color:"#A78BFA", audience:"전문가",
+    sub:"도수치료 전문가 과정",
+    drafts:[
+      {id:"d3-0", topic:"촉진(Palpation)이 치료보다 먼저인 이유",               angle:"평가-치료 연결의 핵심, 실전 촉진 훈련의 필요성"},
+      {id:"d3-1", topic:"교과서 해부학과 실전 도수치료의 괴리",                 angle:"이론적 지식을 임상 적용으로 전환하는 사고 훈련"},
+      {id:"d3-2", topic:"잘 치료하는 것 vs 제대로 치료하는 것의 차이",          angle:"치료 철학과 평가 기반 치료의 우선순위 정립"},
+      {id:"d3-3", topic:"CMT에서 관절가동술을 쓰는 타이밍은?",                  angle:"HVLA와 LVLA의 선택 기준, 실전 판단 프레임 공유"},
+      {id:"d3-4", topic:"환자가 '좋아졌다'고 할 때 치료사가 확인해야 할 것",   angle:"주관적 개선과 객관적 지표의 차이, 재발 방지 전략"},
+    ]},
+  { id:4, icon:"🔬", name:"IFC 얼굴교육",   color:"#F07A9A", audience:"전문가",
+    sub:"얼굴교정 전문가 과정",
+    drafts:[
+      {id:"d4-0", topic:"IFC 얼굴교정, 단순 마사지와 다른 점은 무엇인가?",     angle:"구조적 접근 vs 표면 접근의 차이, IFC 핵심 원리"},
+      {id:"d4-1", topic:"얼굴 교정에서 경추를 반드시 평가해야 하는 이유",      angle:"상부 경추-두개골 연결의 임상적 중요성"},
+      {id:"d4-2", topic:"고객이 원하는 것과 필요한 것이 다를 때",               angle:"에스테틱 상담에서의 기대치 관리와 구조적 설명법"},
+      {id:"d4-3", topic:"INDIBA와 IFC를 함께 사용할 때의 프로토콜",            angle:"기기와 도수 접근의 시너지 — 순서, 타이밍, 포인트"},
+      {id:"d4-4", topic:"얼굴 비대칭 케이스에서 놓치기 쉬운 평가 포인트",      angle:"교합·턱관절·경추 복합 평가 체크리스트 공유"},
+    ]},
+  { id:5, icon:"💡", name:"Re:Al 전문가 과정", color:"#7AB8F0", audience:"전문가",
+    sub:"움직임 전문가 과정",
+    drafts:[
+      {id:"d5-0", topic:"패시브 스트레칭을 언제, 어떻게 써야 하는가?",          angle:"억제-이완 테크닉의 원리와 임상 적용 타이밍"},
+      {id:"d5-1", topic:"기능운동, 치료의 끝이 아닌 연결이다",                  angle:"도수치료 후 기능운동으로의 전환 — Re:Al 접근 철학"},
+      {id:"d5-2", topic:"자세 교정에서 '좋은 자세'가 없는 이유",                angle:"동적 안정성 개념과 자세 교정의 새로운 패러다임"},
+      {id:"d5-3", topic:"고관절 가동성 vs 안정성, 무엇이 먼저인가?",            angle:"기능 사슬(kinetic chain) 관점의 운동 처방 우선순위"},
+      {id:"d5-4", topic:"운동 처방 시 환자 순응도를 높이는 커뮤니케이션 전략",  angle:"행동변화 이론 + 동기부여 인터뷰를 운동 지도에 적용"},
+    ]},
+];
+
+const SK = 'ht_v2';
+
+// ── 기본 프롬프트 (카테고리별 블로그/인스타) ──
+const DEFAULT_PROMPTS = {
+  base: `당신은 '미카닥 박준규' 원장님의 전담 콘텐츠 기획자입니다.
+원장님: 미국 카이로프랙틱 닥터(DC) + 물리치료사(PT), 목동/인천 힐링트리 센터 운영
+프로그램: 도수치료(연부·관절), Re:Al 움직임(스트레칭·기능운동·자세교정), 얼굴관리(교정·작은얼굴), CMT/IFC/Re:Al 전문가 교육
+인스타: @dr.park_dc.pt`,
+  categories: {
+    0: { // 도수치료
+      blog: `네이버 SEO를 고려해 제목을 작성하세요. 일반 환자가 공감할 수 있는 증상 묘사로 시작하고, 도수치료의 원리를 쉽게 풀어 설명합니다. 전문 용어는 최소화하고 따뜻하고 신뢰감 있는 톤을 유지하세요.`,
+      insta: `이미지 없이 텍스트만으로 후킹이 되어야 합니다. 첫 줄에서 멈추게 만드는 짧은 질문이나 공감 문장을 써주세요. 캐러셀은 통증 → 원인 → 해결 흐름으로 구성하세요.`
+    },
+    1: { // Re:Al 움직임
+      blog: `스트레칭이나 운동 루틴을 소개할 때는 단계별로 명확하게 설명하세요. '왜 이 동작인지'를 먼저 설명하고, 일상에서 쉽게 적용할 수 있는 팁을 제공하세요.`,
+      insta: `영상 없이 텍스트+이미지 캐러셀로 운동 방법을 설명합니다. 각 슬라이드는 하나의 동작이나 포인트만 담고, 마지막 슬라이드는 반드시 저장 유도 문구로 마무리하세요.`
+    },
+    2: { // 얼굴 관리
+      blog: `얼굴 비대칭이나 윤곽에 관심 있는 20~40대 여성을 주 독자로 설정하세요. 과학적 근거를 바탕으로 하되 과도한 의학적 표현은 피하고, 공감과 희망을 주는 톤으로 작성하세요.`,
+      insta: `비포/애프터 느낌의 스토리텔링이 효과적입니다. "이런 고민 있으신가요?" 형식으로 시작해 문제 → 원인 → 해결책 → CTA 순서로 구성하세요.`
+    },
+    3: { // CMT 전문가
+      blog: `물리치료사, 카이로프랙터 등 임상 전문가를 대상으로 합니다. 이론과 실전의 간극을 좁히는 내용을 중심으로, 실제 케이스나 임상 경험을 자연스럽게 녹여주세요.`,
+      insta: `전문가 커뮤니티를 타깃으로 합니다. 교육 현장 사진과 함께 핵심 임상 인사이트를 전달하는 방식으로, 동료 전문가에게 말하듯 쓰세요.`
+    },
+    4: { // IFC 얼굴교육
+      blog: `에스테틱과 의료의 경계에 있는 전문가들을 위한 콘텐츠입니다. IFC만의 차별점과 임상적 근거를 강조하고, 교육 참여를 자연스럽게 유도하세요.`,
+      insta: `얼굴 교정의 비포/애프터보다 교육 내용과 전문성을 강조하세요. 수강생 후기나 교육 현장 느낌을 담아 신뢰감을 줍니다.`
+    },
+    5: { // Re:Al 전문가
+      blog: `운동 전문가, 재활 치료사를 대상으로 합니다. 움직임 철학과 임상 적용 방법을 함께 다루며, Re:Al만의 접근 방식이 왜 다른지 명확히 설명하세요.`,
+      insta: `실습 현장 느낌을 살려 교육의 생생함을 전달하세요. 전문가들이 저장해두고 싶은 핵심 개념 카드 형식이 효과적입니다.`
+    }
+  }
+};
+
+let state = {
+  currentCat: 0,
+  filterStatus: '전체',
+  searchQ: '',
+  published: {},
+  generatedOnly: {},
+  showAdd: false,
+  newItem: { date:'', topic:'', catId:0, audience:'일반인' },
+  apiKey: '',
+  selectedId: null,
+  activeTab: 'blog',
+  prompts: null, // null이면 DEFAULT_PROMPTS 사용
+  promptTab: 'blog',
+  editingCatId: 0,
+};
+
+// Load persisted
+try { const s = JSON.parse(localStorage.getItem(SK)); if(s){ state.published=s.published||{}; state.generatedOnly=s.generatedOnly||{}; state.apiKey=s.apiKey||''; state.prompts=s.prompts||null; } } catch(e){}
+
+function save() {
+  localStorage.setItem(SK, JSON.stringify({ published: state.published, generatedOnly: state.generatedOnly, apiKey: state.apiKey, prompts: state.prompts }));
+}
+
+// ── Init ──
+window.onload = () => {
+  if(state.apiKey){ document.getElementById('api-modal').classList.remove('open'); updateApiBadge(); }
+  renderTabs();
+  renderMain();
+};
+
+function saveKey() {
+  const v = document.getElementById('api-input').value.trim();
+  if(!v.startsWith('sk-ant-')){ alert('올바른 API 키를 입력해주세요 (sk-ant- 로 시작)'); return; }
+  state.apiKey = v; save();
+  document.getElementById('api-modal').classList.remove('open');
+  updateApiBadge();
+}
+function openApiModal() {
+  document.getElementById('api-input').value = state.apiKey;
+  document.getElementById('api-modal').classList.add('open');
+}
+function updateApiBadge() {
+  document.getElementById('api-dot').className = 'api-dot' + (state.apiKey ? ' on' : '');
+  document.getElementById('api-status').textContent = state.apiKey ? 'API 연결됨' : 'API 키 설정';
+}
+
+// ── Tabs ──
+function renderTabs() {
+  const wrap = document.getElementById('cat-tabs');
+  wrap.innerHTML = CATEGORIES.map((c,i) => `
+    <button class="cat-tab${state.currentCat===i?' active':''}" onclick="selectCat(${i})">
+      ${c.icon} ${c.name}
+    </button>`).join('');
+}
+
+function selectCat(i) {
+  state.currentCat = i;
+  state.filterStatus = '전체';
+  state.searchQ = '';
+  state.showAdd = false;
+  renderTabs();
+  renderMain();
+}
+
+// ── Recommendations ──
+function getRecommended(catId) {
+  const cat = CATEGORIES[catId];
+  const pubIds = Object.keys(state.published).filter(id => id.startsWith('d'+catId+'-') && state.published[id].date);
+  const unpub = cat.drafts.filter(d => !pubIds.includes(d.id));
+  if(pubIds.length === 0) return [];
+  const related = unpub.slice(0,3).map(d => ({...d, recType:'related'}));
+  const trending = [];
+  for(const oc of CATEGORIES){
+    if(oc.id===catId || oc.audience!==cat.audience) continue;
+    const u = oc.drafts.find(d => !state.published[d.id]?.date);
+    if(u) trending.push({...u, recType:'trending', fromCat:oc.name});
+    if(trending.length>=2) break;
+  }
+  return [...related, ...trending];
+}
+
+// ── Main render ──
+function renderMain() {
+  const cat = CATEGORIES[state.currentCat];
+  const mc = document.getElementById('main-content');
+
+  if(state.showAdd){ mc.innerHTML = renderAddForm(); return; }
+
+  // Alert: upcoming (drafts near publish time — show first unpublished in cat)
+  const firstUnpub = cat.drafts.find(d => !state.published[d.id]?.date);
+  const alertHTML = firstUnpub ? `
+    <div class="alert-banner" onclick="openDetail('${firstUnpub.id}',${cat.id})">
+      <div class="alert-banner-text">
+        <div class="alert-banner-title">📝 다음 발행 추천</div>
+        <div class="alert-banner-topic">${firstUnpub.topic}</div>
+        <div class="alert-banner-meta">${cat.name} · ${cat.audience}</div>
+      </div>
+      <div class="alert-banner-arrow">→</div>
+    </div>` : '';
+
+  // Stats
+  const total = cat.drafts.length;
+  const pubCount = cat.drafts.filter(d=>state.published[d.id]?.date).length;
+  const genCount = cat.drafts.filter(d=>state.generatedOnly[d.id] || state.published[d.id]?.content).length;
+  const statsHTML = `
+    <div class="stats-row">
+      <div class="stat-card${state.filterStatus==='전체'?' active':''}" style="--sc:#6B7280" onclick="setFilter('전체')">
+        <div class="stat-num">${total}</div><div class="stat-label">전체</div>
+      </div>
+      <div class="stat-card${state.filterStatus==='초안있음'?' active':''}" style="--sc:#2563EB" onclick="setFilter('초안있음')">
+        <div class="stat-num">${genCount}</div><div class="stat-label">초안있음</div>
+      </div>
+      <div class="stat-card${state.filterStatus==='발행완료'?' active':''}" style="--sc:#16A34A" onclick="setFilter('발행완료')">
+        <div class="stat-num">${pubCount}</div><div class="stat-label">발행완료</div>
+      </div>
+    </div>`;
+
+  // Search
+  const searchHTML = `
+    <div class="search-wrap">
+      <input class="search-input" value="${state.searchQ}" oninput="setSearch(this.value)" placeholder="주제 검색..." />
+    </div>`;
+
+  // Recommended
+  const recs = getRecommended(state.currentCat);
+  let recHTML = '';
+  if(recs.length > 0 && state.filterStatus==='전체' && !state.searchQ){
+    recHTML = `<div class="rec-section-title">⭐ 이번에 추천하는 초안 <span style="font-weight:400;font-size:10px;color:#C0C0C0">관련 3개 + 호응예상 2개</span></div>` +
+      recs.map(d => draftCardHTML(d, cat, true)).join('') +
+      `<div class="rec-divider"></div><div class="rec-section-title" style="margin-bottom:4px;">전체 초안</div>`;
+  }
+
+  // Draft cards
+  let drafts = cat.drafts;
+  if(state.filterStatus==='초안있음') drafts = drafts.filter(d=>state.generatedOnly[d.id]||state.published[d.id]?.content);
+  if(state.filterStatus==='발행완료') drafts = drafts.filter(d=>state.published[d.id]?.date);
+  if(state.searchQ) drafts = drafts.filter(d=>d.topic.includes(state.searchQ)||d.angle.includes(state.searchQ));
+  const cardsHTML = drafts.length ? drafts.map(d=>draftCardHTML(d,cat,false)).join('') : '<div class="empty-note">조건에 맞는 초안이 없어요</div>';
+
+  mc.innerHTML = alertHTML + statsHTML + searchHTML + `<div class="cards-wrap">${recHTML}${cardsHTML}</div>`;
+}
+
+function draftCardHTML(d, cat, isRec) {
+  const pub = state.published[d.id];
+  const hasContent = pub?.content || state.generatedOnly[d.id];
+  const isPub = !!pub?.date;
+  const color = isRec && d.recType==='trending' ? '#F59E0B' : cat.color;
+  const badges = [
+    `<span class="badge badge-aud">${cat.audience}</span>`,
+    isRec && d.recType==='related' ? '<span class="badge badge-rec">🔗 관련</span>' : '',
+    isRec && d.recType==='trending' ? `<span class="badge badge-rec">⭐ ${d.fromCat}</span>` : '',
+    hasContent ? '<span class="badge badge-gen">📝 초안있음</span>' : '',
+    isPub ? '<span class="badge badge-pub">✓ 발행완료</span>' : '',
+  ].filter(Boolean).join('');
+  return `<div class="draft-card${isPub?' published':''}${isRec?' recommended':''}" style="--cc:${color}" onclick="openDetail('${d.id}',${cat.id})">
+    <div class="card-badges">${badges}</div>
+    <div class="card-topic">${d.topic}</div>
+    <div class="card-angle">${d.angle}</div>
+    <div class="card-footer">
+      <div class="card-date">${isPub?'발행: '+pub.date:'미발행'}</div>
+      <div class="card-arrow">→</div>
+    </div>
+  </div>`;
+}
+
+function setFilter(f){ state.filterStatus=f; renderMain(); }
+function setSearch(v){ state.searchQ=v; renderMain(); }
+
+function toggleAdd(){
+  state.showAdd = !state.showAdd;
+  document.getElementById('add-toggle-btn').textContent = state.showAdd ? '✕ 닫기' : '+ 추가';
+  renderMain();
+}
+
+function renderAddForm(){
+  const catOpts = CATEGORIES.map((c,i)=>`<option value="${i}"${state.newItem.catId===i?' selected':''}>${c.icon} ${c.name}</option>`).join('');
+  return `<div class="add-form">
+    <div class="form-title">📅 새 주제 추가</div>
+    <div class="form-field">
+      <label class="form-label">카테고리</label>
+      <select class="form-select" onchange="setNewCat(this.value)">${catOpts}</select>
+    </div>
+    <div class="form-field">
+      <label class="form-label">주제 아이디어</label>
+      <input class="form-input" value="${state.newItem.topic}" oninput="state.newItem.topic=this.value" placeholder="예: 목 디스크 자가 진단법" />
+    </div>
+    <div class="form-field">
+      <label class="form-label">독자 대상</label>
+      <div class="aud-row">
+        <button class="aud-btn${state.newItem.audience==='일반인'?' active':''}" onclick="setAud('일반인')">일반인</button>
+        <button class="aud-btn${state.newItem.audience==='전문가'?' active':''}" onclick="setAud('전문가')">전문가</button>
+      </div>
+    </div>
+    <button class="btn-submit" onclick="addDraft()">추가하기</button>
+  </div>`;
+}
+function setNewCat(v){ state.newItem.catId=parseInt(v); renderMain(); }
+function setAud(v){ state.newItem.audience=v; renderMain(); }
+function addDraft(){
+  if(!state.newItem.topic.trim()){ alert('주제를 입력해주세요'); return; }
+  const cat = CATEGORIES[state.newItem.catId];
+  const id = 'd'+state.newItem.catId+'-c'+Date.now();
+  cat.drafts.push({ id, topic: state.newItem.topic, angle: state.newItem.audience+'을 위한 콘텐츠' });
+  state.newItem = { date:'', topic:'', catId: state.newItem.catId, audience:'일반인' };
+  state.showAdd = false;
+  document.getElementById('add-toggle-btn').textContent = '+ 추가';
+  state.currentCat = cat.id;
+  renderTabs(); renderMain();
+}
+
+// ── Detail sheet ──
+function openDetail(draftId, catId) {
+  const cat = CATEGORIES[catId];
+  const draft = cat.drafts.find(d=>d.id===draftId);
+  if(!draft) return;
+  state.selectedId = draftId;
+  state.selectedCatId = catId;
+  state.activeTab = 'blog';
+  document.getElementById('sheet-title').textContent = draft.topic;
+  const pub = state.published[draftId];
+  const content = pub?.content || state.generatedOnly[draftId];
+  if(content){ renderSheetContent(content); }
+  else { renderSheetEmpty(draft, cat); }
+  document.getElementById('detail-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('detail-sheet').classList.add('open'), 10);
+}
+
+function renderSheetEmpty(draft, cat) {
+  document.getElementById('sheet-body').innerHTML = `
+    <div style="padding:10px 0 20px;font-size:13px;color:#9CA3AF;line-height:1.7;">${draft.angle}</div>
+    <div style="background:#F8F7F4;border-radius:12px;padding:28px 20px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:12px;">✨</div>
+      <div style="font-size:14px;color:#6B7280;line-height:1.7;margin-bottom:20px;">AI가 블로그 & 인스타 초안을<br>동시에 만들어드려요</div>
+      <button onclick="genContent()" style="background:linear-gradient(135deg,#2DD4BF,#0EA5E9);color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">초안 생성하기</button>
+    </div>`;
+  document.getElementById('sheet-actions').innerHTML = '';
+}
+
+function renderSheetContent(content) {
+  const tab = state.activeTab;
+  const tabsHTML = `<div class="sheet-tabs">
+    <button class="sheet-tab${tab==='blog'?' active':''}" onclick="switchTab('blog')">📝 블로그</button>
+    <button class="sheet-tab${tab==='insta'?' active':''}" onclick="switchTab('insta')">📱 인스타</button>
+  </div>`;
+
+  let bodyHTML = '';
+  if(tab==='blog'){
+    const b = content.blog;
+    bodyHTML = tabsHTML + `
+      ${cb('제목', `<div class="cb-box cb-title">${b.title}</div>`, b.title)}
+      ${cb('후킹 오프닝', `<div class="cb-box">${b.hook}</div>`, b.hook)}
+      <div class="cb"><div class="cb-label">목차 구성</div><div class="cb-box" style="padding:4px 14px;">
+        ${b.outline.map((o,i)=>`<div class="outline-item"><span class="outline-num">${i+1}.</span>${o}</div>`).join('')}
+      </div></div>
+      ${cb('본문 초안', `<div class="cb-box">${b.draft}</div>`, b.draft)}
+      ${cb('마무리 CTA', `<div class="cb-box">${b.cta}</div>`, b.cta)}
+      <div class="cb"><div class="cb-label">해시태그 <button class="copy-btn" onclick="cp(this,'${b.hashtags.map(h=>'#'+h).join(' ')}')">전체복사</button></div>
+        <div class="tag-row">${b.hashtags.map(h=>`<span class="tag">#${h}</span>`).join('')}</div>
+      </div>`;
+  } else {
+    const ig = content.insta;
+    bodyHTML = tabsHTML + `
+      ${cb('첫 줄 후킹', `<div class="cb-box cb-title">${ig.hook}</div>`, ig.hook)}
+      ${cb('캡션', `<div class="cb-box">${ig.caption}</div>`, ig.hook+'\n\n'+ig.caption)}
+      <div class="cb"><div class="cb-label">캐러셀 슬라이드</div>
+        ${ig.carousel.map(c=>`<div class="carousel-item"><span class="slide-badge">S${c.slide}</span><div><strong style="font-size:13px;color:#1A1A1A;display:block;margin-bottom:3px;">${c.title}</strong><span style="font-size:12px;color:#6B7280;">${c.content}</span></div></div>`).join('')}
+      </div>
+      <div class="cb"><div class="cb-label">해시태그 <button class="copy-btn" onclick="cp(this,'${ig.hashtags.map(h=>'#'+h).join(' ')}')">전체복사</button></div>
+        <div class="tag-row">${ig.hashtags.map(h=>`<span class="tag">#${h}</span>`).join('')}</div>
+      </div>`;
+  }
+
+  document.getElementById('sheet-body').innerHTML = bodyHTML;
+  const isPub = !!state.published[state.selectedId]?.date;
+  document.getElementById('sheet-actions').innerHTML = `
+    <button class="btn-regen" onclick="genContent()">🔄 재생성</button>
+    <button class="btn-gen-big" onclick="cp(this, getFullCopy())" style="background:#F3F4F6;color:#374151;flex:1;">📋 전체복사</button>
+    ${!isPub ? `<button class="btn-pub" onclick="markPub()">✅ 발행완료</button>` : '<span style="font-size:12px;color:#16A34A;font-weight:700;padding:0 4px;">✓ 발행됨</span>'}`;
+}
+
+window.getFullCopy = function(){
+  const content = state.published[state.selectedId]?.content || state.generatedOnly[state.selectedId];
+  if(!content) return '';
+  const b = content.blog;
+  return `[블로그]\n제목: ${b.title}\n\n${b.hook}\n\n${b.draft}\n\n${b.cta}\n\n${b.hashtags.map(h=>'#'+h).join(' ')}`;
+};
+
+function cb(label, innerHTML, copyText){
+  return `<div class="cb"><div class="cb-label">${label} <button class="copy-btn" onclick="cp(this,\`${esc(copyText)}\`)">복사</button></div>${innerHTML}</div>`;
+}
+function esc(s){ if(!s) return ''; return s.replace(/`/g,"'").replace(/\\/g,'\\\\').replace(/\n/g,'\\n'); }
+
+window.cp = function(btn, text){
+  navigator.clipboard.writeText(text.replace(/\\n/g,'\n'));
+  btn.textContent='✓ 복사됨'; btn.classList.add('copied');
+  setTimeout(()=>{ btn.textContent='복사'; btn.classList.remove('copied'); }, 1500);
+};
+window.switchTab = function(t){ state.activeTab=t; const content=state.published[state.selectedId]?.content||state.generatedOnly[state.selectedId]; if(content) renderSheetContent(content); };
+
+function closeSheet(){
+  document.getElementById('detail-sheet').classList.remove('open');
+  setTimeout(()=>{ document.getElementById('detail-overlay').classList.remove('open'); }, 280);
+}
+function closeDetail(e){ if(e.target===document.getElementById('detail-overlay')) closeSheet(); }
+
+function markPub(){
+  const today = new Date().toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'});
+  if(!state.published[state.selectedId]) state.published[state.selectedId]={};
+  state.published[state.selectedId].date = today;
+  save(); closeSheet(); renderMain();
+}
+
+// ── Prompt Modal ──
+function getPrompts() {
+  return state.prompts || JSON.parse(JSON.stringify(DEFAULT_PROMPTS));
+}
+function getCatPrompt(catId, type) {
+  return getPrompts().categories[catId]?.[type] || DEFAULT_PROMPTS.categories[catId]?.[type] || '';
+}
+function getBasePrompt() {
+  return getPrompts().base || DEFAULT_PROMPTS.base;
+}
+
+function openPromptModal(catId) {
+  state.editingCatId = catId !== undefined ? catId : state.currentCat;
+  state.promptTab = 'blog';
+  renderPromptModal();
+  document.getElementById('prompt-modal-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('prompt-modal').classList.add('open'), 10);
+}
+
+function renderPromptModal() {
+  const cat = CATEGORIES[state.editingCatId];
+  document.getElementById('prompt-modal-title').textContent = `⚙️ ${cat.icon} ${cat.name} 프롬프트`;
+
+  const catTabs = CATEGORIES.map((c,i)=>`
+    <button class="cat-tab${state.editingCatId===i?' active':''}" onclick="switchPromptCat(${i})" style="color:${state.editingCatId===i?c.color:'#6B6B6B'};border-bottom-color:${state.editingCatId===i?c.color:'transparent'};font-size:11px;padding:8px 10px;">
+      ${c.icon} ${c.name}
+    </button>`).join('');
+
+  const blogVal = getCatPrompt(state.editingCatId, 'blog');
+  const instaVal = getCatPrompt(state.editingCatId, 'insta');
+  const baseVal = getBasePrompt();
+  const pt = state.promptTab;
+
+  document.getElementById('prompt-modal-body').innerHTML = `
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin:-16px -20px 14px;">
+      <div class="cat-tabs-wrap" style="background:#F8F7F4;border-top:none;border-bottom:1px solid #E5E7EB;">
+        <div class="cat-tabs" style="padding:0 8px;">${catTabs}</div>
+      </div>
     </div>
 
-    <script>
-        function openTab(evt, tabName) {
-            var i, tabcontent, tablinks;
+    <div class="prompt-tabs">
+      <button class="prompt-tab${pt==='blog'?' active':''}" onclick="switchPromptTab('blog')">📝 블로그</button>
+      <button class="prompt-tab${pt==='insta'?' active':''}" onclick="switchPromptTab('insta')">📱 인스타</button>
+      <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">🧩 공통 기본</button>
+    </div>
 
-            // 모든 탭 내용(tabcontent) 숨기기
-            tabcontent = document.getElementsByClassName("tab-content");
-            for (i = 0; i < tabcontent.length; i++) {
-                tabcontent[i].style.display = "none";
-                tabcontent[i].classList.remove("active");
-            }
+    ${pt==='blog' ? `
+    <div class="prompt-section">
+      <div class="prompt-section-label">
+        블로그 작성 지침
+        <button class="prompt-reset-btn" onclick="resetPrompt('blog')">기본값으로</button>
+      </div>
+      <textarea class="prompt-textarea" id="pt-blog" placeholder="블로그 글쓰기 스타일, 톤, 구조, 주의사항 등을 자유롭게 입력하세요...">${blogVal}</textarea>
 
-            // 모든 탭 버튼(tab-button)에서 active 클래스 제거
-            tablinks = document.getElementsByClassName("tab-button");
-            for (i = 0; i < tablinks.length; i++) {
-                tablinks[i].classList.remove("active");
-            }
+```
+  <div class="prompt-hint">💡 예: "네이버 SEO를 고려해 제목을 작성하세요. 전문 용어는 최소화하고..." — 이 지침이 Claude에게 전달돼 글쓰기 방향을 잡아요.</div>
+</div>` : ''}
 
-            // 선택된 탭 내용(tabcontent) 보이기
-            document.getElementById(tabName).style.display = "block";
-            document.getElementById(tabName).classList.add("active");
-            
-            // 선택된 탭 버튼(tab-button)에 active 클래스 추가
-            evt.currentTarget.classList.add("active");
-        }
+${pt==='insta' ? `
+<div class="prompt-section">
+  <div class="prompt-section-label">
+    인스타 작성 지침
+    <button class="prompt-reset-btn" onclick="resetPrompt('insta')">기본값으로</button>
+  </div>
+  <textarea class="prompt-textarea" id="pt-insta" placeholder="인스타 캡션 스타일, 캐러셀 구성 방식, 해시태그 전략 등을 입력하세요...">${instaVal}</textarea>
+  <div class="prompt-hint">💡 예: "첫 줄에서 멈추게 만드는 짧은 질문을 써주세요. 캐러셀은 문제→원인→해결 순으로..."</div>
+</div>` : ''}
 
-        // 페이지 로드 시 '모집 요약' 탭을 기본으로 활성화
-        document.addEventListener("DOMContentLoaded", function() {
-            // 초기 로딩 시 openTab을 수동으로 호출하여 active 클래스를 설정하고 내용을 표시합니다.
-            // (첫 번째 버튼과 첫 번째 콘텐츠가 이미 HTML에서 active로 설정되어 있으므로, 이 부분은 생략하거나 필요에 따라 조정 가능)
-            // openTab(null, 'summary');
-        });
-    </script>
+${pt==='base' ? `
+<div class="prompt-section">
+  <div class="prompt-section-label">
+    공통 기본 설정 (모든 카테고리에 적용)
+    <button class="prompt-reset-btn" onclick="resetPrompt('base')">기본값으로</button>
+  </div>
+  <textarea class="prompt-textarea" id="pt-base" style="min-height:180px;" placeholder="원장님 소개, 채널 정보, 전반적인 톤앤매너 등...">${baseVal}</textarea>
+  <div class="prompt-hint">💡 원장님 프로필, 운영 채널, 브랜드 톤 등 모든 초안 생성에 공통으로 쓰이는 기본 정보예요.</div>
+</div>` : ''}
+```
+
+`;
+}
+
+window.switchPromptCat = function(i) {
+// 현재 편집 내용 임시 저장
+autoSaveCurrentEdit();
+state.editingCatId = i;
+renderPromptModal();
+};
+window.switchPromptTab = function(t) {
+autoSaveCurrentEdit();
+state.promptTab = t;
+renderPromptModal();
+};
+
+function autoSaveCurrentEdit() {
+if(!state.prompts) state.prompts = JSON.parse(JSON.stringify(DEFAULT_PROMPTS));
+if(!state.prompts.categories[state.editingCatId]) state.prompts.categories[state.editingCatId] = {};
+const blogEl = document.getElementById(‘pt-blog’);
+const instaEl = document.getElementById(‘pt-insta’);
+const baseEl = document.getElementById(‘pt-base’);
+if(blogEl) state.prompts.categories[state.editingCatId].blog = blogEl.value;
+if(instaEl) state.prompts.categories[state.editingCatId].insta = instaEl.value;
+if(baseEl) state.prompts.base = baseEl.value;
+}
+
+window.resetPrompt = function(type) {
+if(!confirm(‘이 항목을 기본값으로 되돌릴까요?’)) return;
+if(!state.prompts) state.prompts = JSON.parse(JSON.stringify(DEFAULT_PROMPTS));
+if(type===‘base’) { state.prompts.base = DEFAULT_PROMPTS.base; }
+else {
+if(!state.prompts.categories[state.editingCatId]) state.prompts.categories[state.editingCatId]={};
+state.prompts.categories[state.editingCatId][type] = DEFAULT_PROMPTS.categories[state.editingCatId][type];
+}
+renderPromptModal();
+};
+
+function savePrompts() {
+autoSaveCurrentEdit();
+save();
+closePromptModal();
+// 저장 완료 피드백
+const btn = document.querySelector(’.btn-save-prompt’);
+if(btn){ btn.textContent=‘✓ 저장됨’; setTimeout(()=>{ btn.textContent=‘저장하기’; },1200); }
+}
+
+function closePromptModal(e) {
+if(e && e.target !== document.getElementById(‘prompt-modal-overlay’)) return;
+document.getElementById(‘prompt-modal’).classList.remove(‘open’);
+setTimeout(()=>document.getElementById(‘prompt-modal-overlay’).classList.remove(‘open’), 280);
+}
+
+// ── Generate ──
+window.genContent = async function(){
+if(!state.apiKey){ openApiModal(); return; }
+const catId = state.selectedCatId;
+const cat = CATEGORIES[catId];
+const draft = cat.drafts.find(d=>d.id===state.selectedId);
+if(!draft) return;
+
+document.getElementById(‘sheet-body’).innerHTML = `<div class="loading-wrap"><div class="spinner"></div><div class="loading-text">트렌드 분석 중...<br>블로그 & 인스타 초안 생성 중 ✨</div></div>`;
+document.getElementById(‘sheet-actions’).innerHTML = ‘’;
+
+const blogGuide = getCatPrompt(catId, ‘blog’);
+const instaGuide = getCatPrompt(catId, ‘insta’);
+const baseInfo = getBasePrompt();
+
+const prompt = `${baseInfo}
+
+카테고리: ${cat.name} (${cat.sub})
+독자: ${cat.audience}
+주제: “${draft.topic}”
+각도: ${draft.angle}
+
+[블로그 작성 지침]
+${blogGuide}
+
+[인스타 작성 지침]
+${instaGuide}
+
+2026년 봄/초여름 트렌드 반영. JSON만 응답 (다른 텍스트 없이):
+{
+“blog”: {
+“title”: “네이버 SEO 최적화 후킹 제목 (35자 이내, 숫자나 물음표 활용)”,
+“hook”: “공감→문제제기→해결암시 흐름의 오프닝 2~3문장”,
+“outline”: [“소제목1”,“소제목2”,“소제목3”,“소제목4”],
+“draft”: “본문 초안 700~900자. 따뜻하고 전문적인 원장님 톤. 실제 임상 경험 느낌. 단락 구분 포함.”,
+“cta”: “마무리 행동 유도 (힐링트리 센터 자연스럽게 언급)”,
+“hashtags”: [“태그1”,“태그2”,“태그3”,“태그4”,“태그5”,“태그6”]
+},
+“insta”: {
+“hook”: “인스타 첫줄 (이모지+후킹문장, 20자 이내)”,
+“caption”: “캡션 250자 내외. 줄바꿈 활용. 이모지 자연스럽게. 마지막 질문 or CTA.”,
+“carousel”: [
+{“slide”:1,“title”:“슬라이드 제목”,“content”:“2~3줄 내용”},
+{“slide”:2,“title”:“슬라이드 제목”,“content”:“2~3줄 내용”},
+{“slide”:3,“title”:“슬라이드 제목”,“content”:“2~3줄 내용”},
+{“slide”:4,“title”:“슬라이드 제목”,“content”:“2~3줄 내용”},
+{“slide”:5,“title”:“저장 & 팔로우”,“content”:“CTA 문구”}
+],
+“hashtags”: [“태그1”,“태그2”,“태그3”,“태그4”,“태그5”,“태그6”,“태그7”,“태그8”,“태그9”,“태그10”]
+}
+}`;
+
+try {
+const res = await fetch(‘https://api.anthropic.com/v1/messages’, {
+method:‘POST’,
+headers:{ ‘Content-Type’:‘application/json’, ‘x-api-key’:state.apiKey, ‘anthropic-version’:‘2023-06-01’, ‘anthropic-dangerous-direct-browser-access’:‘true’ },
+body: JSON.stringify({ model:‘claude-sonnet-4-20250514’, max_tokens:1000, messages:[{role:‘user’,content:prompt}] })
+});
+const data = await res.json();
+if(data.error) throw new Error(data.error.message);
+const text = data.content.filter(b=>b.type===‘text’).map(b=>b.text).join(’’);
+const content = JSON.parse(text.replace(/`json|`/g,’’).trim());
+
+```
+// Save
+if(!state.published[state.selectedId]) state.published[state.selectedId]={};
+state.published[state.selectedId].content = content;
+state.generatedOnly[state.selectedId] = content;
+save();
+state.activeTab = 'blog';
+renderSheetContent(content);
+renderMain();
+```
+
+} catch(e) {
+document.getElementById(‘sheet-body’).innerHTML = `<div class="loading-wrap" style="color:#EF4444;font-size:13px;">오류: ${e.message}<br><br><button onclick="genContent()" style="background:#F3F4F6;border:none;border-radius:8px;padding:10px 20px;cursor:pointer;font-family:inherit;font-size:13px;margin-top:8px;">다시 시도</button></div>`;
+}
+};
+</script>
+
 </body>
 </html>

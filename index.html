@@ -574,8 +574,11 @@ window.onload = () => {
 
 function saveKey() {
   const v = document.getElementById('api-input').value.trim();
-  if(!v){ alert('API 키를 입력해주세요'); return; }
-  state.apiKey = v; save();
+  const errEl = document.getElementById('api-error');
+  errEl.textContent = '';
+  if(!v){ errEl.textContent = '❌ API 키를 입력해주세요'; return; }
+  state.apiKey = v;
+  try { save(); } catch(e) { errEl.textContent = '❌ 저장 오류: ' + e.message; return; }
   document.getElementById('api-modal').classList.remove('open');
   updateApiBadge();
 }

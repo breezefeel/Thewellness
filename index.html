@@ -381,7 +381,7 @@ font-family: inherit; transition: all .15s;
     <div class="modal-logo">🌿</div>
     <div class="modal-title">힐링트리 콘텐츠 플래너</div>
     <div class="modal-desc">Anthropic API 키를 입력하면 Claude AI가 블로그 & 인스타 초안을 자동으로 만들어드려요. 키는 브라우저에만 저장돼요.</div>
-    <input class="modal-input" type="password" id="api-input" placeholder="sk-ant-..." />
+    <input class="modal-input" type="text" id="api-input" placeholder="API 키를 붙여넣으세요" />
     <div class="modal-hint">🔗 <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>에서 발급받으세요</div>
     <button class="modal-btn" onclick="saveKey()">시작하기 →</button>
   </div>
@@ -574,7 +574,7 @@ window.onload = () => {
 
 function saveKey() {
   const v = document.getElementById('api-input').value.trim();
-  if(!v.startsWith('sk-ant-')){ alert('올바른 API 키를 입력해주세요 (sk-ant- 로 시작)'); return; }
+  if(!v){ alert('API 키를 입력해주세요'); return; }
   state.apiKey = v; save();
   document.getElementById('api-modal').classList.remove('open');
   updateApiBadge();

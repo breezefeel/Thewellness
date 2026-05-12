@@ -10,18 +10,17 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Noto Sans KR', sans-serif; background: #F8F7F4; color: #1A1A1A; min-height: 100vh; }
 
-/* ── Top bar ── */
-.topbar {
+/* ── Planner header (scrolls away) ── */
+.planner-head {
 background: #1A1A1A;
 padding: 14px 20px;
 display: flex; align-items: center; justify-content: space-between;
-position: sticky; top: 0; z-index: 100;
 }
-.topbar-left { display: flex; align-items: center; gap: 10px; }
+.planner-head-left { display: flex; align-items: center; gap: 10px; }
 .logo-icon { font-size: 20px; }
 .logo-text { color: #fff; font-weight: 700; font-size: 15px; letter-spacing: -.3px; }
 .logo-sub { color: #9CA3AF; font-size: 11px; margin-top: 1px; }
-.topbar-right { display: flex; gap: 8px; align-items: center; }
+.planner-head-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .api-badge {
 font-size: 11px; padding: 5px 10px; border-radius: 6px;
 border: 1px solid #3A3A3A; color: #9CA3AF; background: none;
@@ -36,7 +35,25 @@ padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
 font-family: inherit;
 }
 
-/* ── Category tabs ── */
+/* ── Sticky category nav (two rows) ── */
+.sticky-cat-nav {
+position: sticky;
+top: 0;
+z-index: 100;
+background: #1A1A1A;
+}
+.gen-status-bar {
+display: none;
+text-align: center;
+font-size: 11px;
+font-weight: 700;
+color: #FBBF24;
+padding: 6px 12px;
+background: #141414;
+border-bottom: 1px solid #2A2A2A;
+letter-spacing: 0.02em;
+}
+.gen-status-bar.show { display: block; }
 .cat-tabs-wrap {
 background: #1A1A1A;
 border-top: 1px solid #2A2A2A;
@@ -47,6 +64,26 @@ overflow-x: auto;
 .cat-tabs {
 display: flex; padding: 0 12px; gap: 4px; min-width: max-content;
 }
+/* 상단 카테고리: 4열 × 2행, 열 정렬 + 가운데 블록 */
+.cat-tabs-grid {
+display: grid;
+grid-template-columns: repeat(4, minmax(0, 1fr));
+grid-template-rows: auto auto;
+column-gap: 4px;
+row-gap: 0;
+width: 100%;
+max-width: 720px;
+margin: 0 auto;
+padding: 6px 16px 10px;
+box-sizing: border-box;
+background: #1A1A1A;
+border-top: 1px solid #2A2A2A;
+}
+.cat-tabs-grid .cat-tab:nth-child(-n+4) { padding-bottom: 8px; }
+.cat-tabs-grid .cat-tab:nth-child(n+5) {
+border-top: 1px solid #2A2A2A;
+padding-top: 10px;
+}
 .cat-tab {
 padding: 10px 14px; border: none; background: none;
 color: #6B6B6B; font-size: 12px; font-weight: 600;
@@ -54,8 +91,18 @@ cursor: pointer; font-family: inherit; white-space: nowrap;
 border-bottom: 2px solid transparent;
 transition: all 0.15s; display: flex; align-items: center; gap: 5px;
 }
+.cat-tabs-grid .cat-tab {
+justify-content: center;
+min-width: 0;
+width: 100%;
+padding: 10px 8px;
+}
 .cat-tab:hover { color: #D0D0D0; }
 .cat-tab.active { color: #2DD4BF; border-bottom-color: #2DD4BF; }
+@media (max-width: 380px) {
+  .cat-tabs-grid { padding-left: 10px; padding-right: 10px; }
+  .cat-tabs-grid .cat-tab { font-size: 11px; padding-left: 4px; padding-right: 4px; gap: 3px; }
+}
 
 /* ── Alert banner ── */
 .alert-banner {
@@ -560,13 +607,61 @@ background: #F3F4F6; color: #6B7280; border: none; border-radius: 12px;
 padding: 13px 16px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
 }
 
-/* 프롬프트 설정 버튼 (topbar) */
+/* 백그라운드 생성 안내 토스트 */
+.app-toast {
+position: fixed;
+bottom: 22px;
+left: 50%;
+transform: translateX(-50%) translateY(120%);
+max-width: min(420px, calc(100vw - 32px));
+z-index: 320;
+background: #1A1A1A;
+color: #fff;
+padding: 14px 18px;
+border-radius: 12px;
+font-size: 13px;
+font-weight: 600;
+line-height: 1.5;
+box-shadow: 0 10px 40px rgba(0,0,0,0.28);
+opacity: 0;
+pointer-events: none;
+transition: transform 0.28s ease, opacity 0.28s ease;
+text-align: center;
+white-space: pre-line;
+}
+.app-toast.show {
+transform: translateX(-50%) translateY(0);
+opacity: 1;
+pointer-events: auto;
+}
+.app-toast--ok { border: 1px solid #2DD4BF; }
+.app-toast--err { border: 1px solid #F87171; }
+
+/* 프롬프트 설정 버튼 (planner header) */
 .btn-prompt-settings {
 background: none; color: #9CA3AF; border: 1px solid #3A3A3A;
 border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer;
 font-family: inherit; transition: all .15s;
 }
 .btn-prompt-settings:hover { border-color: #F59E0B; color: #F59E0B; }
+.btn-drive-sync {
+background: none; color: #9CA3AF; border: 1px solid #3A3A3A;
+border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer;
+font-family: inherit; transition: all .15s;
+display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+line-height: 1.15; min-width: 4.5rem; text-align: right;
+}
+.drive-btn-main { font-size: 12px; font-weight: 600; }
+.drive-btn-sub {
+font-size: 9px; color: #6B7280; max-width: 140px; margin-top: 2px;
+white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.btn-drive-sync.linked .drive-btn-sub { color: #93C5FD; }
+.btn-drive-sync.linked.warn .drive-btn-sub { color: #FBBF24; }
+.btn-drive-sync:hover { border-color: #4285F4; color: #93C5FD; }
+.btn-drive-sync.linked { border-color: #4285F4; color: #93C5FD; }
+#drive-modal-overlay { z-index: 310; }
+.drive-label { font-size: 11px; font-weight: 700; color: #6B7280; display: block; margin-bottom: 6px; }
 
 @media (min-width: 640px) {
 .detail-sheet { max-width: 480px; left: 50%; right: auto; transform: translateX(-50%) translateY(100%); border-radius: 20px; bottom: 20px; }
@@ -628,31 +723,58 @@ font-family: inherit; transition: all .15s;
   </div>
 </div>
 
-<!-- Top bar -->
+<!-- Google Drive sync modal -->
 
-<div class="topbar">
-  <div class="topbar-left">
+<div class="modal-overlay" id="drive-modal-overlay" onclick="closeDriveModal(event)">
+  <div class="modal-box" style="max-width:440px;" onclick="event.stopPropagation()">
+    <div class="modal-title">구글 Drive 동기화</div>
+    <div class="modal-desc" style="font-size:12px;">발행·초안·프롬프트·API 키를 <strong>내 Google 계정의 앱 전용 데이터</strong> 폴더에 JSON으로 저장합니다. Drive 웹의 ‘내 파일’에는 안 보이는 것이 정상이에요.</div>
+    <div id="drive-modal-err" style="font-size:12px;color:#EF4444;min-height:18px;margin-bottom:6px;"></div>
+    <label class="drive-label" for="drive-client-id">OAuth 클라이언트 ID (다른 ID로 바꿀 때만 입력)</label>
+    <input class="modal-input" type="text" id="drive-client-id" placeholder="비워 두면 이 페이지에 내장된 ID를 사용합니다" autocomplete="off" style="font-family:inherit;" />
+    <div class="modal-hint" style="margin-top:-4px;">Cloud Console에서 <strong>Google Drive API</strong> 사용 설정 → <strong>OAuth 2.0 클라이언트 ID (웹)</strong> 생성 → <strong>승인된 JavaScript 원본</strong>에 아래 주소를 넣으세요.<br><code id="drive-origin-hint" style="font-size:11px;word-break:break-all;background:#F3F4F6;padding:4px 6px;border-radius:4px;display:inline-block;margin-top:6px;"></code><br><a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener">Drive API 사용 설정</a> · <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">사용자 인증 정보</a></div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;">
+      <button type="button" class="modal-btn" onclick="driveLoginAndUpload()">Google 로그인 · 연동 후 지금 업로드</button>
+      <button type="button" class="modal-btn" style="background:#2DD4BF;color:#111;" onclick="drivePullFromCloud()">Drive에서 이 기기로 불러오기</button>
+      <button type="button" class="modal-btn" style="background:#F3F4F6;color:#374151;" onclick="driveManualUploadOnly()">로그인 유지 — 지금만 업로드</button>
+      <button type="button" class="modal-btn" style="background:#fff;color:#9CA3AF;border:1px solid #E5E7EB;" onclick="driveDisconnect()">Drive 연동만 해제 (이 기기 데이터는 유지)</button>
+    </div>
+    <button type="button" style="border:none;background:none;width:100%;cursor:pointer;margin-top:14px;font-size:12px;color:#9CA3AF;font-family:inherit;" onclick="closeDriveModal()">닫기</button>
+  </div>
+</div>
+
+<!-- Planner title bar (scrolls with page) -->
+
+<div class="planner-head">
+  <div class="planner-head-left">
     <span class="logo-icon">🌿</span>
     <div>
       <div class="logo-text">힐링트리 콘텐츠 플래너</div>
       <div class="logo-sub">미카닥 박준규 DC PT</div>
     </div>
   </div>
-  <div class="topbar-right">
+  <div class="planner-head-right">
     <button class="api-badge" onclick="openApiModal()">
       <span class="api-dot" id="api-dot"></span>
       <span id="api-status">API 키 설정</span>
     </button>
     <button class="btn-prompt-settings" onclick="openPromptModal()">⚙️ 프롬프트</button>
+    <button type="button" class="btn-drive-sync" id="btn-drive-sync" onclick="openDriveModal()">
+      <span class="drive-btn-main" id="drive-btn-main">Drive</span>
+      <span class="drive-btn-sub" id="drive-btn-sub">연동 안 됨</span>
+    </button>
     <button class="btn-add" id="add-toggle-btn" onclick="toggleAdd()">+ 추가</button>
   </div>
 </div>
 
-<!-- Category tabs -->
+<!-- Category tabs (sticky under viewport top) -->
 
-<div class="cat-tabs-wrap">
-  <div class="cat-tabs" id="cat-tabs"></div>
+<div class="sticky-cat-nav">
+  <div id="gen-status-bar" class="gen-status-bar">✨ 초안 생성 중…</div>
+  <div class="cat-tabs-grid" id="cat-tabs-grid"></div>
 </div>
+
+<div id="app-toast" class="app-toast" role="status" aria-live="polite"></div>
 
 <!-- Main content -->
 
@@ -734,6 +856,19 @@ const CATEGORIES = [
     ]},
 ];
 
+/** 상단 카테고리 탭: 두 줄 순서·표시명 (데이터 CATEGORIES 인덱스 기준) */
+const CAT_TAB_NAV_ROWS = [[0, 1, 2, 7], [3, 5, 4, 6]];
+const CAT_TAB_SHORT = {
+  0: '도수치료',
+  1: '리:얼 움직임',
+  2: '작은 얼굴관리',
+  7: '힐자계',
+  3: 'CMT 과정',
+  5: 'Re:Al 과정',
+  4: 'IFC 과정',
+  6: '쓰레드'
+};
+
 const SK = 'ht_v2';
 
 /** 시트 하단「가기」버튼용 고정 URL */
@@ -745,6 +880,23 @@ const APARTNER_IOS_STORE = 'https://apps.apple.com/kr/app/id1243505765';
 const APARTNER_PLAY_STORE = 'https://play.google.com/store/apps/details?id=' + APARTNER_ANDROID_PKG;
 const APARTNER_WEB = 'https://www.aptner.com/';
 const NOTEBOOKLM_URL = 'https://notebooklm.google.com/';
+
+/** iPhone·iPad(요청 데스크톱 UA 포함)·Android 구분 — 바로가기 앱 연동용 */
+function isIOSLikeDevice(){
+  const ua = navigator.userAgent || '';
+  if (/iPhone|iPad|iPod/i.test(ua)) return true;
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+}
+function isAndroidDevice(){
+  return /Android/i.test(navigator.userAgent || '');
+}
+function isPhoneOrTablet(){
+  return isIOSLikeDevice() || isAndroidDevice();
+}
+function getThreadsProfileUsername(){
+  const m = String(EXT_THREADS).match(/@([^/?#]+)/);
+  return m ? m[1] : 'dr.park_dc.pt';
+}
 
 const DEFAULT_CHATGPT_IMAGE_PROJECT_URL = 'https://chatgpt.com/g/g-p-6a005d9f06c481918ae0a417388d5d61-imiji-saengseong/project';
 
@@ -876,17 +1028,416 @@ let state = {
 };
 
 // Load persisted
-try { const s = JSON.parse(localStorage.getItem(SK)); if(s){ state.published=s.published||{}; state.generatedOnly=s.generatedOnly||{}; state.apiKey=s.apiKey||''; state.chatgptOpenUrl=s.chatgptOpenUrl||''; state.prompts=s.prompts||null; } } catch(e){}
+try {
+  const s = JSON.parse(localStorage.getItem(SK));
+  if(s){ applyPersistPayload(s); }
+} catch(e){}
 
-function save() {
-  try { localStorage.setItem(SK, JSON.stringify({ published: state.published, generatedOnly: state.generatedOnly, apiKey: state.apiKey, chatgptOpenUrl: state.chatgptOpenUrl, prompts: state.prompts })); } catch(e) { /* localStorage 사용 불가시 무시 */ }
+function getPersistPayload(){
+  var payload = {
+    published: state.published,
+    generatedOnly: state.generatedOnly,
+    apiKey: state.apiKey,
+    chatgptOpenUrl: state.chatgptOpenUrl,
+    prompts: state.prompts
+  };
+  var extra = collectExtraDrafts();
+  if(extra && Object.keys(extra).length) payload.extraDraftsByCat = extra;
+  return payload;
 }
+function collectExtraDrafts(){
+  var out = {};
+  CATEGORIES.forEach(function(cat, i){
+    var extras = cat.drafts.filter(function(d){ return /^d\d+-c\d+$/.test(d.id); });
+    if(extras.length){
+      out[i] = extras.map(function(d){ return { id: d.id, topic: d.topic, angle: d.angle || '' }; });
+    }
+  });
+  return out;
+}
+function mergeExtraDrafts(byCat){
+  if(!byCat || typeof byCat !== 'object') return;
+  Object.keys(byCat).forEach(function(ki){
+    var i = parseInt(ki, 10);
+    if(isNaN(i) || i < 0 || i >= CATEGORIES.length) return;
+    (byCat[ki] || []).forEach(function(d){
+      if(!d || !d.id) return;
+      var exists = CATEGORIES[i].drafts.some(function(x){ return x.id === d.id; });
+      if(!exists) CATEGORIES[i].drafts.push({ id: d.id, topic: d.topic || '', angle: d.angle || '' });
+    });
+  });
+}
+function applyPersistPayload(s){
+  if(!s) return;
+  state.published = s.published || {};
+  state.generatedOnly = s.generatedOnly || {};
+  state.apiKey = s.apiKey || '';
+  state.chatgptOpenUrl = s.chatgptOpenUrl || '';
+  state.prompts = s.prompts !== undefined ? s.prompts : null;
+  mergeExtraDrafts(s.extraDraftsByCat);
+}
+
+function save(opts) {
+  var o = opts || {};
+  var payload = JSON.stringify(getPersistPayload());
+  var ok = false;
+  try {
+    localStorage.setItem(SK, payload);
+    ok = true;
+  } catch (e0) {
+    try {
+      localStorage.setItem(SK, payload);
+      ok = true;
+    } catch (e1) {
+      if (typeof setAppToast === 'function') {
+        setAppToast('이 기기에 저장하지 못했어요.\n저장 공간이 부족하거나 브라우저가 비공개 모드일 수 있어요.', { duration: 6500, variant: 'err' });
+      } else {
+        alert('저장에 실패했습니다.');
+      }
+    }
+  }
+  if (ok) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      try {
+        if (!sessionStorage.getItem('ht_offline_save_hint')) {
+          sessionStorage.setItem('ht_offline_save_hint', '1');
+          if (typeof setAppToast === 'function') {
+            setAppToast('오프라인 상태예요.\n이 기기에는 저장됐고, Drive는 인터넷에 연결되면 자동으로 다시 올라가요.', { duration: 4800, variant: 'ok' });
+          }
+        }
+      } catch (e2) {}
+    }
+    scheduleDriveUpload(!!o.driveImmediate);
+  }
+}
+
+// ── Google Drive (앱 데이터 폴더, 단일 JSON) ──
+const DRIVE_SYNC_FILENAME = 'planner-sync-v1.json';
+/** Google OAuth 웹 클라이언트 ID — 비밀이 아니므로 내장. 다른 ID로 덮어쓰려면 Drive 모달에서 입력( ht_gdrive_cid 저장 ) */
+const GOOGLE_OAUTH_WEB_CLIENT_ID = '442956975507-a6qqamnjlhuqflflfdknq20slb16jrmc.apps.googleusercontent.com';
+let driveTokenWaiters = [];
+let driveUploadTimer = null;
+
+function loadGsiScript(){
+  if(window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
+  if(window.__htGsiLoadPromise) return window.__htGsiLoadPromise;
+  window.__htGsiLoadPromise = new Promise(function(resolve, reject){
+    var s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.onload = function(){ resolve(); };
+    s.onerror = function(){ reject(new Error('Google 로그인 스크립트를 불러오지 못했어요')); };
+    document.head.appendChild(s);
+  });
+  return window.__htGsiLoadPromise;
+}
+function getDriveClientId(){
+  var fromStore = (localStorage.getItem('ht_gdrive_cid') || '').trim();
+  if(fromStore) return fromStore;
+  return GOOGLE_OAUTH_WEB_CLIENT_ID.trim();
+}
+function flushDriveTokenWaiters(ok, val){
+  var w = driveTokenWaiters.slice();
+  driveTokenWaiters = [];
+  w.forEach(function(x){
+    if(ok) x.resolve(val);
+    else x.reject(val instanceof Error ? val : new Error(String(val)));
+  });
+}
+function onDriveTokenReceived(resp){
+  if(resp && resp.access_token){
+    var sec = resp.expires_in || 3600;
+    localStorage.setItem('ht_drive_oauth', JSON.stringify({
+      access_token: resp.access_token,
+      expires_at: Date.now() + sec * 1000 - 120000
+    }));
+    flushDriveTokenWaiters(true, resp.access_token);
+  } else {
+    var msg = (resp && resp.error) ? resp.error : '액세스 토큰을 받지 못했어요';
+    flushDriveTokenWaiters(false, new Error(msg));
+  }
+}
+function getDriveAccessToken(options){
+  options = options || {};
+  var forcePrompt = !!options.forcePrompt;
+  try {
+    var raw = localStorage.getItem('ht_drive_oauth');
+    if(raw && !forcePrompt){
+      var t = JSON.parse(raw);
+      if(t.access_token && t.expires_at > Date.now()) return Promise.resolve(t.access_token);
+    }
+  } catch(e1){}
+  return new Promise(function(resolve, reject){
+    driveTokenWaiters.push({ resolve: resolve, reject: reject });
+    loadGsiScript().then(function(){
+      var cid = getDriveClientId();
+      if(!cid){
+        flushDriveTokenWaiters(false, new Error('OAuth 클라이언트 ID를 입력해 주세요'));
+        return;
+      }
+      if(!window.__htDriveTokenClient || window.__htDriveTokenClientCid !== cid){
+        window.__htDriveTokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: cid,
+          scope: 'https://www.googleapis.com/auth/drive.appdata',
+          callback: onDriveTokenReceived
+        });
+        window.__htDriveTokenClientCid = cid;
+      }
+      window.__htDriveTokenClient.requestAccessToken({ prompt: forcePrompt ? 'consent' : '' });
+    }).catch(function(e2){
+      flushDriveTokenWaiters(false, e2);
+    });
+  });
+}
+async function driveFindSyncFileId(accessToken){
+  var q = "name='" + DRIVE_SYNC_FILENAME + "' and 'appDataFolder' in parents and trashed=false";
+  var url = 'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) + '&spaces=appDataFolder&fields=files(id)';
+  var r = await fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } });
+  var d = await r.json();
+  if(!r.ok) throw new Error((d.error && d.error.message) || 'Drive 목록 조회 실패');
+  return (d.files && d.files[0] && d.files[0].id) ? d.files[0].id : '';
+}
+async function driveEnsureFileId(accessToken){
+  var cached = localStorage.getItem('ht_drive_file_id');
+  if(cached){
+    var h = await fetch('https://www.googleapis.com/drive/v3/files/' + cached + '?fields=id', { headers: { Authorization: 'Bearer ' + accessToken } });
+    if(h.ok) return cached;
+    localStorage.removeItem('ht_drive_file_id');
+  }
+  var found = await driveFindSyncFileId(accessToken);
+  if(found){
+    localStorage.setItem('ht_drive_file_id', found);
+    return found;
+  }
+  var res = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: DRIVE_SYNC_FILENAME, parents: ['appDataFolder'] })
+  });
+  var j = await res.json();
+  if(!res.ok) throw new Error((j.error && j.error.message) || 'Drive 파일 생성 실패');
+  localStorage.setItem('ht_drive_file_id', j.id);
+  return j.id;
+}
+function buildDriveFileBody(){
+  var p = getPersistPayload();
+  p.savedAt = new Date().toISOString();
+  p.syncVersion = 1;
+  return JSON.stringify(p);
+}
+async function driveUploadNow(){
+  var token = await getDriveAccessToken({ forcePrompt: false });
+  var fileId = await driveEnsureFileId(token);
+  var body = buildDriveFileBody();
+  var r = await fetch('https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media', {
+    method: 'PATCH',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: body
+  });
+  if(r.status === 401){
+    try { localStorage.removeItem('ht_drive_oauth'); } catch(e401){}
+    updateDriveButtonState();
+    throw new Error('Drive 로그인이 만료됐어요. Drive 메뉴에서 다시 로그인해 주세요.');
+  }
+  if(!r.ok){
+    var tx = await r.text();
+    throw new Error(tx || ('HTTP ' + r.status));
+  }
+  markDriveUploadOk();
+}
+function scheduleDriveUpload(immediate){
+  try {
+    if(!localStorage.getItem('ht_drive_oauth')) return;
+  } catch(e3){ return; }
+  clearTimeout(driveUploadTimer);
+  driveUploadTimer = null;
+  if(immediate){
+    driveUploadNow().catch(function(err){
+      console.warn('[Drive 즉시 백업]', err);
+    });
+    return;
+  }
+  driveUploadTimer = setTimeout(function(){
+    driveUploadTimer = null;
+    driveUploadNow().catch(function(err){
+      console.warn('[Drive 자동 저장]', err);
+    });
+  }, 2000);
+}
+function formatDriveTimeShort(iso){
+  if(!iso) return '';
+  try{
+    var d = new Date(iso);
+    if(isNaN(d.getTime())) return '';
+    return d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch(e){ return ''; }
+}
+function readDriveAuthExpiryMs(){
+  try{
+    var raw = localStorage.getItem('ht_drive_oauth');
+    if(!raw) return null;
+    var t = JSON.parse(raw);
+    if(!t || !t.access_token) return null;
+    return typeof t.expires_at === 'number' ? t.expires_at : null;
+  } catch(e){ return null; }
+}
+function updateDriveButtonState(){
+  var b = document.getElementById('btn-drive-sync');
+  var sub = document.getElementById('drive-btn-sub');
+  var main = document.getElementById('drive-btn-main');
+  if(!b) return;
+  var lastIso = '';
+  try { lastIso = localStorage.getItem('ht_drive_last_upload_ok') || ''; } catch(e0){}
+  var lastFmt = formatDriveTimeShort(lastIso);
+  var hasToken = false;
+  try { hasToken = !!localStorage.getItem('ht_drive_oauth'); } catch(e1){}
+  var exp = readDriveAuthExpiryMs();
+  var now = Date.now();
+  b.classList.remove('warn');
+  if(!hasToken){
+    b.classList.remove('linked');
+    if(main) main.textContent = 'Drive';
+    if(sub) sub.textContent = lastFmt ? ('연동 안 됨 · 업로드 ' + lastFmt) : '연동 안 됨';
+    b.title = lastFmt ? ('Drive 미연동 — 마지막 클라우드 업로드 ' + lastFmt) : 'Google Drive 동기화';
+    return;
+  }
+  b.classList.add('linked');
+  var state = 'ok';
+  if(!exp || exp <= now) state = 'expired';
+  else if(exp - now < 8 * 60 * 1000) state = 'soon';
+  if(state === 'soon' || state === 'expired') b.classList.add('warn');
+  var stateKo = state === 'expired' ? '로그인 만료' : (state === 'soon' ? '만료 임박' : '연결됨');
+  if(main) main.textContent = 'Drive';
+  if(sub) sub.textContent = stateKo + (lastFmt ? (' · ' + lastFmt) : '');
+  b.title = 'Drive ' + stateKo + (lastFmt ? (' — 마지막 업로드(성공) ' + lastFmt) : '');
+}
+function markDriveUploadOk(){
+  try { localStorage.setItem('ht_drive_last_upload_ok', new Date().toISOString()); } catch(e){}
+  updateDriveButtonState();
+}
+function maybeRequestNotificationAfterDrive(){
+  try{
+    if(localStorage.getItem('ht_notif_drive_prompt_done')) return;
+    if(typeof Notification === 'undefined'){
+      localStorage.setItem('ht_notif_drive_prompt_done', '1');
+      return;
+    }
+    if(Notification.permission !== 'default'){
+      localStorage.setItem('ht_notif_drive_prompt_done', '1');
+      return;
+    }
+    localStorage.setItem('ht_notif_drive_prompt_done', '1');
+    if(typeof setAppToast === 'function'){
+      setAppToast('초안 완료를 기기 알림으로도 받으려면, 곧 뜨는 창에서 허용을 눌러 주세요.\n(건너뛰어도 화면 안내는 그대로예요)', { duration: 5200, variant: 'ok' });
+    }
+    setTimeout(function(){
+      try { Notification.requestPermission(); } catch(e2){}
+    }, 650);
+  } catch(e3){}
+}
+window.openDriveModal = function(){
+  if(location.protocol === 'file:'){
+    alert('Drive 연동은 https 또는 http로 이 페이지를 연 뒤에만 동작합니다. (예: VS Code Live Server, 또는 웹에 업로드)');
+    return;
+  }
+  var err = document.getElementById('drive-modal-err');
+  if(err) err.textContent = '';
+  var hint = document.getElementById('drive-origin-hint');
+  if(hint) hint.textContent = location.origin;
+  var inp = document.getElementById('drive-client-id');
+  if(inp) inp.value = getDriveClientId();
+  document.getElementById('drive-modal-overlay').classList.add('open');
+};
+window.closeDriveModal = function(ev){
+  if(ev && ev.target !== document.getElementById('drive-modal-overlay')) return;
+  document.getElementById('drive-modal-overlay').classList.remove('open');
+};
+window.driveLoginAndUpload = async function(){
+  var errEl = document.getElementById('drive-modal-err');
+  var inp = document.getElementById('drive-client-id');
+  if(inp && inp.value.trim()) localStorage.setItem('ht_gdrive_cid', inp.value.trim());
+  if(!getDriveClientId()){ if(errEl) errEl.textContent = '클라이언트 ID를 입력해 주세요'; return; }
+  if(errEl) errEl.textContent = '';
+  try{
+    window.__htDriveTokenClient = null;
+    window.__htDriveTokenClientCid = null;
+    await getDriveAccessToken({ forcePrompt: true });
+    await driveUploadNow();
+    closeDriveModal();
+    if(typeof setAppToast === 'function') setAppToast('Drive에 저장했어요. 이후 저장은 자동으로 올라가요.', { duration: 4500, variant: 'ok' });
+    else alert('Drive에 저장했습니다.');
+    maybeRequestNotificationAfterDrive();
+  } catch(e5){
+    if(errEl) errEl.textContent = String(e5.message || e5);
+  }
+};
+window.driveManualUploadOnly = async function(){
+  var errEl = document.getElementById('drive-modal-err');
+  var inp = document.getElementById('drive-client-id');
+  if(inp && inp.value.trim()) localStorage.setItem('ht_gdrive_cid', inp.value.trim());
+  if(!getDriveClientId()){ if(errEl) errEl.textContent = '클라이언트 ID를 입력해 주세요'; return; }
+  if(errEl) errEl.textContent = '';
+  try{
+    await driveUploadNow();
+    if(typeof setAppToast === 'function') setAppToast('Drive 업로드 완료', { duration: 3500, variant: 'ok' });
+    else alert('업로드 완료');
+  } catch(e6){
+    if(errEl) errEl.textContent = String(e6.message || e6);
+  }
+};
+window.drivePullFromCloud = async function(){
+  var errEl = document.getElementById('drive-modal-err');
+  var inp = document.getElementById('drive-client-id');
+  if(inp && inp.value.trim()) localStorage.setItem('ht_gdrive_cid', inp.value.trim());
+  if(!getDriveClientId()){ if(errEl) errEl.textContent = '클라이언트 ID를 입력해 주세요'; return; }
+  if(errEl) errEl.textContent = '';
+  try{
+    var token = await getDriveAccessToken({ forcePrompt: false });
+    var fileId = localStorage.getItem('ht_drive_file_id') || await driveFindSyncFileId(token);
+    if(!fileId){
+      if(errEl) errEl.textContent = 'Drive에 아직 백업 파일이 없어요. 먼저 업로드해 주세요.';
+      return;
+    }
+    localStorage.setItem('ht_drive_file_id', fileId);
+    var r = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', { headers: { Authorization: 'Bearer ' + token } });
+    var text = await r.text();
+    if(!r.ok) throw new Error(text || '다운로드 실패');
+    var data = JSON.parse(text);
+    var when = data.savedAt || '알 수 없음';
+    if(!confirm('Drive에 있는 데이터(저장 시각: ' + when + ')로 이 기기 내용을 덮어씁니다. 계속할까요?')) return;
+    applyPersistPayload(data);
+    save();
+    updateApiBadge();
+    renderTabs();
+    renderMain();
+    updateDriveButtonState();
+    closeDriveModal();
+    if(typeof setAppToast === 'function') setAppToast('Drive에서 불러왔어요.', { duration: 4000, variant: 'ok' });
+    else alert('불러오기 완료');
+  } catch(e7){
+    if(errEl) errEl.textContent = String(e7.message || e7);
+  }
+};
+window.driveDisconnect = function(){
+  if(!confirm('Drive에 저장된 파일은 그대로 두고, 이 브라우저의 로그인만 지웁니다.')) return;
+  localStorage.removeItem('ht_drive_oauth');
+  localStorage.removeItem('ht_drive_file_id');
+  window.__htDriveTokenClient = null;
+  window.__htDriveTokenClientCid = null;
+  updateDriveButtonState();
+  closeDriveModal();
+  if(typeof setAppToast === 'function') setAppToast('Drive 연동을 해제했어요.', { duration: 3500, variant: 'ok' });
+};
 
 // ── Init ──
 window.onload = () => {
   if(state.apiKey){ document.getElementById('api-modal').classList.remove('open'); updateApiBadge(); }
+  updateDriveButtonState();
   renderTabs();
   renderMain();
+  window.addEventListener('online', function(){
+    try { sessionStorage.removeItem('ht_offline_save_hint'); } catch(e){}
+  });
 };
 
 function normalizeChatgptOpenUrl(raw){
@@ -942,11 +1493,13 @@ function updateApiBadge() {
 
 // ── Tabs ──
 function renderTabs() {
-  const wrap = document.getElementById('cat-tabs');
-  wrap.innerHTML = CATEGORIES.map((c,i) => `
-    <button class="cat-tab${state.currentCat===i?' active':''}" onclick="selectCat(${i})">
-      ${c.icon} ${c.name}
-    </button>`).join('');
+  function cellHTML(idx) {
+    const c = CATEGORIES[idx];
+    const label = CAT_TAB_SHORT[idx] || c.name;
+    return `<button type="button" class="cat-tab${state.currentCat === idx ? ' active' : ''}" onclick="selectCat(${idx})">${c.icon} ${label}</button>`;
+  }
+  const order = CAT_TAB_NAV_ROWS[0].concat(CAT_TAB_NAV_ROWS[1]);
+  document.getElementById('cat-tabs-grid').innerHTML = order.map(cellHTML).join('');
 }
 
 function selectCat(i) {
@@ -1102,6 +1655,7 @@ function addDraft(){
   document.getElementById('add-toggle-btn').textContent = '+ 추가';
   state.currentCat = cat.id;
   renderTabs(); renderMain();
+  save();
 }
 
 // ── Detail sheet ──
@@ -1357,22 +1911,26 @@ window.copyCurrentTab = function(btn){
 
 window.openExternalNaverBlog = function(){
   const u = EXT_NAVER_BLOG;
-  const mob = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if(!mob){
+  if(!isPhoneOrTablet()){
     window.open(u, '_blank', 'noopener,noreferrer');
     return;
   }
-  if(/Android/i.test(navigator.userAgent)){
+  if(isAndroidDevice()){
     window.location.href = 'intent://blog.naver.com/allenjoy#Intent;scheme=https;package=com.nhn.android.blog;S.browser_fallback_url=' + encodeURIComponent(u) + ';end';
     return;
   }
-  window.open(u, '_blank', 'noopener,noreferrer');
+  // iOS·iPad: 네이버 앱 인앱 브라우저(공식 scheme) → 미설치 시 웹
+  const naverApp = 'naversearchapp://inappbrowser?url=' + encodeURIComponent(u) + '&target=new&version=6';
+  window.location.href = naverApp;
+  setTimeout(function(){
+    if(document.hidden) return;
+    window.open(u, '_blank', 'noopener,noreferrer');
+  }, 900);
 };
 
 window.openExternalInstagram = function(){
   const u = EXT_INSTAGRAM_WEB;
-  const mob = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if(mob){
+  if(isPhoneOrTablet()){
     window.location.href = 'instagram://user?username=dr.park_dc.pt';
     setTimeout(function(){
       if(document.hidden) return;
@@ -1384,23 +1942,58 @@ window.openExternalInstagram = function(){
 };
 
 window.openExternalThreads = function(){
-  window.open(EXT_THREADS, '_blank', 'noopener,noreferrer');
+  const u = EXT_THREADS;
+  const uname = getThreadsProfileUsername();
+  if(!isPhoneOrTablet()){
+    window.open(u, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  if(isIOSLikeDevice()){
+    window.location.href = 'barcelona://user?username=' + encodeURIComponent(uname);
+    setTimeout(function(){
+      if(document.hidden) return;
+      window.open(u, '_blank', 'noopener,noreferrer');
+    }, 900);
+    return;
+  }
+  window.location.href = 'intent:#Intent;action=android.intent.action.VIEW;data=' + encodeURIComponent(u) + ';package=com.instagram.barcelona;S.browser_fallback_url=' + encodeURIComponent(u) + ';end';
+  setTimeout(function(){
+    if(document.hidden) return;
+    window.open(u, '_blank', 'noopener,noreferrer');
+  }, 900);
 };
 
 window.openNotebookLM = function(){
-  window.open(NOTEBOOKLM_URL, '_blank', 'noopener,noreferrer');
+  const u = NOTEBOOKLM_URL;
+  if(!isPhoneOrTablet()){
+    window.open(u, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  if(isIOSLikeDevice()){
+    // NotebookLM 전용 iOS 앱 없음 → Chrome 앱이 있으면 그쪽으로(사파리 단독 회피)
+    window.location.href = 'googlechromes://notebooklm.google.com/';
+    setTimeout(function(){
+      if(document.hidden) return;
+      window.open(u, '_blank', 'noopener,noreferrer');
+    }, 900);
+    return;
+  }
+  window.location.href = 'intent://notebooklm.google.com/#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(u) + ';end';
+  setTimeout(function(){
+    if(document.hidden) return;
+    window.open(u, '_blank', 'noopener,noreferrer');
+  }, 900);
 };
 
 window.openApartnerApp = function(){
-  const mob = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if(!mob){
+  if(!isPhoneOrTablet()){
     window.open(APARTNER_WEB, '_blank', 'noopener,noreferrer');
     return;
   }
   window.location.href = 'apartner://';
   setTimeout(function(){
     if(document.hidden) return;
-    if(/Android/i.test(navigator.userAgent)){
+    if(isAndroidDevice()){
       window.open(APARTNER_PLAY_STORE, '_blank', 'noopener,noreferrer');
     } else {
       window.open(APARTNER_IOS_STORE, '_blank', 'noopener,noreferrer');
@@ -2030,21 +2623,70 @@ document.getElementById('prompt-modal').classList.remove('open');
 setTimeout(()=>document.getElementById('prompt-modal-overlay').classList.remove('open'), 280);
 }
 
-// ── Generate ──
+// ── Generate (백그라운드 + 탭 간 Web Locks 순차 처리) ──
+let appToastTimer = null;
+function setAppToast(message, options) {
+  options = options || {};
+  var duration = options.duration !== undefined ? options.duration : 4200;
+  var variant = options.variant || '';
+  var el = document.getElementById('app-toast');
+  if (!el) return;
+  clearTimeout(appToastTimer);
+  el.classList.remove('app-toast--ok', 'app-toast--err');
+  if (variant === 'ok') el.classList.add('app-toast--ok');
+  else if (variant === 'err') el.classList.add('app-toast--err');
+  el.textContent = message;
+  el.classList.add('show');
+  if (duration > 0) appToastTimer = setTimeout(function(){ el.classList.remove('show'); }, duration);
+}
+function tryNotifyDraftDone(topic, ok) {
+  try {
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    new Notification(ok ? '초안 생성 완료' : '초안 생성 실패', { body: topic });
+  } catch (e) { }
+}
+
+var genPendingCount = 0;
+function beginGenIndicator(){
+  genPendingCount++;
+  updateGenIndicator();
+}
+function endGenIndicator(){
+  genPendingCount = Math.max(0, genPendingCount - 1);
+  updateGenIndicator();
+}
+function updateGenIndicator(){
+  var el = document.getElementById('gen-status-bar');
+  if(!el) return;
+  if(genPendingCount > 0){
+    el.classList.add('show');
+    el.textContent = genPendingCount > 1 ? ('✨ 초안 생성 중… (' + genPendingCount + '건)') : '✨ 초안 생성 중…';
+  } else {
+    el.classList.remove('show');
+  }
+}
+
 window.genContent = async function(){
 if(!state.apiKey){ openApiModal(); return; }
-const catId = state.selectedCatId;
-const cat = CATEGORIES[catId];
-const draft = cat.drafts.find(d=>d.id===state.selectedId);
-if(!draft) return;
+var jobCatId = state.selectedCatId;
+var jobDraftId = state.selectedId;
+var cat0 = CATEGORIES[jobCatId];
+var draft0 = cat0.drafts.find(function(d){ return d.id === jobDraftId; });
+if(!draft0){
+  if(typeof setAppToast === 'function') setAppToast('선택된 초안을 찾을 수 없어요. 카드를 다시 눌러 주세요.', { duration: 4000, variant: 'err' });
+  return;
+}
+var jobTopic = draft0.topic;
 
-const loadLines = isThreadCategory(catId)
-  ? '쓰레드 톤으로 짧게 쪼개는 중… ✨'
-  : isHeiljagyaeCategory(catId)
-  ? '아파트너 게시글·이미지 프롬프트(2장) 작성 중… ✨'
-  : '트렌드 분석 중...<br>블로그·인스타·노트북 LM·이미지 생성 중 ✨';
-document.getElementById('sheet-body').innerHTML = `<div class="loading-wrap"><div class="spinner"></div><div class="loading-text">${loadLines}</div></div>`;
-document.getElementById('sheet-actions').innerHTML = '';
+setAppToast('백그라운드에서 초안을 만들고 있어요.\n다른 카드나 브라우저 탭에서도 순서대로 처리되며, 완료되면 알려드릴게요.', { duration: 3000 });
+closeSheet();
+beginGenIndicator();
+
+async function runDraftJob() {
+var catId = jobCatId;
+var cat = CATEGORIES[catId];
+var draft = cat.drafts.find(function(d){ return d.id === jobDraftId; });
+if(!draft) throw new Error('초안을 찾을 수 없어요');
 
 const blogGuide = getCatPrompt(catId, 'blog');
 const instaGuide = getCatPrompt(catId, 'insta');
@@ -2197,7 +2839,6 @@ notebookLM.qa는 **정확히 7개** 객체 배열. 각 q는 한 문장 질문, �
 반드시 images.gptVisuals는 정확히 5개. 각 prompt 필드는 완성된 영문 이미지 프롬프트 한 덩어리(구도·조명·소품·카메라 앵글·피할 요소 등). 위 JSON 예시의 한글 설명문은 설명용이며 출력 시에는 제거하고, 예시에 나온 영문 구절을 그대로 복사하지 말고 주제·각도·본문 셀프 팁에 맞춰 새로 쓸 것.`;
 }
 
-try {
 const res = await fetch('https://api.anthropic.com/v1/messages', {
 method: 'POST',
 headers: {
@@ -2241,15 +2882,33 @@ if(isThreadCategory(catId)){
   delete content.community;
 }
 
-if(!state.published[state.selectedId]) state.published[state.selectedId]={};
-state.published[state.selectedId].content = content;
-state.generatedOnly[state.selectedId] = content;
-save();
-state.activeTab = isThreadCategory(catId) ? 'thread' : (isHeiljagyaeCategory(catId) ? 'community' : 'blog');
-renderSheetContent(content);
+if(!state.published[jobDraftId]) state.published[jobDraftId]={};
+state.published[jobDraftId].content = content;
+state.generatedOnly[jobDraftId] = content;
+save({ driveImmediate: true });
+var nextTab = isThreadCategory(catId) ? 'thread' : (isHeiljagyaeCategory(catId) ? 'community' : 'blog');
+var ov = document.getElementById('detail-overlay');
+if(ov && ov.classList.contains('open') && state.selectedId === jobDraftId && state.selectedCatId === jobCatId){
+  state.activeTab = nextTab;
+  renderSheetContent(content);
+}
 renderMain();
-} catch(e) {
-document.getElementById('sheet-body').innerHTML = `<div class="loading-wrap" style="color:#EF4444;font-size:13px;">오류: ${String(e.message)}<br><br><button onclick="genContent()" style="background:#F3F4F6;border:none;border-radius:8px;padding:10px 20px;cursor:pointer;font-family:inherit;font-size:13px;margin-top:8px;">다시 시도</button></div>`;
+}
+
+try {
+  if (navigator.locks && navigator.locks.request) {
+    await navigator.locks.request('ht-planner-draft-queue', function(){ return runDraftJob(); });
+  } else {
+    await runDraftJob();
+  }
+  setAppToast('✓ 초안 생성 완료\n«' + jobTopic + '»', { duration: 6500, variant: 'ok' });
+  tryNotifyDraftDone(jobTopic, true);
+} catch (e) {
+  var errMsg = (e && e.message) ? e.message : String(e);
+  setAppToast('초안 생성에 실패했어요.\n' + errMsg + '\n\n같은 화면에서 다시 시도해 주세요.', { duration: 9000, variant: 'err' });
+  tryNotifyDraftDone(jobTopic, false);
+} finally {
+  endGenIndicator();
 }
 };
 </script>

@@ -21,6 +21,18 @@ display: flex; align-items: center; justify-content: space-between;
 .logo-text { color: #fff; font-weight: 700; font-size: 15px; letter-spacing: -.3px; }
 .logo-sub { color: #9CA3AF; font-size: 11px; margin-top: 1px; }
 .planner-head-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.btn-refresh-topics{
+background:#fff;
+color:#111827;
+border:1px solid #3A3A3A;
+border-radius: 6px;
+padding: 6px 12px;
+font-size: 12px;
+font-weight: 800;
+cursor: pointer;
+font-family: inherit;
+}
+.btn-refresh-topics:hover{ border-color:#2DD4BF; color:#2DD4BF; }
 .api-badge {
 font-size: 11px; padding: 5px 10px; border-radius: 6px;
 border: 1px solid #3A3A3A; color: #9CA3AF; background: none;
@@ -99,6 +111,21 @@ padding: 10px 8px;
 }
 .cat-tab:hover { color: #D0D0D0; }
 .cat-tab.active { color: #2DD4BF; border-bottom-color: #2DD4BF; }
+.cat-tab-badge{
+display:inline-flex;
+align-items:center;
+justify-content:center;
+min-width: 20px;
+height: 16px;
+padding: 0 6px;
+border-radius: 999px;
+background: rgba(255,255,255,0.08);
+color:#C9D1D9;
+font-size: 11px;
+font-weight: 900;
+margin-left: 4px;
+}
+.cat-tab.active .cat-tab-badge{ background: rgba(45, 212, 191, 0.25); color:#E7FFF9; }
 @media (max-width: 380px) {
   .cat-tabs-grid { padding-left: 10px; padding-right: 10px; }
   .cat-tabs-grid .cat-tab { font-size: 11px; padding-left: 4px; padding-right: 4px; gap: 3px; }
@@ -204,6 +231,19 @@ width: 30px; height: 30px; font-size: 14px; cursor: pointer;
 flex-shrink: 0; margin-top: 2px;
 }
 .sheet-title { font-weight: 700; font-size: 14px; line-height: 1.45; flex: 1; }
+.sheet-lock-btn{
+background: #F3F4F6;
+border: none;
+border-radius: 8px;
+padding: 7px 10px;
+font-size: 12px;
+font-weight: 900;
+cursor: pointer;
+font-family: inherit;
+flex-shrink: 0;
+margin-top: 2px;
+}
+.sheet-lock-btn.on{ background:#111827; color:#fff; }
 .sheet-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
 .sheet-actions {
 padding: 12px 20px 24px; border-top: 1px solid #F3F4F6;
@@ -647,6 +687,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     <div class="sheet-header">
       <button class="sheet-close" onclick="closeSheet()">✕</button>
       <div class="sheet-title" id="sheet-title"></div>
+      <button type="button" class="sheet-lock-btn" id="sheet-lock-btn" onclick="toggleTopicLock()">🔓</button>
     </div>
     <div class="sheet-body" id="sheet-body"></div>
     <div class="sheet-actions" id="sheet-actions"></div>
@@ -706,6 +747,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       <span id="api-status">API 키 설정</span>
     </button>
     <button class="btn-prompt-settings" onclick="openPromptModal()">⚙️ 프롬프트</button>
+    <button type="button" class="btn-refresh-topics" onclick="refreshTopicsCurrent()">🔄 주제</button>
     <button type="button" class="btn-drive-sync" id="btn-drive-sync" onclick="openDriveModal()">
       <span class="drive-btn-main" id="drive-btn-main">Drive</span>
       <span class="drive-btn-sub" id="drive-btn-sub">연동 안 됨</span>
@@ -962,6 +1004,8 @@ let state = {
   searchQ: '',
   published: {},
   generatedOnly: {},
+  topicLocks: {},
+  localSavedAt: '',
   showAdd: false,
   newItem: { date:'', topic:'', catId:0, audience:'일반인' },
   apiKey: '',
@@ -983,6 +1027,8 @@ function getPersistPayload(){
   var payload = {
     published: state.published,
     generatedOnly: state.generatedOnly,
+    topicLocks: state.topicLocks,
+    localSavedAt: state.localSavedAt,
     apiKey: state.apiKey,
     chatgptOpenUrl: state.chatgptOpenUrl,
     prompts: state.prompts
@@ -1017,6 +1063,8 @@ function applyPersistPayload(s){
   if(!s) return;
   state.published = s.published || {};
   state.generatedOnly = s.generatedOnly || {};
+  state.topicLocks = s.topicLocks || {};
+  state.localSavedAt = s.localSavedAt || '';
   state.apiKey = s.apiKey || '';
   state.chatgptOpenUrl = s.chatgptOpenUrl || '';
   state.prompts = s.prompts !== undefined ? s.prompts : null;
@@ -1025,6 +1073,7 @@ function applyPersistPayload(s){
 
 function save(opts) {
   var o = opts || {};
+  state.localSavedAt = new Date().toISOString();
   var payload = JSON.stringify(getPersistPayload());
   var ok = false;
   try {
@@ -1053,7 +1102,7 @@ function save(opts) {
         }
       } catch (e2) {}
     }
-    scheduleDriveUpload(!!o.driveImmediate);
+    if(!o.skipDriveUpload) scheduleDriveUpload(!!o.driveImmediate);
   }
 }
 
@@ -1331,6 +1380,52 @@ window.driveManualUploadOnly = async function(){
     if(errEl) errEl.textContent = String(e6.message || e6);
   }
 };
+
+async function driveDownloadCloudPayload_(token){
+  var fileId = localStorage.getItem('ht_drive_file_id') || await driveFindSyncFileId(token);
+  if(!fileId) return { fileId: '', data: null };
+  localStorage.setItem('ht_drive_file_id', fileId);
+  var r = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', { headers: { Authorization: 'Bearer ' + token } });
+  var text = await r.text();
+  if(!r.ok) throw new Error(text || 'Drive 다운로드 실패');
+  var data = JSON.parse(text);
+  return { fileId: fileId, data: data };
+}
+
+function parseIsoMs_(iso){
+  try{
+    if(!iso) return 0;
+    var d = new Date(iso);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  } catch(e){ return 0; }
+}
+
+async function driveAutoSyncIfNewer_(reason){
+  // 조용히 확인: 로그인(토큰) 없으면 아무 것도 안 함
+  var hasToken = false;
+  try { hasToken = !!localStorage.getItem('ht_drive_oauth'); } catch(e0){}
+  if(!hasToken) return;
+  try{
+    var token = await getDriveAccessToken({ forcePrompt: false });
+    var out = await driveDownloadCloudPayload_(token);
+    if(!out.data) return;
+    var cloudMs = parseIsoMs_(out.data.savedAt);
+    var localMs = parseIsoMs_(state.localSavedAt);
+    if(cloudMs && (!localMs || cloudMs > localMs + 1500)){
+      applyPersistPayload(out.data);
+      save({ skipDriveUpload: true });
+      updateApiBadge();
+      renderTabs();
+      renderMain();
+      updateDriveButtonState();
+      if(typeof setAppToast === 'function') setAppToast('Drive 최신본으로 동기화했어요.', { duration: 3200, variant: 'ok' });
+    }
+  } catch(e1){
+    // 자동 동기화는 조용히 실패(사용자 흐름 방해 X)
+    console.warn('[Drive 자동 동기화]', reason || '', e1);
+  }
+}
+
 window.drivePullFromCloud = async function(){
   var errEl = document.getElementById('drive-modal-err');
   var inp = document.getElementById('drive-client-id');
@@ -1339,20 +1434,16 @@ window.drivePullFromCloud = async function(){
   if(errEl) errEl.textContent = '';
   try{
     var token = await getDriveAccessToken({ forcePrompt: false });
-    var fileId = localStorage.getItem('ht_drive_file_id') || await driveFindSyncFileId(token);
-    if(!fileId){
+    var dl = await driveDownloadCloudPayload_(token);
+    if(!dl.data){
       if(errEl) errEl.textContent = 'Drive에 아직 백업 파일이 없어요. 먼저 업로드해 주세요.';
       return;
     }
-    localStorage.setItem('ht_drive_file_id', fileId);
-    var r = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', { headers: { Authorization: 'Bearer ' + token } });
-    var text = await r.text();
-    if(!r.ok) throw new Error(text || '다운로드 실패');
-    var data = JSON.parse(text);
+    var data = dl.data;
     var when = data.savedAt || '알 수 없음';
     if(!confirm('Drive에 있는 데이터(저장 시각: ' + when + ')로 이 기기 내용을 덮어씁니다. 계속할까요?')) return;
     applyPersistPayload(data);
-    save();
+    save({ skipDriveUpload: true });
     updateApiBadge();
     renderTabs();
     renderMain();
@@ -1381,8 +1472,27 @@ window.onload = () => {
   updateDriveButtonState();
   renderTabs();
   renderMain();
+  // Drive 최신본 자동 확인(조용히) — 재접속/재활성화 시 동기화
+  driveAutoSyncIfNewer_('load');
+  window.addEventListener('focus', function(){ driveAutoSyncIfNewer_('focus'); });
+  let hiddenAt = 0;
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden){
+      hiddenAt = Date.now();
+      return;
+    }
+    driveAutoSyncIfNewer_('visibility');
+    if(hiddenAt){
+      var sec = Math.floor((Date.now() - hiddenAt) / 1000);
+      hiddenAt = 0;
+      if(sec >= 10 && typeof setAppToast === 'function'){
+        setAppToast('다른 앱/화면으로 전환하면 브라우저가 잠시 멈출 수 있어요.\n탭을 닫지 말고 그대로 두면, 다시 돌아왔을 때 이어서 동작합니다.', { duration: 5200 });
+      }
+    }
+  });
   window.addEventListener('online', function(){
     try { sessionStorage.removeItem('ht_offline_save_hint'); } catch(e){}
+    driveAutoSyncIfNewer_('online');
   });
 };
 
@@ -1439,10 +1549,23 @@ function updateApiBadge() {
 
 // ── Tabs ──
 function renderTabs() {
+  function isDraftDone(id){
+    return !!(state.generatedOnly[id] || (state.published[id] && state.published[id].content));
+  }
+  function doneCountForCat(idx){
+    const cat = CATEGORIES[idx];
+    if(!cat || !cat.drafts) return 0;
+    let n = 0;
+    cat.drafts.forEach(function(d){
+      if(d && d.id && isDraftDone(d.id)) n++;
+    });
+    return n;
+  }
   function cellHTML(idx) {
     const c = CATEGORIES[idx];
     const label = CAT_TAB_SHORT[idx] || c.name;
-    return `<button type="button" class="cat-tab${state.currentCat === idx ? ' active' : ''}" onclick="selectCat(${idx})">${c.icon} ${label}</button>`;
+    const done = doneCountForCat(idx);
+    return `<button type="button" class="cat-tab${state.currentCat === idx ? ' active' : ''}" onclick="selectCat(${idx})">${c.icon} ${label}<span class="cat-tab-badge" title="완성된 초안">${done}</span></button>`;
   }
   const order = CAT_TAB_NAV_ROWS[0].concat(CAT_TAB_NAV_ROWS[1]);
   document.getElementById('cat-tabs-grid').innerHTML = order.map(cellHTML).join('');
@@ -1540,10 +1663,12 @@ function draftCardHTML(d, cat, isRec) {
   const hasContent = pub?.content || state.generatedOnly[d.id];
   const isPub = !!pub?.date;
   const color = isRec && d.recType==='trending' ? '#F59E0B' : cat.color;
+  const isLocked = !!(state.topicLocks && state.topicLocks[d.id]);
   const badges = [
     `<span class="badge badge-aud">${cat.audience}</span>`,
     isRec && d.recType==='related' ? '<span class="badge badge-rec">🔗 관련</span>' : '',
     isRec && d.recType==='trending' ? `<span class="badge badge-rec">⭐ ${d.fromCat}</span>` : '',
+    isLocked ? '<span class="badge badge-rec">🔒 잠금</span>' : '',
     hasContent ? '<span class="badge badge-gen">📝 초안있음</span>' : '',
     isPub ? '<span class="badge badge-pub">✓ 발행완료</span>' : '',
   ].filter(Boolean).join('');
@@ -1604,6 +1729,104 @@ function addDraft(){
   save();
 }
 
+window.refreshTopicsCurrent = async function(){
+  if(!state.apiKey){ openApiModal(); return; }
+  const catId = state.currentCat;
+  const cat = CATEGORIES[catId];
+  if(!cat) return;
+  const locked = state.topicLocks || {};
+  const unlocked = (cat.drafts || []).filter(function(d){ return d && d.id && !locked[d.id]; });
+  if(unlocked.length === 0){
+    if(typeof setAppToast === 'function') setAppToast('잠금(🔒)된 주제만 있어서 리프레쉬할 항목이 없어요.', { duration: 4200 });
+    return;
+  }
+  if(typeof setAppToast === 'function') setAppToast('주제를 리프레쉬하고 있어요…', { duration: 2600 });
+
+  const avoidTopics = (cat.drafts || []).map(function(d){ return d && d.topic ? d.topic : ''; }).filter(Boolean).slice(0, 80);
+  const ids = unlocked.map(function(d){ return d.id; });
+
+  const prompt =
+`당신은 콘텐츠 기획자입니다.
+카테고리: ${cat.name} (${cat.sub})
+독자: ${cat.audience}
+
+아래 ID 목록 각각에 대해 "topic"과 "angle"을 새로 만들어 주세요.
+- topic: 한국어 한 줄(너무 길지 않게, 15~32자 정도, 후킹/질문형 가능)
+- angle: 이 주제를 어떤 관점으로 풀지 한 줄(신뢰/오해해소/실천팁/메커니즘 등)
+
+[중복 금지]
+아래 기존 topic들과 최대한 겹치지 않게:
+${avoidTopics.map(t=>' - '+t).join('\n')}
+
+[출력]
+반드시 JSON 배열만 출력:
+[
+  {"id":"${ids[0] || 'dX-0'}","topic":"...","angle":"..."}
+]
+
+ID는 반드시 아래 목록에서만 사용:
+${ids.join(', ')}`;
+
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1400,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error((data.error && data.error.message) ? data.error.message : ('HTTP ' + res.status));
+    const text = (data.content || []).filter(b=>b.type==='text').map(b=>b.text).join('');
+    const raw = text.replace(/^```json\s*/i, '').replace(/```\s*$/g, '').trim();
+    const arr = JSON.parse(raw);
+    if(!Array.isArray(arr)) throw new Error('형식이 올바르지 않아요 (JSON 배열 필요)');
+
+    const map = {};
+    arr.forEach(function(x){
+      if(!x || !x.id) return;
+      map[String(x.id)] = { topic: String(x.topic || '').trim(), angle: String(x.angle || '').trim() };
+    });
+
+    let changed = 0;
+    (cat.drafts || []).forEach(function(d){
+      if(!d || !d.id) return;
+      const u = map[d.id];
+      if(!u) return;
+      if(u.topic) d.topic = u.topic;
+      if(u.angle) d.angle = u.angle;
+      changed++;
+    });
+
+    if(changed > 0){
+      // 디테일 시트가 열려 있고, 현재 선택된 주제의 제목이 바뀐 경우 반영
+      if(state.selectedId){
+        const cur = cat.drafts.find(function(d){ return d.id === state.selectedId; });
+        if(cur){
+          const ttl = document.getElementById('sheet-title');
+          if(ttl) ttl.textContent = cur.topic;
+        }
+      }
+      renderTabs();
+      renderMain();
+      save({ driveImmediate: true });
+      if(typeof setAppToast === 'function') setAppToast('주제를 리프레쉬했어요. (잠금은 그대로 유지)', { duration: 4200, variant: 'ok' });
+    } else {
+      if(typeof setAppToast === 'function') setAppToast('바뀐 주제가 없어요. 다시 한 번 눌러주세요.', { duration: 3200 });
+    }
+  } catch(e){
+    const msg = String((e && e.message) ? e.message : e);
+    if(typeof setAppToast === 'function') setAppToast('주제 리프레쉬에 실패했어요.\n' + msg, { duration: 6500, variant: 'err' });
+  }
+};
+
 // ── Detail sheet ──
 function openDetail(draftId, catId) {
   const cat = CATEGORIES[catId];
@@ -1613,12 +1836,35 @@ function openDetail(draftId, catId) {
   state.selectedCatId = catId;
   state.activeTab = isThreadCategory(catId) ? 'thread' : (isHeiljagyaeCategory(catId) ? 'community' : 'blog');
   document.getElementById('sheet-title').textContent = draft.topic;
+  updateSheetLockButton_();
   const pub = state.published[draftId];
   const content = pub?.content || state.generatedOnly[draftId];
   if(content){ renderSheetContent(content); }
   else { renderSheetEmpty(draft, cat); }
   document.getElementById('detail-overlay').classList.add('open');
   setTimeout(()=>document.getElementById('detail-sheet').classList.add('open'), 10);
+}
+
+function updateSheetLockButton_(){
+  const btn = document.getElementById('sheet-lock-btn');
+  if(!btn) return;
+  const id = state.selectedId;
+  const on = !!(id && state.topicLocks && state.topicLocks[id]);
+  btn.classList.toggle('on', on);
+  btn.textContent = on ? '🔒' : '🔓';
+  btn.title = on ? '이 주제는 리프레쉬에서 제외됩니다' : '리프레쉬에서 제외하려면 잠그기';
+}
+
+function toggleTopicLock(){
+  const id = state.selectedId;
+  if(!id) return;
+  if(!state.topicLocks) state.topicLocks = {};
+  if(state.topicLocks[id]) delete state.topicLocks[id];
+  else state.topicLocks[id] = true;
+  updateSheetLockButton_();
+  renderMain();
+  renderTabs();
+  save({ driveImmediate: true });
 }
 
 function renderSheetEmpty(draft, cat) {

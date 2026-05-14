@@ -17,22 +17,10 @@ padding: 14px 20px;
 display: flex; align-items: center; justify-content: space-between;
 }
 .planner-head-left { display: flex; align-items: center; gap: 10px; }
-.logo-icon { font-size: 20px; }
+.logo-icon { display: none; }
 .logo-text { color: #fff; font-weight: 700; font-size: 15px; letter-spacing: -.3px; }
 .logo-sub { color: #9CA3AF; font-size: 11px; margin-top: 1px; }
 .planner-head-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
-.btn-refresh-topics{
-background:#fff;
-color:#111827;
-border:1px solid #3A3A3A;
-border-radius: 6px;
-padding: 6px 12px;
-font-size: 12px;
-font-weight: 800;
-cursor: pointer;
-font-family: inherit;
-}
-.btn-refresh-topics:hover{ border-color:#2DD4BF; color:#2DD4BF; }
 .api-badge {
 font-size: 11px; padding: 5px 10px; border-radius: 6px;
 border: 1px solid #3A3A3A; color: #9CA3AF; background: none;
@@ -64,6 +52,8 @@ padding: 6px 12px;
 background: #141414;
 border-bottom: 1px solid #2A2A2A;
 letter-spacing: 0.02em;
+line-height: 1.45;
+word-break: keep-all;
 }
 .gen-status-bar.show { display: block; }
 .cat-tabs-wrap {
@@ -94,7 +84,7 @@ border-top: 1px solid #2A2A2A;
 .cat-tabs-grid .cat-tab:nth-child(-n+4) { padding-bottom: 8px; }
 .cat-tabs-grid .cat-tab:nth-child(n+5) {
 border-top: 1px solid #2A2A2A;
-padding-top: 10px;
+padding-top: 6px;
 }
 .cat-tab {
 padding: 10px 14px; border: none; background: none;
@@ -190,6 +180,29 @@ background: var(--cc, #2DD4BF);
 .draft-card.recommended { border-color: #F59E0B; }
 .draft-card.recommended::before { background: #F59E0B; }
 
+.draft-card-refresh-mini {
+position: absolute;
+top: 10px;
+right: 10px;
+z-index: 2;
+font-size: 9px;
+font-weight: 800;
+padding: 4px 7px;
+border-radius: 6px;
+border: 1px solid #E5E7EB;
+background: #fff;
+color: #6B7280;
+cursor: pointer;
+font-family: inherit;
+line-height: 1.2;
+letter-spacing: -0.02em;
+box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.draft-card-refresh-mini:hover {
+border-color: var(--cc, #2DD4BF);
+color: #0F766E;
+}
+
 .card-badges { display: flex; gap: 5px; margin-bottom: 8px; flex-wrap: wrap; }
 .badge {
 font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700;
@@ -199,7 +212,7 @@ font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700;
 .badge-pub { background: #F3F4F6; color: #9CA3AF; }
 .badge-gen { background: #DBEAFE; color: #2563EB; }
 
-.card-topic { font-weight: 700; font-size: 14px; color: #1A1A1A; margin-bottom: 5px; line-height: 1.45; }
+.card-topic { font-weight: 700; font-size: 14px; color: #1A1A1A; margin-bottom: 5px; line-height: 1.45; padding-right: 72px; }
 .card-angle { font-size: 12px; color: #9CA3AF; line-height: 1.55; }
 .card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
 .card-date { font-size: 11px; color: #C0C0C0; }
@@ -231,19 +244,6 @@ width: 30px; height: 30px; font-size: 14px; cursor: pointer;
 flex-shrink: 0; margin-top: 2px;
 }
 .sheet-title { font-weight: 700; font-size: 14px; line-height: 1.45; flex: 1; }
-.sheet-lock-btn{
-background: #F3F4F6;
-border: none;
-border-radius: 8px;
-padding: 7px 10px;
-font-size: 12px;
-font-weight: 900;
-cursor: pointer;
-font-family: inherit;
-flex-shrink: 0;
-margin-top: 2px;
-}
-.sheet-lock-btn.on{ background:#111827; color:#fff; }
 .sheet-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
 .sheet-actions {
 padding: 12px 20px 24px; border-top: 1px solid #F3F4F6;
@@ -455,7 +455,7 @@ backdrop-filter: blur(6px);
 background: #fff; border-radius: 20px; padding: 32px 28px;
 max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,.2);
 }
-.modal-logo { font-size: 28px; margin-bottom: 10px; }
+.modal-logo { display: none; }
 .modal-title { font-size: 20px; font-weight: 900; margin-bottom: 6px; }
 .modal-desc { font-size: 13px; color: #6B7280; line-height: 1.7; margin-bottom: 20px; }
 .modal-input {
@@ -664,12 +664,12 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 
 <div class="modal-overlay open" id="api-modal">
   <div class="modal-box">
-    <div class="modal-logo">🌿</div>
+    <div class="modal-logo" aria-hidden="true"></div>
     <div class="modal-title">힐링트리 콘텐츠 플래너</div>
     <div class="modal-desc">Anthropic API 키를 입력하면 Claude AI가 블로그 & 인스타 초안을 자동으로 만들어드려요. 키는 브라우저에만 저장돼요.</div>
     <input class="modal-input" type="text" id="api-input" placeholder="API 키를 붙여넣으세요" />
     <div id="api-error" style="font-size:12px;color:#EF4444;min-height:18px;margin-bottom:8px;"></div>
-    <div class="modal-hint">🔗 <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>에서 발급받으세요</div>
+    <div class="modal-hint"><a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>에서 발급받으세요</div>
     <div style="margin-top:18px;padding-top:14px;border-top:1px solid #E5E7EB;">
       <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">ChatGPT 이미지 프로젝트 열기 주소 (선택)</div>
       <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:8px;">ChatGPT 웹에서 「이미지 생성」 프로젝트를 연 뒤 <strong>주소창 URL</strong>을 붙여넣으세요 (예: <code style="font-size:10px;background:#F3F4F6;padding:2px 4px;border-radius:4px;">https://chatgpt.com/g/g-p-…/project</code>). <strong>같은 채팅 스레드에 이미지를 모으려면</strong> 프로젝트 안에서 그 대화를 연 상태의 주소(<code style="font-size:10px;">…/c/…</code>)를 저장하는 편이 좋습니다. 비우면 기본 홈으로 열립니다.</div>
@@ -685,9 +685,8 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   <div class="detail-sheet" id="detail-sheet">
     <div class="sheet-handle"></div>
     <div class="sheet-header">
-      <button class="sheet-close" onclick="closeSheet()">✕</button>
+      <button class="sheet-close" onclick="closeSheet()" aria-label="닫기">×</button>
       <div class="sheet-title" id="sheet-title"></div>
-      <button type="button" class="sheet-lock-btn" id="sheet-lock-btn" onclick="toggleTopicLock()">🔓</button>
     </div>
     <div class="sheet-body" id="sheet-body"></div>
     <div class="sheet-actions" id="sheet-actions"></div>
@@ -700,8 +699,8 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   <div class="prompt-modal" id="prompt-modal">
     <div class="prompt-modal-handle"></div>
     <div class="prompt-modal-header">
-      <button class="prompt-modal-close" onclick="closePromptModal()">✕</button>
-      <div class="prompt-modal-title" id="prompt-modal-title">⚙️ 프롬프트 설정</div>
+      <button class="prompt-modal-close" onclick="closePromptModal()" aria-label="닫기">×</button>
+      <div class="prompt-modal-title" id="prompt-modal-title">프롬프트 설정</div>
     </div>
     <div class="prompt-modal-body" id="prompt-modal-body"></div>
     <div class="prompt-modal-footer">
@@ -735,7 +734,6 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 
 <div class="planner-head">
   <div class="planner-head-left">
-    <span class="logo-icon">🌿</span>
     <div>
       <div class="logo-text">힐링트리 콘텐츠 플래너</div>
       <div class="logo-sub">미카닥 박준규 DC PT</div>
@@ -746,20 +744,19 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       <span class="api-dot" id="api-dot"></span>
       <span id="api-status">API 키 설정</span>
     </button>
-    <button class="btn-prompt-settings" onclick="openPromptModal()">⚙️ 프롬프트</button>
-    <button type="button" class="btn-refresh-topics" onclick="refreshTopicsCurrent()">🔄 주제</button>
+    <button class="btn-prompt-settings" onclick="openPromptModal()">프롬프트</button>
     <button type="button" class="btn-drive-sync" id="btn-drive-sync" onclick="openDriveModal()">
       <span class="drive-btn-main" id="drive-btn-main">Drive</span>
       <span class="drive-btn-sub" id="drive-btn-sub">연동 안 됨</span>
     </button>
-    <button class="btn-add" id="add-toggle-btn" onclick="toggleAdd()">+ 추가</button>
+    <button class="btn-add" id="add-toggle-btn" onclick="toggleAdd()">추가</button>
   </div>
 </div>
 
 <!-- Category tabs (sticky under viewport top) -->
 
 <div class="sticky-cat-nav">
-  <div id="gen-status-bar" class="gen-status-bar">✨ 초안 생성 중…</div>
+  <div id="gen-status-bar" class="gen-status-bar"></div>
   <div class="cat-tabs-grid" id="cat-tabs-grid"></div>
 </div>
 
@@ -771,7 +768,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 
 <script>
 const CATEGORIES = [
-  { id:0, icon:"🦴", name:"도수치료",       color:"#2DD4BF", audience:"일반인",
+  { id:0, icon:"", name:"도수치료",       color:"#2DD4BF", audience:"일반인",
     sub:"연부 치료 · 관절치료",
     drafts:[
       {id:"d0-0", topic:"허리가 뻐근한 이유, 근육만의 문제가 아닙니다",        angle:"관절 구조와 연부조직이 함께 만들어내는 통증 메커니즘 설명"},
@@ -780,7 +777,7 @@ const CATEGORIES = [
       {id:"d0-3", topic:"연부조직 치료, 어디까지 해야 효과가 날까요?",         angle:"근막·인대·건 각각의 치료 접근과 적절한 치료 횟수 가이드"},
       {id:"d0-4", topic:"목·허리·어깨 중 가장 먼저 치료해야 할 곳은?",        angle:"연쇄 보상 패턴 설명으로 치료 순서의 중요성 강조"},
     ]},
-  { id:1, icon:"🏃", name:"리:얼 Movement",   color:"#7AF0C8", audience:"일반인",
+  { id:1, icon:"", name:"리:얼 Movement",   color:"#7AF0C8", audience:"일반인",
     sub:"Re-Alignment Movement Center — 패시브 스트레칭 · 기능운동 · 자세교정",
     drafts:[
       {id:"d1-0", topic:"스트레칭을 매일 해도 왜 몸이 안 풀릴까요?",           angle:"패시브 스트레칭의 올바른 방법과 잘못된 습관 교정"},
@@ -789,7 +786,7 @@ const CATEGORIES = [
       {id:"d1-3", topic:"앉아서 일하는 당신을 위한 3분 루틴",                  angle:"재택·사무직을 위한 척추-고관절 기능운동 시퀀스"},
       {id:"d1-4", topic:"걷기만 해도 자세가 교정된다, 가능한 이야기일까요?",   angle:"보행 패턴과 자세 교정의 연관성, 올바른 걷기 방법"},
     ]},
-  { id:2, icon:"✨", name:"얼굴 관리",       color:"#F0C87A", audience:"일반인",
+  { id:2, icon:"", name:"얼굴 관리",       color:"#F0C87A", audience:"일반인",
     sub:"얼굴 교정 · 작은얼굴",
     drafts:[
       {id:"d2-0", topic:"셀카에서 한쪽 얼굴만 작아 보이는 진짜 이유",          angle:"안면비대칭의 원인 — 습관, 교합, 경추 연관성 설명"},
@@ -798,7 +795,7 @@ const CATEGORIES = [
       {id:"d2-3", topic:"얼굴 비대칭 교정, 몇 번 받으면 티가 날까요?",        angle:"실제 케이스 기반 치료 기간 안내 + 기대치 조율"},
       {id:"d2-4", topic:"이중턱이 생기는 세 가지 구조적 이유",                 angle:"피부·지방·골격 요인을 분리해서 설명, 각각의 접근법"},
     ]},
-  { id:3, icon:"🩺", name:"CMT 전문가 교육", color:"#A78BFA", audience:"전문가",
+  { id:3, icon:"", name:"CMT 전문가 교육", color:"#A78BFA", audience:"전문가",
     sub:"도수치료 전문가 과정",
     drafts:[
       {id:"d3-0", topic:"촉진(Palpation)이 치료보다 먼저인 이유",               angle:"평가-치료 연결의 핵심, 실전 촉진 훈련의 필요성"},
@@ -807,7 +804,7 @@ const CATEGORIES = [
       {id:"d3-3", topic:"CMT에서 관절가동술을 쓰는 타이밍은?",                  angle:"HVLA와 LVLA의 선택 기준, 실전 판단 프레임 공유"},
       {id:"d3-4", topic:"환자가 '좋아졌다'고 할 때 치료사가 확인해야 할 것",   angle:"주관적 개선과 객관적 지표의 차이, 재발 방지 전략"},
     ]},
-  { id:4, icon:"🔬", name:"IFC 얼굴교육",   color:"#F07A9A", audience:"전문가",
+  { id:4, icon:"", name:"IFC 얼굴교육",   color:"#F07A9A", audience:"전문가",
     sub:"얼굴교정 전문가 과정",
     drafts:[
       {id:"d4-0", topic:"IFC 얼굴교정, 단순 마사지와 다른 점은 무엇인가?",     angle:"구조적 접근 vs 표면 접근의 차이, IFC 핵심 원리"},
@@ -816,7 +813,7 @@ const CATEGORIES = [
       {id:"d4-3", topic:"INDIBA와 IFC를 함께 사용할 때의 프로토콜",            angle:"기기와 도수 접근의 시너지 — 순서, 타이밍, 포인트"},
       {id:"d4-4", topic:"얼굴 비대칭 케이스에서 놓치기 쉬운 평가 포인트",      angle:"교합·턱관절·경추 복합 평가 체크리스트 공유"},
     ]},
-  { id:5, icon:"💡", name:"리:얼 Movement 전문가 과정", color:"#7AB8F0", audience:"전문가",
+  { id:5, icon:"", name:"리:얼 Movement 전문가 과정", color:"#7AB8F0", audience:"전문가",
     sub:"Re-Alignment Movement Center · 전문가 교육",
     drafts:[
       {id:"d5-0", topic:"패시브 스트레칭을 언제, 어떻게 써야 하는가?",          angle:"억제-이완 테크닉의 원리와 임상 적용 타이밍"},
@@ -825,7 +822,7 @@ const CATEGORIES = [
       {id:"d5-3", topic:"고관절 가동성 vs 안정성, 무엇이 먼저인가?",            angle:"기능 사슬(kinetic chain) 관점의 운동 처방 우선순위"},
       {id:"d5-4", topic:"운동 처방 시 환자 순응도를 높이는 커뮤니케이션 전략",  angle:"행동변화 이론 + 동기부여 인터뷰를 운동 지도에 적용"},
     ]},
-  { id:6, icon:"🧵", name:"쓰레드", color:"#F59E0B", audience:"일반인·전문가",
+  { id:6, icon:"", name:"쓰레드", color:"#F59E0B", audience:"일반인·전문가",
     sub:"전문 이슈 · 임상 썰 · 트렌드 — 짧은 글 이어 붙이기",
     drafts:[
       {id:"d6-0", topic:"'도수 받으면 중독된다'는 말, 어디까지 진짜일까", angle:"의존 vs 재활의 경계를 쓰레드로 풀기 — 과장·오해 정리"},
@@ -834,7 +831,7 @@ const CATEGORIES = [
       {id:"d6-3", topic:"패시브 스트레칭만으로 체형이 바뀐다는 주장에 대한 내 생각", angle:"가능한 범위·한계·함께 해야 할 기능운동까지 이어서"},
       {id:"d6-4", topic:"유튜브 셀프 교정 영상, 따라해도 되는 경우 / 안 되는 경우", angle:"전문가 시선에서 리스크 짚는 핫토픽 쓰레드"},
     ]},
-  { id:7, icon:"🏘", name:"힐자계", color:"#34D399", audience:"입주민",
+  { id:7, icon:"", name:"힐자계", color:"#34D399", audience:"입주민",
     sub:"힐스테이트 자이 계양 — PAR · P-스트레칭 · 자세 · 기능운동 · 작은얼굴",
     drafts:[
       {id:"d7-0", topic:"앉아만 있어도 목이 뻐근할 때, 먼저 확인해 보면 좋은 한 가지", angle:"거북목이라고 단정 짓기 전에 — 경추·어깨·호흡을 아주 쉽게"},
@@ -885,6 +882,43 @@ function isPhoneOrTablet(){
 function getThreadsProfileUsername(){
   const m = String(EXT_THREADS).match(/@([^/?#]+)/);
   return m ? m[1] : 'dr.park_dc.pt';
+}
+function getInstagramUsernameFromExt_(){
+  const m = String(EXT_INSTAGRAM_WEB || '').match(/instagram\.com\/([^/?#]+)/i);
+  return m ? m[1].replace(/\/$/, '') : 'dr.park_dc.pt';
+}
+/** 예전 초안: carousel이 있으면 캡션에 합쳐 붙여넣기용으로 사용 */
+function formatCarouselKeyPointsForCaption_(carousel){
+  if(!carousel || !carousel.length) return '';
+  return carousel
+    .map(function (c) {
+      if(!c) return '';
+      const t = String(c.title || '').trim();
+      const body = String(c.content || '').trim();
+      if(!t && !body) return '';
+      if(t && body) return '• ' + t + '\n' + body;
+      if(t) return '• ' + t;
+      return body;
+    })
+    .filter(Boolean)
+    .join('\n\n');
+}
+function getInstaCaptionBodyMerged_(ig){
+  if(!ig) return '';
+  const cap = String(ig.caption || '').trim();
+  const extra = formatCarouselKeyPointsForCaption_(ig.carousel);
+  if(!extra) return cap;
+  const firstLine = String((ig.carousel[0] && ig.carousel[0].title) || '').trim();
+  if(firstLine && cap.indexOf(firstLine) !== -1) return cap;
+  return cap ? cap + '\n\n' + extra : extra;
+}
+function getInstaFullPasteText_(ig){
+  if(!ig) return '';
+  const hook = String(ig.hook || '').trim();
+  const body = getInstaCaptionBodyMerged_(ig);
+  const mid = hook ? hook + (body ? '\n\n' + body : '') : body;
+  const tags = (ig.hashtags || []).map(function (h){ return '#' + h; }).join(' ');
+  return (mid + (tags ? '\n\n' + tags : '')).trim();
 }
 
 const DEFAULT_CHATGPT_IMAGE_PROJECT_URL = 'https://chatgpt.com/g/g-p-6a005d9f06c481918ae0a417388d5d61-imiji-saengseong/project';
@@ -961,32 +995,32 @@ const DEFAULT_PROMPTS = {
   categories: {
     0: { // 도수치료
       blog: `네이버 SEO를 고려해 제목을 작성하세요. 일반 환자가 공감할 수 있는 증상 묘사로 시작하고, 도수치료의 원리를 쉽게 풀어 설명합니다. 전문 용어는 최소화하고 따뜻하고 신뢰감 있는 톤을 유지하세요.`,
-      insta: `이미지 없이 텍스트만으로 후킹이 되어야 합니다. 첫 줄에서 멈추게 만드는 짧은 질문이나 공감 문장을 써주세요. 캐러셀은 통증 → 원인 → 해결 흐름으로 구성하세요.`,
+      insta: `캐러셀(여러 장 슬라이드) 없이 **한 포스트 캡션**으로 끝내세요. 첫 줄 후킹에 이어, 본문 캡션 안에 통증→원인→해결 흐름의 **핵심 포인트**를 번호(1. 2.) 또는 • 불릿으로 넣어 한 번에 읽히게 하세요.`,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
     },
     1: { // 리:얼 Movement
       blog: `스트레칭이나 운동 루틴을 소개할 때는 단계별로 명확하게 설명하세요. '왜 이 동작인지'를 먼저 설명하고, 일상에서 쉽게 적용할 수 있는 팁을 제공하세요.`,
-      insta: `영상 없이 텍스트+이미지 캐러셀로 운동 방법을 설명합니다. 각 슬라이드는 하나의 동작이나 포인트만 담고, 마지막 슬라이드는 반드시 저장 유도 문구로 마무리하세요.`,
+      insta: `캐러셀 없이 **한 포스트 캡션**에 동작·포인트·주의사항을 단계적으로 적습니다. 마지막에 저장·팔로우 유도 문장을 캡션 끝에 자연스럽게 넣으세요.`,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
     },
     2: { // 얼굴 관리
       blog: `얼굴 비대칭이나 윤곽에 관심 있는 20~40대 여성을 주 독자로 설정하세요. 과학적 근거를 바탕으로 하되 과도한 의학적 표현은 피하고, 공감과 희망을 주는 톤으로 작성하세요.`,
-      insta: `비포/애프터 느낌의 스토리텔링이 효과적입니다. "이런 고민 있으신가요?" 형식으로 시작해 문제 → 원인 → 해결책 → CTA 순서로 구성하세요.`,
+      insta: `캐러셀 없이 **한 포스트 캡션**으로 스토리텔링하세요. "이런 고민 있으신가요?"에 이어 문제→원인→해결→CTA를 캡션 안에서 줄바꿈으로 구분해 읽기 쉽게.`,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
     },
     3: { // CMT 전문가
       blog: `물리치료사, 카이로프랙터 등 임상 전문가를 대상으로 합니다. 이론과 실전의 간극을 좁히는 내용을 중심으로, 실제 케이스나 임상 경험을 자연스럽게 녹여주세요.`,
-      insta: `전문가 커뮤니티를 타깃으로 합니다. 교육 현장 사진과 함께 핵심 임상 인사이트를 전달하는 방식으로, 동료 전문가에게 말하듯 쓰세요.`,
+      insta: `전문가 타깃. 캐러셀 없이 **한 포스트 캡션**에 임상 인사이트·핵심 개념을 카드처럼 불릿으로 모아 동료에게 말하듯 밀도 있게.`,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
     },
     4: { // IFC 얼굴교육
       blog: `에스테틱과 의료의 경계에 있는 전문가들을 위한 콘텐츠입니다. IFC만의 차별점과 임상적 근거를 강조하고, 교육 참여를 자연스럽게 유도하세요.`,
-      insta: `얼굴 교정의 비포/애프터보다 교육 내용과 전문성을 강조하세요. 수강생 후기나 교육 현장 느낌을 담아 신뢰감을 줍니다.`,
+      insta: `교육·전문성 중심. 캐러셀 없이 **한 포스트 캡션**에 수강생에게 도움 되는 포인트를 정리하고, 신뢰·차별화가 드러나게.`,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
     },
     5: { // 리:얼 Movement 전문가
       blog: `운동 전문가, 재활 치료사를 대상으로 합니다. 움직임 철학과 임상 적용 방법을 함께 다루며, 리:얼 Movement(Re:Al)만의 접근 방식이 왜 다른지 명확히 설명하세요.`,
-      insta: `실습 현장 느낌을 살려 교육의 생생함을 전달하세요. 전문가들이 저장해두고 싶은 핵심 개념 카드 형식이 효과적입니다.`,
+      insta: `실습·교육 현장 느낌. 캐러셀 없이 **한 포스트 캡션**에 저장하고 싶은 핵심 개념을 불릿·짧은 문단으로 압축.`,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
     },
     6: { // 쓰레드 (생성은 쓰레드 JSON만 — 블로그/인스타/이미지 없음)
@@ -1004,7 +1038,6 @@ let state = {
   searchQ: '',
   published: {},
   generatedOnly: {},
-  topicLocks: {},
   localSavedAt: '',
   showAdd: false,
   newItem: { date:'', topic:'', catId:0, audience:'일반인' },
@@ -1027,7 +1060,6 @@ function getPersistPayload(){
   var payload = {
     published: state.published,
     generatedOnly: state.generatedOnly,
-    topicLocks: state.topicLocks,
     localSavedAt: state.localSavedAt,
     apiKey: state.apiKey,
     chatgptOpenUrl: state.chatgptOpenUrl,
@@ -1063,7 +1095,6 @@ function applyPersistPayload(s){
   if(!s) return;
   state.published = s.published || {};
   state.generatedOnly = s.generatedOnly || {};
-  state.topicLocks = s.topicLocks || {};
   state.localSavedAt = s.localSavedAt || '';
   state.apiKey = s.apiKey || '';
   state.chatgptOpenUrl = s.chatgptOpenUrl || '';
@@ -1523,11 +1554,11 @@ function saveKey() {
   const urlIn = document.getElementById('chatgpt-open-url') ? document.getElementById('chatgpt-open-url').value : '';
   const errEl = document.getElementById('api-error');
   errEl.textContent = '';
-  if(!v && !state.apiKey){ errEl.textContent = '❌ API 키를 입력해주세요'; return; }
+  if(!v && !state.apiKey){ errEl.textContent = 'API 키를 입력해주세요'; return; }
   if(v) state.apiKey = v;
   const nu = normalizeChatgptOpenUrl(urlIn);
   if(nu === '__invalid__'){
-    errEl.textContent = '❌ ChatGPT 주소는 chatgpt.com 또는 chat.openai.com 만 허용됩니다';
+    errEl.textContent = 'ChatGPT 주소는 chatgpt.com 또는 chat.openai.com 만 허용됩니다';
     return;
   }
   state.chatgptOpenUrl = nu === '' ? '' : nu;
@@ -1548,16 +1579,29 @@ function updateApiBadge() {
 }
 
 // ── Tabs ──
-function renderTabs() {
-  function isDraftDone(id){
-    return !!(state.generatedOnly[id] || (state.published[id] && state.published[id].content));
-  }
-  function doneCountForCat(idx){
+function getSortedCatTabOrder() {
+  const flat = CAT_TAB_NAV_ROWS[0].concat(CAT_TAB_NAV_ROWS[1]);
+  function doneCountForCat(idx) {
     const cat = CATEGORIES[idx];
-    if(!cat || !cat.drafts) return 0;
+    if (!cat || !cat.drafts) return 0;
     let n = 0;
-    cat.drafts.forEach(function(d){
-      if(d && d.id && isDraftDone(d.id)) n++;
+    cat.drafts.forEach(function (d) {
+      if (d && d.id && (state.generatedOnly[d.id] || (state.published[d.id] && state.published[d.id].content))) n++;
+    });
+    return n;
+  }
+  const withDrafts = flat.filter(function (i) { return doneCountForCat(i) > 0; });
+  const without = flat.filter(function (i) { return doneCountForCat(i) === 0; });
+  return withDrafts.concat(without);
+}
+
+function renderTabs() {
+  function doneCountForCat(idx) {
+    const cat = CATEGORIES[idx];
+    if (!cat || !cat.drafts) return 0;
+    let n = 0;
+    cat.drafts.forEach(function (d) {
+      if (d && d.id && (state.generatedOnly[d.id] || (state.published[d.id] && state.published[d.id].content))) n++;
     });
     return n;
   }
@@ -1565,9 +1609,19 @@ function renderTabs() {
     const c = CATEGORIES[idx];
     const label = CAT_TAB_SHORT[idx] || c.name;
     const done = doneCountForCat(idx);
-    return `<button type="button" class="cat-tab${state.currentCat === idx ? ' active' : ''}" onclick="selectCat(${idx})">${c.icon} ${label}<span class="cat-tab-badge" title="완성된 초안">${done}</span></button>`;
+    return (
+      '<button type="button" class="cat-tab' +
+      (state.currentCat === idx ? ' active' : '') +
+      '" onclick="selectCat(' +
+      idx +
+      ')"><span class="cat-tab-label">' +
+      label +
+      '</span><span class="cat-tab-badge" title="완성된 초안">' +
+      done +
+      '</span></button>'
+    );
   }
-  const order = CAT_TAB_NAV_ROWS[0].concat(CAT_TAB_NAV_ROWS[1]);
+  const order = getSortedCatTabOrder();
   document.getElementById('cat-tabs-grid').innerHTML = order.map(cellHTML).join('');
 }
 
@@ -1609,7 +1663,7 @@ function renderMain() {
   const alertHTML = firstUnpub ? `
     <div class="alert-banner" onclick="openDetail('${firstUnpub.id}',${cat.id})">
       <div class="alert-banner-text">
-        <div class="alert-banner-title">📝 다음 발행 추천</div>
+        <div class="alert-banner-title">다음 발행 추천</div>
         <div class="alert-banner-topic">${firstUnpub.topic}</div>
         <div class="alert-banner-meta">${cat.name} · ${cat.audience}</div>
       </div>
@@ -1643,7 +1697,7 @@ function renderMain() {
   const recs = getRecommended(state.currentCat);
   let recHTML = '';
   if(recs.length > 0 && state.filterStatus==='전체' && !state.searchQ){
-    recHTML = `<div class="rec-section-title">⭐ 이번에 추천하는 초안 <span style="font-weight:400;font-size:10px;color:#C0C0C0">관련 3개 + 호응예상 2개</span></div>` +
+    recHTML = `<div class="rec-section-title">이번에 추천하는 초안 <span style="font-weight:400;font-size:10px;color:#C0C0C0">관련 3개 + 호응예상 2개</span></div>` +
       recs.map(d => draftCardHTML(d, cat, true)).join('') +
       `<div class="rec-divider"></div><div class="rec-section-title" style="margin-bottom:4px;">전체 초안</div>`;
   }
@@ -1663,16 +1717,15 @@ function draftCardHTML(d, cat, isRec) {
   const hasContent = pub?.content || state.generatedOnly[d.id];
   const isPub = !!pub?.date;
   const color = isRec && d.recType==='trending' ? '#F59E0B' : cat.color;
-  const isLocked = !!(state.topicLocks && state.topicLocks[d.id]);
   const badges = [
     `<span class="badge badge-aud">${cat.audience}</span>`,
-    isRec && d.recType==='related' ? '<span class="badge badge-rec">🔗 관련</span>' : '',
-    isRec && d.recType==='trending' ? `<span class="badge badge-rec">⭐ ${d.fromCat}</span>` : '',
-    isLocked ? '<span class="badge badge-rec">🔒 잠금</span>' : '',
-    hasContent ? '<span class="badge badge-gen">📝 초안있음</span>' : '',
-    isPub ? '<span class="badge badge-pub">✓ 발행완료</span>' : '',
+    isRec && d.recType==='related' ? '<span class="badge badge-rec">관련</span>' : '',
+    isRec && d.recType==='trending' ? `<span class="badge badge-rec">호응예상 · ${d.fromCat}</span>` : '',
+    hasContent ? '<span class="badge badge-gen">초안있음</span>' : '',
+    isPub ? '<span class="badge badge-pub">발행완료</span>' : '',
   ].filter(Boolean).join('');
   return `<div class="draft-card${isPub?' published':''}${isRec?' recommended':''}" style="--cc:${color}" onclick="openDetail('${d.id}',${cat.id})">
+    <button type="button" class="draft-card-refresh-mini" title="이 주제의 제목·각도만 다시 받기" onclick="event.stopPropagation();refreshTopicsForDraft(${cat.id},'${d.id}')">주제 변경</button>
     <div class="card-badges">${badges}</div>
     <div class="card-topic">${d.topic}</div>
     <div class="card-angle">${d.angle}</div>
@@ -1688,14 +1741,14 @@ function setSearch(v){ state.searchQ=v; renderMain(); }
 
 function toggleAdd(){
   state.showAdd = !state.showAdd;
-  document.getElementById('add-toggle-btn').textContent = state.showAdd ? '✕ 닫기' : '+ 추가';
+  document.getElementById('add-toggle-btn').textContent = state.showAdd ? '닫기' : '추가';
   renderMain();
 }
 
 function renderAddForm(){
-  const catOpts = CATEGORIES.map((c,i)=>`<option value="${i}"${state.newItem.catId===i?' selected':''}>${c.icon} ${c.name}</option>`).join('');
+  const catOpts = CATEGORIES.map((c,i)=>`<option value="${i}"${state.newItem.catId===i?' selected':''}>${c.name}</option>`).join('');
   return `<div class="add-form">
-    <div class="form-title">📅 새 주제 추가</div>
+    <div class="form-title">새 주제 추가</div>
     <div class="form-field">
       <label class="form-label">카테고리</label>
       <select class="form-select" onchange="setNewCat(this.value)">${catOpts}</select>
@@ -1723,27 +1776,25 @@ function addDraft(){
   cat.drafts.push({ id, topic: state.newItem.topic, angle: state.newItem.audience+'을 위한 콘텐츠' });
   state.newItem = { date:'', topic:'', catId: state.newItem.catId, audience:'일반인' };
   state.showAdd = false;
-  document.getElementById('add-toggle-btn').textContent = '+ 추가';
+  document.getElementById('add-toggle-btn').textContent = '추가';
   state.currentCat = cat.id;
   renderTabs(); renderMain();
   save();
 }
 
-window.refreshTopicsCurrent = async function(){
+window.refreshTopicsForCat = async function(catId){
   if(!state.apiKey){ openApiModal(); return; }
-  const catId = state.currentCat;
   const cat = CATEGORIES[catId];
   if(!cat) return;
-  const locked = state.topicLocks || {};
-  const unlocked = (cat.drafts || []).filter(function(d){ return d && d.id && !locked[d.id]; });
-  if(unlocked.length === 0){
-    if(typeof setAppToast === 'function') setAppToast('잠금(🔒)된 주제만 있어서 리프레쉬할 항목이 없어요.', { duration: 4200 });
+  const list = (cat.drafts || []).filter(function(d){ return d && d.id; });
+  if(list.length === 0){
+    if(typeof setAppToast === 'function') setAppToast('이 카테고리에 리프레쉬할 주제가 없어요.', { duration: 3200 });
     return;
   }
-  if(typeof setAppToast === 'function') setAppToast('주제를 리프레쉬하고 있어요…', { duration: 2600 });
+  if(typeof setAppToast === 'function') setAppToast('「' + cat.name + '」 주제를 리프레쉬하고 있어요…', { duration: 2600 });
 
   const avoidTopics = (cat.drafts || []).map(function(d){ return d && d.topic ? d.topic : ''; }).filter(Boolean).slice(0, 80);
-  const ids = unlocked.map(function(d){ return d.id; });
+  const ids = list.map(function(d){ return d.id; });
 
   const prompt =
 `당신은 콘텐츠 기획자입니다.
@@ -1806,7 +1857,6 @@ ${ids.join(', ')}`;
     });
 
     if(changed > 0){
-      // 디테일 시트가 열려 있고, 현재 선택된 주제의 제목이 바뀐 경우 반영
       if(state.selectedId){
         const cur = cat.drafts.find(function(d){ return d.id === state.selectedId; });
         if(cur){
@@ -1817,10 +1867,96 @@ ${ids.join(', ')}`;
       renderTabs();
       renderMain();
       save({ driveImmediate: true });
-      if(typeof setAppToast === 'function') setAppToast('주제를 리프레쉬했어요. (잠금은 그대로 유지)', { duration: 4200, variant: 'ok' });
+      if(typeof setAppToast === 'function') setAppToast('주제를 리프레쉬했어요.', { duration: 4200, variant: 'ok' });
     } else {
       if(typeof setAppToast === 'function') setAppToast('바뀐 주제가 없어요. 다시 한 번 눌러주세요.', { duration: 3200 });
     }
+  } catch(e){
+    const msg = String((e && e.message) ? e.message : e);
+    if(typeof setAppToast === 'function') setAppToast('주제 리프레쉬에 실패했어요.\n' + msg, { duration: 6500, variant: 'err' });
+  }
+};
+
+window.refreshTopicsForDraft = async function(catId, draftId){
+  if(!state.apiKey){ openApiModal(); return; }
+  const cat = CATEGORIES[catId];
+  if(!cat || !draftId) return;
+  const d = (cat.drafts || []).find(function(x){ return x && x.id === draftId; });
+  if(!d){
+    if(typeof setAppToast === 'function') setAppToast('주제를 찾을 수 없어요.', { duration: 3200 });
+    return;
+  }
+  if(typeof setAppToast === 'function'){
+    const t0 = d.topic || '주제';
+    const short = t0.length > 26 ? t0.slice(0, 26) + '…' : t0;
+    setAppToast('「' + short + '」 주제를 리프레쉬하고 있어요…', { duration: 2600 });
+  }
+
+  const avoidTopics = (cat.drafts || [])
+    .map(function(x){ return x && x.topic ? x.topic : ''; })
+    .filter(Boolean)
+    .slice(0, 80);
+
+  const prompt =
+`당신은 콘텐츠 기획자입니다.
+카테고리: ${cat.name} (${cat.sub})
+독자: ${cat.audience}
+
+아래 ID 한 건에 대해 "topic"과 "angle"을 새로 만들어 주세요.
+- topic: 한국어 한 줄(너무 길지 않게, 15~32자 정도, 후킹/질문형 가능)
+- angle: 이 주제를 어떤 관점으로 풀지 한 줄(신뢰/오해해소/실천팁/메커니즘 등)
+
+[중복 금지]
+아래 기존 topic들과 최대한 겹치지 않게:
+${avoidTopics.map(t=>' - '+t).join('\n')}
+
+[출력]
+반드시 JSON 배열만 출력 (원소 1개):
+[
+  {"id":"${draftId}","topic":"...","angle":"..."}
+]`;
+
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': state.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 800,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error((data.error && data.error.message) ? data.error.message : ('HTTP ' + res.status));
+    const text = (data.content || []).filter(b=>b.type==='text').map(b=>b.text).join('');
+    const raw = text.replace(/^```json\s*/i, '').replace(/```\s*$/g, '').trim();
+    const arr = JSON.parse(raw);
+    if(!Array.isArray(arr) || !arr[0]) throw new Error('형식이 올바르지 않아요 (JSON 배열 1개 필요)');
+    const u = arr[0];
+    if(!u || String(u.id) !== String(draftId)) throw new Error('응답 ID가 일치하지 않아요');
+
+    const nt = String(u.topic || '').trim();
+    const na = String(u.angle || '').trim();
+    if(nt) d.topic = nt;
+    if(na) d.angle = na;
+    if(!nt && !na){
+      if(typeof setAppToast === 'function') setAppToast('바뀐 주제가 없어요. 다시 한 번 눌러주세요.', { duration: 3200 });
+      return;
+    }
+
+    if(state.selectedId === draftId){
+      const ttl = document.getElementById('sheet-title');
+      if(ttl) ttl.textContent = d.topic;
+    }
+    renderTabs();
+    renderMain();
+    save({ driveImmediate: true });
+    if(typeof setAppToast === 'function') setAppToast('이 주제를 리프레쉬했어요.', { duration: 4200, variant: 'ok' });
   } catch(e){
     const msg = String((e && e.message) ? e.message : e);
     if(typeof setAppToast === 'function') setAppToast('주제 리프레쉬에 실패했어요.\n' + msg, { duration: 6500, variant: 'err' });
@@ -1836,35 +1972,12 @@ function openDetail(draftId, catId) {
   state.selectedCatId = catId;
   state.activeTab = isThreadCategory(catId) ? 'thread' : (isHeiljagyaeCategory(catId) ? 'community' : 'blog');
   document.getElementById('sheet-title').textContent = draft.topic;
-  updateSheetLockButton_();
   const pub = state.published[draftId];
   const content = pub?.content || state.generatedOnly[draftId];
   if(content){ renderSheetContent(content); }
   else { renderSheetEmpty(draft, cat); }
   document.getElementById('detail-overlay').classList.add('open');
   setTimeout(()=>document.getElementById('detail-sheet').classList.add('open'), 10);
-}
-
-function updateSheetLockButton_(){
-  const btn = document.getElementById('sheet-lock-btn');
-  if(!btn) return;
-  const id = state.selectedId;
-  const on = !!(id && state.topicLocks && state.topicLocks[id]);
-  btn.classList.toggle('on', on);
-  btn.textContent = on ? '🔒' : '🔓';
-  btn.title = on ? '이 주제는 리프레쉬에서 제외됩니다' : '리프레쉬에서 제외하려면 잠그기';
-}
-
-function toggleTopicLock(){
-  const id = state.selectedId;
-  if(!id) return;
-  if(!state.topicLocks) state.topicLocks = {};
-  if(state.topicLocks[id]) delete state.topicLocks[id];
-  else state.topicLocks[id] = true;
-  updateSheetLockButton_();
-  renderMain();
-  renderTabs();
-  save({ driveImmediate: true });
 }
 
 function renderSheetEmpty(draft, cat) {
@@ -1876,7 +1989,6 @@ function renderSheetEmpty(draft, cat) {
   document.getElementById('sheet-body').innerHTML = `
     <div style="padding:10px 0 20px;font-size:13px;color:#9CA3AF;line-height:1.7;">${draft.angle}</div>
     <div style="background:#F8F7F4;border-radius:12px;padding:28px 20px;text-align:center;">
-      <div style="font-size:36px;margin-bottom:12px;">✨</div>
       <div style="font-size:14px;color:#6B7280;line-height:1.7;margin-bottom:20px;">${genLine}</div>
       <button onclick="genContent()" style="background:linear-gradient(135deg,#2DD4BF,#0EA5E9);color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">초안 생성하기</button>
     </div>`;
@@ -1894,7 +2006,7 @@ function renderSheetContent(content) {
     const th = normalizeThreadBlock(content.thread);
     if(!th || !th.summary){
       bodyHTML = tabsHTML + `<p class="empty-note" style="padding:12px 0;">쓰레드 초안이 없어요. 아래에서 다시 생성해 주세요.</p>
-        <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:8px;">🔄 초안 다시 생성</button>`;
+        <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:8px;">초안 다시 생성</button>`;
     } else {
       const fullThread = getThreadPlainText(th);
       const preview = '<div class="thread-summary-wrap">' +
@@ -1919,22 +2031,21 @@ function renderSheetContent(content) {
       </div>`;
   } else if(tab==='insta'){
     const ig = content.insta;
+    const mergedBody = getInstaCaptionBodyMerged_(ig);
+    const instaCaptionCopy = ((ig.hook || '').trim() ? String(ig.hook).trim() + '\n\n' : '') + mergedBody;
+    const igTags = (ig.hashtags || []).map(function(h){ return '#' + h; }).join(' ');
     bodyHTML = tabsHTML + `
-      ${cb('첫 줄 후킹', `<div class="cb-box cb-title">${ig.hook}</div>`, ig.hook)}
-      ${cb('캡션', `<div class="cb-box">${ig.caption}</div>`, ig.hook+'\n\n'+ig.caption)}
-      <div class="cb"><div class="cb-label">캐러셀 슬라이드</div>
-        ${ig.carousel.map(c=>`<div class="carousel-item"><span class="slide-badge">S${c.slide}</span><div><strong style="font-size:13px;color:#1A1A1A;display:block;margin-bottom:3px;">${escapeHtml(c.title)}</strong><span style="font-size:12px;color:#6B7280;white-space:pre-wrap;">${escapeHtml(c.content)}</span></div></div>`).join('')}
-        <button type="button" class="btn-carousel-dl" onclick="downloadInstaCarouselPngs(this)">🖼 캐러셀 슬라이드 PNG로 저장 (${(ig.carousel||[]).length}장)</button>
-        <p class="carousel-dl-hint">텍스트만 캔버스로 그려 4:5 비율(인스타 피드) PNG로 내려받습니다. 사진·일러스트는 포함되지 않아요.</p>
+      ${cb('첫 줄 후킹', `<div class="cb-box cb-title">${escapeHtml(ig.hook)}</div>`, ig.hook)}
+      ${cb('캡션 (한 포스트 · 핵심 포함)', `<div class="cb-box" style="white-space:pre-wrap;">${escapeHtml(mergedBody)}</div>`, instaCaptionCopy)}
+      <div class="cb"><div class="cb-label">해시태그 <button class="copy-btn" onclick="cp(this,\`${esc(igTags)}\`)">복사</button></div>
+        <div class="tag-row">${(ig.hashtags || []).map(h=>`<span class="tag">#${escapeHtml(h)}</span>`).join('')}</div>
       </div>
-      <div class="cb"><div class="cb-label">해시태그 <button class="copy-btn" onclick="cp(this,'${ig.hashtags.map(h=>'#'+h).join(' ')}')">복사</button></div>
-        <div class="tag-row">${ig.hashtags.map(h=>`<span class="tag">#${h}</span>`).join('')}</div>
-      </div>`;
+      <p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">캐러셀(여러 장) 대신, 위 캡션에 포인트를 모두 넣었어요. 예전 초안에 슬라이드 데이터가 있으면 자동으로 이 캡션에 합쳐져요.</p>`;
   } else if(tab==='notebooklm'){
     const nl = content.notebookLM;
     if(!nl){
       bodyHTML = tabsHTML + `<p class="empty-note" style="padding:12px 0;">노트북 LM용 Q&A 초안이 없어요. 초안을 다시 생성하면 함께 만들어져요.</p>
-        <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:8px;">🔄 초안 다시 생성</button>`;
+        <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:8px;">초안 다시 생성</button>`;
     } else {
       const exportText = formatNotebookLMExportText(nl);
       const qaHtml = (nl.qa && nl.qa.length)
@@ -1966,7 +2077,7 @@ function renderSheetContent(content) {
     const co = content.community;
     if(!co){
       bodyHTML = tabsHTML + `<p class="empty-note" style="padding:12px 0;">커뮤니티 초안이 없어요. 초안을 다시 생성하면 함께 만들어져요.</p>
-        <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:8px;">🔄 초안 다시 생성</button>`;
+        <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:8px;">초안 다시 생성</button>`;
     } else {
       const fullPost = formatCommunityPostText(co);
       const bulletsHtml = (co.empathyBullets && co.empathyBullets.length)
@@ -1979,7 +2090,7 @@ function renderSheetContent(content) {
         <div class="cb-box" style="white-space:pre-wrap;margin-bottom:8px;">${escapeHtml(co.empathyLead || '')}</div>
         ${bulletsHtml}</div>
         ${cb('2. 전문 설명', `<div class="cb-box" style="white-space:pre-wrap;line-height:1.7;">${escapeHtml(co.explanation || '')}</div>`, co.explanation || '')}
-        ${cb('3. 셀프 케어 팁 (👉)', `<div class="cb-box" style="white-space:pre-wrap;line-height:1.7;">${escapeHtml(co.selfCare || '')}</div>`, co.selfCare || '')}
+        ${cb('3. 셀프 케어 팁', `<div class="cb-box" style="white-space:pre-wrap;line-height:1.7;">${escapeHtml(co.selfCare || '')}</div>`, co.selfCare || '')}
         ${cb('마무리 (고정)', `<div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">${escapeHtml(COMMUNITY_FIXED_CLOSING)}</div>`, COMMUNITY_FIXED_CLOSING)}
         ${cb('게시판 붙여넣기 (전체)', `<div class="cb-box" style="white-space:pre-wrap;font-size:12px;line-height:1.7;max-height:240px;overflow-y:auto;">${escapeHtml(fullPost)}</div>`, fullPost)}`;
     }
@@ -1994,10 +2105,10 @@ function renderSheetContent(content) {
   else if(isHeiljagyaeCategory(state.selectedCatId) && state.activeTab === 'images') goTab = null;
   const goBtn = goTab ? getSheetGoButtonHTML(goTab) : '';
   document.getElementById('sheet-actions').innerHTML = `
-    <button type="button" class="btn-regen" onclick="genContent()">🔄 재생성</button>
-    <button type="button" class="btn-gen-big btn-sheet-copy" onclick="copyCurrentTab(this)" style="background:#F3F4F6;color:#374151;flex:1;min-width:72px;">📋 복사</button>
+    <button type="button" class="btn-regen" onclick="genContent()">재생성</button>
+    <button type="button" class="btn-gen-big btn-sheet-copy" onclick="copyCurrentTab(this)" style="background:#F3F4F6;color:#374151;flex:1;min-width:72px;">복사</button>
     ${goBtn}
-    ${!isPub ? `<button type="button" class="btn-pub" onclick="markPub()">✅ 발행완료</button>` : '<span style="font-size:12px;color:#16A34A;font-weight:700;padding:0 4px;">✓ 발행됨</span>'}`;
+    ${!isPub ? `<button type="button" class="btn-pub" onclick="markPub()">발행완료</button>` : '<span style="font-size:12px;color:#16A34A;font-weight:700;padding:0 4px;">발행됨</span>'}`;
 }
 
 window.getFullCopy = function(){
@@ -2014,7 +2125,7 @@ window.getFullCopy = function(){
   }
   const ig = content.insta;
   if(ig){
-    t += `\n\n[인스타]\n${ig.hook}\n\n${ig.caption}\n\n${ig.hashtags.map(h=>'#'+h).join(' ')}`;
+    t += `\n\n[인스타]\n` + getInstaFullPasteText_(ig);
   }
   const com = content.community;
   if(com){
@@ -2054,12 +2165,7 @@ function getTabCopyText(tab, content){
   if(tab === 'insta'){
     const ig = content.insta;
     if(!ig) return '';
-    let t = '[인스타]\n' + (ig.hook || '') + '\n\n' + (ig.caption || '') + '\n\n';
-    (ig.carousel || []).forEach(function(c){
-      t += '\n[S' + c.slide + '] ' + (c.title || '') + '\n' + (c.content || '') + '\n';
-    });
-    t += '\n' + (ig.hashtags || []).map(function(h){ return '#' + h; }).join(' ');
-    return t.trim();
+    return '[인스타]\n' + getInstaFullPasteText_(ig);
   }
   if(tab === 'community'){
     const c = content.community;
@@ -2097,7 +2203,7 @@ window.copyCurrentTab = function(btn){
   }
   const label = btn ? btn.textContent : '';
   navigator.clipboard.writeText(text).then(function(){
-    if(btn){ btn.textContent = '✓ 복사됨'; setTimeout(function(){ btn.textContent = label || '📋 복사'; }, 1600); }
+    if(btn){ btn.textContent = '복사됨'; setTimeout(function(){ btn.textContent = label || '복사'; }, 1600); }
   }).catch(function(){
     alert('클립보드 복사에 실패했어요. 브라우저에서 권한을 허용했는지 확인해 주세요.');
   });
@@ -2113,31 +2219,54 @@ window.openExternalNaverBlog = function(){
     window.location.href = 'intent://blog.naver.com/allenjoy#Intent;scheme=https;package=com.nhn.android.blog;S.browser_fallback_url=' + encodeURIComponent(u) + ';end';
     return;
   }
-  // iOS·iPad: 네이버 앱 인앱 브라우저(공식 scheme) → 미설치 시 웹
   const naverApp = 'naversearchapp://inappbrowser?url=' + encodeURIComponent(u) + '&target=new&version=6';
   window.location.href = naverApp;
   setTimeout(function(){
     if(document.hidden) return;
+    window.location.href = u;
+  }, 450);
+  setTimeout(function(){
+    if(document.hidden) return;
     window.open(u, '_blank', 'noopener,noreferrer');
-  }, 900);
+  }, 1100);
 };
 
 window.openExternalInstagram = function(){
   const u = EXT_INSTAGRAM_WEB;
-  if(isPhoneOrTablet()){
-    window.location.href = 'instagram://user?username=dr.park_dc.pt';
+  const user = getInstagramUsernameFromExt_();
+  if(!isPhoneOrTablet()){
+    window.open(u, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  if(isAndroidDevice()){
+    const profileU = 'https://www.instagram.com/' + user.replace(/^@/, '') + '/';
+    window.location.href =
+      'intent://www.instagram.com/' +
+      user.replace(/^@/, '') +
+      '/#Intent;scheme=https;package=com.instagram.android;S.browser_fallback_url=' +
+      encodeURIComponent(profileU) +
+      ';end';
     setTimeout(function(){
       if(document.hidden) return;
       window.open(u, '_blank', 'noopener,noreferrer');
     }, 900);
     return;
   }
-  window.open(u, '_blank', 'noopener,noreferrer');
+  window.location.href = 'instagram://user?username=' + encodeURIComponent(user);
+  setTimeout(function(){
+    if(document.hidden) return;
+    window.location.href = u;
+  }, 450);
+  setTimeout(function(){
+    if(document.hidden) return;
+    window.open(u, '_blank', 'noopener,noreferrer');
+  }, 1100);
 };
 
 window.openExternalThreads = function(){
   const u = EXT_THREADS;
   const uname = getThreadsProfileUsername();
+  const threadsNet = 'https://www.threads.net/@' + encodeURIComponent(uname);
   if(!isPhoneOrTablet()){
     window.open(u, '_blank', 'noopener,noreferrer');
     return;
@@ -2146,8 +2275,12 @@ window.openExternalThreads = function(){
     window.location.href = 'barcelona://user?username=' + encodeURIComponent(uname);
     setTimeout(function(){
       if(document.hidden) return;
+      window.location.href = threadsNet;
+    }, 450);
+    setTimeout(function(){
+      if(document.hidden) return;
       window.open(u, '_blank', 'noopener,noreferrer');
-    }, 900);
+    }, 1100);
     return;
   }
   window.location.href = 'intent:#Intent;action=android.intent.action.VIEW;data=' + encodeURIComponent(u) + ';package=com.instagram.barcelona;S.browser_fallback_url=' + encodeURIComponent(u) + ';end';
@@ -2164,12 +2297,15 @@ window.openNotebookLM = function(){
     return;
   }
   if(isIOSLikeDevice()){
-    // NotebookLM 전용 iOS 앱 없음 → Chrome 앱이 있으면 그쪽으로(사파리 단독 회피)
     window.location.href = 'googlechromes://notebooklm.google.com/';
     setTimeout(function(){
       if(document.hidden) return;
+      window.location.href = u;
+    }, 450);
+    setTimeout(function(){
+      if(document.hidden) return;
       window.open(u, '_blank', 'noopener,noreferrer');
-    }, 900);
+    }, 1100);
     return;
   }
   window.location.href = 'intent://notebooklm.google.com/#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(u) + ';end';
@@ -2319,7 +2455,7 @@ window.downloadInstaCarouselPngs = async function(btn){
   }
   if(btn){
     btn.disabled = false;
-    btn.textContent = '🖼 캐러셀 슬라이드 PNG로 저장 (' + list.length + '장)';
+    btn.textContent = '캐러셀 슬라이드 PNG로 저장 (' + list.length + '장)';
   }
 };
 
@@ -2339,15 +2475,15 @@ function buildSheetTabsHTML(tab){
   }
   if(isHeiljagyaeCategory(cid)){
     return `<div class="sheet-tabs-scroll"><div class="sheet-tabs">
-    <button type="button" class="sheet-tab${tab==='community'?' active':''}" onclick="switchTab('community')">🏘 게시판</button>
-    <button type="button" class="sheet-tab${tab==='images'?' active':''}" onclick="switchTab('images')">🖼 이미지 (2)</button>
+    <button type="button" class="sheet-tab${tab==='community'?' active':''}" onclick="switchTab('community')">게시판</button>
+    <button type="button" class="sheet-tab${tab==='images'?' active':''}" onclick="switchTab('images')">이미지 (2)</button>
   </div></div>`;
   }
   return `<div class="sheet-tabs-scroll"><div class="sheet-tabs">
-    <button type="button" class="sheet-tab${tab==='blog'?' active':''}" onclick="switchTab('blog')">📝 블로그</button>
-    <button type="button" class="sheet-tab${tab==='insta'?' active':''}" onclick="switchTab('insta')">📱 인스타</button>
-    <button type="button" class="sheet-tab${tab==='notebooklm'?' active':''}" onclick="switchTab('notebooklm')">📓 노트북 LM</button>
-    <button type="button" class="sheet-tab${tab==='images'?' active':''}" onclick="switchTab('images')">🖼 이미지</button>
+    <button type="button" class="sheet-tab${tab==='blog'?' active':''}" onclick="switchTab('blog')">블로그</button>
+    <button type="button" class="sheet-tab${tab==='insta'?' active':''}" onclick="switchTab('insta')">인스타</button>
+    <button type="button" class="sheet-tab${tab==='notebooklm'?' active':''}" onclick="switchTab('notebooklm')">노트북 LM</button>
+    <button type="button" class="sheet-tab${tab==='images'?' active':''}" onclick="switchTab('images')">이미지</button>
   </div></div>`;
 }
 
@@ -2508,7 +2644,7 @@ function buildImageTabBody(content){
   const imgCap = isHeiljagyaeCategory(state.selectedCatId) ? 2 : 5;
   if(!im){
     return `<p class="empty-note" style="padding:0;">이 초안에는 이미지 추천이 없어요. 초안을 다시 생성하면 함께 만들어져요.</p>
-      <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:12px;">🔄 초안·이미지 다시 생성</button>`;
+      <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:12px;">초안·이미지 다시 생성</button>`;
   }
   const gpt = (im.gptVisuals || []).filter(function(s){ return s && s.prompt; }).slice(0, imgCap);
 
@@ -2541,7 +2677,7 @@ function buildImageTabBody(content){
     }
   }
 
-  html += '<div class="img-tool-hint">웹 브라우저는 보안상 다른 사이트 입력창에 자동으로 글을 넣을 수 없어요. 버튼을 누르면 <strong>프롬프트가 클립보드에 복사</strong>된 뒤 ChatGPT가 열립니다. 채팅 입력란에 <strong>Ctrl+V</strong>로 붙여넣기 하세요.<br/><br/>같은 프로젝트·채팅방에서 이미지를 모으려면 상단 <strong>API 키 설정</strong> 모달에서 <strong>ChatGPT 이미지 프로젝트 열기 주소</strong>에 주소창 URL을 저장하세요. <button type="button" onclick="openApiModal()" style="margin-top:6px;background:#F3F4F6;border:none;border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer;font-family:inherit;">🔗 주소 저장하기</button></div>';
+  html += '<div class="img-tool-hint">웹 브라우저는 보안상 다른 사이트 입력창에 자동으로 글을 넣을 수 없어요. 버튼을 누르면 <strong>프롬프트가 클립보드에 복사</strong>된 뒤 ChatGPT가 열립니다. 채팅 입력란에 <strong>Ctrl+V</strong>로 붙여넣기 하세요.<br/><br/>같은 프로젝트·채팅방에서 이미지를 모으려면 상단 <strong>API 키 설정</strong> 모달에서 <strong>ChatGPT 이미지 프로젝트 열기 주소</strong>에 주소창 URL을 저장하세요. <button type="button" onclick="openApiModal()" style="margin-top:6px;background:#F3F4F6;border:none;border-radius:8px;padding:6px 12px;font-size:11px;cursor:pointer;font-family:inherit;">주소 저장하기</button></div>';
 
   return html;
 }
@@ -2554,7 +2690,7 @@ window.copyOpenImageTool = function(btn){
   var label = btn.textContent;
   navigator.clipboard.writeText(prompt).then(function(){
     window.open(url, '_blank', 'noopener,noreferrer');
-    btn.textContent = '✓ 복사 후 이동함';
+    btn.textContent = '복사 후 이동함';
     setTimeout(function(){ btn.textContent = label; }, 2200);
   }).catch(function(){
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -2568,7 +2704,7 @@ window.copyPromptOnly = function(btn){
   if(!prompt) return;
   var label = btn.textContent;
   navigator.clipboard.writeText(prompt).then(function(){
-    btn.textContent = '✓ 복사됨';
+    btn.textContent = '복사됨';
     setTimeout(function(){ btn.textContent = label; }, 1500);
   }).catch(function(){
     window.prompt('복사할 프롬프트:', prompt);
@@ -2577,7 +2713,7 @@ window.copyPromptOnly = function(btn){
 
 window.cp = function(btn, text){
   navigator.clipboard.writeText(text.replace(/\\n/g,'\n'));
-  btn.textContent='✓ 복사됨'; btn.classList.add('copied');
+  btn.textContent='복사됨'; btn.classList.add('copied');
   setTimeout(()=>{ btn.textContent='복사'; btn.classList.remove('copied'); }, 1500);
 };
 window.switchTab = function(t){
@@ -2635,11 +2771,11 @@ function openPromptModal(catId) {
 
 function renderPromptModal() {
   const cat = CATEGORIES[state.editingCatId];
-  document.getElementById('prompt-modal-title').textContent = `⚙️ ${cat.icon} ${cat.name} 프롬프트`;
+  document.getElementById('prompt-modal-title').textContent = cat.name + ' 프롬프트';
 
   const catTabs = CATEGORIES.map((c,i)=>`
     <button class="cat-tab${state.editingCatId===i?' active':''}" onclick="switchPromptCat(${i})" style="color:${state.editingCatId===i?c.color:'#6B6B6B'};border-bottom-color:${state.editingCatId===i?c.color:'transparent'};font-size:11px;padding:8px 10px;">
-      ${c.icon} ${c.name}
+      ${c.name}
     </button>`).join('');
 
   const blogVal = getCatPrompt(state.editingCatId, 'blog');
@@ -2662,16 +2798,16 @@ function renderPromptModal() {
     <div class="prompt-tabs-scroll">
       <div class="prompt-tabs">
         ${threadCat ? `
-        <button class="prompt-tab${pt==='thread'?' active':''}" onclick="switchPromptTab('thread')">🧵 쓰레드</button>
-        <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">🧩 공통 기본</button>
+        <button class="prompt-tab${pt==='thread'?' active':''}" onclick="switchPromptTab('thread')">쓰레드</button>
+        <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">공통 기본</button>
         ` : heiljCat ? `
-        <button class="prompt-tab${pt==='community'?' active':''}" onclick="switchPromptTab('community')">🏘 아파트너 게시판</button>
-        <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">🧩 공통 기본</button>
+        <button class="prompt-tab${pt==='community'?' active':''}" onclick="switchPromptTab('community')">아파트너 게시판</button>
+        <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">공통 기본</button>
         ` : `
-        <button class="prompt-tab${pt==='blog'?' active':''}" onclick="switchPromptTab('blog')">📝 블로그</button>
-        <button class="prompt-tab${pt==='insta'?' active':''}" onclick="switchPromptTab('insta')">📱 인스타</button>
-        <button class="prompt-tab${pt==='notebooklm'?' active':''}" onclick="switchPromptTab('notebooklm')">📓 노트북 LM</button>
-        <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">🧩 공통 기본</button>
+        <button class="prompt-tab${pt==='blog'?' active':''}" onclick="switchPromptTab('blog')">블로그</button>
+        <button class="prompt-tab${pt==='insta'?' active':''}" onclick="switchPromptTab('insta')">인스타</button>
+        <button class="prompt-tab${pt==='notebooklm'?' active':''}" onclick="switchPromptTab('notebooklm')">노트북 LM</button>
+        <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">공통 기본</button>
         `}
       </div>
     </div>
@@ -2683,7 +2819,7 @@ function renderPromptModal() {
         <button class="prompt-reset-btn" onclick="resetPrompt('blog')">기본값으로</button>
       </div>
       <textarea class="prompt-textarea" id="pt-blog" placeholder="블로그 글쓰기 스타일, 톤, 구조, 주의사항 등을 자유롭게 입력하세요...">${blogVal}</textarea>
-      <div class="prompt-hint">💡 예: "네이버 SEO를 고려해 제목을 작성하세요. 전문 용어는 최소화하고..." — 이 지침이 Claude에게 전달돼 글쓰기 방향을 잡아요.</div>
+      <div class="prompt-hint">예: "네이버 SEO를 고려해 제목을 작성하세요. 전문 용어는 최소화하고..." — 이 지침이 Claude에게 전달돼 글쓰기 방향을 잡아요.</div>
     </div>` : ''}
 
 ${!threadCat && !heiljCat && pt==='insta' ? `
@@ -2692,8 +2828,8 @@ ${!threadCat && !heiljCat && pt==='insta' ? `
     인스타 작성 지침
     <button class="prompt-reset-btn" onclick="resetPrompt('insta')">기본값으로</button>
   </div>
-  <textarea class="prompt-textarea" id="pt-insta" placeholder="인스타 캡션 스타일, 캐러셀 구성 방식, 해시태그 전략 등을 입력하세요...">${instaVal}</textarea>
-  <div class="prompt-hint">💡 예: "첫 줄에서 멈추게 만드는 짧은 질문을 써주세요. 캐러셀은 문제→원인→해결 순으로..."</div>
+  <textarea class="prompt-textarea" id="pt-insta" placeholder="한 포스트 캡션 톤, 줄바꿈·불릿 스타일, 해시태그 전략 등을 입력하세요. (캐러셀 다장 구성은 사용하지 않습니다.)">${instaVal}</textarea>
+  <div class="prompt-hint">예: "첫 줄에서 멈추게 만드는 짧은 질문을 써주세요. 캐러셀은 문제→원인→해결 순으로..."</div>
 </div>` : ''}
 
 ${pt==='thread' && threadCat ? `
@@ -2703,7 +2839,7 @@ ${pt==='thread' && threadCat ? `
     <button class="prompt-reset-btn" onclick="resetPrompt('thread')">기본값으로</button>
   </div>
   <textarea class="prompt-textarea" id="pt-thread" style="min-height:200px;" placeholder="톤, 문장 수(3~7), 핵심만 드러내기, 금지 사항 등...">${escapeHtml(threadVal)}</textarea>
-  <div class="prompt-hint">💡 짧은 말풍선·구어체·핫이슈 한 조각이 핵심이에요. 에세이식 나열은 피하라고 적어 두면 좋아요.</div>
+  <div class="prompt-hint">짧은 말풍선·구어체·핫이슈 한 조각이 핵심이에요. 에세이식 나열은 피하라고 적어 두면 좋아요.</div>
 </div>` : ''}
 
 ${pt==='community' && heiljCat ? `
@@ -2713,7 +2849,7 @@ ${pt==='community' && heiljCat ? `
     <button class="prompt-reset-btn" onclick="resetPrompt('community')">기본값으로</button>
   </div>
   <textarea class="prompt-textarea" id="pt-community" style="min-height:200px;" placeholder="아파트 게시판 톤, 고정 형식, 금지 사항 등...">${escapeHtml(communityVal)}</textarea>
-  <div class="prompt-hint">💡 옆집 이웃 톤·설득 최소·게시글+이미지 프롬프트 2장만 생성돼요.</div>
+  <div class="prompt-hint">옆집 이웃 톤·설득 최소·게시글+이미지 프롬프트 2장만 생성돼요.</div>
 </div>` : ''}
 
 ${pt==='notebooklm' && !threadCat && !heiljCat ? `
@@ -2723,7 +2859,7 @@ ${pt==='notebooklm' && !threadCat && !heiljCat ? `
     <button class="prompt-reset-btn" onclick="resetPrompt('notebookLM')">기본값으로</button>
   </div>
   <textarea class="prompt-textarea" id="pt-notebooklm" style="min-height:200px;" placeholder="질문 구성, 답변 분량, 톤, 금지 사항 등...">${escapeHtml(notebookLMVal)}</textarea>
-  <div class="prompt-hint">💡 소스로 붙여 넣었을 때 오디오·카드·영상 대본으로 잘 펼쳐지게 질문·답변 구조를 조정해 보세요.</div>
+  <div class="prompt-hint">소스로 붙여 넣었을 때 오디오·카드·영상 대본으로 잘 펼쳐지게 질문·답변 구조를 조정해 보세요.</div>
 </div>` : ''}
 
 ${pt==='base' ? `
@@ -2733,7 +2869,7 @@ ${pt==='base' ? `
     <button class="prompt-reset-btn" onclick="resetPrompt('base')">기본값으로</button>
   </div>
   <textarea class="prompt-textarea" id="pt-base" style="min-height:180px;" placeholder="원장님 소개, 채널 정보, 전반적인 톤앤매너 등...">${baseVal}</textarea>
-  <div class="prompt-hint">💡 원장님 프로필, 운영 채널, 브랜드 톤 등 모든 초안 생성에 공통으로 쓰이는 기본 정보예요.</div>
+  <div class="prompt-hint">원장님 프로필, 운영 채널, 브랜드 톤 등 모든 초안 생성에 공통으로 쓰이는 기본 정보예요.</div>
 </div>` : ''}
 `;
 }
@@ -2789,7 +2925,7 @@ save();
 closePromptModal();
 // 저장 완료 피드백
 const btn = document.querySelector('.btn-save-prompt');
-if(btn){ btn.textContent='✓ 저장됨'; setTimeout(()=>{ btn.textContent='저장하기'; },1200); }
+if(btn){ btn.textContent='저장됨'; setTimeout(()=>{ btn.textContent='저장하기'; },1200); }
 }
 
 function closePromptModal(e) {
@@ -2822,23 +2958,73 @@ function tryNotifyDraftDone(topic, ok) {
 }
 
 var genPendingCount = 0;
-function beginGenIndicator(){
+var genActiveJob = null;
+var genUiTimer = null;
+
+function estimateDraftMs(catId) {
+  if (isThreadCategory(catId)) return 45000;
+  if (isHeiljagyaeCategory(catId)) return 70000;
+  return 110000;
+}
+
+function formatRoughCountdown(sec) {
+  sec = Math.max(0, Math.floor(sec));
+  if (sec <= 0) return '마무리 중';
+  if (sec < 60) return sec + '초';
+  var m = Math.floor(sec / 60);
+  var s = sec % 60;
+  if (s === 0) return m + '분';
+  return m + '분 ' + s + '초';
+}
+
+function ensureGenUiTimer() {
+  if (genUiTimer) return;
+  genUiTimer = setInterval(function () {
+    updateGenIndicator();
+  }, 400);
+}
+
+function stopGenUiTimer() {
+  if (genUiTimer) {
+    clearInterval(genUiTimer);
+    genUiTimer = null;
+  }
+}
+
+function beginGenIndicator() {
   genPendingCount++;
+  ensureGenUiTimer();
   updateGenIndicator();
 }
-function endGenIndicator(){
+function endGenIndicator() {
   genPendingCount = Math.max(0, genPendingCount - 1);
   updateGenIndicator();
+  if (genPendingCount === 0 && !genActiveJob) stopGenUiTimer();
 }
-function updateGenIndicator(){
+function updateGenIndicator() {
   var el = document.getElementById('gen-status-bar');
-  if(!el) return;
-  if(genPendingCount > 0){
-    el.classList.add('show');
-    el.textContent = genPendingCount > 1 ? ('✨ 초안 생성 중… (' + genPendingCount + '건)') : '✨ 초안 생성 중…';
-  } else {
+  if (!el) return;
+  var busy = genPendingCount > 0 || genActiveJob;
+  if (!busy) {
     el.classList.remove('show');
+    stopGenUiTimer();
+    return;
   }
+  el.classList.add('show');
+  var parts = [];
+  if (genActiveJob && genActiveJob.topic !== undefined) {
+    var t = genActiveJob.topic || '주제';
+    if (t.length > 36) t = t.slice(0, 36) + '…';
+    var leftSec = (genActiveJob.endMs - Date.now()) / 1000;
+    parts.push('「' + t + '」');
+    parts.push('남은 시간 약 ' + formatRoughCountdown(leftSec));
+  } else if (genPendingCount > 0) {
+    parts.push('순서 대기 중');
+  }
+  if (genPendingCount > 1) {
+    parts.push('요청 ' + genPendingCount + '건');
+  }
+  el.textContent = '초안 작성 중 · ' + parts.join(' · ');
 }
 
 window.genContent = async function(){
@@ -2862,6 +3048,10 @@ var catId = jobCatId;
 var cat = CATEGORIES[catId];
 var draft = cat.drafts.find(function(d){ return d.id === jobDraftId; });
 if(!draft) throw new Error('초안을 찾을 수 없어요');
+
+genActiveJob = { topic: draft.topic || '', endMs: Date.now() + estimateDraftMs(catId) };
+updateGenIndicator();
+try {
 
 const blogGuide = getCatPrompt(catId, 'blog');
 const instaGuide = getCatPrompt(catId, 'insta');
@@ -2978,14 +3168,8 @@ ${imagePromptGuide}
 },
 "insta": {
 "hook": "인스타 첫줄 (이모지+후킹문장, 20자 이내)",
-"caption": "캡션 250자 내외. 줄바꿈 활용. 이모지 자연스럽게. 마지막 질문 or CTA.",
-"carousel": [
-{"slide":1,"title":"슬라이드 제목","content":"2~3줄 내용"},
-{"slide":2,"title":"슬라이드 제목","content":"2~3줄 내용"},
-{"slide":3,"title":"슬라이드 제목","content":"2~3줄 내용"},
-{"slide":4,"title":"슬라이드 제목","content":"2~3줄 내용"},
-{"slide":5,"title":"저장 & 팔로우","content":"CTA 문구"}
-],
+"caption": "**한 포스트 전체 본문 캡션**(hook 제외). 예전 캐러셀에 넣었을 법한 핵심(통증·원인·실천·주의·CTA)을 줄바꿈·번호(1. 2.)·• 불릿으로 모두 이 필드 안에 포함. 분량은 스크롤 한두 번 안(대략 400~900자).",
+"carousel": [],
 "hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6","태그7","태그8","태그9","태그10"]
 },
 "notebookLM": {
@@ -3006,6 +3190,8 @@ ${imgJsonTail}
 }
 
 notebookLM.qa는 **정확히 7개** 객체 배열. 각 q는 한 문장 질문, 각 a는 심층 답변. blog·insta와 **중복 복붙**하지 말고 강의·스크립트 관점에서 새로 구성. chapterTitles는 5개. videoIntroScript는 볼드·번호 목록 없이 말하듯.
+
+인스타는 **캐러셀(여러 장) 없이** caption 한 필드에 본문 전부를 넣습니다. insta.carousel은 **반드시 빈 배열 []** 만 출력(슬라이드 JSON 금지).
 
 반드시 images.gptVisuals는 정확히 5개. 각 prompt 필드는 완성된 영문 이미지 프롬프트 한 덩어리(구도·조명·소품·카메라 앵글·피할 요소 등). 위 JSON 예시의 한글 설명문은 설명용이며 출력 시에는 제거하고, 예시에 나온 영문 구절을 그대로 복사하지 말고 주제·각도·본문 셀프 팁에 맞춰 새로 쓸 것.`;
 }
@@ -3051,6 +3237,15 @@ if(isThreadCategory(catId)){
   content.notebookLM = normalizeNotebookLMBlock(content.notebookLM);
   content.community = null;
   delete content.community;
+  if(content.insta){
+    if(!Array.isArray(content.insta.carousel)) content.insta.carousel = [];
+    const extra = formatCarouselKeyPointsForCaption_(content.insta.carousel);
+    if(extra){
+      const cap = String(content.insta.caption || '').trim();
+      content.insta.caption = cap ? cap + '\n\n' + extra : extra;
+    }
+    content.insta.carousel = [];
+  }
 }
 
 if(!state.published[jobDraftId]) state.published[jobDraftId]={};
@@ -3063,7 +3258,12 @@ if(ov && ov.classList.contains('open') && state.selectedId === jobDraftId && sta
   state.activeTab = nextTab;
   renderSheetContent(content);
 }
+renderTabs();
 renderMain();
+} finally {
+  genActiveJob = null;
+  updateGenIndicator();
+}
 }
 
 try {
@@ -3072,7 +3272,7 @@ try {
   } else {
     await runDraftJob();
   }
-  setAppToast('✓ 초안 생성 완료\n«' + jobTopic + '»', { duration: 6500, variant: 'ok' });
+  setAppToast('초안 생성 완료\n«' + jobTopic + '»', { duration: 6500, variant: 'ok' });
   tryNotifyDraftDone(jobTopic, true);
 } catch (e) {
   var errMsg = (e && e.message) ? e.message : String(e);

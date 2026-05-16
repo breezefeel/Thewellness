@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>힐링트리 콘텐츠 플래너</title>
+<title>콘텐츠 플래너</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -638,7 +638,10 @@ font-family: inherit; transition: all .15s;
 display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
 line-height: 1.15; min-width: 4.5rem; text-align: right;
 }
-.drive-btn-main { font-size: 12px; font-weight: 600; }
+.drive-btn-main { font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+.drive-dot { width: 6px; height: 6px; border-radius: 50%; background: #EF4444; flex: 0 0 auto; }
+.drive-dot.on { background: #2DD4BF; }
+.drive-dot.warn { background: #FBBF24; }
 .drive-btn-sub {
 font-size: 9px; color: #6B7280; max-width: 140px; margin-top: 2px;
 white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -665,7 +668,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 <div class="modal-overlay open" id="api-modal">
   <div class="modal-box">
     <div class="modal-logo" aria-hidden="true"></div>
-    <div class="modal-title">힐링트리 콘텐츠 플래너</div>
+    <div class="modal-title">콘텐츠 플래너</div>
     <div class="modal-desc">Anthropic API 키를 입력하면 Claude AI가 블로그 & 인스타 초안을 자동으로 만들어드려요. 키는 브라우저에만 저장돼요.</div>
     <input class="modal-input" type="text" id="api-input" placeholder="API 키를 붙여넣으세요" />
     <div id="api-error" style="font-size:12px;color:#EF4444;min-height:18px;margin-bottom:8px;"></div>
@@ -735,7 +738,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 <div class="planner-head">
   <div class="planner-head-left">
     <div>
-      <div class="logo-text">힐링트리 콘텐츠 플래너</div>
+      <div class="logo-text">콘텐츠 플래너</div>
       <div class="logo-sub">미카닥 박준규 DC PT</div>
     </div>
   </div>
@@ -746,7 +749,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     </button>
     <button class="btn-prompt-settings" onclick="openPromptModal()">프롬프트</button>
     <button type="button" class="btn-drive-sync" id="btn-drive-sync" onclick="openDriveModal()">
-      <span class="drive-btn-main" id="drive-btn-main">Drive</span>
+      <span class="drive-btn-main" id="drive-btn-main"><span class="drive-dot" id="drive-dot"></span><span id="drive-status">Drive</span></span>
       <span class="drive-btn-sub" id="drive-btn-sub">연동 안 됨</span>
     </button>
     <button class="btn-add" id="add-toggle-btn" onclick="toggleAdd()">추가</button>
@@ -847,7 +850,7 @@ const CAT_TAB_NAV_ROWS = [[0, 1, 2, 7], [3, 5, 4, 6]];
 const CAT_TAB_SHORT = {
   0: '도수치료',
   1: '리:얼 움직임',
-  2: '작은 얼굴관리',
+  2: 'Re:Al 뷰티',
   7: '힐자계',
   3: 'CMT 과정',
   5: 'Re:Al 과정',
@@ -1310,7 +1313,8 @@ function readDriveAuthExpiryMs(){
 function updateDriveButtonState(){
   var b = document.getElementById('btn-drive-sync');
   var sub = document.getElementById('drive-btn-sub');
-  var main = document.getElementById('drive-btn-main');
+  var status = document.getElementById('drive-status');
+  var dot = document.getElementById('drive-dot');
   if(!b) return;
   var lastIso = '';
   try { lastIso = localStorage.getItem('ht_drive_last_upload_ok') || ''; } catch(e0){}
@@ -1320,9 +1324,10 @@ function updateDriveButtonState(){
   var exp = readDriveAuthExpiryMs();
   var now = Date.now();
   b.classList.remove('warn');
+  if(dot) dot.className = 'drive-dot';
   if(!hasToken){
     b.classList.remove('linked');
-    if(main) main.textContent = 'Drive';
+    if(status) status.textContent = 'Drive';
     if(sub) sub.textContent = lastFmt ? ('연동 안 됨 · 업로드 ' + lastFmt) : '연동 안 됨';
     b.title = lastFmt ? ('Drive 미연동 — 마지막 클라우드 업로드 ' + lastFmt) : 'Google Drive 동기화';
     return;
@@ -1333,7 +1338,8 @@ function updateDriveButtonState(){
   else if(exp - now < 8 * 60 * 1000) state = 'soon';
   if(state === 'soon' || state === 'expired') b.classList.add('warn');
   var stateKo = state === 'expired' ? '로그인 만료' : (state === 'soon' ? '만료 임박' : '연결됨');
-  if(main) main.textContent = 'Drive';
+  if(dot) dot.classList.add(state === 'ok' ? 'on' : 'warn');
+  if(status) status.textContent = 'Drive ' + stateKo;
   if(sub) sub.textContent = stateKo + (lastFmt ? (' · ' + lastFmt) : '');
   b.title = 'Drive ' + stateKo + (lastFmt ? (' — 마지막 업로드(성공) ' + lastFmt) : '');
 }
@@ -1580,19 +1586,7 @@ function updateApiBadge() {
 
 // ── Tabs ──
 function getSortedCatTabOrder() {
-  const flat = CAT_TAB_NAV_ROWS[0].concat(CAT_TAB_NAV_ROWS[1]);
-  function doneCountForCat(idx) {
-    const cat = CATEGORIES[idx];
-    if (!cat || !cat.drafts) return 0;
-    let n = 0;
-    cat.drafts.forEach(function (d) {
-      if (d && d.id && (state.generatedOnly[d.id] || (state.published[d.id] && state.published[d.id].content))) n++;
-    });
-    return n;
-  }
-  const withDrafts = flat.filter(function (i) { return doneCountForCat(i) > 0; });
-  const without = flat.filter(function (i) { return doneCountForCat(i) === 0; });
-  return withDrafts.concat(without);
+  return CAT_TAB_NAV_ROWS[0].concat(CAT_TAB_NAV_ROWS[1]);
 }
 
 function renderTabs() {
@@ -1635,20 +1629,42 @@ function selectCat(i) {
 }
 
 // ── Recommendations ──
+function draftHasContent(d) {
+  return !!(d && d.id && (state.generatedOnly[d.id] || (state.published[d.id] && state.published[d.id].content)));
+}
+
+function sortDraftsForDisplay(drafts) {
+  return (drafts || []).slice().sort(function (a, b) {
+    const ag = draftHasContent(a) ? 1 : 0;
+    const bg = draftHasContent(b) ? 1 : 0;
+    return bg - ag;
+  });
+}
+
+function getNextPublishRecommendation() {
+  const flatOrder = CAT_TAB_NAV_ROWS[0].concat(CAT_TAB_NAV_ROWS[1]);
+  const candidates = [];
+  for (const catId of flatOrder) {
+    const cat = CATEGORIES[catId];
+    if (!cat || !cat.drafts) continue;
+    cat.drafts.forEach(function (draft) {
+      if (draft && !state.published[draft.id]?.date) candidates.push({ draft: draft, cat: cat });
+    });
+  }
+  candidates.sort(function (a, b) {
+    const ag = draftHasContent(a.draft) ? 1 : 0;
+    const bg = draftHasContent(b.draft) ? 1 : 0;
+    return bg - ag;
+  });
+  return candidates[0] || null;
+}
+
 function getRecommended(catId) {
   const cat = CATEGORIES[catId];
   const pubIds = Object.keys(state.published).filter(id => id.startsWith('d'+catId+'-') && state.published[id].date);
   const unpub = cat.drafts.filter(d => !pubIds.includes(d.id));
   if(pubIds.length === 0) return [];
-  const related = unpub.slice(0,3).map(d => ({...d, recType:'related'}));
-  const trending = [];
-  for(const oc of CATEGORIES){
-    if(oc.id===catId || oc.audience!==cat.audience) continue;
-    const u = oc.drafts.find(d => !state.published[d.id]?.date);
-    if(u) trending.push({...u, recType:'trending', fromCat:oc.name});
-    if(trending.length>=2) break;
-  }
-  return [...related, ...trending];
+  return unpub.slice(0,5).map(d => ({...d, recType:'related'}));
 }
 
 // ── Main render ──
@@ -1658,14 +1674,14 @@ function renderMain() {
 
   if(state.showAdd){ mc.innerHTML = renderAddForm(); return; }
 
-  // Alert: upcoming (drafts near publish time — show first unpublished in cat)
-  const firstUnpub = cat.drafts.find(d => !state.published[d.id]?.date);
-  const alertHTML = firstUnpub ? `
-    <div class="alert-banner" onclick="openDetail('${firstUnpub.id}',${cat.id})">
+  // Alert: upcoming — choose from all categories so the next topic suggestion is not tied to the open tab.
+  const nextRec = getNextPublishRecommendation();
+  const alertHTML = nextRec ? `
+    <div class="alert-banner" onclick="openDetail('${nextRec.draft.id}',${nextRec.cat.id})">
       <div class="alert-banner-text">
         <div class="alert-banner-title">다음 발행 추천</div>
-        <div class="alert-banner-topic">${firstUnpub.topic}</div>
-        <div class="alert-banner-meta">${cat.name} · ${cat.audience}</div>
+        <div class="alert-banner-topic">${nextRec.draft.topic}</div>
+        <div class="alert-banner-meta">${nextRec.cat.name} · ${nextRec.cat.audience}</div>
       </div>
       <div class="alert-banner-arrow">→</div>
     </div>` : '';
@@ -1697,7 +1713,7 @@ function renderMain() {
   const recs = getRecommended(state.currentCat);
   let recHTML = '';
   if(recs.length > 0 && state.filterStatus==='전체' && !state.searchQ){
-    recHTML = `<div class="rec-section-title">이번에 추천하는 초안 <span style="font-weight:400;font-size:10px;color:#C0C0C0">관련 3개 + 호응예상 2개</span></div>` +
+    recHTML = `<div class="rec-section-title">이번에 추천하는 초안 <span style="font-weight:400;font-size:10px;color:#C0C0C0">${cat.name} 관련</span></div>` +
       recs.map(d => draftCardHTML(d, cat, true)).join('') +
       `<div class="rec-divider"></div><div class="rec-section-title" style="margin-bottom:4px;">전체 초안</div>`;
   }
@@ -1707,6 +1723,7 @@ function renderMain() {
   if(state.filterStatus==='초안있음') drafts = drafts.filter(d=>state.generatedOnly[d.id]||state.published[d.id]?.content);
   if(state.filterStatus==='발행완료') drafts = drafts.filter(d=>state.published[d.id]?.date);
   if(state.searchQ) drafts = drafts.filter(d=>d.topic.includes(state.searchQ)||d.angle.includes(state.searchQ));
+  drafts = sortDraftsForDisplay(drafts);
   const cardsHTML = drafts.length ? drafts.map(d=>draftCardHTML(d,cat,false)).join('') : '<div class="empty-note">조건에 맞는 초안이 없어요</div>';
 
   mc.innerHTML = alertHTML + statsHTML + searchHTML + `<div class="cards-wrap">${recHTML}${cardsHTML}</div>`;
@@ -1716,11 +1733,10 @@ function draftCardHTML(d, cat, isRec) {
   const pub = state.published[d.id];
   const hasContent = pub?.content || state.generatedOnly[d.id];
   const isPub = !!pub?.date;
-  const color = isRec && d.recType==='trending' ? '#F59E0B' : cat.color;
+  const color = cat.color;
   const badges = [
     `<span class="badge badge-aud">${cat.audience}</span>`,
     isRec && d.recType==='related' ? '<span class="badge badge-rec">관련</span>' : '',
-    isRec && d.recType==='trending' ? `<span class="badge badge-rec">호응예상 · ${d.fromCat}</span>` : '',
     hasContent ? '<span class="badge badge-gen">초안있음</span>' : '',
     isPub ? '<span class="badge badge-pub">발행완료</span>' : '',
   ].filter(Boolean).join('');

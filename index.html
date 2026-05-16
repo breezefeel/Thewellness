@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>힐링트리 콘텐츠 플래너</title>
+<title>콘텐츠 플래너</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -638,7 +638,10 @@ font-family: inherit; transition: all .15s;
 display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
 line-height: 1.15; min-width: 4.5rem; text-align: right;
 }
-.drive-btn-main { font-size: 12px; font-weight: 600; }
+.drive-btn-main { font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+.drive-dot { width: 6px; height: 6px; border-radius: 50%; background: #EF4444; flex: 0 0 auto; }
+.drive-dot.on { background: #2DD4BF; }
+.drive-dot.warn { background: #FBBF24; }
 .drive-btn-sub {
 font-size: 9px; color: #6B7280; max-width: 140px; margin-top: 2px;
 white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -665,7 +668,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 <div class="modal-overlay open" id="api-modal">
   <div class="modal-box">
     <div class="modal-logo" aria-hidden="true"></div>
-    <div class="modal-title">힐링트리 콘텐츠 플래너</div>
+    <div class="modal-title">콘텐츠 플래너</div>
     <div class="modal-desc">Anthropic API 키를 입력하면 Claude AI가 블로그 & 인스타 초안을 자동으로 만들어드려요. 키는 브라우저에만 저장돼요.</div>
     <input class="modal-input" type="text" id="api-input" placeholder="API 키를 붙여넣으세요" />
     <div id="api-error" style="font-size:12px;color:#EF4444;min-height:18px;margin-bottom:8px;"></div>
@@ -724,7 +727,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       <button type="button" class="modal-btn" onclick="driveLoginAndUpload()">Google 로그인 · 연동 후 지금 업로드</button>
       <button type="button" class="modal-btn" style="background:#2DD4BF;color:#111;" onclick="drivePullFromCloud()">Drive에서 이 기기로 불러오기</button>
       <button type="button" class="modal-btn" style="background:#F3F4F6;color:#374151;" onclick="driveManualUploadOnly()">로그인 유지 — 지금만 업로드</button>
-      <button type="button" class="modal-btn" style="background:#fff;color:#9CA3AF;border:1px solid #E5E7EB;" onclick="driveDisconnect()">Drive 연동만 해제 (이 기기 데이터는 유지)</button>
+      <button type="button" class="modal-btn" style="background:#fff;color:#9CA3AF;border:1px solid #E5E7EB;" onclick="driveDisconnect()">Drive 로그아웃 (이 기기 데이터는 유지)</button>
     </div>
     <button type="button" style="border:none;background:none;width:100%;cursor:pointer;margin-top:14px;font-size:12px;color:#9CA3AF;font-family:inherit;" onclick="closeDriveModal()">닫기</button>
   </div>
@@ -735,7 +738,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 <div class="planner-head">
   <div class="planner-head-left">
     <div>
-      <div class="logo-text">힐링트리 콘텐츠 플래너</div>
+      <div class="logo-text">콘텐츠 플래너</div>
       <div class="logo-sub">미카닥 박준규 DC PT</div>
     </div>
   </div>
@@ -746,7 +749,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     </button>
     <button class="btn-prompt-settings" onclick="openPromptModal()">프롬프트</button>
     <button type="button" class="btn-drive-sync" id="btn-drive-sync" onclick="openDriveModal()">
-      <span class="drive-btn-main" id="drive-btn-main">Drive</span>
+      <span class="drive-btn-main" id="drive-btn-main"><span class="drive-dot" id="drive-dot"></span><span id="drive-status">Drive</span></span>
       <span class="drive-btn-sub" id="drive-btn-sub">연동 안 됨</span>
     </button>
     <button class="btn-add" id="add-toggle-btn" onclick="toggleAdd()">추가</button>
@@ -847,7 +850,7 @@ const CAT_TAB_NAV_ROWS = [[0, 1, 2, 7], [3, 5, 4, 6]];
 const CAT_TAB_SHORT = {
   0: '도수치료',
   1: '리:얼 움직임',
-  2: '작은 얼굴관리',
+  2: 'Re:Al 뷰티',
   7: '힐자계',
   3: 'CMT 과정',
   5: 'Re:Al 과정',
@@ -1139,6 +1142,7 @@ function save(opts) {
 
 // ── Google Drive (앱 데이터 폴더, 단일 JSON) ──
 const DRIVE_SYNC_FILENAME = 'planner-sync-v1.json';
+const DRIVE_CONNECTED_KEY = 'ht_drive_connected';
 /** Google OAuth 웹 클라이언트 ID — 비밀이 아니므로 내장. 다른 ID로 덮어쓰려면 Drive 모달에서 입력( ht_gdrive_cid 저장 ) */
 const GOOGLE_OAUTH_WEB_CLIENT_ID = '442956975507-a6qqamnjlhuqflflfdknq20slb16jrmc.apps.googleusercontent.com';
 let driveTokenWaiters = [];
@@ -1162,6 +1166,17 @@ function getDriveClientId(){
   if(fromStore) return fromStore;
   return GOOGLE_OAUTH_WEB_CLIENT_ID.trim();
 }
+function setDriveConnected_(connected){
+  try {
+    if(connected) localStorage.setItem(DRIVE_CONNECTED_KEY, '1');
+    else localStorage.removeItem(DRIVE_CONNECTED_KEY);
+  } catch(e){}
+}
+function hasDriveConnection_(){
+  try {
+    return localStorage.getItem(DRIVE_CONNECTED_KEY) === '1' || !!localStorage.getItem('ht_drive_oauth');
+  } catch(e){ return false; }
+}
 function flushDriveTokenWaiters(ok, val){
   var w = driveTokenWaiters.slice();
   driveTokenWaiters = [];
@@ -1177,6 +1192,8 @@ function onDriveTokenReceived(resp){
       access_token: resp.access_token,
       expires_at: Date.now() + sec * 1000 - 120000
     }));
+    setDriveConnected_(true);
+    updateDriveButtonState();
     flushDriveTokenWaiters(true, resp.access_token);
   } else {
     var msg = (resp && resp.error) ? resp.error : '액세스 토큰을 받지 못했어요';
@@ -1255,15 +1272,26 @@ async function driveUploadNow(){
   var token = await getDriveAccessToken({ forcePrompt: false });
   var fileId = await driveEnsureFileId(token);
   var body = buildDriveFileBody();
-  var r = await fetch('https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media', {
+  var uploadUrl = 'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media';
+  var r = await fetch(uploadUrl, {
     method: 'PATCH',
     headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
     body: body
   });
   if(r.status === 401){
     try { localStorage.removeItem('ht_drive_oauth'); } catch(e401){}
+    token = await getDriveAccessToken({ forcePrompt: false });
+    fileId = await driveEnsureFileId(token);
+    uploadUrl = 'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media';
+    r = await fetch(uploadUrl, {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: body
+    });
+  }
+  if(r.status === 401){
     updateDriveButtonState();
-    throw new Error('Drive 로그인이 만료됐어요. Drive 메뉴에서 다시 로그인해 주세요.');
+    throw new Error('Drive 인증을 새로 받아야 해요. Drive 메뉴에서 다시 로그인해 주세요.');
   }
   if(!r.ok){
     var tx = await r.text();
@@ -1273,7 +1301,7 @@ async function driveUploadNow(){
 }
 function scheduleDriveUpload(immediate){
   try {
-    if(!localStorage.getItem('ht_drive_oauth')) return;
+    if(!hasDriveConnection_()) return;
   } catch(e3){ return; }
   clearTimeout(driveUploadTimer);
   driveUploadTimer = null;
@@ -1310,32 +1338,32 @@ function readDriveAuthExpiryMs(){
 function updateDriveButtonState(){
   var b = document.getElementById('btn-drive-sync');
   var sub = document.getElementById('drive-btn-sub');
-  var main = document.getElementById('drive-btn-main');
+  var status = document.getElementById('drive-status');
+  var dot = document.getElementById('drive-dot');
   if(!b) return;
   var lastIso = '';
   try { lastIso = localStorage.getItem('ht_drive_last_upload_ok') || ''; } catch(e0){}
   var lastFmt = formatDriveTimeShort(lastIso);
-  var hasToken = false;
-  try { hasToken = !!localStorage.getItem('ht_drive_oauth'); } catch(e1){}
+  var hasConnection = hasDriveConnection_();
   var exp = readDriveAuthExpiryMs();
   var now = Date.now();
   b.classList.remove('warn');
-  if(!hasToken){
+  if(dot) dot.className = 'drive-dot';
+  if(!hasConnection){
     b.classList.remove('linked');
-    if(main) main.textContent = 'Drive';
+    if(status) status.textContent = 'Drive';
     if(sub) sub.textContent = lastFmt ? ('연동 안 됨 · 업로드 ' + lastFmt) : '연동 안 됨';
     b.title = lastFmt ? ('Drive 미연동 — 마지막 클라우드 업로드 ' + lastFmt) : 'Google Drive 동기화';
     return;
   }
   b.classList.add('linked');
   var state = 'ok';
-  if(!exp || exp <= now) state = 'expired';
-  else if(exp - now < 8 * 60 * 1000) state = 'soon';
-  if(state === 'soon' || state === 'expired') b.classList.add('warn');
-  var stateKo = state === 'expired' ? '로그인 만료' : (state === 'soon' ? '만료 임박' : '연결됨');
-  if(main) main.textContent = 'Drive';
-  if(sub) sub.textContent = stateKo + (lastFmt ? (' · ' + lastFmt) : '');
-  b.title = 'Drive ' + stateKo + (lastFmt ? (' — 마지막 업로드(성공) ' + lastFmt) : '');
+  if(exp && exp > now && exp - now < 8 * 60 * 1000) state = 'soon';
+  if(state === 'soon') b.classList.add('warn');
+  if(dot) dot.classList.add(state === 'soon' ? 'warn' : 'on');
+  if(status) status.textContent = 'Drive 연결됨';
+  if(sub) sub.textContent = '연결됨' + (lastFmt ? (' · ' + lastFmt) : '');
+  b.title = 'Drive 연결됨' + (lastFmt ? (' — 마지막 업로드(성공) ' + lastFmt) : '');
 }
 function markDriveUploadOk(){
   try { localStorage.setItem('ht_drive_last_upload_ok', new Date().toISOString()); } catch(e){}
@@ -1417,6 +1445,11 @@ async function driveDownloadCloudPayload_(token){
   if(!fileId) return { fileId: '', data: null };
   localStorage.setItem('ht_drive_file_id', fileId);
   var r = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', { headers: { Authorization: 'Bearer ' + token } });
+  if(r.status === 401){
+    try { localStorage.removeItem('ht_drive_oauth'); } catch(e401){}
+    token = await getDriveAccessToken({ forcePrompt: false });
+    r = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', { headers: { Authorization: 'Bearer ' + token } });
+  }
   var text = await r.text();
   if(!r.ok) throw new Error(text || 'Drive 다운로드 실패');
   var data = JSON.parse(text);
@@ -1432,10 +1465,8 @@ function parseIsoMs_(iso){
 }
 
 async function driveAutoSyncIfNewer_(reason){
-  // 조용히 확인: 로그인(토큰) 없으면 아무 것도 안 함
-  var hasToken = false;
-  try { hasToken = !!localStorage.getItem('ht_drive_oauth'); } catch(e0){}
-  if(!hasToken) return;
+  // 조용히 확인: Drive 연동 자체가 없으면 아무 것도 안 함
+  if(!hasDriveConnection_()) return;
   try{
     var token = await getDriveAccessToken({ forcePrompt: false });
     var out = await driveDownloadCloudPayload_(token);
@@ -1488,13 +1519,14 @@ window.drivePullFromCloud = async function(){
 };
 window.driveDisconnect = function(){
   if(!confirm('Drive에 저장된 파일은 그대로 두고, 이 브라우저의 로그인만 지웁니다.')) return;
+  setDriveConnected_(false);
   localStorage.removeItem('ht_drive_oauth');
   localStorage.removeItem('ht_drive_file_id');
   window.__htDriveTokenClient = null;
   window.__htDriveTokenClientCid = null;
   updateDriveButtonState();
   closeDriveModal();
-  if(typeof setAppToast === 'function') setAppToast('Drive 연동을 해제했어요.', { duration: 3500, variant: 'ok' });
+  if(typeof setAppToast === 'function') setAppToast('Drive에서 로그아웃했어요.', { duration: 3500, variant: 'ok' });
 };
 
 // ── Init ──
@@ -1580,19 +1612,7 @@ function updateApiBadge() {
 
 // ── Tabs ──
 function getSortedCatTabOrder() {
-  const flat = CAT_TAB_NAV_ROWS[0].concat(CAT_TAB_NAV_ROWS[1]);
-  function doneCountForCat(idx) {
-    const cat = CATEGORIES[idx];
-    if (!cat || !cat.drafts) return 0;
-    let n = 0;
-    cat.drafts.forEach(function (d) {
-      if (d && d.id && (state.generatedOnly[d.id] || (state.published[d.id] && state.published[d.id].content))) n++;
-    });
-    return n;
-  }
-  const withDrafts = flat.filter(function (i) { return doneCountForCat(i) > 0; });
-  const without = flat.filter(function (i) { return doneCountForCat(i) === 0; });
-  return withDrafts.concat(without);
+  return CAT_TAB_NAV_ROWS[0].concat(CAT_TAB_NAV_ROWS[1]);
 }
 
 function renderTabs() {
@@ -1635,20 +1655,42 @@ function selectCat(i) {
 }
 
 // ── Recommendations ──
+function draftHasContent(d) {
+  return !!(d && d.id && (state.generatedOnly[d.id] || (state.published[d.id] && state.published[d.id].content)));
+}
+
+function sortDraftsForDisplay(drafts) {
+  return (drafts || []).slice().sort(function (a, b) {
+    const ag = draftHasContent(a) ? 1 : 0;
+    const bg = draftHasContent(b) ? 1 : 0;
+    return bg - ag;
+  });
+}
+
+function getNextPublishRecommendation() {
+  const flatOrder = CAT_TAB_NAV_ROWS[0].concat(CAT_TAB_NAV_ROWS[1]);
+  const candidates = [];
+  for (const catId of flatOrder) {
+    const cat = CATEGORIES[catId];
+    if (!cat || !cat.drafts) continue;
+    cat.drafts.forEach(function (draft) {
+      if (draft && !state.published[draft.id]?.date) candidates.push({ draft: draft, cat: cat });
+    });
+  }
+  candidates.sort(function (a, b) {
+    const ag = draftHasContent(a.draft) ? 1 : 0;
+    const bg = draftHasContent(b.draft) ? 1 : 0;
+    return bg - ag;
+  });
+  return candidates[0] || null;
+}
+
 function getRecommended(catId) {
   const cat = CATEGORIES[catId];
   const pubIds = Object.keys(state.published).filter(id => id.startsWith('d'+catId+'-') && state.published[id].date);
   const unpub = cat.drafts.filter(d => !pubIds.includes(d.id));
   if(pubIds.length === 0) return [];
-  const related = unpub.slice(0,3).map(d => ({...d, recType:'related'}));
-  const trending = [];
-  for(const oc of CATEGORIES){
-    if(oc.id===catId || oc.audience!==cat.audience) continue;
-    const u = oc.drafts.find(d => !state.published[d.id]?.date);
-    if(u) trending.push({...u, recType:'trending', fromCat:oc.name});
-    if(trending.length>=2) break;
-  }
-  return [...related, ...trending];
+  return unpub.slice(0,5).map(d => ({...d, recType:'related'}));
 }
 
 // ── Main render ──
@@ -1658,14 +1700,14 @@ function renderMain() {
 
   if(state.showAdd){ mc.innerHTML = renderAddForm(); return; }
 
-  // Alert: upcoming (drafts near publish time — show first unpublished in cat)
-  const firstUnpub = cat.drafts.find(d => !state.published[d.id]?.date);
-  const alertHTML = firstUnpub ? `
-    <div class="alert-banner" onclick="openDetail('${firstUnpub.id}',${cat.id})">
+  // Alert: upcoming — choose from all categories so the next topic suggestion is not tied to the open tab.
+  const nextRec = getNextPublishRecommendation();
+  const alertHTML = nextRec ? `
+    <div class="alert-banner" onclick="openDetail('${nextRec.draft.id}',${nextRec.cat.id})">
       <div class="alert-banner-text">
         <div class="alert-banner-title">다음 발행 추천</div>
-        <div class="alert-banner-topic">${firstUnpub.topic}</div>
-        <div class="alert-banner-meta">${cat.name} · ${cat.audience}</div>
+        <div class="alert-banner-topic">${nextRec.draft.topic}</div>
+        <div class="alert-banner-meta">${nextRec.cat.name} · ${nextRec.cat.audience}</div>
       </div>
       <div class="alert-banner-arrow">→</div>
     </div>` : '';
@@ -1697,7 +1739,7 @@ function renderMain() {
   const recs = getRecommended(state.currentCat);
   let recHTML = '';
   if(recs.length > 0 && state.filterStatus==='전체' && !state.searchQ){
-    recHTML = `<div class="rec-section-title">이번에 추천하는 초안 <span style="font-weight:400;font-size:10px;color:#C0C0C0">관련 3개 + 호응예상 2개</span></div>` +
+    recHTML = `<div class="rec-section-title">이번에 추천하는 초안 <span style="font-weight:400;font-size:10px;color:#C0C0C0">${cat.name} 관련</span></div>` +
       recs.map(d => draftCardHTML(d, cat, true)).join('') +
       `<div class="rec-divider"></div><div class="rec-section-title" style="margin-bottom:4px;">전체 초안</div>`;
   }
@@ -1707,6 +1749,7 @@ function renderMain() {
   if(state.filterStatus==='초안있음') drafts = drafts.filter(d=>state.generatedOnly[d.id]||state.published[d.id]?.content);
   if(state.filterStatus==='발행완료') drafts = drafts.filter(d=>state.published[d.id]?.date);
   if(state.searchQ) drafts = drafts.filter(d=>d.topic.includes(state.searchQ)||d.angle.includes(state.searchQ));
+  drafts = sortDraftsForDisplay(drafts);
   const cardsHTML = drafts.length ? drafts.map(d=>draftCardHTML(d,cat,false)).join('') : '<div class="empty-note">조건에 맞는 초안이 없어요</div>';
 
   mc.innerHTML = alertHTML + statsHTML + searchHTML + `<div class="cards-wrap">${recHTML}${cardsHTML}</div>`;
@@ -1716,11 +1759,10 @@ function draftCardHTML(d, cat, isRec) {
   const pub = state.published[d.id];
   const hasContent = pub?.content || state.generatedOnly[d.id];
   const isPub = !!pub?.date;
-  const color = isRec && d.recType==='trending' ? '#F59E0B' : cat.color;
+  const color = cat.color;
   const badges = [
     `<span class="badge badge-aud">${cat.audience}</span>`,
     isRec && d.recType==='related' ? '<span class="badge badge-rec">관련</span>' : '',
-    isRec && d.recType==='trending' ? `<span class="badge badge-rec">호응예상 · ${d.fromCat}</span>` : '',
     hasContent ? '<span class="badge badge-gen">초안있음</span>' : '',
     isPub ? '<span class="badge badge-pub">발행완료</span>' : '',
   ].filter(Boolean).join('');

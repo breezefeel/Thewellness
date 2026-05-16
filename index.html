@@ -727,7 +727,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       <button type="button" class="modal-btn" onclick="driveLoginAndUpload()">Google 로그인 · 연동 후 지금 업로드</button>
       <button type="button" class="modal-btn" style="background:#2DD4BF;color:#111;" onclick="drivePullFromCloud()">Drive에서 이 기기로 불러오기</button>
       <button type="button" class="modal-btn" style="background:#F3F4F6;color:#374151;" onclick="driveManualUploadOnly()">로그인 유지 — 지금만 업로드</button>
-      <button type="button" class="modal-btn" style="background:#fff;color:#9CA3AF;border:1px solid #E5E7EB;" onclick="driveDisconnect()">Drive 연동만 해제 (이 기기 데이터는 유지)</button>
+      <button type="button" class="modal-btn" style="background:#fff;color:#9CA3AF;border:1px solid #E5E7EB;" onclick="driveDisconnect()">Drive 로그아웃 (이 기기 데이터는 유지)</button>
     </div>
     <button type="button" style="border:none;background:none;width:100%;cursor:pointer;margin-top:14px;font-size:12px;color:#9CA3AF;font-family:inherit;" onclick="closeDriveModal()">닫기</button>
   </div>
@@ -1142,6 +1142,7 @@ function save(opts) {
 
 // ── Google Drive (앱 데이터 폴더, 단일 JSON) ──
 const DRIVE_SYNC_FILENAME = 'planner-sync-v1.json';
+const DRIVE_CONNECTED_KEY = 'ht_drive_connected';
 /** Google OAuth 웹 클라이언트 ID — 비밀이 아니므로 내장. 다른 ID로 덮어쓰려면 Drive 모달에서 입력( ht_gdrive_cid 저장 ) */
 const GOOGLE_OAUTH_WEB_CLIENT_ID = '442956975507-a6qqamnjlhuqflflfdknq20slb16jrmc.apps.googleusercontent.com';
 let driveTokenWaiters = [];
@@ -1165,6 +1166,17 @@ function getDriveClientId(){
   if(fromStore) return fromStore;
   return GOOGLE_OAUTH_WEB_CLIENT_ID.trim();
 }
+function setDriveConnected_(connected){
+  try {
+    if(connected) localStorage.setItem(DRIVE_CONNECTED_KEY, '1');
+    else localStorage.removeItem(DRIVE_CONNECTED_KEY);
+  } catch(e){}
+}
+function hasDriveConnection_(){
+  try {
+    return localStorage.getItem(DRIVE_CONNECTED_KEY) === '1' || !!localStorage.getItem('ht_drive_oauth');
+  } catch(e){ return false; }
+}
 function flushDriveTokenWaiters(ok, val){
   var w = driveTokenWaiters.slice();
   driveTokenWaiters = [];
@@ -1180,6 +1192,8 @@ function onDriveTokenReceived(resp){
       access_token: resp.access_token,
       expires_at: Date.now() + sec * 1000 - 120000
     }));
+    setDriveConnected_(true);
+    updateDriveButtonState();
     flushDriveTokenWaiters(true, resp.access_token);
   } else {
     var msg = (resp && resp.error) ? resp.error : '액세스 토큰을 받지 못했어요';
@@ -1258,15 +1272,26 @@ async function driveUploadNow(){
   var token = await getDriveAccessToken({ forcePrompt: false });
   var fileId = await driveEnsureFileId(token);
   var body = buildDriveFileBody();
-  var r = await fetch('https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media', {
+  var uploadUrl = 'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media';
+  var r = await fetch(uploadUrl, {
     method: 'PATCH',
     headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
     body: body
   });
   if(r.status === 401){
     try { localStorage.removeItem('ht_drive_oauth'); } catch(e401){}
+    token = await getDriveAccessToken({ forcePrompt: false });
+    fileId = await driveEnsureFileId(token);
+    uploadUrl = 'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media';
+    r = await fetch(uploadUrl, {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: body
+    });
+  }
+  if(r.status === 401){
     updateDriveButtonState();
-    throw new Error('Drive 로그인이 만료됐어요. Drive 메뉴에서 다시 로그인해 주세요.');
+    throw new Error('Drive 인증을 새로 받아야 해요. Drive 메뉴에서 다시 로그인해 주세요.');
   }
   if(!r.ok){
     var tx = await r.text();
@@ -1276,7 +1301,7 @@ async function driveUploadNow(){
 }
 function scheduleDriveUpload(immediate){
   try {
-    if(!localStorage.getItem('ht_drive_oauth')) return;
+    if(!hasDriveConnection_()) return;
   } catch(e3){ return; }
   clearTimeout(driveUploadTimer);
   driveUploadTimer = null;
@@ -1319,13 +1344,12 @@ function updateDriveButtonState(){
   var lastIso = '';
   try { lastIso = localStorage.getItem('ht_drive_last_upload_ok') || ''; } catch(e0){}
   var lastFmt = formatDriveTimeShort(lastIso);
-  var hasToken = false;
-  try { hasToken = !!localStorage.getItem('ht_drive_oauth'); } catch(e1){}
+  var hasConnection = hasDriveConnection_();
   var exp = readDriveAuthExpiryMs();
   var now = Date.now();
   b.classList.remove('warn');
   if(dot) dot.className = 'drive-dot';
-  if(!hasToken){
+  if(!hasConnection){
     b.classList.remove('linked');
     if(status) status.textContent = 'Drive';
     if(sub) sub.textContent = lastFmt ? ('연동 안 됨 · 업로드 ' + lastFmt) : '연동 안 됨';
@@ -1334,14 +1358,12 @@ function updateDriveButtonState(){
   }
   b.classList.add('linked');
   var state = 'ok';
-  if(!exp || exp <= now) state = 'expired';
-  else if(exp - now < 8 * 60 * 1000) state = 'soon';
-  if(state === 'soon' || state === 'expired') b.classList.add('warn');
-  var stateKo = state === 'expired' ? '로그인 만료' : (state === 'soon' ? '만료 임박' : '연결됨');
-  if(dot) dot.classList.add(state === 'ok' ? 'on' : 'warn');
-  if(status) status.textContent = 'Drive ' + stateKo;
-  if(sub) sub.textContent = stateKo + (lastFmt ? (' · ' + lastFmt) : '');
-  b.title = 'Drive ' + stateKo + (lastFmt ? (' — 마지막 업로드(성공) ' + lastFmt) : '');
+  if(exp && exp > now && exp - now < 8 * 60 * 1000) state = 'soon';
+  if(state === 'soon') b.classList.add('warn');
+  if(dot) dot.classList.add(state === 'soon' ? 'warn' : 'on');
+  if(status) status.textContent = 'Drive 연결됨';
+  if(sub) sub.textContent = '연결됨' + (lastFmt ? (' · ' + lastFmt) : '');
+  b.title = 'Drive 연결됨' + (lastFmt ? (' — 마지막 업로드(성공) ' + lastFmt) : '');
 }
 function markDriveUploadOk(){
   try { localStorage.setItem('ht_drive_last_upload_ok', new Date().toISOString()); } catch(e){}
@@ -1423,6 +1445,11 @@ async function driveDownloadCloudPayload_(token){
   if(!fileId) return { fileId: '', data: null };
   localStorage.setItem('ht_drive_file_id', fileId);
   var r = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', { headers: { Authorization: 'Bearer ' + token } });
+  if(r.status === 401){
+    try { localStorage.removeItem('ht_drive_oauth'); } catch(e401){}
+    token = await getDriveAccessToken({ forcePrompt: false });
+    r = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', { headers: { Authorization: 'Bearer ' + token } });
+  }
   var text = await r.text();
   if(!r.ok) throw new Error(text || 'Drive 다운로드 실패');
   var data = JSON.parse(text);
@@ -1438,10 +1465,8 @@ function parseIsoMs_(iso){
 }
 
 async function driveAutoSyncIfNewer_(reason){
-  // 조용히 확인: 로그인(토큰) 없으면 아무 것도 안 함
-  var hasToken = false;
-  try { hasToken = !!localStorage.getItem('ht_drive_oauth'); } catch(e0){}
-  if(!hasToken) return;
+  // 조용히 확인: Drive 연동 자체가 없으면 아무 것도 안 함
+  if(!hasDriveConnection_()) return;
   try{
     var token = await getDriveAccessToken({ forcePrompt: false });
     var out = await driveDownloadCloudPayload_(token);
@@ -1494,13 +1519,14 @@ window.drivePullFromCloud = async function(){
 };
 window.driveDisconnect = function(){
   if(!confirm('Drive에 저장된 파일은 그대로 두고, 이 브라우저의 로그인만 지웁니다.')) return;
+  setDriveConnected_(false);
   localStorage.removeItem('ht_drive_oauth');
   localStorage.removeItem('ht_drive_file_id');
   window.__htDriveTokenClient = null;
   window.__htDriveTokenClientCid = null;
   updateDriveButtonState();
   closeDriveModal();
-  if(typeof setAppToast === 'function') setAppToast('Drive 연동을 해제했어요.', { duration: 3500, variant: 'ok' });
+  if(typeof setAppToast === 'function') setAppToast('Drive에서 로그아웃했어요.', { duration: 3500, variant: 'ok' });
 };
 
 // ── Init ──

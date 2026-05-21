@@ -1,9 +1,13 @@
-GitHub / 웹 호스팅 배포 시 이 폴더에 아래 두 파일을 함께 올리세요.
+GitHub Pages (Thewellness 저장소):
 
-  플래너.html
-  planner-sw.js
+  https://breezefeel.github.io/Thewellness/
 
-(또는 저장소 루트에 두 파일을 나란히 두어도 됩니다. planner-sw.js 는 플래너.html 과 반드시 같은 경로.)
+이 URL에 플래너 HTML(index.html 또는 플래너.html)과 planner-sw.js 를 같은 폴더에 올리세요.
 
-Apps Script: 상위 폴더의 code-full.gs 를 스프레드시트에 붙여넣은 뒤
-메뉴 「약수 관리」→「플래너 · 매일 초안 트리거 설치」 실행.
+Apps Script (code-full.gs):
+  PLANNER_PAGE_URL = https://breezefeel.github.io/Thewellness/ (기본값 반영됨)
+  메뉴 「약수 관리」→「플래너 · 매일 초안 트리거 설치」
+
+Google OAuth (Drive 연동) — 둘 다 등록:
+  JavaScript 원본: https://breezefeel.github.io
+  리디렉션 URI (모바일 필수): https://breezefeel.github.io/Thewellness/

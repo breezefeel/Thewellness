@@ -718,7 +718,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 <div class="modal-overlay" id="drive-modal-overlay" onclick="closeDriveModal(event)">
   <div class="modal-box" style="max-width:440px;" onclick="event.stopPropagation()">
     <div class="modal-title">구글 Drive 동기화</div>
-    <div class="modal-desc" style="font-size:12px;">발행·초안·프롬프트·API 키를 <strong>내 Google 계정의 앱 전용 데이터</strong> 폴더에 JSON으로 저장합니다. Drive 웹의 ‘내 파일’에는 안 보이는 것이 정상이에요.</div>
+    <div class="modal-desc" style="font-size:12px;">발행·초안·프롬프트·API 키를 <strong>내 Google 계정의 앱 전용 데이터</strong> 폴더에 JSON으로 저장합니다. Drive 웹의 ‘내 파일’에는 안 보이는 것이 정상이에요.<br><span style="color:#6B7280;">한 번 로그인하면 이 기기에서는 <strong>자동으로</strong> 동기화합니다 (계정은 최초 1회만 선택).</span></div>
     <div id="drive-modal-err" style="font-size:12px;color:#EF4444;min-height:18px;margin-bottom:6px;"></div>
     <label class="drive-label" for="drive-client-id">OAuth 클라이언트 ID (다른 ID로 바꿀 때만 입력)</label>
     <input class="modal-input" type="text" id="drive-client-id" placeholder="비워 두면 이 페이지에 내장된 ID를 사용합니다" autocomplete="off" style="font-family:inherit;" />
@@ -859,6 +859,11 @@ const CAT_TAB_SHORT = {
 };
 
 const SK = 'ht_v2';
+/** 약수·피드백과 동일 웹앱 — code-full.gs 배포 URL */
+const PLANNER_GAS_URL = 'https://script.google.com/macros/s/AKfycbwVJSc6rY5tcBSB1VaRi4DBEXGyUBr1ADFfs6QEA9Z9bu0G-0mdMAv374-MdPVYMnSaeQ/exec';
+/** GitHub Pages 공개 주소 — Apps Script PLANNER_PAGE_URL 과 동일하게 유지 */
+const PLANNER_PUBLIC_URL = 'https://breezefeel.github.io/Thewellness/';
+let plannerGasPushTimer = null;
 
 /** 시트 하단「가기」버튼용 고정 URL */
 const EXT_NAVER_BLOG = 'https://blog.naver.com/allenjoy';
@@ -1059,18 +1064,114 @@ try {
   if(s){ applyPersistPayload(s); }
 } catch(e){}
 
+function getPlannerGasUrl_(){
+  try {
+    var u = (localStorage.getItem('ht_planner_gas_url') || '').trim();
+    if(u) return u;
+  } catch(e){}
+  return PLANNER_GAS_URL;
+}
 function getPersistPayload(){
+  var dailyLast = '';
+  try { dailyLast = localStorage.getItem('ht_daily_auto_last') || ''; } catch(e0){}
   var payload = {
     published: state.published,
     generatedOnly: state.generatedOnly,
     localSavedAt: state.localSavedAt,
     apiKey: state.apiKey,
     chatgptOpenUrl: state.chatgptOpenUrl,
-    prompts: state.prompts
+    prompts: state.prompts,
+    dailyAutoLast: dailyLast
   };
   var extra = collectExtraDrafts();
   if(extra && Object.keys(extra).length) payload.extraDraftsByCat = extra;
   return payload;
+}
+function schedulePlannerGasPush_(immediate){
+  if(!getPlannerGasUrl_() || location.protocol === 'file:') return;
+  clearTimeout(plannerGasPushTimer);
+  plannerGasPushTimer = null;
+  var run = function(){
+    plannerGasPushNow_().catch(function(err){ console.warn('[서버 동기화]', err); });
+  };
+  if(immediate) run();
+  else plannerGasPushTimer = setTimeout(run, 2500);
+}
+async function plannerGasPushNow_(){
+  var url = getPlannerGasUrl_();
+  if(!url) return;
+  var body = getPersistPayload();
+  body.savedAt = new Date().toISOString();
+  var r = await fetch(url, {
+    method: 'POST',
+    mode: 'cors',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'plannerSyncPush', payload: body })
+  });
+  var data = await r.json();
+  if(data.result === 'conflict' && data.payload){
+    var serverAt = data.savedAt || (data.payload && data.payload.savedAt) || '';
+    var localAt = state.localSavedAt || '';
+    if(serverAt && (!localAt || new Date(serverAt) > new Date(localAt))){
+      applyPersistPayload(data.payload);
+      if(data.payload.plannerLastAuto && typeof handleServerPlannerAuto_ === 'function'){
+        handleServerPlannerAuto_(data.payload);
+      }
+      renderTabs();
+      renderMain();
+    }
+  }
+}
+async function plannerGasPullIfNewer_(reason){
+  var url = getPlannerGasUrl_();
+  if(!url || location.protocol === 'file:') return;
+  try {
+    var r = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'plannerSyncPull' })
+    });
+    var data = await r.json();
+    if(data.result !== 'success' || !data.payload) return;
+    var serverAt = data.savedAt || data.payload.savedAt || data.payload.localSavedAt || '';
+    var localAt = state.localSavedAt || '';
+    if(!serverAt) return;
+    if(localAt && new Date(serverAt) <= new Date(localAt)) return;
+    applyPersistPayload(data.payload);
+    try {
+      if(data.payload.dailyAutoLast) localStorage.setItem('ht_daily_auto_last', data.payload.dailyAutoLast);
+    } catch(e0){}
+    try {
+      var store = getPersistPayload();
+      if(data.payload.plannerLastAuto) store.plannerLastAuto = data.payload.plannerLastAuto;
+      localStorage.setItem(SK, JSON.stringify(store));
+    } catch(e){}
+    if(data.payload.plannerLastAuto) handleServerPlannerAuto_(data.payload);
+    renderTabs();
+    renderMain();
+    if(data.payload.plannerLastAuto && data.payload.plannerLastAuto.draftId != null){
+      setTimeout(function(){
+        openDetailFromDeepLink_(data.payload.plannerLastAuto.draftId, data.payload.plannerLastAuto.catId);
+      }, 400);
+    } else if(typeof setAppToast === 'function'){
+      setAppToast('서버(Drive)에서 최신 초안을 불러왔어요.', { duration: 4000, variant: 'ok' });
+    }
+  } catch(e1){
+    console.warn('[plannerGasPull]', reason || '', e1);
+  }
+}
+function handleServerPlannerAuto_(payload){
+  var auto = payload && payload.plannerLastAuto;
+  if(!auto || !auto.draftId || auto.catId == null) return;
+  var seenKey = 'ht_server_auto_seen_' + (auto.at || auto.draftId);
+  try {
+    if(localStorage.getItem(seenKey)) return;
+    localStorage.setItem(seenKey, '1');
+  } catch(e){}
+  if(typeof tryNotifyDraftDone === 'function'){
+    tryNotifyDraftDone(auto.topic || '오늘의 발행 초안', true, auto.draftId, auto.catId, true);
+  }
 }
 function collectExtraDrafts(){
   var out = {};
@@ -1137,6 +1238,7 @@ function save(opts) {
       } catch (e2) {}
     }
     if(!o.skipDriveUpload) scheduleDriveUpload(!!o.driveImmediate);
+    if(!o.skipGasPush) schedulePlannerGasPush_(!!o.gasImmediate);
   }
 }
 
@@ -1185,6 +1287,55 @@ function flushDriveTokenWaiters(ok, val){
     else x.reject(val instanceof Error ? val : new Error(String(val)));
   });
 }
+function getDriveHintEmail_(){
+  try { return (localStorage.getItem('ht_drive_hint_email') || '').trim(); } catch(e){ return ''; }
+}
+function saveDriveHintEmail_(email){
+  try {
+    if(email) localStorage.setItem('ht_drive_hint_email', String(email).trim());
+  } catch(e){}
+}
+async function fetchAndSaveDriveHintEmail_(accessToken){
+  if(!accessToken || getDriveHintEmail_()) return;
+  try {
+    var r = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: 'Bearer ' + accessToken }
+    });
+    if(!r.ok) return;
+    var u = await r.json();
+    if(u && u.email) saveDriveHintEmail_(u.email);
+  } catch(e){}
+}
+function readCachedDriveToken_(){
+  try {
+    var raw = localStorage.getItem('ht_drive_oauth');
+    if(!raw) return '';
+    var t = JSON.parse(raw);
+    if(t.access_token && t.expires_at > Date.now()) return t.access_token;
+  } catch(e1){}
+  return '';
+}
+function ensureDriveTokenClient_(){
+  var cid = getDriveClientId();
+  if(!cid) throw new Error('OAuth 클라이언트 ID를 입력해 주세요');
+  if(window.__htDriveTokenClient && window.__htDriveTokenClientCid === cid) return;
+  var opts = {
+    client_id: cid,
+    scope: 'https://www.googleapis.com/auth/drive.appdata',
+    callback: onDriveTokenReceived,
+    error_callback: onDriveTokenError_
+  };
+  var hint = getDriveHintEmail_();
+  if(hint) opts.hint = hint;
+  window.__htDriveTokenClient = google.accounts.oauth2.initTokenClient(opts);
+  window.__htDriveTokenClientCid = cid;
+}
+function onDriveTokenError_(err){
+  var msg = 'Drive 인증이 취소되었어요';
+  if(err && err.type === 'popup_closed') msg = 'POPUP_CLOSED';
+  else if(err && err.message) msg = String(err.message);
+  flushDriveTokenWaiters(false, new Error(msg));
+}
 function onDriveTokenReceived(resp){
   if(resp && resp.access_token){
     var sec = resp.expires_in || 3600;
@@ -1194,43 +1345,70 @@ function onDriveTokenReceived(resp){
     }));
     setDriveConnected_(true);
     updateDriveButtonState();
+    fetchAndSaveDriveHintEmail_(resp.access_token);
     flushDriveTokenWaiters(true, resp.access_token);
   } else {
     var msg = (resp && resp.error) ? resp.error : '액세스 토큰을 받지 못했어요';
     flushDriveTokenWaiters(false, new Error(msg));
   }
 }
-function getDriveAccessToken(options){
-  options = options || {};
-  var forcePrompt = !!options.forcePrompt;
-  try {
-    var raw = localStorage.getItem('ht_drive_oauth');
-    if(raw && !forcePrompt){
-      var t = JSON.parse(raw);
-      if(t.access_token && t.expires_at > Date.now()) return Promise.resolve(t.access_token);
-    }
-  } catch(e1){}
+function requestDriveTokenOnce_(promptMode){
   return new Promise(function(resolve, reject){
     driveTokenWaiters.push({ resolve: resolve, reject: reject });
     loadGsiScript().then(function(){
-      var cid = getDriveClientId();
-      if(!cid){
-        flushDriveTokenWaiters(false, new Error('OAuth 클라이언트 ID를 입력해 주세요'));
-        return;
-      }
-      if(!window.__htDriveTokenClient || window.__htDriveTokenClientCid !== cid){
-        window.__htDriveTokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: cid,
-          scope: 'https://www.googleapis.com/auth/drive.appdata',
-          callback: onDriveTokenReceived
-        });
-        window.__htDriveTokenClientCid = cid;
-      }
-      window.__htDriveTokenClient.requestAccessToken({ prompt: forcePrompt ? 'consent' : '' });
+      ensureDriveTokenClient_();
+      var req = { prompt: promptMode || '' };
+      var hint = getDriveHintEmail_();
+      if(hint) req.hint = hint;
+      window.__htDriveTokenClient.requestAccessToken(req);
     }).catch(function(e2){
       flushDriveTokenWaiters(false, e2);
     });
   });
+}
+function requestDriveTokenChain_(promptModes){
+  var modes = promptModes.slice();
+  function attempt(i){
+    if(i >= modes.length) return Promise.reject(new Error('Drive 로그인이 필요해요. Drive 메뉴에서 다시 연결해 주세요.'));
+    return requestDriveTokenOnce_(modes[i]).catch(function(err){
+      var m = (err && err.message) ? err.message : '';
+      if(m === 'POPUP_CLOSED' || m.indexOf('access_denied') !== -1) return attempt(i + 1);
+      return attempt(i + 1);
+    });
+  }
+  return attempt(0);
+}
+function getDriveAccessToken(options){
+  options = options || {};
+  var cached = readCachedDriveToken_();
+  if(cached && !options.forcePrompt) return Promise.resolve(cached);
+  var wantConsent = options.forcePrompt === true || options.forcePrompt === 'consent';
+  var modes;
+  if(wantConsent) modes = ['consent'];
+  else if(hasDriveConnection_()) modes = ['none', ''];
+  else modes = [''];
+  return requestDriveTokenChain_(modes);
+}
+function driveSilentWarmup_(){
+  if(location.protocol === 'file:' || !hasDriveConnection_()) return;
+  getDriveAccessToken({}).then(function(tok){
+    return fetchAndSaveDriveHintEmail_(tok);
+  }).then(function(){
+    return driveAutoSyncIfNewer_('warmup');
+  }).catch(function(){});
+}
+var driveRefreshTimer = null;
+function startDriveTokenRefreshLoop_(){
+  if(driveRefreshTimer) return;
+  driveRefreshTimer = setInterval(function(){
+    if(!hasDriveConnection_()) return;
+    var exp = readDriveAuthExpiryMs();
+    if(!exp) return;
+    var left = exp - Date.now();
+    if(left > 0 && left < 25 * 60 * 1000){
+      getDriveAccessToken({}).catch(function(){});
+    }
+  }, 10 * 60 * 1000);
 }
 async function driveFindSyncFileId(accessToken){
   var q = "name='" + DRIVE_SYNC_FILENAME + "' and 'appDataFolder' in parents and trashed=false";
@@ -1298,6 +1476,7 @@ async function driveUploadNow(){
     throw new Error(tx || ('HTTP ' + r.status));
   }
   markDriveUploadOk();
+  schedulePlannerGasPush_(true);
 }
 function scheduleDriveUpload(immediate){
   try {
@@ -1413,9 +1592,12 @@ window.driveLoginAndUpload = async function(){
   if(!getDriveClientId()){ if(errEl) errEl.textContent = '클라이언트 ID를 입력해 주세요'; return; }
   if(errEl) errEl.textContent = '';
   try{
-    window.__htDriveTokenClient = null;
-    window.__htDriveTokenClientCid = null;
-    await getDriveAccessToken({ forcePrompt: true });
+    var firstConnect = !hasDriveConnection_();
+    if(firstConnect){
+      window.__htDriveTokenClient = null;
+      window.__htDriveTokenClientCid = null;
+    }
+    await getDriveAccessToken({ forcePrompt: firstConnect ? 'consent' : false });
     await driveUploadNow();
     closeDriveModal();
     if(typeof setAppToast === 'function') setAppToast('Drive에 저장했어요. 이후 저장은 자동으로 올라가요.', { duration: 4500, variant: 'ok' });
@@ -1535,9 +1717,23 @@ window.onload = () => {
   updateDriveButtonState();
   renderTabs();
   renderMain();
+  if('serviceWorker' in navigator && location.protocol !== 'file:'){
+    navigator.serviceWorker.register('planner-sw.js').catch(function(e){ console.warn('[SW]', e); });
+  }
+  driveSilentWarmup_();
+  startDriveTokenRefreshLoop_();
+  plannerGasPullIfNewer_('load');
+  consumeDeepLinkFromHash_();
+  scheduleDailyAutoDraft_();
+  setInterval(function(){ maybeRunDailyAutoDraft_('interval'); }, 2 * 60 * 1000);
+  setTimeout(function(){ maybeRunDailyAutoDraft_('load'); }, 4000);
   // Drive 최신본 자동 확인(조용히) — 재접속/재활성화 시 동기화
   driveAutoSyncIfNewer_('load');
-  window.addEventListener('focus', function(){ driveAutoSyncIfNewer_('focus'); });
+  window.addEventListener('focus', function(){
+    driveAutoSyncIfNewer_('focus');
+    plannerGasPullIfNewer_('focus');
+    maybeRunDailyAutoDraft_('focus');
+  });
   let hiddenAt = 0;
   document.addEventListener('visibilitychange', function(){
     if(document.hidden){
@@ -1545,6 +1741,7 @@ window.onload = () => {
       return;
     }
     driveAutoSyncIfNewer_('visibility');
+    maybeRunDailyAutoDraft_('visibility');
     if(hiddenAt){
       var sec = Math.floor((Date.now() - hiddenAt) / 1000);
       hiddenAt = 0;
@@ -2004,6 +2201,157 @@ ${avoidTopics.map(t=>' - '+t).join('\n')}
     if(typeof setAppToast === 'function') setAppToast('주제 리프레쉬에 실패했어요.\n' + msg, { duration: 6500, variant: 'err' });
   }
 };
+
+// ── 알림 · 딥링크 · 매일 8:30 자동 초안 ──
+const DAILY_AUTO_HOUR = 8;
+const DAILY_AUTO_MINUTE = 30;
+const DAILY_AUTO_LAST_KEY = 'ht_daily_auto_last';
+const DAILY_AUTO_ENABLED_KEY = 'ht_daily_auto_enabled';
+var dailyAutoTimer = null;
+
+function isDailyAutoEnabled_(){
+  try {
+    var v = localStorage.getItem(DAILY_AUTO_ENABLED_KEY);
+    if(v === '0') return false;
+    return true;
+  } catch(e){ return true; }
+}
+function getSeoulMinutesNow_(){
+  try {
+    var parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+    var h = 0, m = 0;
+    parts.forEach(function(p){
+      if(p.type === 'hour') h = parseInt(p.value, 10);
+      if(p.type === 'minute') m = parseInt(p.value, 10);
+    });
+    return h * 60 + m;
+  } catch(e2){
+    var d = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    return d.getUTCHours() * 60 + d.getUTCMinutes();
+  }
+}
+function getSeoulDateKey_(fromDate){
+  if(fromDate){
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(fromDate);
+    } catch(e2){}
+  }
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  } catch(e3){
+    var d = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+  }
+}
+function dailyAutoAlreadyRanToday_(){
+  try { return localStorage.getItem(DAILY_AUTO_LAST_KEY) === getSeoulDateKey_(); } catch(e){ return false; }
+}
+function markDailyAutoRanToday_(){
+  try { localStorage.setItem(DAILY_AUTO_LAST_KEY, getSeoulDateKey_()); } catch(e){}
+}
+function msUntilNextDailyAuto_(){
+  var target = DAILY_AUTO_HOUR * 60 + DAILY_AUTO_MINUTE;
+  var now = getSeoulMinutesNow_();
+  var diffMin = target - now;
+  if(diffMin <= 0) diffMin += 24 * 60;
+  return diffMin * 60 * 1000 + 1500;
+}
+function scheduleDailyAutoDraft_(){
+  if(dailyAutoTimer) clearTimeout(dailyAutoTimer);
+  if(!isDailyAutoEnabled_()) return;
+  dailyAutoTimer = setTimeout(function(){
+    dailyAutoTimer = null;
+    maybeRunDailyAutoDraft_('schedule');
+    scheduleDailyAutoDraft_();
+  }, msUntilNextDailyAuto_());
+}
+function openDetailFromDeepLink_(draftId, catId){
+  if(catId != null && state.currentCat !== catId){
+    state.currentCat = catId;
+    renderTabs();
+  }
+  renderMain();
+  openDetail(draftId, catId);
+  try { location.hash = 'open/' + encodeURIComponent(draftId) + '/' + catId; } catch(e){}
+}
+function consumeDeepLinkFromHash_(){
+  var h = (location.hash || '').replace(/^#/, '');
+  var m = h.match(/^open\/([^/]+)\/(\d+)$/);
+  if(!m) return;
+  openDetailFromDeepLink_(decodeURIComponent(m[1]), parseInt(m[2], 10));
+}
+function focusPlannerAndOpenDraft_(draftId, catId){
+  try { window.focus(); } catch(e){}
+  openDetailFromDeepLink_(draftId, catId);
+}
+function tryNotifyDraftDone(topic, ok, draftId, catId, isDaily){
+  try {
+    if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    var title = ok
+      ? (isDaily ? '오늘의 발행 초안 완료' : '초안 생성 완료')
+      : (isDaily ? '오늘의 발행 초안 실패' : '초안 생성 실패');
+    var payload = { draftId: draftId, catId: catId };
+    var opts = {
+      body: topic,
+      tag: 'ht-draft-' + String(draftId),
+      data: payload,
+      requireInteraction: !!ok && !!isDaily
+    };
+    if(document.hidden && navigator.serviceWorker){
+      navigator.serviceWorker.ready.then(function(reg){
+        return reg.showNotification(title, opts);
+      }).catch(function(){
+        var n = new Notification(title, opts);
+        n.onclick = function(){ n.close(); focusPlannerAndOpenDraft_(draftId, catId); };
+      });
+      return;
+    }
+    var n = new Notification(title, opts);
+    n.onclick = function(){
+      n.close();
+      focusPlannerAndOpenDraft_(draftId, catId);
+    };
+  } catch (e) { }
+}
+var dailyAutoRunning = false;
+function serverDailyAutoRanToday_(){
+  try {
+    var raw = localStorage.getItem(SK);
+    if(!raw) return false;
+    var s = JSON.parse(raw);
+    var auto = s && s.plannerLastAuto;
+    if(!auto || !auto.at) return false;
+    var d = new Date(auto.at);
+    return getSeoulDateKey_() === getSeoulDateKey_(d);
+  } catch(e){ return false; }
+}
+async function maybeRunDailyAutoDraft_(reason){
+  if(!isDailyAutoEnabled_()) return;
+  if(dailyAutoRunning || genPendingCount > 0 || genActiveJob) return;
+  if(serverDailyAutoRanToday_()) return;
+  if(!state.apiKey) return;
+  if(dailyAutoAlreadyRanToday_()) return;
+  var target = DAILY_AUTO_HOUR * 60 + DAILY_AUTO_MINUTE;
+  if(getSeoulMinutesNow_() < target && reason !== 'schedule') return;
+  var rec = getNextPublishRecommendation();
+  if(!rec || !rec.draft || !rec.draft.id) return;
+  if(draftHasContent(rec.draft)) {
+    markDailyAutoRanToday_();
+    return;
+  }
+  dailyAutoRunning = true;
+  try {
+    if(typeof setAppToast === 'function'){
+      setAppToast('오전 8:30 · 「다음 발행 추천」 초안을 백그라운드에서 만들고 있어요.', { duration: 4200, variant: 'ok' });
+    }
+    await window.enqueueDraftGeneration(rec.cat.id, rec.draft.id, { dailyAuto: true });
+    markDailyAutoRanToday_();
+  } catch(e){
+    console.warn('[매일 자동 초안]', e);
+  } finally {
+    dailyAutoRunning = false;
+  }
+}
 
 // ── Detail sheet ──
 function openDetail(draftId, catId) {
@@ -2992,13 +3340,6 @@ function setAppToast(message, options) {
   el.classList.add('show');
   if (duration > 0) appToastTimer = setTimeout(function(){ el.classList.remove('show'); }, duration);
 }
-function tryNotifyDraftDone(topic, ok) {
-  try {
-    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-    new Notification(ok ? '초안 생성 완료' : '초안 생성 실패', { body: topic });
-  } catch (e) { }
-}
-
 var genPendingCount = 0;
 var genActiveJob = null;
 var genUiTimer = null;
@@ -3069,20 +3410,28 @@ function updateGenIndicator() {
   el.textContent = '초안 작성 중 · ' + parts.join(' · ');
 }
 
-window.genContent = async function(){
-if(!state.apiKey){ openApiModal(); return; }
-var jobCatId = state.selectedCatId;
-var jobDraftId = state.selectedId;
+window.enqueueDraftGeneration = async function(jobCatId, jobDraftId, opts){
+opts = opts || {};
+if(!state.apiKey){
+  if(!opts.dailyAuto) openApiModal();
+  return;
+}
 var cat0 = CATEGORIES[jobCatId];
+if(!cat0){
+  if(!opts.dailyAuto && typeof setAppToast === 'function') setAppToast('카테고리를 찾을 수 없어요.', { duration: 4000, variant: 'err' });
+  return;
+}
 var draft0 = cat0.drafts.find(function(d){ return d.id === jobDraftId; });
 if(!draft0){
-  if(typeof setAppToast === 'function') setAppToast('선택된 초안을 찾을 수 없어요. 카드를 다시 눌러 주세요.', { duration: 4000, variant: 'err' });
+  if(!opts.dailyAuto && typeof setAppToast === 'function') setAppToast('선택된 초안을 찾을 수 없어요. 카드를 다시 눌러 주세요.', { duration: 4000, variant: 'err' });
   return;
 }
 var jobTopic = draft0.topic;
 
-setAppToast('백그라운드에서 초안을 만들고 있어요.\n다른 카드나 브라우저 탭에서도 순서대로 처리되며, 완료되면 알려드릴게요.', { duration: 3000 });
-closeSheet();
+if(opts.userInitiated){
+  setAppToast('백그라운드에서 초안을 만들고 있어요.\n다른 카드나 브라우저 탭에서도 순서대로 처리되며, 완료되면 알려드릴게요.', { duration: 3000 });
+  closeSheet();
+}
 beginGenIndicator();
 
 async function runDraftJob() {
@@ -3293,7 +3642,7 @@ if(isThreadCategory(catId)){
 if(!state.published[jobDraftId]) state.published[jobDraftId]={};
 state.published[jobDraftId].content = content;
 state.generatedOnly[jobDraftId] = content;
-save({ driveImmediate: true });
+save({ driveImmediate: true, gasImmediate: true });
 var nextTab = isThreadCategory(catId) ? 'thread' : (isHeiljagyaeCategory(catId) ? 'community' : 'blog');
 var ov = document.getElementById('detail-overlay');
 if(ov && ov.classList.contains('open') && state.selectedId === jobDraftId && state.selectedCatId === jobCatId){
@@ -3314,15 +3663,29 @@ try {
   } else {
     await runDraftJob();
   }
-  setAppToast('초안 생성 완료\n«' + jobTopic + '»', { duration: 6500, variant: 'ok' });
-  tryNotifyDraftDone(jobTopic, true);
+  if(opts.dailyAuto){
+    setAppToast('오늘의 발행 초안 완료\n«' + jobTopic + '»\n알림을 누르면 바로 열어요.', { duration: 7500, variant: 'ok' });
+  } else {
+    setAppToast('초안 생성 완료\n«' + jobTopic + '»', { duration: 6500, variant: 'ok' });
+  }
+  tryNotifyDraftDone(jobTopic, true, jobDraftId, jobCatId, !!opts.dailyAuto);
 } catch (e) {
   var errMsg = (e && e.message) ? e.message : String(e);
-  setAppToast('초안 생성에 실패했어요.\n' + errMsg + '\n\n같은 화면에서 다시 시도해 주세요.', { duration: 9000, variant: 'err' });
-  tryNotifyDraftDone(jobTopic, false);
+  if(!opts.dailyAuto){
+    setAppToast('초안 생성에 실패했어요.\n' + errMsg + '\n\n같은 화면에서 다시 시도해 주세요.', { duration: 9000, variant: 'err' });
+  }
+  tryNotifyDraftDone(jobTopic, false, jobDraftId, jobCatId, !!opts.dailyAuto);
 } finally {
   endGenIndicator();
 }
+};
+
+window.genContent = async function(){
+  if(!state.selectedId){
+    if(typeof setAppToast === 'function') setAppToast('먼저 초안 카드를 선택해 주세요.', { duration: 3500, variant: 'err' });
+    return;
+  }
+  await window.enqueueDraftGeneration(state.selectedCatId, state.selectedId, { userInitiated: true });
 };
 </script>
 

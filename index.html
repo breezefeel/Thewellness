@@ -16,11 +16,51 @@ background: #1A1A1A;
 padding: 14px 20px;
 display: flex; align-items: center; justify-content: space-between;
 }
-.planner-head-left { display: flex; align-items: center; gap: 10px; }
+.planner-head-left {
+  display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.planner-head-left > div { min-width: 0; }
 .logo-icon { display: none; }
-.logo-text { color: #fff; font-weight: 700; font-size: 15px; letter-spacing: -.3px; }
-.logo-sub { color: #9CA3AF; font-size: 11px; margin-top: 1px; }
+.logo-text {
+  color: #fff; font-weight: 700; font-size: 15px; letter-spacing: -.3px;
+  white-space: nowrap;
+  word-break: keep-all;
+  line-height: 1.25;
+}
+.logo-sub {
+  color: #9CA3AF; font-size: 11px; margin-top: 1px;
+  white-space: nowrap;
+  word-break: keep-all;
+  line-height: 1.3;
+}
 .planner-head-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 720px) {
+  .planner-head {
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 10px;
+    padding: 12px 14px;
+  }
+  .planner-head-left {
+    flex: 1 1 auto;
+    min-width: min-content;
+    max-width: 100%;
+  }
+  .planner-head-right {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+  .planner-head-right .api-badge,
+  .planner-head-right .btn-prompt-settings,
+  .planner-head-right .btn-drive-sync,
+  .planner-head-right .btn-add {
+    font-size: 10px;
+    padding: 5px 8px;
+  }
+}
 .api-badge {
 font-size: 11px; padding: 5px 10px; border-radius: 6px;
 border: 1px solid #3A3A3A; color: #9CA3AF; background: none;
@@ -722,7 +762,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     <div id="drive-modal-err" style="font-size:12px;color:#EF4444;min-height:18px;margin-bottom:6px;"></div>
     <label class="drive-label" for="drive-client-id">OAuth 클라이언트 ID (다른 ID로 바꿀 때만 입력)</label>
     <input class="modal-input" type="text" id="drive-client-id" placeholder="비워 두면 이 페이지에 내장된 ID를 사용합니다" autocomplete="off" style="font-family:inherit;" />
-    <div class="modal-hint" style="margin-top:-4px;">Cloud Console에서 <strong>Google Drive API</strong> 사용 설정 → <strong>OAuth 2.0 클라이언트 ID (웹)</strong> 생성 → <strong>승인된 JavaScript 원본</strong>에 아래 주소를 넣으세요.<br><code id="drive-origin-hint" style="font-size:11px;word-break:break-all;background:#F3F4F6;padding:4px 6px;border-radius:4px;display:inline-block;margin-top:6px;"></code><br><a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener">Drive API 사용 설정</a> · <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">사용자 인증 정보</a></div>
+    <div class="modal-hint" style="margin-top:-4px;">Cloud Console → <strong>OAuth 2.0 (웹)</strong><br>① <strong>JavaScript 원본</strong>: <code style="font-size:10px;">https://breezefeel.github.io</code><br>② <strong>리디렉션 URI</strong>(모바일 필수): <code style="font-size:10px;">https://breezefeel.github.io/Thewellness/</code><br>현재 페이지: <code id="drive-origin-hint" style="font-size:10px;word-break:break-all;background:#F3F4F6;padding:2px 4px;border-radius:4px;"></code><br><span id="drive-mobile-hint" style="display:block;margin-top:6px;color:#6B7280;font-size:11px;"></span><a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener">Drive API</a> · <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">인증 정보</a></div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;">
       <button type="button" class="modal-btn" onclick="driveLoginAndUpload()">Google 로그인 · 연동 후 지금 업로드</button>
       <button type="button" class="modal-btn" style="background:#2DD4BF;color:#111;" onclick="drivePullFromCloud()">Drive에서 이 기기로 불러오기</button>
@@ -1048,7 +1088,7 @@ let state = {
   generatedOnly: {},
   localSavedAt: '',
   showAdd: false,
-  newItem: { date:'', topic:'', catId:0, audience:'일반인' },
+  newItem: { date:'', topic:'', catId:0, refImage:null },
   apiKey: '',
   chatgptOpenUrl: '',
   selectedId: null,
@@ -1315,10 +1355,30 @@ function readCachedDriveToken_(){
   } catch(e1){}
   return '';
 }
-function ensureDriveTokenClient_(){
+function isInAppBrowser_(){
+  var ua = navigator.userAgent || '';
+  return /KAKAOTALK|Instagram|FBAN|FBAV|Line\/|NAVER|DaumApps/i.test(ua);
+}
+function isDrivePreferRedirect_(){
+  if(location.protocol === 'file:') return false;
+  if(isInAppBrowser_()) return true;
+  var ua = navigator.userAgent || '';
+  if(/Android|iPhone|iPad|iPod|Mobile|CriOS|FxiOS/i.test(ua)) return true;
+  if(navigator.maxTouchPoints > 0 && window.innerWidth < 960) return true;
+  return false;
+}
+function getDriveRedirectUri_(){
+  if(location.hostname === 'breezefeel.github.io' && location.pathname.indexOf('/Thewellness') !== -1){
+    return PLANNER_PUBLIC_URL.replace(/\/?$/, '/');
+  }
+  var u = location.origin + (location.pathname || '/');
+  return u.replace(/#.*$/, '').replace(/\?.*$/, '').replace(/\/?$/, '/') ;
+}
+function ensureDriveTokenClient_(useRedirect){
   var cid = getDriveClientId();
   if(!cid) throw new Error('OAuth 클라이언트 ID를 입력해 주세요');
-  if(window.__htDriveTokenClient && window.__htDriveTokenClientCid === cid) return;
+  var redirect = !!useRedirect;
+  if(window.__htDriveTokenClient && window.__htDriveTokenClientCid === cid && window.__htDriveTokenClientRedirect === redirect) return;
   var opts = {
     client_id: cid,
     scope: 'https://www.googleapis.com/auth/drive.appdata',
@@ -1327,8 +1387,97 @@ function ensureDriveTokenClient_(){
   };
   var hint = getDriveHintEmail_();
   if(hint) opts.hint = hint;
+  if(redirect){
+    opts.ux_mode = 'redirect';
+    opts.redirect_uri = getDriveRedirectUri_();
+  }
   window.__htDriveTokenClient = google.accounts.oauth2.initTokenClient(opts);
   window.__htDriveTokenClientCid = cid;
+  window.__htDriveTokenClientRedirect = redirect;
+}
+function consumeDriveOAuthRedirect_(){
+  var h = location.hash || '';
+  if(h.indexOf('access_token=') === -1 && h.indexOf('error=') === -1) return false;
+  var qs = h.indexOf('#') === 0 ? h.slice(1) : h;
+  var params = new URLSearchParams(qs);
+  var cleanUrl = location.pathname + (location.search || '');
+  if(params.get('error')){
+    try { sessionStorage.removeItem('ht_drive_pending_action'); } catch(e0){}
+    history.replaceState(null, '', cleanUrl);
+    var rh = '';
+    try { rh = sessionStorage.getItem('ht_drive_return_hash') || ''; sessionStorage.removeItem('ht_drive_return_hash'); } catch(e1){}
+    if(rh) location.hash = rh;
+    if(typeof setAppToast === 'function'){
+      setAppToast('Drive 로그인이 취소되었거나 차단되었어요.\nSafari·Chrome에서 다시 시도해 주세요.', { duration: 7000, variant: 'err' });
+    }
+    return true;
+  }
+  var token = params.get('access_token');
+  if(!token) return false;
+  var sec = parseInt(params.get('expires_in') || '3600', 10);
+  try {
+    localStorage.setItem('ht_drive_oauth', JSON.stringify({
+      access_token: token,
+      expires_at: Date.now() + sec * 1000 - 120000
+    }));
+    setDriveConnected_(true);
+  } catch(e2){ return false; }
+  fetchAndSaveDriveHintEmail_(token);
+  updateDriveButtonState();
+  history.replaceState(null, '', cleanUrl);
+  var retHash = '';
+  try { retHash = sessionStorage.getItem('ht_drive_return_hash') || ''; sessionStorage.removeItem('ht_drive_return_hash'); } catch(e3){}
+  if(retHash) location.hash = retHash;
+  return true;
+}
+function startDriveRedirectAuth_(prompt, pendingAction){
+  if(isInAppBrowser_()){
+    return Promise.reject(new Error('카카오톡·인스타 등 앱 안 브라우저에서는 Google 로그인이 안 될 수 있어요.\n링크를 복사해 Safari 또는 Chrome에서 열어 주세요.'));
+  }
+  if(pendingAction){
+    try { sessionStorage.setItem('ht_drive_pending_action', pendingAction); } catch(e){}
+  }
+  if(location.hash && /^#open\//.test(location.hash)){
+    try { sessionStorage.setItem('ht_drive_return_hash', location.hash); } catch(e2){}
+  }
+  window.__htDriveTokenClient = null;
+  window.__htDriveTokenClientCid = null;
+  return loadGsiScript().then(function(){
+    ensureDriveTokenClient_(true);
+    var req = { prompt: prompt || 'consent' };
+    var hint = getDriveHintEmail_();
+    if(hint) req.hint = hint;
+    window.__htDriveTokenClient.requestAccessToken(req);
+  });
+}
+async function handleDrivePendingActionAfterRedirect_(){
+  var act = '';
+  try { act = sessionStorage.getItem('ht_drive_pending_action') || ''; sessionStorage.removeItem('ht_drive_pending_action'); } catch(e){}
+  if(!act) return;
+  try {
+    if(act === 'upload'){
+      await driveUploadNow();
+      if(typeof setAppToast === 'function') setAppToast('Drive에 저장했어요.', { duration: 4500, variant: 'ok' });
+      maybeRequestNotificationAfterDrive();
+    } else if(act === 'pull'){
+      var token = await getDriveAccessToken({ forcePrompt: false });
+      var dl = await driveDownloadCloudPayload_(token);
+      if(dl.data){
+        applyPersistPayload(dl.data);
+        save({ skipDriveUpload: true });
+        updateApiBadge();
+        renderTabs();
+        renderMain();
+        updateDriveButtonState();
+        if(typeof setAppToast === 'function') setAppToast('Drive에서 불러왔어요.', { duration: 4000, variant: 'ok' });
+      }
+    }
+    closeDriveModal();
+  } catch(err){
+    var errEl = document.getElementById('drive-modal-err');
+    if(errEl) errEl.textContent = String(err.message || err);
+    console.warn('[Drive redirect 후 작업]', err);
+  }
 }
 function onDriveTokenError_(err){
   var msg = 'Drive 인증이 취소되었어요';
@@ -1356,7 +1505,7 @@ function requestDriveTokenOnce_(promptMode){
   return new Promise(function(resolve, reject){
     driveTokenWaiters.push({ resolve: resolve, reject: reject });
     loadGsiScript().then(function(){
-      ensureDriveTokenClient_();
+      ensureDriveTokenClient_(false);
       var req = { prompt: promptMode || '' };
       var hint = getDriveHintEmail_();
       if(hint) req.hint = hint;
@@ -1369,10 +1518,13 @@ function requestDriveTokenOnce_(promptMode){
 function requestDriveTokenChain_(promptModes){
   var modes = promptModes.slice();
   function attempt(i){
-    if(i >= modes.length) return Promise.reject(new Error('Drive 로그인이 필요해요. Drive 메뉴에서 다시 연결해 주세요.'));
+    if(i >= modes.length){
+      if(isDrivePreferRedirect_()){
+        return Promise.reject(new Error('모바일: 「Google 로그인 · 연동」 버튼을 눌러 주세요. (팝업 대신 로그인 페이지로 이동합니다)'));
+      }
+      return Promise.reject(new Error('Drive 로그인이 필요해요. Drive 메뉴에서 다시 연결해 주세요.'));
+    }
     return requestDriveTokenOnce_(modes[i]).catch(function(err){
-      var m = (err && err.message) ? err.message : '';
-      if(m === 'POPUP_CLOSED' || m.indexOf('access_denied') !== -1) return attempt(i + 1);
       return attempt(i + 1);
     });
   }
@@ -1382,6 +1534,9 @@ function getDriveAccessToken(options){
   options = options || {};
   var cached = readCachedDriveToken_();
   if(cached && !options.forcePrompt) return Promise.resolve(cached);
+  if(isDrivePreferRedirect_() && !options.desktopPopup){
+    return Promise.reject(new Error('모바일: Drive 메뉴에서 「Google 로그인 · 연동」을 눌러 주세요.'));
+  }
   var wantConsent = options.forcePrompt === true || options.forcePrompt === 'consent';
   var modes;
   if(wantConsent) modes = ['consent'];
@@ -1576,7 +1731,17 @@ window.openDriveModal = function(){
   var err = document.getElementById('drive-modal-err');
   if(err) err.textContent = '';
   var hint = document.getElementById('drive-origin-hint');
-  if(hint) hint.textContent = location.origin;
+  if(hint) hint.textContent = location.origin + (location.pathname || '');
+  var mobHint = document.getElementById('drive-mobile-hint');
+  if(mobHint){
+    if(isInAppBrowser_()){
+      mobHint.textContent = '⚠️ 카톡/인스타 앱 안에서는 로그인이 안 될 수 있어요. Safari·Chrome에서 이 페이지를 여세요.';
+    } else if(isDrivePreferRedirect_()){
+      mobHint.textContent = '모바일: 로그인 버튼을 누르면 Google 페이지로 이동합니다. Cloud Console에 리디렉션 URI도 등록하세요.';
+    } else {
+      mobHint.textContent = '';
+    }
+  }
   var inp = document.getElementById('drive-client-id');
   if(inp) inp.value = getDriveClientId();
   document.getElementById('drive-modal-overlay').classList.add('open');
@@ -1592,12 +1757,17 @@ window.driveLoginAndUpload = async function(){
   if(!getDriveClientId()){ if(errEl) errEl.textContent = '클라이언트 ID를 입력해 주세요'; return; }
   if(errEl) errEl.textContent = '';
   try{
-    var firstConnect = !hasDriveConnection_();
+    var firstConnect = !hasDriveConnection_() && !readCachedDriveToken_();
+    if(isDrivePreferRedirect_() && !readCachedDriveToken_()){
+      if(errEl) errEl.textContent = 'Google 로그인 페이지로 이동합니다…';
+      await startDriveRedirectAuth_(firstConnect ? 'consent' : 'consent', 'upload');
+      return;
+    }
     if(firstConnect){
       window.__htDriveTokenClient = null;
       window.__htDriveTokenClientCid = null;
     }
-    await getDriveAccessToken({ forcePrompt: firstConnect ? 'consent' : false });
+    await getDriveAccessToken({ forcePrompt: firstConnect ? 'consent' : false, desktopPopup: true });
     await driveUploadNow();
     closeDriveModal();
     if(typeof setAppToast === 'function') setAppToast('Drive에 저장했어요. 이후 저장은 자동으로 올라가요.', { duration: 4500, variant: 'ok' });
@@ -1614,6 +1784,11 @@ window.driveManualUploadOnly = async function(){
   if(!getDriveClientId()){ if(errEl) errEl.textContent = '클라이언트 ID를 입력해 주세요'; return; }
   if(errEl) errEl.textContent = '';
   try{
+    if(!readCachedDriveToken_() && isDrivePreferRedirect_()){
+      if(errEl) errEl.textContent = 'Google 로그인 페이지로 이동합니다…';
+      await startDriveRedirectAuth_('consent', 'upload');
+      return;
+    }
     await driveUploadNow();
     if(typeof setAppToast === 'function') setAppToast('Drive 업로드 완료', { duration: 3500, variant: 'ok' });
     else alert('업로드 완료');
@@ -1677,7 +1852,12 @@ window.drivePullFromCloud = async function(){
   if(!getDriveClientId()){ if(errEl) errEl.textContent = '클라이언트 ID를 입력해 주세요'; return; }
   if(errEl) errEl.textContent = '';
   try{
-    var token = await getDriveAccessToken({ forcePrompt: false });
+    if(!readCachedDriveToken_() && isDrivePreferRedirect_()){
+      if(errEl) errEl.textContent = 'Google 로그인 페이지로 이동합니다…';
+      await startDriveRedirectAuth_('consent', 'pull');
+      return;
+    }
+    var token = await getDriveAccessToken({ forcePrompt: false, desktopPopup: true });
     var dl = await driveDownloadCloudPayload_(token);
     if(!dl.data){
       if(errEl) errEl.textContent = 'Drive에 아직 백업 파일이 없어요. 먼저 업로드해 주세요.';
@@ -1713,17 +1893,22 @@ window.driveDisconnect = function(){
 
 // ── Init ──
 window.onload = () => {
+  var oauthReturned = consumeDriveOAuthRedirect_();
   if(state.apiKey){ document.getElementById('api-modal').classList.remove('open'); updateApiBadge(); }
   updateDriveButtonState();
   renderTabs();
   renderMain();
+  if(oauthReturned){
+    handleDrivePendingActionAfterRedirect_();
+  }
   if('serviceWorker' in navigator && location.protocol !== 'file:'){
     navigator.serviceWorker.register('planner-sw.js').catch(function(e){ console.warn('[SW]', e); });
   }
   driveSilentWarmup_();
   startDriveTokenRefreshLoop_();
   plannerGasPullIfNewer_('load');
-  consumeDeepLinkFromHash_();
+  if(!oauthReturned) consumeDeepLinkFromHash_();
+  else setTimeout(function(){ consumeDeepLinkFromHash_(); }, 300);
   scheduleDailyAutoDraft_();
   setInterval(function(){ maybeRunDailyAutoDraft_('interval'); }, 2 * 60 * 1000);
   setTimeout(function(){ maybeRunDailyAutoDraft_('load'); }, 4000);
@@ -1980,46 +2165,158 @@ function setSearch(v){ state.searchQ=v; renderMain(); }
 
 function toggleAdd(){
   state.showAdd = !state.showAdd;
+  if(state.showAdd){
+    state.newItem.catId = state.currentCat;
+    state.newItem.topic = state.newItem.topic || '';
+  }
   document.getElementById('add-toggle-btn').textContent = state.showAdd ? '닫기' : '추가';
   renderMain();
 }
 
+function buildClaudeMessageContent_(textPrompt, imagePayload){
+  if(!imagePayload || !imagePayload.data) return textPrompt;
+  return [
+    { type: 'image', source: { type: 'base64', media_type: imagePayload.mediaType || 'image/jpeg', data: imagePayload.data } },
+    { type: 'text', text: textPrompt }
+  ];
+}
+
+async function callClaudePlanner_(prompt, options){
+  options = options || {};
+  var res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': state.apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: options.maxTokens || 1200,
+      messages: [{ role: 'user', content: buildClaudeMessageContent_(prompt, options.image) }]
+    })
+  });
+  var data = await res.json();
+  if(!res.ok) throw new Error((data.error && data.error.message) ? data.error.message : ('HTTP ' + res.status));
+  return (data.content || []).filter(function(b){ return b.type === 'text'; }).map(function(b){ return b.text; }).join('');
+}
+
+async function generateTopicFromKeywords_(catId, keywords, imagePayload){
+  var cat = CATEGORIES[catId];
+  if(!cat) throw new Error('카테고리를 찾을 수 없어요');
+  var avoidTopics = (cat.drafts || []).map(function(d){ return d && d.topic ? d.topic : ''; }).filter(Boolean).slice(0, 40);
+  var imgNote = imagePayload && imagePayload.data
+    ? '\n[첨부 참고 사진이 있습니다. 사진에 보이는 자세·부위·상황을 topic·angle에 반영하세요.]'
+    : '';
+  var prompt =
+'당신은 콘텐츠 기획자입니다.\n' +
+'카테고리: ' + cat.name + ' (' + (cat.sub || '') + ')\n' +
+'독자: ' + cat.audience + ' (카테고리 기본 독자 — 별도 선택 없음)\n' +
+'입력 키워드: ' + keywords + imgNote + '\n\n' +
+'키워드를 바탕으로 블로그·SNS에 쓸 주제 1개를 만드세요.\n' +
+'- topic: 한국어 제목 한 줄 (15~36자, 후킹·질문형 가능)\n' +
+'- angle: 어떤 관점으로 풀지 한 줄 (메커니즘·실천·오해 해소 등)\n\n' +
+'기존 주제와 겹치지 않게:\n' + avoidTopics.map(function(t){ return ' - ' + t; }).join('\n') + '\n\n' +
+'JSON만 출력:\n{"topic":"...","angle":"..."}';
+  var text = await callClaudePlanner_(prompt, { image: imagePayload, maxTokens: 800 });
+  var raw = text.replace(/^```json\s*/i, '').replace(/```\s*$/g, '').trim();
+  var start = raw.indexOf('{');
+  var end = raw.lastIndexOf('}');
+  if(start < 0 || end <= start) throw new Error('AI 응답에서 주제 JSON을 찾지 못했어요');
+  var obj = JSON.parse(raw.slice(start, end + 1));
+  if(!obj.topic) throw new Error('topic이 비어 있어요');
+  return { topic: String(obj.topic).trim(), angle: String(obj.angle || cat.audience + ' 관점의 콘텐츠').trim() };
+}
+
+window.onNewItemImage = function(input){
+  var f = input && input.files && input.files[0];
+  if(!f){ state.newItem.refImage = null; return; }
+  if(f.size > 4 * 1024 * 1024){
+    alert('사진은 4MB 이하로 올려 주세요.');
+    input.value = '';
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(){
+    var dataUrl = reader.result || '';
+    var m = String(dataUrl).match(/^data:([^;]+);base64,(.+)$/);
+    if(!m){ state.newItem.refImage = null; return; }
+    state.newItem.refImage = { mediaType: m[1], data: m[2], name: f.name };
+    renderMain();
+  };
+  reader.readAsDataURL(f);
+};
+
 function renderAddForm(){
-  const catOpts = CATEGORIES.map((c,i)=>`<option value="${i}"${state.newItem.catId===i?' selected':''}>${c.name}</option>`).join('');
+  const cat = CATEGORIES[state.newItem.catId] || CATEGORIES[0];
+  const catOpts = CATEGORIES.map((c,i)=>`<option value="${i}"${state.newItem.catId===i?' selected':''}>${c.name} · ${c.audience}</option>`).join('');
+  const imgHint = state.newItem.refImage && state.newItem.refImage.name
+    ? '<span style="font-size:11px;color:#0F766E;">참고 사진: ' + escapeHtml(state.newItem.refImage.name) + '</span>'
+    : '<span style="font-size:11px;color:#9CA3AF;">올리면 주제·초안 작성 시 사진을 참고합니다 (이 기기에만 유지)</span>';
   return `<div class="add-form">
     <div class="form-title">새 주제 추가</div>
+    <p style="font-size:12px;color:#6B7280;line-height:1.55;margin-bottom:12px;">추가한 주제는 <strong>선택한 카테고리 탭</strong>의 「전체 초안」 목록 맨 아래에 카드로 생깁니다.</p>
     <div class="form-field">
       <label class="form-label">카테고리</label>
       <select class="form-select" onchange="setNewCat(this.value)">${catOpts}</select>
+      <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">독자: <strong>${cat.audience}</strong> (카테고리에 맞게 자동)</div>
     </div>
     <div class="form-field">
-      <label class="form-label">주제 아이디어</label>
-      <input class="form-input" value="${state.newItem.topic}" oninput="state.newItem.topic=this.value" placeholder="예: 목 디스크 자가 진단법" />
+      <label class="form-label">키워드</label>
+      <input class="form-input" value="${escapeHtml(state.newItem.topic)}" oninput="state.newItem.topic=this.value" placeholder="예: 거북목, 어깨 결림, 재택 근무 (쉼표로 구분)" />
+      <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">AI가 키워드로 <strong>주제 제목</strong>과 <strong>각도</strong>를 만든 뒤 목록에 넣습니다.</div>
     </div>
     <div class="form-field">
-      <label class="form-label">독자 대상</label>
-      <div class="aud-row">
-        <button class="aud-btn${state.newItem.audience==='일반인'?' active':''}" onclick="setAud('일반인')">일반인</button>
-        <button class="aud-btn${state.newItem.audience==='전문가'?' active':''}" onclick="setAud('전문가')">전문가</button>
-      </div>
+      <label class="form-label">참고 사진 (선택)</label>
+      <input class="form-input" type="file" accept="image/*" capture="environment" onchange="onNewItemImage(this)" style="padding:8px;" />
+      <div style="margin-top:4px;">${imgHint}</div>
     </div>
-    <button class="btn-submit" onclick="addDraft()">추가하기</button>
+    <button type="button" class="btn-submit" id="btn-add-draft-submit" onclick="addDraft()">키워드로 주제 만들기</button>
   </div>`;
 }
-function setNewCat(v){ state.newItem.catId=parseInt(v); renderMain(); }
-function setAud(v){ state.newItem.audience=v; renderMain(); }
-function addDraft(){
-  if(!state.newItem.topic.trim()){ alert('주제를 입력해주세요'); return; }
-  const cat = CATEGORIES[state.newItem.catId];
-  const id = 'd'+state.newItem.catId+'-c'+Date.now();
-  cat.drafts.push({ id, topic: state.newItem.topic, angle: state.newItem.audience+'을 위한 콘텐츠' });
-  state.newItem = { date:'', topic:'', catId: state.newItem.catId, audience:'일반인' };
-  state.showAdd = false;
-  document.getElementById('add-toggle-btn').textContent = '추가';
-  state.currentCat = cat.id;
-  renderTabs(); renderMain();
-  save();
-}
+function setNewCat(v){ state.newItem.catId=parseInt(v,10); renderMain(); }
+
+window.addDraft = async function(){
+  var keywords = (state.newItem.topic || '').trim();
+  if(!keywords){
+    if(typeof setAppToast === 'function') setAppToast('키워드를 입력해 주세요.', { duration: 3500, variant: 'err' });
+    else alert('키워드를 입력해주세요');
+    return;
+  }
+  if(!state.apiKey){ openApiModal(); return; }
+  var btn = document.getElementById('btn-add-draft-submit');
+  if(btn){ btn.disabled = true; btn.textContent = '주제 생성 중…'; }
+  if(typeof setAppToast === 'function') setAppToast('키워드로 주제 제목·각도를 만들고 있어요…', { duration: 2800, variant: 'ok' });
+  try {
+    var gen = await generateTopicFromKeywords_(state.newItem.catId, keywords, state.newItem.refImage);
+    var cat = CATEGORIES[state.newItem.catId];
+    var id = 'd' + state.newItem.catId + '-c' + Date.now();
+    var draft = { id: id, topic: gen.topic, angle: gen.angle };
+    if(state.newItem.refImage && state.newItem.refImage.data){
+      draft.refImage = {
+        mediaType: state.newItem.refImage.mediaType,
+        data: state.newItem.refImage.data,
+        name: state.newItem.refImage.name || ''
+      };
+    }
+    cat.drafts.push(draft);
+    state.newItem = { date:'', topic:'', catId: state.newItem.catId, refImage: null };
+    state.showAdd = false;
+    document.getElementById('add-toggle-btn').textContent = '추가';
+    state.currentCat = cat.id;
+    renderTabs();
+    renderMain();
+    save();
+    if(typeof setAppToast === 'function') setAppToast('「' + gen.topic + '」 주제가 추가됐어요.\n카드를 눌러 초안 생성하세요.', { duration: 5500, variant: 'ok' });
+  } catch(e){
+    var msg = (e && e.message) ? e.message : String(e);
+    if(typeof setAppToast === 'function') setAppToast('주제 생성 실패\n' + msg, { duration: 7000, variant: 'err' });
+    else alert(msg);
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = '키워드로 주제 만들기'; }
+  }
+};
 
 window.refreshTopicsForCat = async function(catId){
   if(!state.apiKey){ openApiModal(); return; }
@@ -3587,6 +3884,11 @@ notebookLM.qa는 **정확히 7개** 객체 배열. 각 q는 한 문장 질문, �
 반드시 images.gptVisuals는 정확히 5개. 각 prompt 필드는 완성된 영문 이미지 프롬프트 한 덩어리(구도·조명·소품·카메라 앵글·피할 요소 등). 위 JSON 예시의 한글 설명문은 설명용이며 출력 시에는 제거하고, 예시에 나온 영문 구절을 그대로 복사하지 말고 주제·각도·본문 셀프 팁에 맞춰 새로 쓸 것.`;
 }
 
+var draftRefImage = (draft.refImage && draft.refImage.data) ? draft.refImage : null;
+if(draftRefImage){
+  prompt += '\n\n[첨부 참고 사진] 사진에 보이는 자세·부위·상황을 topic·본문에 반영하세요. 과장·단정적 진단 표현은 피하세요.';
+}
+
 const res = await fetch('https://api.anthropic.com/v1/messages', {
 method: 'POST',
 headers: {
@@ -3598,7 +3900,7 @@ headers: {
 body: JSON.stringify({
   model: 'claude-sonnet-4-20250514',
   max_tokens: isThreadCategory(catId) ? 2048 : (isHeiljagyaeCategory(catId) ? 4096 : 8192),
-  messages: [{ role: 'user', content: prompt }]
+  messages: [{ role: 'user', content: buildClaudeMessageContent_(prompt, draftRefImage) }]
 })
 });
 const data = await res.json();

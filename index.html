@@ -5,6 +5,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>콘텐츠 플래너</title>
+<script>
+(function(){
+  var h = location.hash || '';
+  if(h.indexOf('access_token=') === -1 && h.indexOf('error=') === -1) return;
+  try { sessionStorage.setItem('ht_drive_oauth_hash', h); } catch(e){}
+})();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -273,21 +280,38 @@ transform: translateY(100%); transition: transform 0.3s;
 z-index: 201;
 }
 .detail-sheet.open { transform: translateY(0); }
-.sheet-handle { width: 40px; height: 4px; background: #E5E7EB; border-radius: 2px; margin: 12px auto 0; }
+.sheet-handle {
+width: 40px; height: 4px; background: #E5E7EB; border-radius: 2px; margin: 12px auto 0;
+cursor: pointer; flex-shrink: 0;
+}
 .sheet-header {
-padding: 14px 20px 12px; border-bottom: 1px solid #F3F4F6;
-display: flex; align-items: flex-start; gap: 12px;
+position: sticky; top: 0; z-index: 6;
+padding: 10px 16px 12px; border-bottom: 1px solid #F3F4F6;
+display: flex; align-items: flex-start; gap: 10px;
+background: #fff;
 }
 .sheet-close {
-background: #F3F4F6; border: none; border-radius: 8px;
-width: 30px; height: 30px; font-size: 14px; cursor: pointer;
-flex-shrink: 0; margin-top: 2px;
+background: #1A1A1A; color: #fff; border: none; border-radius: 10px;
+min-width: 52px; height: 40px; padding: 0 14px;
+font-size: 13px; font-weight: 700; cursor: pointer;
+flex-shrink: 0; font-family: inherit;
+-webkit-tap-highlight-color: transparent;
 }
-.sheet-title { font-weight: 700; font-size: 14px; line-height: 1.45; flex: 1; }
-.sheet-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+.sheet-title { font-weight: 700; font-size: 14px; line-height: 1.45; flex: 1; min-width: 0; }
+.sheet-body { flex: 1; overflow-y: auto; padding: 16px 20px; -webkit-overflow-scrolling: touch; }
 .sheet-actions {
-padding: 12px 20px 24px; border-top: 1px solid #F3F4F6;
+position: sticky; bottom: 0; z-index: 6;
+padding: 10px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+border-top: 1px solid #F3F4F6;
 display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch;
+background: #fff; box-shadow: 0 -4px 16px rgba(0,0,0,0.06);
+}
+.btn-sheet-close-bar {
+width: 100%; flex: 1 1 100%;
+background: #F3F4F6; color: #374151; border: 1px solid #E5E7EB;
+border-radius: 12px; padding: 12px 16px; font-size: 14px; font-weight: 700;
+cursor: pointer; font-family: inherit;
+-webkit-tap-highlight-color: transparent;
 }
 .btn-sheet-link {
 background: #fff; color: #2563EB; border: 1.5px solid #BFDBFE;
@@ -691,6 +715,19 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .btn-drive-sync:hover { border-color: #4285F4; color: #93C5FD; }
 .btn-drive-sync.linked { border-color: #4285F4; color: #93C5FD; }
 #drive-modal-overlay { z-index: 310; }
+#drive-oauth-busy {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: rgba(26,26,26,.92); color: #fff;
+  flex-direction: column; align-items: center; justify-content: center;
+  padding: 24px; text-align: center; font-size: 15px; line-height: 1.55;
+}
+#drive-oauth-busy.show { display: flex; }
+#drive-oauth-busy .spin {
+  width: 36px; height: 36px; border: 3px solid rgba(255,255,255,.25);
+  border-top-color: #2DD4BF; border-radius: 50%;
+  animation: driveOAuthSpin .85s linear infinite; margin-bottom: 16px;
+}
+@keyframes driveOAuthSpin { to { transform: rotate(360deg); } }
 .drive-label { font-size: 11px; font-weight: 700; color: #6B7280; display: block; margin-bottom: 6px; }
 
 @media (min-width: 640px) {
@@ -702,6 +739,11 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 
 </head>
 <body>
+
+<div id="drive-oauth-busy" aria-live="polite" aria-busy="true">
+  <div class="spin" aria-hidden="true"></div>
+  <div id="drive-oauth-busy-msg">Google 로그인 결과를 처리하는 중…</div>
+</div>
 
 <!-- API Modal -->
 
@@ -725,11 +767,11 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 <!-- Detail Overlay -->
 
 <div class="detail-overlay" id="detail-overlay" onclick="closeDetail(event)">
-  <div class="detail-sheet" id="detail-sheet">
-    <div class="sheet-handle"></div>
+  <div class="detail-sheet" id="detail-sheet" onclick="event.stopPropagation()">
+    <div class="sheet-handle" onclick="closeSheet()" title="아래로 닫기" role="button" aria-label="닫기"></div>
     <div class="sheet-header">
-      <button class="sheet-close" onclick="closeSheet()" aria-label="닫기">×</button>
       <div class="sheet-title" id="sheet-title"></div>
+      <button type="button" class="sheet-close" onclick="closeSheet(); event.stopPropagation();" aria-label="닫기">닫기</button>
     </div>
     <div class="sheet-body" id="sheet-body"></div>
     <div class="sheet-actions" id="sheet-actions"></div>
@@ -1374,6 +1416,39 @@ function getDriveRedirectUri_(){
   var u = location.origin + (location.pathname || '/');
   return u.replace(/#.*$/, '').replace(/\?.*$/, '').replace(/\/?$/, '/') ;
 }
+function showDriveOAuthBusy_(msg){
+  var el = document.getElementById('drive-oauth-busy');
+  var tx = document.getElementById('drive-oauth-busy-msg');
+  if(tx) tx.textContent = msg || 'Google 로그인 결과를 처리하는 중…';
+  if(el) el.classList.add('show');
+}
+function hideDriveOAuthBusy_(){
+  var el = document.getElementById('drive-oauth-busy');
+  if(el) el.classList.remove('show');
+  try { sessionStorage.removeItem('ht_drive_oauth_started'); } catch(e){}
+}
+function readDriveOAuthHash_(){
+  var h = location.hash || '';
+  if(h.indexOf('access_token=') !== -1 || h.indexOf('error=') !== -1) return h;
+  try {
+    var saved = sessionStorage.getItem('ht_drive_oauth_hash') || '';
+    if(saved) return saved.indexOf('#') === 0 ? saved : ('#' + saved.replace(/^#/, ''));
+  } catch(e){}
+  return '';
+}
+function checkDriveOAuthStuck_(){
+  var started = 0;
+  try { started = parseInt(sessionStorage.getItem('ht_drive_oauth_started') || '0', 10); } catch(e){}
+  if(!started || Date.now() - started < 90000) return;
+  if(readCachedDriveToken_()){ hideDriveOAuthBusy_(); return; }
+  hideDriveOAuthBusy_();
+  try { sessionStorage.removeItem('ht_drive_oauth_started'); } catch(e2){}
+  var errEl = document.getElementById('drive-modal-err');
+  if(errEl) errEl.textContent = '';
+  if(typeof setAppToast === 'function'){
+    setAppToast('Drive 로그인이 완료되지 않았어요.\n① Safari·Chrome에서 열기 ② Google Cloud에 리디렉션 URI 등록\n' + getDriveRedirectUri_(), { duration: 9000, variant: 'err' });
+  }
+}
 function ensureDriveTokenClient_(useRedirect){
   var cid = getDriveClientId();
   if(!cid) throw new Error('OAuth 클라이언트 ID를 입력해 주세요');
@@ -1396,13 +1471,16 @@ function ensureDriveTokenClient_(useRedirect){
   window.__htDriveTokenClientRedirect = redirect;
 }
 function consumeDriveOAuthRedirect_(){
-  var h = location.hash || '';
+  var h = readDriveOAuthHash_();
   if(h.indexOf('access_token=') === -1 && h.indexOf('error=') === -1) return false;
+  showDriveOAuthBusy_('Drive 연동을 마무리하는 중…');
   var qs = h.indexOf('#') === 0 ? h.slice(1) : h;
   var params = new URLSearchParams(qs);
   var cleanUrl = location.pathname + (location.search || '');
+  try { sessionStorage.removeItem('ht_drive_oauth_hash'); } catch(e0){}
   if(params.get('error')){
-    try { sessionStorage.removeItem('ht_drive_pending_action'); } catch(e0){}
+    hideDriveOAuthBusy_();
+    try { sessionStorage.removeItem('ht_drive_pending_action'); } catch(e0b){}
     history.replaceState(null, '', cleanUrl);
     var rh = '';
     try { rh = sessionStorage.getItem('ht_drive_return_hash') || ''; sessionStorage.removeItem('ht_drive_return_hash'); } catch(e1){}
@@ -1413,7 +1491,7 @@ function consumeDriveOAuthRedirect_(){
     return true;
   }
   var token = params.get('access_token');
-  if(!token) return false;
+  if(!token){ hideDriveOAuthBusy_(); return false; }
   var sec = parseInt(params.get('expires_in') || '3600', 10);
   try {
     localStorage.setItem('ht_drive_oauth', JSON.stringify({
@@ -1421,12 +1499,13 @@ function consumeDriveOAuthRedirect_(){
       expires_at: Date.now() + sec * 1000 - 120000
     }));
     setDriveConnected_(true);
-  } catch(e2){ return false; }
+  } catch(e2){ hideDriveOAuthBusy_(); return false; }
   fetchAndSaveDriveHintEmail_(token);
   updateDriveButtonState();
   history.replaceState(null, '', cleanUrl);
   var retHash = '';
   try { retHash = sessionStorage.getItem('ht_drive_return_hash') || ''; sessionStorage.removeItem('ht_drive_return_hash'); } catch(e3){}
+  hideDriveOAuthBusy_();
   if(retHash) location.hash = retHash;
   return true;
 }
@@ -1440,6 +1519,12 @@ function startDriveRedirectAuth_(prompt, pendingAction){
   if(location.hash && /^#open\//.test(location.hash)){
     try { sessionStorage.setItem('ht_drive_return_hash', location.hash); } catch(e2){}
   }
+  try {
+    sessionStorage.setItem('ht_drive_oauth_started', String(Date.now()));
+    sessionStorage.setItem('ht_drive_redirect_uri', getDriveRedirectUri_());
+  } catch(e3){}
+  closeDriveModal();
+  showDriveOAuthBusy_('Google 로그인 화면으로 이동합니다…\n잠시만 기다려 주세요.');
   window.__htDriveTokenClient = null;
   window.__htDriveTokenClientCid = null;
   return loadGsiScript().then(function(){
@@ -1450,10 +1535,52 @@ function startDriveRedirectAuth_(prompt, pendingAction){
     window.__htDriveTokenClient.requestAccessToken(req);
   });
 }
+async function driveLoginInteractive_(pendingAction, promptMode){
+  if(isInAppBrowser_()){
+    throw new Error('카카오톡·인스타 등 앱 안 브라우저에서는 Google 로그인이 안 될 수 있어요.\n링크를 복사해 Safari 또는 Chrome에서 열어 주세요.');
+  }
+  var pr = promptMode || 'consent';
+  var errEl = document.getElementById('drive-modal-err');
+  if(errEl) errEl.textContent = '';
+  try {
+    await getDriveAccessToken({ forcePrompt: pr, desktopPopup: true });
+  } catch(popErr){
+    var popMsg = String((popErr && popErr.message) || popErr || '');
+    var useRedirect = isDrivePreferRedirect_() && (
+      popMsg === 'POPUP_CLOSED' ||
+      /popup|blocked|closed|user_cancel|access_denied/i.test(popMsg)
+    );
+    if(!useRedirect) throw popErr;
+    await startDriveRedirectAuth_(pr, pendingAction);
+    return false;
+  }
+  if(pendingAction === 'upload'){
+    await driveUploadNow();
+    if(typeof setAppToast === 'function') setAppToast('Drive에 저장했어요. 이후 저장은 자동으로 올라가요.', { duration: 4500, variant: 'ok' });
+    maybeRequestNotificationAfterDrive();
+  } else if(pendingAction === 'pull'){
+    var token = await getDriveAccessToken({ forcePrompt: false, desktopPopup: true });
+    var dl = await driveDownloadCloudPayload_(token);
+    if(!dl.data) throw new Error('Drive에 아직 백업 파일이 없어요. 먼저 업로드해 주세요.');
+    var data = dl.data;
+    var when = data.savedAt || '알 수 없음';
+    if(!confirm('Drive에 있는 데이터(저장 시각: ' + when + ')로 이 기기 내용을 덮어씁니다. 계속할까요?')) return true;
+    applyPersistPayload(data);
+    save({ skipDriveUpload: true });
+    updateApiBadge();
+    renderTabs();
+    renderMain();
+    updateDriveButtonState();
+    if(typeof setAppToast === 'function') setAppToast('Drive에서 불러왔어요.', { duration: 4000, variant: 'ok' });
+  }
+  closeDriveModal();
+  return true;
+}
 async function handleDrivePendingActionAfterRedirect_(){
   var act = '';
   try { act = sessionStorage.getItem('ht_drive_pending_action') || ''; sessionStorage.removeItem('ht_drive_pending_action'); } catch(e){}
   if(!act) return;
+  showDriveOAuthBusy_('Drive에 연결하는 중…');
   try {
     if(act === 'upload'){
       await driveUploadNow();
@@ -1477,6 +1604,9 @@ async function handleDrivePendingActionAfterRedirect_(){
     var errEl = document.getElementById('drive-modal-err');
     if(errEl) errEl.textContent = String(err.message || err);
     console.warn('[Drive redirect 후 작업]', err);
+    if(typeof setAppToast === 'function') setAppToast(String(err.message || err), { duration: 6500, variant: 'err' });
+  } finally {
+    hideDriveOAuthBusy_();
   }
 }
 function onDriveTokenError_(err){
@@ -1737,10 +1867,13 @@ window.openDriveModal = function(){
     if(isInAppBrowser_()){
       mobHint.textContent = '⚠️ 카톡/인스타 앱 안에서는 로그인이 안 될 수 있어요. Safari·Chrome에서 이 페이지를 여세요.';
     } else if(isDrivePreferRedirect_()){
-      mobHint.textContent = '모바일: 로그인 버튼을 누르면 Google 페이지로 이동합니다. Cloud Console에 리디렉션 URI도 등록하세요.';
+      mobHint.textContent = '모바일: 먼저 팝업 로그인을 시도하고, 안 되면 Google 페이지로 이동합니다. 리디렉션 URI: ' + getDriveRedirectUri_();
     } else {
       mobHint.textContent = '';
     }
+  }
+  if(/플래너\.html$/i.test(location.pathname || '')){
+    if(mobHint) mobHint.textContent = (mobHint.textContent ? mobHint.textContent + '\n' : '') + '⚠️ Drive 로그인은 ' + PLANNER_PUBLIC_URL + ' 주소에서 여는 것이 안전합니다.';
   }
   var inp = document.getElementById('drive-client-id');
   if(inp) inp.value = getDriveClientId();
@@ -1758,22 +1891,23 @@ window.driveLoginAndUpload = async function(){
   if(errEl) errEl.textContent = '';
   try{
     var firstConnect = !hasDriveConnection_() && !readCachedDriveToken_();
-    if(isDrivePreferRedirect_() && !readCachedDriveToken_()){
-      if(errEl) errEl.textContent = 'Google 로그인 페이지로 이동합니다…';
-      await startDriveRedirectAuth_(firstConnect ? 'consent' : 'consent', 'upload');
-      return;
-    }
     if(firstConnect){
       window.__htDriveTokenClient = null;
       window.__htDriveTokenClientCid = null;
     }
-    await getDriveAccessToken({ forcePrompt: firstConnect ? 'consent' : false, desktopPopup: true });
+    if(!readCachedDriveToken_()){
+      var ok = await driveLoginInteractive_('upload', firstConnect ? 'consent' : 'consent');
+      if(!ok) return;
+      maybeRequestNotificationAfterDrive();
+      return;
+    }
     await driveUploadNow();
     closeDriveModal();
     if(typeof setAppToast === 'function') setAppToast('Drive에 저장했어요. 이후 저장은 자동으로 올라가요.', { duration: 4500, variant: 'ok' });
     else alert('Drive에 저장했습니다.');
     maybeRequestNotificationAfterDrive();
   } catch(e5){
+    hideDriveOAuthBusy_();
     if(errEl) errEl.textContent = String(e5.message || e5);
   }
 };
@@ -1784,15 +1918,15 @@ window.driveManualUploadOnly = async function(){
   if(!getDriveClientId()){ if(errEl) errEl.textContent = '클라이언트 ID를 입력해 주세요'; return; }
   if(errEl) errEl.textContent = '';
   try{
-    if(!readCachedDriveToken_() && isDrivePreferRedirect_()){
-      if(errEl) errEl.textContent = 'Google 로그인 페이지로 이동합니다…';
-      await startDriveRedirectAuth_('consent', 'upload');
-      return;
+    if(!readCachedDriveToken_()){
+      var done = await driveLoginInteractive_('upload', 'consent');
+      if(!done) return;
     }
     await driveUploadNow();
     if(typeof setAppToast === 'function') setAppToast('Drive 업로드 완료', { duration: 3500, variant: 'ok' });
     else alert('업로드 완료');
   } catch(e6){
+    hideDriveOAuthBusy_();
     if(errEl) errEl.textContent = String(e6.message || e6);
   }
 };
@@ -1852,9 +1986,9 @@ window.drivePullFromCloud = async function(){
   if(!getDriveClientId()){ if(errEl) errEl.textContent = '클라이언트 ID를 입력해 주세요'; return; }
   if(errEl) errEl.textContent = '';
   try{
-    if(!readCachedDriveToken_() && isDrivePreferRedirect_()){
-      if(errEl) errEl.textContent = 'Google 로그인 페이지로 이동합니다…';
-      await startDriveRedirectAuth_('consent', 'pull');
+    if(!readCachedDriveToken_()){
+      var pulled = await driveLoginInteractive_('pull', 'consent');
+      if(!pulled) return;
       return;
     }
     var token = await getDriveAccessToken({ forcePrompt: false, desktopPopup: true });
@@ -1876,6 +2010,7 @@ window.drivePullFromCloud = async function(){
     if(typeof setAppToast === 'function') setAppToast('Drive에서 불러왔어요.', { duration: 4000, variant: 'ok' });
     else alert('불러오기 완료');
   } catch(e7){
+    hideDriveOAuthBusy_();
     if(errEl) errEl.textContent = String(e7.message || e7);
   }
 };
@@ -1893,6 +2028,7 @@ window.driveDisconnect = function(){
 
 // ── Init ──
 window.onload = () => {
+  checkDriveOAuthStuck_();
   var oauthReturned = consumeDriveOAuthRedirect_();
   if(state.apiKey){ document.getElementById('api-modal').classList.remove('open'); updateApiBadge(); }
   updateDriveButtonState();
@@ -1901,6 +2037,11 @@ window.onload = () => {
   if(oauthReturned){
     handleDrivePendingActionAfterRedirect_();
   }
+  window.addEventListener('pageshow', function(ev){
+    if(!ev.persisted && !(location.hash || '').match(/access_token=|error=/)) return;
+    var again = consumeDriveOAuthRedirect_();
+    if(again) handleDrivePendingActionAfterRedirect_();
+  });
   if('serviceWorker' in navigator && location.protocol !== 'file:'){
     navigator.serviceWorker.register('planner-sw.js').catch(function(e){ console.warn('[SW]', e); });
   }
@@ -1938,6 +2079,11 @@ window.onload = () => {
   window.addEventListener('online', function(){
     try { sessionStorage.removeItem('ht_offline_save_hint'); } catch(e){}
     driveAutoSyncIfNewer_('online');
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape' && document.getElementById('detail-overlay').classList.contains('open')){
+      closeSheet();
+    }
   });
 };
 
@@ -2664,7 +2810,8 @@ function openDetail(draftId, catId) {
   if(content){ renderSheetContent(content); }
   else { renderSheetEmpty(draft, cat); }
   document.getElementById('detail-overlay').classList.add('open');
-  setTimeout(()=>document.getElementById('detail-sheet').classList.add('open'), 10);
+  document.body.style.overflow = 'hidden';
+  setTimeout(function(){ document.getElementById('detail-sheet').classList.add('open'); }, 10);
 }
 
 function renderSheetEmpty(draft, cat) {
@@ -2679,7 +2826,7 @@ function renderSheetEmpty(draft, cat) {
       <div style="font-size:14px;color:#6B7280;line-height:1.7;margin-bottom:20px;">${genLine}</div>
       <button onclick="genContent()" style="background:linear-gradient(135deg,#2DD4BF,#0EA5E9);color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">초안 생성하기</button>
     </div>`;
-  document.getElementById('sheet-actions').innerHTML = '';
+  setSheetActionsHtml_('');
 }
 
 function renderSheetContent(content) {
@@ -2791,11 +2938,12 @@ function renderSheetContent(content) {
   if(isThreadCategory(state.selectedCatId)) goTab = 'thread';
   else if(isHeiljagyaeCategory(state.selectedCatId) && state.activeTab === 'images') goTab = null;
   const goBtn = goTab ? getSheetGoButtonHTML(goTab) : '';
-  document.getElementById('sheet-actions').innerHTML = `
-    <button type="button" class="btn-regen" onclick="genContent()">재생성</button>
-    <button type="button" class="btn-gen-big btn-sheet-copy" onclick="copyCurrentTab(this)" style="background:#F3F4F6;color:#374151;flex:1;min-width:72px;">복사</button>
-    ${goBtn}
-    ${!isPub ? `<button type="button" class="btn-pub" onclick="markPub()">발행완료</button>` : '<span style="font-size:12px;color:#16A34A;font-weight:700;padding:0 4px;">발행됨</span>'}`;
+  setSheetActionsHtml_(
+    '<button type="button" class="btn-regen" onclick="genContent()">재생성</button>' +
+    '<button type="button" class="btn-gen-big btn-sheet-copy" onclick="copyCurrentTab(this)" style="background:#F3F4F6;color:#374151;flex:1;min-width:72px;">복사</button>' +
+    goBtn +
+    (!isPub ? '<button type="button" class="btn-pub" onclick="markPub()">발행완료</button>' : '<span style="font-size:12px;color:#16A34A;font-weight:700;padding:0 4px;align-self:center;">발행됨</span>')
+  );
 }
 
 window.getFullCopy = function(){
@@ -3415,9 +3563,18 @@ window.switchTab = function(t){
   if(content) renderSheetContent(content);
 };
 
+function sheetCloseActionsPrefix_(){
+  return '<button type="button" class="btn-sheet-close-bar" onclick="closeSheet()">← 목록으로 닫기</button>';
+}
+function setSheetActionsHtml_(inner){
+  document.getElementById('sheet-actions').innerHTML = sheetCloseActionsPrefix_() + (inner || '');
+}
 function closeSheet(){
   document.getElementById('detail-sheet').classList.remove('open');
-  setTimeout(()=>{ document.getElementById('detail-overlay').classList.remove('open'); }, 280);
+  setTimeout(function(){
+    document.getElementById('detail-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }, 280);
 }
 function closeDetail(e){ if(e.target===document.getElementById('detail-overlay')) closeSheet(); }
 

@@ -874,19 +874,14 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 
 <div class="modal-overlay" id="drive-modal-overlay" onclick="closeDriveModal(event)">
   <div class="modal-box" style="max-width:440px;" onclick="event.stopPropagation()">
-    <div class="modal-title">구글 Drive 동기화</div>
-    <div class="modal-desc" style="font-size:12px;">발행·초안·<strong>프롬프트</strong>·API 키를 <strong>내 Google 계정의 앱 전용 데이터</strong> 폴더에 JSON(<code style="font-size:10px;">planner-sync-v1.json</code>)으로 저장합니다. Drive 웹의 ‘내 파일’에는 안 보이는 것이 정상이에요.<br><span style="color:#6B7280;">프롬프트 수정 시 자동 업로드 · 다른 기기/탭으로 돌아오면 <strong>더 최신본</strong>을 불러옵니다.</span></div>
-    <div id="drive-modal-err" style="font-size:12px;color:#EF4444;min-height:18px;margin-bottom:6px;"></div>
-    <label class="drive-label" for="drive-client-id">OAuth 클라이언트 ID (다른 ID로 바꿀 때만 입력)</label>
-    <input class="modal-input" type="text" id="drive-client-id" placeholder="비워 두면 이 페이지에 내장된 ID를 사용합니다" autocomplete="off" style="font-family:inherit;" />
-    <div class="modal-hint" style="margin-top:-4px;">Cloud Console → <strong>OAuth 2.0 (웹)</strong><br>① <strong>JavaScript 원본</strong>: <code style="font-size:10px;">https://breezefeel.github.io</code><br>② <strong>리디렉션 URI</strong>(모바일 필수): <code style="font-size:10px;">https://breezefeel.github.io/Thewellness/</code><br>현재 페이지: <code id="drive-origin-hint" style="font-size:10px;word-break:break-all;background:#F3F4F6;padding:2px 4px;border-radius:4px;"></code><br><span id="drive-mobile-hint" style="display:block;margin-top:6px;color:#6B7280;font-size:11px;"></span><a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener">Drive API</a> · <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">인증 정보</a></div>
+    <div class="modal-title">구글 Drive</div>
+    <div class="modal-desc" style="font-size:12px;">발행·초안·프롬프트를 계정 앱 데이터에 저장합니다. 저장 시 자동 업로드 · <strong>5분간 활동 없음</strong> 후 최신본 확인 · 탭 복귀 시에도 동기화합니다.</div>
+    <div id="drive-modal-err" style="font-size:12px;color:#EF4444;min-height:18px;margin-bottom:8px;"></div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;">
-      <button type="button" class="modal-btn" onclick="driveLoginAndUpload()">Google 로그인 · 연동 후 지금 업로드</button>
-      <button type="button" class="modal-btn" style="background:#2DD4BF;color:#111;" onclick="drivePullFromCloud()">Drive에서 이 기기로 불러오기</button>
-      <button type="button" class="modal-btn" style="background:#F3F4F6;color:#374151;" onclick="driveManualUploadOnly()">로그인 유지 — 지금만 업로드</button>
-      <button type="button" class="modal-btn" style="background:#fff;color:#9CA3AF;border:1px solid #E5E7EB;" onclick="driveDisconnect()">Drive 로그아웃 (이 기기 데이터는 유지)</button>
+      <button type="button" class="modal-btn" onclick="driveLoginAndUpload()">Drive 로그인</button>
+      <button type="button" class="modal-btn" style="background:#fff;color:#6B7280;border:1px solid #E5E7EB;" onclick="driveDisconnect()">Drive 로그아웃</button>
+      <button type="button" class="modal-btn" style="background:#F3F4F6;color:#374151;" onclick="closeDriveModal()">닫기</button>
     </div>
-    <button type="button" style="border:none;background:none;width:100%;cursor:pointer;margin-top:14px;font-size:12px;color:#9CA3AF;font-family:inherit;" onclick="closeDriveModal()">닫기</button>
   </div>
 </div>
 
@@ -1313,6 +1308,31 @@ function getPayloadSavedMs_(payload){
 
 function promptsFingerprint_(prompts){
   try { return JSON.stringify(prompts || null); } catch(e){ return ''; }
+}
+
+const PLANNER_IDLE_SYNC_MS = 5 * 60 * 1000;
+let plannerIdleSyncTimer = null;
+
+function armPlannerIdleSync_() {
+  if (plannerIdleSyncTimer) clearTimeout(plannerIdleSyncTimer);
+  plannerIdleSyncTimer = setTimeout(function () {
+    plannerIdleSyncTimer = null;
+    syncAllSourcesIfNewer_('idle').catch(function (e) {
+      console.warn('[동기화 idle]', e);
+    });
+    armPlannerIdleSync_();
+  }, PLANNER_IDLE_SYNC_MS);
+}
+
+function onPlannerUserActivity_() {
+  armPlannerIdleSync_();
+}
+
+function startPlannerIdleSync_() {
+  ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'].forEach(function (ev) {
+    document.addEventListener(ev, onPlannerUserActivity_, { passive: true });
+  });
+  armPlannerIdleSync_();
 }
 
 /** Drive(appData) · GAS 서버 백업 중 더 최신 JSON을 이 기기에 반영 (프롬프트·발행본 포함) */
@@ -1998,28 +2018,11 @@ function maybeRequestNotificationAfterDrive(){
 }
 window.openDriveModal = function(){
   if(location.protocol === 'file:'){
-    alert('Drive 연동은 https 또는 http로 이 페이지를 연 뒤에만 동작합니다. (예: VS Code Live Server, 또는 웹에 업로드)');
+    alert('Drive 연동은 https 또는 http로 이 페이지를 연 뒤에만 동작합니다.');
     return;
   }
   var err = document.getElementById('drive-modal-err');
   if(err) err.textContent = '';
-  var hint = document.getElementById('drive-origin-hint');
-  if(hint) hint.textContent = location.origin + (location.pathname || '');
-  var mobHint = document.getElementById('drive-mobile-hint');
-  if(mobHint){
-    if(isInAppBrowser_()){
-      mobHint.textContent = '⚠️ 카톡/인스타 앱 안에서는 로그인이 안 될 수 있어요. Safari·Chrome에서 이 페이지를 여세요.';
-    } else if(isDrivePreferRedirect_()){
-      mobHint.textContent = '모바일: 먼저 팝업 로그인을 시도하고, 안 되면 Google 페이지로 이동합니다. 리디렉션 URI: ' + getDriveRedirectUri_();
-    } else {
-      mobHint.textContent = '';
-    }
-  }
-  if(/플래너\.html$/i.test(location.pathname || '')){
-    if(mobHint) mobHint.textContent = (mobHint.textContent ? mobHint.textContent + '\n' : '') + '⚠️ Drive 로그인은 ' + PLANNER_PUBLIC_URL + ' 주소에서 여는 것이 안전합니다.';
-  }
-  var inp = document.getElementById('drive-client-id');
-  if(inp) inp.value = getDriveClientId();
   document.getElementById('drive-modal-overlay').classList.add('open');
 };
 window.closeDriveModal = function(ev){
@@ -2028,9 +2031,7 @@ window.closeDriveModal = function(ev){
 };
 window.driveLoginAndUpload = async function(){
   var errEl = document.getElementById('drive-modal-err');
-  var inp = document.getElementById('drive-client-id');
-  if(inp && inp.value.trim()) localStorage.setItem('ht_gdrive_cid', inp.value.trim());
-  if(!getDriveClientId()){ if(errEl) errEl.textContent = '클라이언트 ID를 입력해 주세요'; return; }
+  if(!getDriveClientId()){ if(errEl) errEl.textContent = 'Drive 클라이언트 ID가 없습니다'; return; }
   if(errEl) errEl.textContent = '';
   try{
     var firstConnect = !hasDriveConnection_() && !readCachedDriveToken_();
@@ -2201,6 +2202,7 @@ window.onload = () => {
     try { sessionStorage.removeItem('ht_offline_save_hint'); } catch(e){}
     syncAllSourcesIfNewer_('online');
   });
+  startPlannerIdleSync_();
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape' && document.getElementById('detail-overlay').classList.contains('open')){
       closeSheet();
@@ -2268,11 +2270,9 @@ function renderTabs() {
   function doneCountForCat(idx) {
     const cat = CATEGORIES[idx];
     if (!cat || !cat.drafts) return 0;
-    let n = 0;
-    cat.drafts.forEach(function (d) {
-      if (d && d.id && (state.generatedOnly[d.id] || (state.published[d.id] && state.published[d.id].content))) n++;
-    });
-    return n;
+    return cat.drafts.filter(function (d) {
+      return draftIsPendingPublish_(d);
+    }).length;
   }
   function cellHTML(idx) {
     const c = CATEGORIES[idx];
@@ -2285,7 +2285,7 @@ function renderTabs() {
       idx +
       ')"><span class="cat-tab-label">' +
       label +
-      '</span><span class="cat-tab-badge" title="완성된 초안">' +
+      '</span><span class="cat-tab-badge" title="미발행 초안">' +
       done +
       '</span></button>'
     );
@@ -2304,14 +2304,27 @@ function selectCat(i) {
 }
 
 // ── Recommendations ──
+function draftIsPublished_(draftId) {
+  return !!(draftId && state.published[draftId] && state.published[draftId].date);
+}
+
+/** 미발행 초안(생성됐지만 아직 발행 완료 전) */
+function draftIsPendingPublish_(d) {
+  if (!d || !d.id || draftIsPublished_(d.id)) return false;
+  return !!(state.generatedOnly[d.id] || state.published[d.id]?.content);
+}
+
 function draftHasContent(d) {
   return !!(d && d.id && (state.generatedOnly[d.id] || (state.published[d.id] && state.published[d.id].content)));
 }
 
 function sortDraftsForDisplay(drafts) {
   return (drafts || []).slice().sort(function (a, b) {
-    const ag = draftHasContent(a) ? 1 : 0;
-    const bg = draftHasContent(b) ? 1 : 0;
+    const ap = draftIsPublished_(a.id) ? 1 : 0;
+    const bp = draftIsPublished_(b.id) ? 1 : 0;
+    if (ap !== bp) return ap - bp;
+    const ag = draftIsPendingPublish_(a) ? 1 : 0;
+    const bg = draftIsPendingPublish_(b) ? 1 : 0;
     return bg - ag;
   });
 }
@@ -2363,9 +2376,9 @@ function renderMain() {
 
   // Stats
   const total = cat.drafts.length;
-  const pubCount = cat.drafts.filter(d=>state.published[d.id]?.date).length;
-  const genCount = cat.drafts.filter(d=>state.generatedOnly[d.id] || state.published[d.id]?.content).length;
-  const missingCount = total - genCount;
+  const pubCount = cat.drafts.filter(d=>draftIsPublished_(d.id)).length;
+  const genCount = cat.drafts.filter(d=>draftIsPendingPublish_(d)).length;
+  const missingCount = cat.drafts.filter(d=>!draftHasContent(d)).length;
   const batchBusy = genPendingCount > 0 || genActiveJob || genBatchRunning;
   const statsHTML = `
     <div class="stats-row">
@@ -2411,8 +2424,8 @@ function renderMain() {
 
   // Draft cards
   let drafts = cat.drafts;
-  if(state.filterStatus==='초안있음') drafts = drafts.filter(d=>state.generatedOnly[d.id]||state.published[d.id]?.content);
-  if(state.filterStatus==='발행완료') drafts = drafts.filter(d=>state.published[d.id]?.date);
+  if(state.filterStatus==='초안있음') drafts = drafts.filter(d=>draftIsPendingPublish_(d));
+  if(state.filterStatus==='발행완료') drafts = drafts.filter(d=>draftIsPublished_(d.id));
   if(state.searchQ) drafts = drafts.filter(d=>d.topic.includes(state.searchQ)||d.angle.includes(state.searchQ));
   drafts = sortDraftsForDisplay(drafts);
   const cardsHTML = drafts.length ? drafts.map(d=>draftCardHTML(d,cat,false)).join('') : '<div class="empty-note">조건에 맞는 초안이 없어요</div>';
@@ -2422,13 +2435,13 @@ function renderMain() {
 
 function draftCardHTML(d, cat, isRec) {
   const pub = state.published[d.id];
-  const hasContent = pub?.content || state.generatedOnly[d.id];
-  const isPub = !!pub?.date;
+  const hasDraft = draftIsPendingPublish_(d);
+  const isPub = draftIsPublished_(d.id);
   const color = cat.color;
   const badges = [
     `<span class="badge badge-aud">${cat.audience}</span>`,
     isRec && d.recType==='related' ? '<span class="badge badge-rec">관련</span>' : '',
-    hasContent ? '<span class="badge badge-gen">초안있음</span>' : '',
+    hasDraft ? '<span class="badge badge-gen">초안있음</span>' : '',
     isPub ? '<span class="badge badge-pub">발행완료</span>' : '',
   ].filter(Boolean).join('');
   return `<div class="draft-card${isPub?' published':''}${isRec?' recommended':''}" style="--cc:${color}" onclick="openDetail('${d.id}',${cat.id})">
@@ -3901,9 +3914,11 @@ window.confirmPublishFinal = async function(){
   if(!state.published[draftId].content && state.generatedOnly[draftId]){
     state.published[draftId].content = state.generatedOnly[draftId];
   }
+  delete state.generatedOnly[draftId];
   save({ driveImmediate: true, gasImmediate: true });
   closePublishModal();
   closeSheet();
+  renderTabs();
   renderMain();
   if(btn){ btn.disabled = false; btn.textContent = '발행 저장'; }
   setAppToast('발행본이 저장됐어요.', { duration: 4200, variant: 'ok' });

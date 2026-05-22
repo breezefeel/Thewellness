@@ -202,6 +202,32 @@ background: #fff; font-family: inherit;
 }
 .search-input:focus { border-color: #2DD4BF; }
 
+.batch-gen-row {
+  padding: 10px 16px 0;
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.btn-batch-gen {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1.5px solid #99F6E4;
+  background: linear-gradient(135deg, #F0FDFA, #ECFEFF);
+  color: #0F766E;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1.45;
+  text-align: left;
+}
+.btn-batch-gen:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn-batch-gen strong { display: block; font-size: 13px; margin-bottom: 2px; }
+
 /* ── Cards ── */
 .cards-wrap { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
 
@@ -576,6 +602,33 @@ min-width: 0;
 transform: translateY(100%); transition: transform 0.3s;
 }
 .prompt-modal.open { transform: translateY(0); }
+.publish-modal-overlay {
+display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+z-index: 320; align-items: flex-end; justify-content: center;
+backdrop-filter: blur(4px);
+}
+.publish-modal-overlay.open { display: flex; }
+.publish-modal {
+background: #fff; border-radius: 20px 20px 0 0;
+width: 100%; max-width: 600px; max-height: 92vh;
+display: flex; flex-direction: column; min-width: 0;
+transform: translateY(100%); transition: transform 0.3s;
+}
+.publish-modal.open { transform: translateY(0); }
+.publish-modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+.publish-final-textarea {
+width: 100%; min-height: 220px; max-height: 50vh;
+padding: 12px 14px; border-radius: 12px; border: 1.5px solid #E5E7EB;
+font-size: 13px; line-height: 1.65; font-family: inherit; resize: vertical;
+}
+.publish-final-textarea:focus { border-color: #16A34A; outline: none; }
+.publish-modal-meta { font-size: 12px; color: #6B7280; line-height: 1.55; margin-bottom: 10px; }
+.publish-refine-note {
+margin-top: 12px; padding: 12px 14px; border-radius: 10px;
+background: #F0FDF4; border: 1px solid #BBF7D0; font-size: 12px;
+color: #166534; line-height: 1.6; display: none;
+}
+.publish-refine-note.show { display: block; }
 .prompt-modal-handle { width: 40px; height: 4px; background: #E5E7EB; border-radius: 2px; margin: 12px auto 0; flex-shrink: 0; }
 .prompt-modal-header {
 padding: 14px 20px 12px; border-bottom: 1px solid #F3F4F6;
@@ -795,12 +848,34 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   </div>
 </div>
 
+<!-- 발행 완료 · 최종본 저장 -->
+
+<div class="publish-modal-overlay" id="publish-modal-overlay" onclick="closePublishModal(event)">
+  <div class="publish-modal prompt-modal" id="publish-modal" onclick="event.stopPropagation()">
+    <div class="prompt-modal-handle"></div>
+    <div class="prompt-modal-header">
+      <button class="prompt-modal-close" onclick="closePublishModal()" aria-label="닫기">×</button>
+      <div class="prompt-modal-title" id="publish-modal-title">발행 완료 · 최종본 저장</div>
+    </div>
+    <div class="publish-modal-body">
+      <div class="publish-modal-meta" id="publish-modal-meta"></div>
+      <label class="form-label" for="publish-final-text">실제에 올린(올릴) 글 — 직접 다듬은 최종본</label>
+      <textarea class="publish-final-textarea" id="publish-final-text" placeholder="블로그·인스타·게시판에 붙여 넣은 문장을 그대로 저장해 두세요."></textarea>
+      <div class="publish-refine-note" id="publish-refine-note"></div>
+    </div>
+    <div class="prompt-modal-footer">
+      <button type="button" class="btn-cancel-prompt" onclick="closePublishModal()">취소</button>
+      <button type="button" class="btn-save-prompt" id="btn-publish-save" onclick="confirmPublishFinal()" style="background:#16A34A;">발행 저장</button>
+    </div>
+  </div>
+</div>
+
 <!-- Google Drive sync modal -->
 
 <div class="modal-overlay" id="drive-modal-overlay" onclick="closeDriveModal(event)">
   <div class="modal-box" style="max-width:440px;" onclick="event.stopPropagation()">
     <div class="modal-title">구글 Drive 동기화</div>
-    <div class="modal-desc" style="font-size:12px;">발행·초안·프롬프트·API 키를 <strong>내 Google 계정의 앱 전용 데이터</strong> 폴더에 JSON으로 저장합니다. Drive 웹의 ‘내 파일’에는 안 보이는 것이 정상이에요.<br><span style="color:#6B7280;">한 번 로그인하면 이 기기에서는 <strong>자동으로</strong> 동기화합니다 (계정은 최초 1회만 선택).</span></div>
+    <div class="modal-desc" style="font-size:12px;">발행·초안·<strong>프롬프트</strong>·API 키를 <strong>내 Google 계정의 앱 전용 데이터</strong> 폴더에 JSON(<code style="font-size:10px;">planner-sync-v1.json</code>)으로 저장합니다. Drive 웹의 ‘내 파일’에는 안 보이는 것이 정상이에요.<br><span style="color:#6B7280;">프롬프트 수정 시 자동 업로드 · 다른 기기/탭으로 돌아오면 <strong>더 최신본</strong>을 불러옵니다.</span></div>
     <div id="drive-modal-err" style="font-size:12px;color:#EF4444;min-height:18px;margin-bottom:6px;"></div>
     <label class="drive-label" for="drive-client-id">OAuth 클라이언트 ID (다른 ID로 바꿀 때만 입력)</label>
     <input class="modal-input" type="text" id="drive-client-id" placeholder="비워 두면 이 페이지에 내장된 ID를 사용합니다" autocomplete="off" style="font-family:inherit;" />
@@ -1064,19 +1139,18 @@ P-스트레칭은 패시브, 수동적 이완이에요. …
 const DEFAULT_DAILY_SHARE_PROMPT = `**일상 공유** 탭용 글입니다. Threads·인스타 등에 올리는 **생활 일기·오늘의 한마디** 톤으로 써 주세요.
 
 [주제 축]
-- 일상·쉬는 시간, **계절·날씨**, 몸 컨디션·가벼운 건강, **여행·이동**, 최근 이슈에 대한 **느낌·공감**(논쟁·설교 금지), 감사·여유
+- 일상·쉬는 시간, **계절·날씨**, 몸 컨디션·가벼운 건강, **여행·이동**, 최근 이슈에 대한 **느낌**(논쟁·설교 금지), 감사·여유
 
-[사진이 있을 때 — 매우 중요]
-- 교육·세미나·클리닉·전문가 모임·임상 장면 사진이어도 **전문 강의·치료 설명 톤 금지**
-- "오늘 여기 다녀왔는데", "피곤하지만 보람 있었다", "사진 찍어 두니 그날이 생각난다"처럼 **일상 일기·생활 나눔**으로만
+[사진이 있을 때]
+- 교육·세미나·클리닉 사진이어도 **전문 강의·치료 설명 톤 금지** — "오늘 다녀왔는데", "피곤하지만 좋았다" 같은 **일기·생활 나눔**만
 
 [절대 피할 것]
-- 소제목·번호·강의록·임상 케이스 설명·예약·센터 홍보
-- "결론부터", "첫째 둘째" 식 프레젠 멘트
+- **억지 공감 유도**, **독자에게 던지는 질문**("~하신 적 있나요?", "~하지 않으세요?", "~할 때 있죠?" 등)
+- 소제목·번호·강의록·임상 설명·홍보·"결론부터" 멘트
 
 [이렇게 써 주세요]
-- **topicTitle**: 오늘의 한 줄 (질문·감탄·날씨·장면)
-- **summary**: topicTitle에 이어지는 **연속 본문**. "근데", "솔직히", "오늘은" 같은 구어체. 이모지 0~1개
+- **topicTitle**: 오늘의 한 줄 **평서·감탄·장면 묘사** (질문형·설문형 금지)
+- **summary**: topicTitle에 이어지는 **연속 본문**. 관찰·느낌·여유를 말하듯. 이모지 0~1개
 - **3~7문장**, 번호·불릿 없이 한 덩어리`;
 
 const DEFAULT_NOTEBOOKLM_PROMPT = `Google **NotebookLM**에 소스로 붙여 넣으면, 오디오 오버뷰·강의 카드·영상 대본 등으로 확장할 수 있는 **질문·답변 중심 텍스트**를 만듭니다.
@@ -1157,6 +1231,9 @@ let state = {
   prompts: null, // null이면 DEFAULT_PROMPTS 사용
   promptTab: 'blog',
   editingCatId: 0,
+  promptRefineMilestones: {}, // catId → 마지막 반영한 발행 N건 (5, 10, …)
+  publishModalDraftId: null,
+  publishModalCatId: null,
 };
 
 // Load persisted
@@ -1182,6 +1259,7 @@ function getPersistPayload(){
     apiKey: state.apiKey,
     chatgptOpenUrl: state.chatgptOpenUrl,
     prompts: state.prompts,
+    promptRefineMilestones: state.promptRefineMilestones || {},
     dailyAutoLast: dailyLast
   };
   var extra = collectExtraDrafts();
@@ -1214,53 +1292,97 @@ async function plannerGasPushNow_(){
     var serverAt = data.savedAt || (data.payload && data.payload.savedAt) || '';
     var localAt = state.localSavedAt || '';
     if(serverAt && (!localAt || new Date(serverAt) > new Date(localAt))){
+      var promptsBefore = promptsFingerprint_(state.prompts);
       applyPersistPayload(data.payload);
+      save({ skipDriveUpload: true, skipGasPush: true });
       if(data.payload.plannerLastAuto && typeof handleServerPlannerAuto_ === 'function'){
         handleServerPlannerAuto_(data.payload);
       }
       renderTabs();
       renderMain();
+      if(typeof setAppToast === 'function' && promptsBefore !== promptsFingerprint_(state.prompts)){
+        setAppToast('서버에 더 최신 프롬프트가 있어 반영했어요.', { duration: 4200, variant: 'ok' });
+      }
     }
   }
 }
-async function plannerGasPullIfNewer_(reason){
-  var url = getPlannerGasUrl_();
-  if(!url || location.protocol === 'file:') return;
-  try {
-    var r = await fetch(url, {
-      method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'plannerSyncPull' })
-    });
-    var data = await r.json();
-    if(data.result !== 'success' || !data.payload) return;
-    var serverAt = data.savedAt || data.payload.savedAt || data.payload.localSavedAt || '';
-    var localAt = state.localSavedAt || '';
-    if(!serverAt) return;
-    if(localAt && new Date(serverAt) <= new Date(localAt)) return;
-    applyPersistPayload(data.payload);
+function getPayloadSavedMs_(payload){
+  if(!payload) return 0;
+  return parseIsoMs_(payload.savedAt || payload.localSavedAt);
+}
+
+function promptsFingerprint_(prompts){
+  try { return JSON.stringify(prompts || null); } catch(e){ return ''; }
+}
+
+/** Drive(appData) · GAS 서버 백업 중 더 최신 JSON을 이 기기에 반영 (프롬프트·발행본 포함) */
+async function syncAllSourcesIfNewer_(reason){
+  var localMs = parseIsoMs_(state.localSavedAt);
+  var best = null;
+  var bestMs = 0;
+  var bestSource = '';
+
+  if(hasDriveConnection_()){
     try {
-      if(data.payload.dailyAutoLast) localStorage.setItem('ht_daily_auto_last', data.payload.dailyAutoLast);
-    } catch(e0){}
-    try {
-      var store = getPersistPayload();
-      if(data.payload.plannerLastAuto) store.plannerLastAuto = data.payload.plannerLastAuto;
-      localStorage.setItem(SK, JSON.stringify(store));
-    } catch(e){}
-    if(data.payload.plannerLastAuto) handleServerPlannerAuto_(data.payload);
-    renderTabs();
-    renderMain();
-    if(data.payload.plannerLastAuto && data.payload.plannerLastAuto.draftId != null){
-      setTimeout(function(){
-        openDetailFromDeepLink_(data.payload.plannerLastAuto.draftId, data.payload.plannerLastAuto.catId);
-      }, 400);
-    } else if(typeof setAppToast === 'function'){
-      setAppToast('서버(Drive)에서 최신 초안을 불러왔어요.', { duration: 4000, variant: 'ok' });
+      var token = await getDriveAccessToken({ forcePrompt: false });
+      var out = await driveDownloadCloudPayload_(token);
+      if(out.data){
+        var ms = getPayloadSavedMs_(out.data);
+        if(ms > bestMs){ best = out.data; bestMs = ms; bestSource = 'Drive'; }
+      }
+    } catch(e0){
+      console.warn('[동기화 Drive]', reason || '', e0);
     }
-  } catch(e1){
-    console.warn('[plannerGasPull]', reason || '', e1);
   }
+
+  var url = getPlannerGasUrl_();
+  if(url && location.protocol !== 'file:'){
+    try {
+      var r = await fetch(url, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'plannerSyncPull' })
+      });
+      var data = await r.json();
+      if(data.result === 'success' && data.payload){
+        var ms2 = getPayloadSavedMs_(data.payload);
+        if(ms2 > bestMs){ best = data.payload; bestMs = ms2; bestSource = '서버'; }
+      }
+    } catch(e1){
+      console.warn('[동기화 서버]', reason || '', e1);
+    }
+  }
+
+  if(!best || !bestMs || bestMs <= localMs + 1500) return false;
+
+  var promptsBefore = promptsFingerprint_(state.prompts);
+  applyPersistPayload(best);
+  try {
+    if(best.dailyAutoLast) localStorage.setItem('ht_daily_auto_last', best.dailyAutoLast);
+  } catch(e2){}
+  save({ skipDriveUpload: true, skipGasPush: true });
+  updateApiBadge();
+  renderTabs();
+  renderMain();
+  updateDriveButtonState();
+
+  var promptsChanged = promptsBefore !== promptsFingerprint_(state.prompts);
+  if(best.plannerLastAuto && best.plannerLastAuto.draftId != null){
+    handleServerPlannerAuto_(best);
+    setTimeout(function(){
+      openDetailFromDeepLink_(best.plannerLastAuto.draftId, best.plannerLastAuto.catId);
+    }, 400);
+  } else if(typeof setAppToast === 'function'){
+    var msg = (bestSource === 'Drive' ? 'Drive' : '서버') + '에서 최신 데이터를 불러왔어요.';
+    if(promptsChanged) msg += '\n프롬프트 설정도 반영됐어요.';
+    setAppToast(msg, { duration: 4500, variant: 'ok' });
+  }
+  return true;
+}
+
+async function plannerGasPullIfNewer_(reason){
+  return syncAllSourcesIfNewer_(reason);
 }
 function handleServerPlannerAuto_(payload){
   var auto = payload && payload.plannerLastAuto;
@@ -1304,6 +1426,7 @@ function applyPersistPayload(s){
   state.apiKey = s.apiKey || '';
   state.chatgptOpenUrl = s.chatgptOpenUrl || '';
   state.prompts = s.prompts !== undefined ? s.prompts : null;
+  state.promptRefineMilestones = s.promptRefineMilestones || {};
   mergeExtraDrafts(s.extraDraftsByCat);
 }
 
@@ -1350,6 +1473,7 @@ const DRIVE_CONNECTED_KEY = 'ht_drive_connected';
 const GOOGLE_OAUTH_WEB_CLIENT_ID = '442956975507-a6qqamnjlhuqflflfdknq20slb16jrmc.apps.googleusercontent.com';
 let driveTokenWaiters = [];
 let driveUploadTimer = null;
+let promptCloudSaveTimer = null;
 
 function loadGsiScript(){
   if(window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
@@ -1975,27 +2099,7 @@ function parseIsoMs_(iso){
 }
 
 async function driveAutoSyncIfNewer_(reason){
-  // 조용히 확인: Drive 연동 자체가 없으면 아무 것도 안 함
-  if(!hasDriveConnection_()) return;
-  try{
-    var token = await getDriveAccessToken({ forcePrompt: false });
-    var out = await driveDownloadCloudPayload_(token);
-    if(!out.data) return;
-    var cloudMs = parseIsoMs_(out.data.savedAt);
-    var localMs = parseIsoMs_(state.localSavedAt);
-    if(cloudMs && (!localMs || cloudMs > localMs + 1500)){
-      applyPersistPayload(out.data);
-      save({ skipDriveUpload: true });
-      updateApiBadge();
-      renderTabs();
-      renderMain();
-      updateDriveButtonState();
-      if(typeof setAppToast === 'function') setAppToast('Drive 최신본으로 동기화했어요.', { duration: 3200, variant: 'ok' });
-    }
-  } catch(e1){
-    // 자동 동기화는 조용히 실패(사용자 흐름 방해 X)
-    console.warn('[Drive 자동 동기화]', reason || '', e1);
-  }
+  return syncAllSourcesIfNewer_(reason);
 }
 
 window.drivePullFromCloud = async function(){
@@ -2066,26 +2170,24 @@ window.onload = () => {
   }
   driveSilentWarmup_();
   startDriveTokenRefreshLoop_();
-  plannerGasPullIfNewer_('load');
+  syncAllSourcesIfNewer_('load');
   if(!oauthReturned) consumeDeepLinkFromHash_();
   else setTimeout(function(){ consumeDeepLinkFromHash_(); }, 300);
   scheduleDailyAutoDraft_();
   setInterval(function(){ maybeRunDailyAutoDraft_('interval'); }, 2 * 60 * 1000);
   setTimeout(function(){ maybeRunDailyAutoDraft_('load'); }, 4000);
-  // Drive 최신본 자동 확인(조용히) — 재접속/재활성화 시 동기화
-  driveAutoSyncIfNewer_('load');
   window.addEventListener('focus', function(){
-    driveAutoSyncIfNewer_('focus');
-    plannerGasPullIfNewer_('focus');
+    syncAllSourcesIfNewer_('focus');
     maybeRunDailyAutoDraft_('focus');
   });
   let hiddenAt = 0;
   document.addEventListener('visibilitychange', function(){
     if(document.hidden){
       hiddenAt = Date.now();
+      flushPromptCloudSave_();
       return;
     }
-    driveAutoSyncIfNewer_('visibility');
+    syncAllSourcesIfNewer_('visibility');
     maybeRunDailyAutoDraft_('visibility');
     if(hiddenAt){
       var sec = Math.floor((Date.now() - hiddenAt) / 1000);
@@ -2097,7 +2199,7 @@ window.onload = () => {
   });
   window.addEventListener('online', function(){
     try { sessionStorage.removeItem('ht_offline_save_hint'); } catch(e){}
-    driveAutoSyncIfNewer_('online');
+    syncAllSourcesIfNewer_('online');
   });
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape' && document.getElementById('detail-overlay').classList.contains('open')){
@@ -2263,6 +2365,8 @@ function renderMain() {
   const total = cat.drafts.length;
   const pubCount = cat.drafts.filter(d=>state.published[d.id]?.date).length;
   const genCount = cat.drafts.filter(d=>state.generatedOnly[d.id] || state.published[d.id]?.content).length;
+  const missingCount = total - genCount;
+  const batchBusy = genPendingCount > 0 || genActiveJob || genBatchRunning;
   const statsHTML = `
     <div class="stats-row">
       <div class="stat-card${state.filterStatus==='전체'?' active':''}" style="--sc:#6B7280" onclick="setFilter('전체')">
@@ -2275,6 +2379,20 @@ function renderMain() {
         <div class="stat-num">${pubCount}</div><div class="stat-label">발행완료</div>
       </div>
     </div>`;
+
+  const batchHTML = (!state.showAdd && missingCount > 0) ? `
+    <div class="batch-gen-row">
+      <button type="button" class="btn-batch-gen" ${batchBusy ? 'disabled' : ''} onclick="genAllMissingForCurrentCat(false)">
+        <strong>미작성 ${missingCount}건 전부 생성</strong>
+        「${escapeHtml(cat.name)}」 제안 주제를 순서대로 AI 초안 작성 (탭을 닫지 마세요)
+      </button>
+    </div>` : (missingCount === 0 && !state.showAdd ? `
+    <div class="batch-gen-row">
+      <button type="button" class="btn-batch-gen" disabled style="opacity:0.55;">
+        <strong>이 탭 주제는 모두 초안 있음</strong>
+        다시 만들려면 카드 열기 → 재생성
+      </button>
+    </div>` : '');
 
   // Search
   const searchHTML = `
@@ -2299,7 +2417,7 @@ function renderMain() {
   drafts = sortDraftsForDisplay(drafts);
   const cardsHTML = drafts.length ? drafts.map(d=>draftCardHTML(d,cat,false)).join('') : '<div class="empty-note">조건에 맞는 초안이 없어요</div>';
 
-  mc.innerHTML = alertHTML + statsHTML + searchHTML + `<div class="cards-wrap">${recHTML}${cardsHTML}</div>`;
+  mc.innerHTML = alertHTML + statsHTML + batchHTML + searchHTML + `<div class="cards-wrap">${recHTML}${cardsHTML}</div>`;
 }
 
 function draftCardHTML(d, cat, isRec) {
@@ -2881,7 +2999,7 @@ function renderSheetEmpty(draft, cat) {
     ? 'AI가 <strong>일상 일기·생활 나눔</strong> 톤으로<br><strong>한 줄 + 3~7문장</strong> 글을 만들어드려요 (사진이 있으면 장면에 맞춰요)'
     : isHeiljagyaeCategory(cat.id)
     ? 'AI가 <strong>아파트너 게시판 글</strong>과 <strong>추천 이미지 프롬프트 2개</strong>만<br>만들어드려요'
-    : 'AI가 블로그·인스타·노트북 LM(Q&A)·이미지 초안을<br>한 번에 만들어드려요';
+    : 'AI가 <strong>블로그·인스타</strong>와 이미지 프롬프트 <strong>2장</strong><br>(전문 설명 보조 · 셀프케어 동작)을 만들어드려요';
   document.getElementById('sheet-body').innerHTML = `
     <div style="padding:10px 0 20px;font-size:13px;color:#9CA3AF;line-height:1.7;">${draft.angle}</div>
     <div style="background:#F8F7F4;border-radius:12px;padding:28px 20px;text-align:center;">
@@ -3004,7 +3122,7 @@ function renderSheetContent(content) {
     '<button type="button" class="btn-regen" onclick="genContent()">재생성</button>' +
     '<button type="button" class="btn-gen-big btn-sheet-copy" onclick="copyCurrentTab(this)" style="background:#F3F4F6;color:#374151;flex:1;min-width:72px;">복사</button>' +
     goBtn +
-    (!isPub ? '<button type="button" class="btn-pub" onclick="markPub()">발행완료</button>' : '<span style="font-size:12px;color:#16A34A;font-weight:700;padding:0 4px;align-self:center;">발행됨</span>')
+    (!isPub ? '<button type="button" class="btn-pub" onclick="openPublishModal()">발행완료</button>' : '<button type="button" class="btn-pub" style="background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0;" onclick="openPublishModal()">발행본 보기</button>')
   );
 }
 
@@ -3028,13 +3146,10 @@ window.getFullCopy = function(){
   if(com){
     t += '\n\n[힐자계 커뮤니티 게시판]\n' + formatCommunityPostText(com);
   }
-  const nlm = content.notebookLM;
-  if(nlm){
-    t += '\n\n[노트북 LM]\n' + formatNotebookLMExportText(nlm);
-  }
   const im = content.images;
   if(im){
-    t += '\n\n[ChatGPT 이미지 프롬프트 · 5장]';
+    const nImg = getImageSlotCount(state.selectedCatId) || (im.gptVisuals || []).length;
+    t += '\n\n[ChatGPT 이미지 프롬프트 · ' + nImg + '장]';
     (im.gptVisuals || []).forEach(function(x, i){
       if(x && x.prompt){ t += '\n' + (i + 1) + '. ' + (x.title || '') + '\n' + x.prompt; }
     });
@@ -3379,8 +3494,7 @@ function buildSheetTabsHTML(tab){
   return `<div class="sheet-tabs-scroll"><div class="sheet-tabs">
     <button type="button" class="sheet-tab${tab==='blog'?' active':''}" onclick="switchTab('blog')">블로그</button>
     <button type="button" class="sheet-tab${tab==='insta'?' active':''}" onclick="switchTab('insta')">인스타</button>
-    <button type="button" class="sheet-tab${tab==='notebooklm'?' active':''}" onclick="switchTab('notebooklm')">노트북 LM</button>
-    <button type="button" class="sheet-tab${tab==='images'?' active':''}" onclick="switchTab('images')">이미지</button>
+    <button type="button" class="sheet-tab${tab==='images'?' active':''}" onclick="switchTab('images')">이미지 (2)</button>
   </div></div>`;
 }
 
@@ -3389,6 +3503,21 @@ function normalizeImagesBlock(raw){
   return {
     gptVisuals: Array.isArray(raw.gptVisuals) ? raw.gptVisuals : [],
   };
+}
+
+/** 블로그 탭: 예전 5장 초안이면 ③·④에 해당하는 항목 우선 */
+function trimBlogInstaImages_(gptVisuals){
+  var list = (gptVisuals || []).filter(function(x){ return x && x.prompt; });
+  if(list.length <= 2) return list;
+  var pro = list.find(function(x){
+    return /전문|설명|보조|③|infographic|illustration/i.test(String(x.title || ''));
+  });
+  var self = list.find(function(x){
+    return /셀프|케어|동작|④|stretch|exercise|self/i.test(String(x.title || ''));
+  });
+  if(pro && self) return [pro, self];
+  if(list.length >= 5) return [list[2], list[3]].filter(Boolean);
+  return list.slice(0, 2);
 }
 
 function normalizeCommunityBlock(raw){
@@ -3489,28 +3618,26 @@ function buildImagePromptGuide(topic, angle){
   const t = String(topic || '').trim();
   const a = String(angle || '').trim();
   return `
-[이미지 5장 — 주제 맞춤 생성 규칙]
+[이미지 2장 — 주제 맞춤 생성 규칙]
 이번 초안 주제: "${t}"
 작성 각도: "${a}"
 
-각 gptVisuals.prompt는 **영문 한 개의 문자열**로만 작성 (ChatGPT·DALL·E에 그대로 붙여넣기). 분량은 역할당 대략 90~220 단어. 한 줄 짜리 요약·불릿 금지.
+**정확히 2개** gptVisuals만. 대표·공감·마무리 정물 등은 만들지 마세요.
 
-■ 공통 스타일 — 모든 프롬프트에 자연스럽게 녹일 것
-Photorealistic editorial OR (③번만) clean soft medical illustration; **Korean domestic visual language**: typical Korean apartment or local PT/wellness studio (light wood floor, white or warm gray walls, sheer curtains, compact tidy furniture—not US loft/mansion, not generic Western stock-photo lobby). People (②④): East Asian adults, natural minimal makeup, everyday modest clothing common in Korea (neutrals, simple knits or training wear), relaxed natural poses—avoid Hollywood glam, heavy contour, blonde default casting, magazine "Western wellness" cliché. Mood: Korean drama still-life warmth (soft low-contrast, slightly desaturated), **Seoul-area clinic / home** authenticity. Palette: warm beige, sage green, cream white; soft window light or diffused daylight; gentle contrast, subtle film-like softness, not oversaturated; no text overlay, no logos, no watermarks, no gore, no readable anatomical labels in ③.
+각 prompt는 **영문 한 덩어리** (90~200 단어). 한 줄 요약·불릿 금지.
 
-■ 주제 키워드별 장면 조정 (위 주제·각도에 가장 잘 맞는 한 축으로 통일)
-· 목·경추·거북목·디스크·스트레이트 넥·어깨: ② 손으로 목·승모 잡기·거북목 피로; ③ 경추 측면 곡선 또는 신경 압박을 과장 없이 단순 단면도/화살표 흐름; ④ chin tuck, 바닥에 베개 없이 누워 목 길게 늘리기, 스컬 헌팅 등 글에서 준 **동일한** 셀프 동작.
-· 스트레칭·운동·가동성·패시브 스트레칭·리:얼 Movement: ② 뻐근한 등·다리·어깨 일상; ③ 근막 연결 또는 관절 ROM 단순 도식; ④ 요가 매트 위 고관절·척추 스트레칭·호흡 — 글의 팁과 동작·횟수 일치.
-· 얼굴·림프·교합·비대칭·작은얼굴: ② 턱·볼에 손·피로한 표정; ③ 얼굴·목 림프 흐름 인포그래픽(화살표만, 라벨 없음); ④ 가벼운 림프 드레나주 동작.
-· 허리·요통·골반·디스크(요추): ② 허리에 손; ③ 요추·골반 단순 단면 또는 부하 분산 도식; ④ 무릎 세운 누운 자세·옆누워 골반 안정 등 글의 팁과 일치.
+■ ① 전문 설명 보조
+- clean soft medical illustration 또는 minimal infographic
+- 주제에 맞는 단순 단면·화살표·ROM·근막·림프 흐름 등 (과장·고어·읽을 수 있는 라벨 금지)
+- sage green, cream white, soft palette, non-graphic educational tone
 
-역할 고정 키워드(영문으로 반영): ① soft morning light, green plant, calm **Korean-style** interior, warm tone, local wellness clinic thumbnail mood · ② **Korean adult** + 주제에 맞는 신체 부위 + fatigue + soft lighting + **realistic everyday life in Korea** (home or studio) · ③ minimal clean infographic + soft color + educational non-graphic · ④ same self-care pose as article + **Korean home floor mat or studio mat** + top or side view + soft natural light · ⑤ herbal tea, green plant, warm sunlight, cozy **Korean apartment** corner, minimal still-life.
+■ ② 셀프케어 동작
+- **블로그·인스타 본문**에 나온 셀프 스트레칭·동작과 **동일한** 자세·부위
+- Korean home wood floor or studio yoga mat, East Asian adult, modest clothing, top or side view, soft natural light
+- 동작·초·회·분이 본문에 있으면 영문 프롬프트에 구체적으로
 
-■ 품질 체크
-5개 프롬프트는 서로 다른 구도·앵글·소품. 동일 문단 복붙 금지. ④번 동작은 노트북 LM Q&A의 실천 답변·블로그 본문·또는 일상 공유 본문 속 셀프 제안과 같은 동작·숫자(초·회·분)를 쓸 것.
-
-■ 구조 참고용 (그대로 복사 금지 — 톤·길이만 참고)
-① 창가 햇살·식물 클로즈업 → ② 일상 피로 클로즈업 → ③ 단순 의학 도식 → ④ 매트/바닥 동작 한 컷 → ⑤ 허브티·식물 정물. 각각 이전에 사용한 것과 다른 영어 표현으로 새로 쓸 것.
+■ 공통
+Korean domestic visual language, warm beige sage cream, soft daylight, no text overlay, no logos, no watermarks.
 `;
 }
 
@@ -3535,21 +3662,24 @@ Photorealistic editorial, **Korean apartment / local wellness** authenticity, wa
 
 function buildImageTabBody(content){
   const im = content.images;
-  const imgCap = isHeiljagyaeCategory(state.selectedCatId) ? 2 : 5;
+  const imgCap = getImageSlotCount(state.selectedCatId) || 2;
   if(!im){
     return `<p class="empty-note" style="padding:0;">이 초안에는 이미지 추천이 없어요. 초안을 다시 생성하면 함께 만들어져요.</p>
       <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:12px;">초안·이미지 다시 생성</button>`;
   }
-  const gpt = (im.gptVisuals || []).filter(function(s){ return s && s.prompt; }).slice(0, imgCap);
+  var rawGpt = (im.gptVisuals || []).filter(function(s){ return s && s.prompt; });
+  const gpt = isHeiljagyaeCategory(state.selectedCatId)
+    ? rawGpt.slice(0, imgCap)
+    : trimBlogInstaImages_(rawGpt).slice(0, imgCap);
 
   let html = '';
 
-  if(imgCap === 2){
+  if(isHeiljagyaeCategory(state.selectedCatId)){
     html += '<div class="img-section-title">ChatGPT 이미지 프롬프트 (2장 · 아파트너용)</div>';
-    html += '<p style="font-size:12px;color:#6B7280;margin:0 0 14px;line-height:1.55;">① 동네에서 공감되는 일상 컷 · ② 게시글 셀프 케어와 같은 동작 장면. 아파트너에 어울리게 과하지 않게.</p>';
+    html += '<p style="font-size:12px;color:#6B7280;margin:0 0 14px;line-height:1.55;">① 동네에서 공감되는 일상 컷 · ② 게시글 셀프 케어와 같은 동작 장면.</p>';
   } else {
-    html += '<div class="img-section-title">ChatGPT 이미지 생성 (5장 구성)</div>';
-    html += '<p style="font-size:12px;color:#6B7280;margin:0 0 14px;line-height:1.55;">① 대표·② 공감·③ 전문 설명·④ 셀프 케어·⑤ 마무리 순서. 초안 주제·각도에 맞게 장면이 바뀌며, 색감은 베이지·그린·화이트 톤으로 통일.</p>';
+    html += '<div class="img-section-title">ChatGPT 이미지 프롬프트 (2장)</div>';
+    html += '<p style="font-size:12px;color:#6B7280;margin:0 0 14px;line-height:1.55;">① 전문 설명 보조(도식·인포) · ② 셀프케어 동작(블로그·인스타 본문과 동일 동작).</p>';
   }
   if(gpt.length === 0){
     html += '<p class="empty-note" style="padding:12px 0;">프롬프트가 없습니다. 재생성해 주세요.</p>';
@@ -3613,9 +3743,9 @@ window.cp = function(btn, text){
 window.switchTab = function(t){
   if(isThreadCategory(state.selectedCatId) && t !== 'thread') return;
   if(isHeiljagyaeCategory(state.selectedCatId) && t !== 'community' && t !== 'images') return;
-  if(!isThreadCategory(state.selectedCatId) && !isHeiljagyaeCategory(state.selectedCatId)){
-    if(t === 'community') t = 'notebooklm';
-    if(t !== 'blog' && t !== 'insta' && t !== 'notebooklm' && t !== 'images') return;
+  if(isBlogInstaCategory(state.selectedCatId)){
+    if(t === 'notebooklm' || t === 'community' || t === 'thread') t = 'blog';
+    if(t !== 'blog' && t !== 'insta' && t !== 'images') return;
   }
   state.activeTab = t;
   const content = state.published[state.selectedId]?.content || state.generatedOnly[state.selectedId];
@@ -3637,12 +3767,231 @@ function closeSheet(){
 }
 function closeDetail(e){ if(e.target===document.getElementById('detail-overlay')) closeSheet(); }
 
-function markPub(){
-  const today = new Date().toLocaleDateString('ko-KR',{month:'numeric',day:'numeric'});
-  if(!state.published[state.selectedId]) state.published[state.selectedId]={};
-  state.published[state.selectedId].date = today;
-  save(); closeSheet(); renderMain();
+function getCatIdFromDraftId_(draftId){
+  var m = String(draftId || '').match(/^d(\d+)-/);
+  return m ? parseInt(m[1], 10) : (state.selectedCatId != null ? state.selectedCatId : 0);
 }
+
+function buildFinalPublishDefault_(draftId, catId){
+  var pub = state.published[draftId];
+  if(pub && pub.finalText) return String(pub.finalText);
+  var content = (pub && pub.content) || state.generatedOnly[draftId];
+  if(!content) return '';
+  if(isDailyShareCategory(catId)){
+    var th = normalizeThreadBlock(content.thread);
+    return th && th.summary ? getThreadPlainText(th) : '';
+  }
+  if(isHeiljagyaeCategory(catId)){
+    return content.community ? formatCommunityPostText(content.community) : '';
+  }
+  var tab = state.activeTab;
+  if(tab === 'insta' && content.insta) return getTabCopyText('insta', content);
+  if(tab === 'blog' && content.blog) return getTabCopyText('blog', content);
+  var parts = [];
+  if(content.blog && content.blog.title) parts.push(getTabCopyText('blog', content));
+  if(content.insta) parts.push(getTabCopyText('insta', content));
+  return parts.join('\n\n---\n\n');
+}
+
+function countPublishedInCat_(catId){
+  var cat = CATEGORIES[catId];
+  if(!cat) return 0;
+  return cat.drafts.filter(function(d){
+    return d && d.id && state.published[d.id] && state.published[d.id].date;
+  }).length;
+}
+
+function getLastPublishedSamples_(catId, limit){
+  limit = limit || 5;
+  var cat = CATEGORIES[catId];
+  if(!cat) return [];
+  var rows = [];
+  cat.drafts.forEach(function(d){
+    var p = state.published[d.id];
+    if(!p || !p.date) return;
+    var text = (p.finalText || '').trim();
+    if(!text) text = buildFinalPublishDefault_(d.id, catId).trim();
+    if(text.length < 40) return;
+    rows.push({
+      topic: d.topic,
+      date: p.date,
+      savedAt: p.savedAt || '',
+      finalText: text.slice(0, 3500)
+    });
+  });
+  rows.sort(function(a, b){ return (b.savedAt || '').localeCompare(a.savedAt || ''); });
+  return rows.slice(0, limit);
+}
+
+function shouldRefinePromptsAfterPublish_(catId){
+  var n = countPublishedInCat_(catId);
+  if(n < 5 || n % 5 !== 0) return false;
+  if(!state.promptRefineMilestones) state.promptRefineMilestones = {};
+  if(state.promptRefineMilestones[String(catId)] === n) return false;
+  return getLastPublishedSamples_(catId, 5).length >= 3;
+}
+
+window.openPublishModal = function(){
+  var draftId = state.selectedId;
+  if(!draftId){
+    setAppToast('먼저 초안 카드를 선택해 주세요.', { duration: 3500, variant: 'err' });
+    return;
+  }
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  var cat = CATEGORIES[catId];
+  var draft = cat && cat.drafts.find(function(d){ return d.id === draftId; });
+  var content = state.published[draftId]?.content || state.generatedOnly[draftId];
+  if(!content){
+    setAppToast('초안이 없어요. 먼저 초안을 생성해 주세요.', { duration: 4000, variant: 'err' });
+    return;
+  }
+  state.publishModalDraftId = draftId;
+  state.publishModalCatId = catId;
+  var pub = state.published[draftId];
+  var isEdit = !!(pub && pub.date);
+  document.getElementById('publish-modal-title').textContent = isEdit ? '발행본 수정' : '발행 완료 · 최종본 저장';
+  document.getElementById('publish-modal-meta').innerHTML =
+    '<strong>' + escapeHtml(cat ? cat.name : '') + '</strong> · ' + escapeHtml(draft ? draft.topic : '') +
+    '<br><span style="color:#9CA3AF;">이미지 프롬프트는 제외했어요. 실제 게시글만 저장합니다.</span>';
+  document.getElementById('publish-final-text').value = buildFinalPublishDefault_(draftId, catId);
+  document.getElementById('btn-publish-save').textContent = isEdit ? '저장' : '발행 저장';
+  var refineNote = document.getElementById('publish-refine-note');
+  refineNote.classList.remove('show');
+  refineNote.textContent = '';
+  var nextN = countPublishedInCat_(catId) + (isEdit ? 0 : 1);
+  if(!isEdit && nextN % 5 === 0){
+    refineNote.textContent = '저장 후 「' + (cat ? cat.name : '') + '」 발행 ' + nextN + '건이 되면, 최근 발행본 5개를 분석해 프롬프트를 자동 개선합니다.';
+    refineNote.classList.add('show');
+  }
+  document.getElementById('publish-modal-overlay').classList.add('open');
+  setTimeout(function(){ document.getElementById('publish-modal').classList.add('open'); }, 10);
+  document.body.style.overflow = 'hidden';
+};
+
+window.closePublishModal = function(e){
+  if(e && e.target !== document.getElementById('publish-modal-overlay')) return;
+  document.getElementById('publish-modal').classList.remove('open');
+  setTimeout(function(){
+    document.getElementById('publish-modal-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+  }, 280);
+};
+
+window.confirmPublishFinal = async function(){
+  var draftId = state.publishModalDraftId;
+  var catId = state.publishModalCatId;
+  if(draftId == null || catId == null) return;
+  var text = (document.getElementById('publish-final-text').value || '').trim();
+  if(!text){
+    setAppToast('최종본 글을 입력해 주세요.', { duration: 3500, variant: 'err' });
+    return;
+  }
+  var btn = document.getElementById('btn-publish-save');
+  if(btn){ btn.disabled = true; btn.textContent = '저장 중…'; }
+  var today = new Date().toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
+  var cat = CATEGORIES[catId];
+  var draft = cat && cat.drafts.find(function(d){ return d.id === draftId; });
+  if(!state.published[draftId]) state.published[draftId] = {};
+  var wasPublished = !!state.published[draftId].date;
+  state.published[draftId].date = today;
+  state.published[draftId].savedAt = new Date().toISOString();
+  state.published[draftId].finalText = text;
+  state.published[draftId].catId = catId;
+  state.published[draftId].topic = draft ? draft.topic : '';
+  if(!state.published[draftId].content && state.generatedOnly[draftId]){
+    state.published[draftId].content = state.generatedOnly[draftId];
+  }
+  save({ driveImmediate: true, gasImmediate: true });
+  closePublishModal();
+  closeSheet();
+  renderMain();
+  if(btn){ btn.disabled = false; btn.textContent = '발행 저장'; }
+  setAppToast('발행본이 저장됐어요.', { duration: 4200, variant: 'ok' });
+
+  if(!wasPublished && shouldRefinePromptsAfterPublish_(catId)){
+    setAppToast('발행 ' + countPublishedInCat_(catId) + '건 · 프롬프트 분석 중…', { duration: 5000, variant: 'ok' });
+    try {
+      await refineCategoryPromptsFromPublished_(catId);
+    } catch(err){
+      console.warn('[프롬프트 개선]', err);
+      setAppToast('프롬프트 자동 개선에 실패했어요.\n' + ((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
+    }
+  }
+};
+
+async function refineCategoryPromptsFromPublished_(catId){
+  if(!state.apiKey) return;
+  var cat = CATEGORIES[catId];
+  if(!cat) return;
+  var samples = getLastPublishedSamples_(catId, 5);
+  if(samples.length < 3) return;
+
+  if(!state.prompts) state.prompts = JSON.parse(JSON.stringify(DEFAULT_PROMPTS));
+  if(!state.prompts.categories[catId]) state.prompts.categories[catId] = {};
+  var curBlog = getCatPrompt(catId, 'blog');
+  var curInsta = getCatPrompt(catId, 'insta');
+  var curCommunity = getCatPrompt(catId, 'community');
+  var curThread = getCatPrompt(catId, 'thread');
+
+  var sampleBlock = samples.map(function(s, i){
+    return '--- 발행본 ' + (i + 1) + ' · ' + s.topic + ' (' + s.date + ') ---\n' + s.finalText;
+  }).join('\n\n');
+
+  var promptTypes = [];
+  if(isDailyShareCategory(catId)) promptTypes.push('thread');
+  else if(isHeiljagyaeCategory(catId)) promptTypes.push('community');
+  else { promptTypes.push('blog'); promptTypes.push('insta'); }
+
+  var prompt = '당신은 콘텐츠 전략가입니다.\n' +
+    '카테고리: ' + cat.name + ' (' + (cat.sub || '') + ')\n' +
+    '최근 실제 발행(게시)한 최종본 ' + samples.length + '개를 분석해, 아래 **현재 작성 지침**을 개선하세요.\n\n' +
+    '[현재 지침]\n' +
+    (promptTypes.indexOf('blog') >= 0 ? 'blog:\n' + curBlog + '\n\n' : '') +
+    (promptTypes.indexOf('insta') >= 0 ? 'insta:\n' + curInsta + '\n\n' : '') +
+    (promptTypes.indexOf('community') >= 0 ? 'community:\n' + curCommunity + '\n\n' : '') +
+    (promptTypes.indexOf('thread') >= 0 ? 'thread:\n' + curThread + '\n\n' : '') +
+    '[발행본 샘플]\n' + sampleBlock + '\n\n' +
+    '[요청]\n' +
+    '- 공통으로 드러난 **톤·문장 길이·구조·잘 된 표현·피할 패턴**을 반영\n' +
+    '- 기존 지침을 **통째로 갈아엎지 말고**, 발행본 스타일에 맞게 **보강·구체화**\n' +
+    '- 변경이 거의 없으면 해당 키는 빈 문자열 ""\n\n' +
+    'JSON만:\n{\n' +
+    '"summary":"한국어 3~6문장. 무엇을 반영했는지",\n' +
+    '"blog":"개선된 blog 지침 전문 또는 """,\n' +
+    '"insta":"개선된 insta 지침 전문 또는 """,\n' +
+    '"community":"개선된 community 지침 전문 또는 """,\n' +
+    '"thread":"개선된 thread 지침 전문 또는 """\n}';
+
+  var text = await callClaudePlanner_(prompt, { maxTokens: 2500 });
+  var raw = text.replace(/^```json\s*/i, '').replace(/```\s*$/g, '').trim();
+  var start = raw.indexOf('{');
+  var end = raw.lastIndexOf('}');
+  if(start < 0 || end <= start) throw new Error('프롬프트 개선 JSON을 찾지 못했어요');
+  var obj = JSON.parse(raw.slice(start, end + 1));
+
+  var changed = [];
+  ['blog', 'insta', 'community', 'thread'].forEach(function(key){
+    if(promptTypes.indexOf(key) < 0) return;
+    var next = obj[key] != null ? String(obj[key]).trim() : '';
+    if(next.length < 20) return;
+    state.prompts.categories[catId][key] = next;
+    changed.push(key);
+  });
+
+  if(!state.promptRefineMilestones) state.promptRefineMilestones = {};
+  state.promptRefineMilestones[String(catId)] = countPublishedInCat_(catId);
+  save({ driveImmediate: true, gasImmediate: true });
+
+  var summary = obj.summary ? String(obj.summary).trim() : '발행본 스타일을 반영했습니다.';
+  var keysLabel = { blog: '블로그', insta: '인스타', community: '아파트너', thread: '일상 공유' };
+  var changedKr = changed.map(function(k){ return keysLabel[k] || k; }).join(', ');
+  setAppToast(
+    '「' + cat.name + '」프롬프트 개선 완료\n' + summary + (changedKr ? '\n반영: ' + changedKr : '') + '\n\n프롬프트 메뉴에서 확인할 수 있어요.',
+    { duration: 10000, variant: 'ok' }
+  );
+}
+
+function markPub(){ openPublishModal(); }
 
 // ── Prompt Modal ──
 function getPrompts() {
@@ -3661,6 +4010,12 @@ function getCatPrompt(catId, type) {
 function isDailyShareCategory(catId){ return catId === 6; }
 function isThreadCategory(catId){ return isDailyShareCategory(catId); }
 function isHeiljagyaeCategory(catId){ return catId === 7; }
+/** 블로그·인스타·이미지(2장) 워크플로 — 도수·리:얼·뷰티·교육 탭 */
+function isBlogInstaCategory(catId){ return catId !== 6 && catId !== 7; }
+function getImageSlotCount(catId){
+  if(isDailyShareCategory(catId)) return 0;
+  return 2;
+}
 function getBasePrompt() {
   return getPrompts().base || DEFAULT_PROMPTS.base;
 }
@@ -3685,7 +4040,6 @@ function renderPromptModal() {
   const blogVal = getCatPrompt(state.editingCatId, 'blog');
   const instaVal = getCatPrompt(state.editingCatId, 'insta');
   const communityVal = getCatPrompt(state.editingCatId, 'community');
-  const notebookLMVal = getCatPrompt(state.editingCatId, 'notebookLM');
   const threadVal = getCatPrompt(state.editingCatId, 'thread');
   const baseVal = getBasePrompt();
   const pt = state.promptTab;
@@ -3710,7 +4064,6 @@ function renderPromptModal() {
         ` : `
         <button class="prompt-tab${pt==='blog'?' active':''}" onclick="switchPromptTab('blog')">블로그</button>
         <button class="prompt-tab${pt==='insta'?' active':''}" onclick="switchPromptTab('insta')">인스타</button>
-        <button class="prompt-tab${pt==='notebooklm'?' active':''}" onclick="switchPromptTab('notebooklm')">노트북 LM</button>
         <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">공통 기본</button>
         `}
       </div>
@@ -3756,16 +4109,6 @@ ${pt==='community' && heiljCat ? `
   <div class="prompt-hint">옆집 이웃 톤·공감 질문→3줄→비유 설명→👉 셀프케어. 계절 주제는 각도에 맞을 때만. 이미지 프롬프트 2장.</div>
 </div>` : ''}
 
-${pt==='notebooklm' && !threadCat && !heiljCat ? `
-<div class="prompt-section">
-  <div class="prompt-section-label">
-    NotebookLM용 Q&A·강의 스크립트 지침
-    <button class="prompt-reset-btn" onclick="resetPrompt('notebookLM')">기본값으로</button>
-  </div>
-  <textarea class="prompt-textarea" id="pt-notebooklm" style="min-height:200px;" placeholder="질문 구성, 답변 분량, 톤, 금지 사항 등...">${escapeHtml(notebookLMVal)}</textarea>
-  <div class="prompt-hint">소스로 붙여 넣었을 때 오디오·카드·영상 대본으로 잘 펼쳐지게 질문·답변 구조를 조정해 보세요.</div>
-</div>` : ''}
-
 ${pt==='base' ? `
 <div class="prompt-section">
   <div class="prompt-section-label">
@@ -3776,21 +4119,46 @@ ${pt==='base' ? `
   <div class="prompt-hint">원장님 프로필, 운영 채널, 브랜드 톤 등 모든 초안 생성에 공통으로 쓰이는 기본 정보예요.</div>
 </div>` : ''}
 `;
+  bindPromptTextareaAutosave_();
+}
+
+function flushPromptCloudSave_(){
+  if(promptCloudSaveTimer){
+    clearTimeout(promptCloudSaveTimer);
+    promptCloudSaveTimer = null;
+  }
+  autoSaveCurrentEdit();
+  save({ driveImmediate: true, gasImmediate: true });
+}
+
+function schedulePromptCloudSave_(){
+  clearTimeout(promptCloudSaveTimer);
+  promptCloudSaveTimer = setTimeout(function(){
+    promptCloudSaveTimer = null;
+    autoSaveCurrentEdit();
+    save({ driveImmediate: true, gasImmediate: true });
+  }, 1600);
+}
+
+function bindPromptTextareaAutosave_(){
+  ['pt-blog', 'pt-insta', 'pt-community', 'pt-thread', 'pt-base'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el || el.__htPromptAutosave) return;
+    el.__htPromptAutosave = true;
+    el.addEventListener('input', schedulePromptCloudSave_);
+  });
 }
 
 window.switchPromptCat = function(i) {
-// 현재 편집 내용 임시 저장
-autoSaveCurrentEdit();
+flushPromptCloudSave_();
 state.editingCatId = i;
 if(isThreadCategory(i) && (state.promptTab === 'community' || state.promptTab === 'blog' || state.promptTab === 'insta' || state.promptTab === 'notebooklm')) state.promptTab = 'thread';
 if(isHeiljagyaeCategory(i) && (state.promptTab === 'thread' || state.promptTab === 'blog' || state.promptTab === 'insta' || state.promptTab === 'notebooklm')) state.promptTab = 'community';
-if(!isThreadCategory(i) && !isHeiljagyaeCategory(i) && state.promptTab === 'thread') state.promptTab = 'blog';
-if(!isThreadCategory(i) && !isHeiljagyaeCategory(i) && state.promptTab === 'community') state.promptTab = 'notebooklm';
-if(isHeiljagyaeCategory(i) && state.promptTab === 'notebooklm') state.promptTab = 'community';
+if(isBlogInstaCategory(i) && (state.promptTab === 'thread' || state.promptTab === 'community' || state.promptTab === 'notebooklm')) state.promptTab = 'blog';
 renderPromptModal();
 };
 window.switchPromptTab = function(t) {
-autoSaveCurrentEdit();
+flushPromptCloudSave_();
 state.promptTab = t;
 renderPromptModal();
 };
@@ -3821,15 +4189,19 @@ if(!state.prompts.categories[state.editingCatId]) state.prompts.categories[state
 state.prompts.categories[state.editingCatId][type] = DEFAULT_PROMPTS.categories[state.editingCatId][type];
 }
 renderPromptModal();
+flushPromptCloudSave_();
 };
 
 function savePrompts() {
 autoSaveCurrentEdit();
-save();
+save({ driveImmediate: true, gasImmediate: true });
 closePromptModal();
-// 저장 완료 피드백
 const btn = document.querySelector('.btn-save-prompt');
 if(btn){ btn.textContent='저장됨'; setTimeout(()=>{ btn.textContent='저장하기'; },1200); }
+if(typeof setAppToast === 'function'){
+  var hint = hasDriveConnection_() ? '프롬프트를 저장했어요.\nDrive·서버에 반영 중이에요.' : '프롬프트를 저장했어요.\n서버에 반영 중이에요.';
+  setAppToast(hint, { duration: 4200, variant: 'ok' });
+}
 }
 
 function closePromptModal(e) {
@@ -3857,11 +4229,13 @@ function setAppToast(message, options) {
 var genPendingCount = 0;
 var genActiveJob = null;
 var genUiTimer = null;
+var genBatchRunning = false;
+var genBatchState = null;
 
 function estimateDraftMs(catId) {
   if (isThreadCategory(catId)) return 45000;
   if (isHeiljagyaeCategory(catId)) return 70000;
-  return 110000;
+  return 75000;
 }
 
 function formatRoughCountdown(sec) {
@@ -3918,27 +4292,85 @@ function updateGenIndicator() {
   } else if (genPendingCount > 0) {
     parts.push('순서 대기 중');
   }
+  if (genBatchState && genBatchState.total > 0) {
+    parts.push('일괄 ' + genBatchState.done + '/' + genBatchState.total);
+    if (genBatchState.catName) parts.push(genBatchState.catName);
+  }
   if (genPendingCount > 1) {
     parts.push('요청 ' + genPendingCount + '건');
   }
   el.textContent = '초안 작성 중 · ' + parts.join(' · ');
 }
 
+function getMissingDraftsForCat_(catId){
+  var cat = CATEGORIES[catId];
+  if(!cat || !cat.drafts) return [];
+  return cat.drafts.filter(function(d){ return d && d.id && !draftHasContent(d); });
+}
+
+window.genAllMissingForCurrentCat = async function(forceRegen){
+  var catId = state.currentCat;
+  var cat = CATEGORIES[catId];
+  if(!cat) return;
+  if(!state.apiKey){ openApiModal(); return; }
+  if(genBatchRunning || genPendingCount > 0 || genActiveJob){
+    setAppToast('이미 초안을 만들고 있어요. 끝난 뒤 다시 시도해 주세요.', { duration: 4000, variant: 'err' });
+    return;
+  }
+  var pending = forceRegen
+    ? cat.drafts.filter(function(d){ return d && d.id; })
+    : getMissingDraftsForCat_(catId);
+  if(pending.length === 0){
+    setAppToast(forceRegen ? '생성할 주제가 없어요.' : '「' + cat.name + '」 미작성 주제가 없어요.\n이미 전부 초안이 있어요.', { duration: 4500, variant: 'ok' });
+    return;
+  }
+  var estMin = Math.max(1, Math.ceil(pending.length * estimateDraftMs(catId) / 60000));
+  var msg = '「' + cat.name + '」 ' + pending.length + '건을 순서대로 만듭니다.\n' +
+    '대략 ' + estMin + '분 이상 걸릴 수 있어요. 이 탭·브라우저를 닫지 마세요.\n\n계속할까요?';
+  if(!confirm(msg)) return;
+
+  genBatchRunning = true;
+  genBatchState = { total: pending.length, done: 0, catName: cat.name, ok: 0, fail: 0 };
+  setAppToast('「' + cat.name + '」 미작성 ' + pending.length + '건 생성을 시작했어요…', { duration: 5000, variant: 'ok' });
+  renderMain();
+
+  var okCount = 0;
+  var failCount = 0;
+  for(var i = 0; i < pending.length; i++){
+    var d = pending[i];
+    var ok = await window.enqueueDraftGeneration(catId, d.id, { batch: true });
+    if(ok) okCount++; else failCount++;
+    genBatchState.done = i + 1;
+    updateGenIndicator();
+    renderMain();
+  }
+
+  genBatchRunning = false;
+  genBatchState = null;
+  updateGenIndicator();
+  renderMain();
+  setAppToast(
+    '「' + cat.name + '」 일괄 생성 끝\n성공 ' + okCount + '건' +
+    (failCount ? '\n실패 ' + failCount + '건 — 해당 카드에서 재생성해 주세요' : ''),
+    { duration: 7500, variant: failCount ? 'err' : 'ok' }
+  );
+};
+
 window.enqueueDraftGeneration = async function(jobCatId, jobDraftId, opts){
 opts = opts || {};
 if(!state.apiKey){
-  if(!opts.dailyAuto) openApiModal();
-  return;
+  if(!opts.dailyAuto && !opts.batch) openApiModal();
+  return false;
 }
 var cat0 = CATEGORIES[jobCatId];
 if(!cat0){
-  if(!opts.dailyAuto && typeof setAppToast === 'function') setAppToast('카테고리를 찾을 수 없어요.', { duration: 4000, variant: 'err' });
-  return;
+  if(!opts.dailyAuto && !opts.batch && typeof setAppToast === 'function') setAppToast('카테고리를 찾을 수 없어요.', { duration: 4000, variant: 'err' });
+  return false;
 }
 var draft0 = cat0.drafts.find(function(d){ return d.id === jobDraftId; });
 if(!draft0){
-  if(!opts.dailyAuto && typeof setAppToast === 'function') setAppToast('선택된 초안을 찾을 수 없어요. 카드를 다시 눌러 주세요.', { duration: 4000, variant: 'err' });
-  return;
+  if(!opts.dailyAuto && !opts.batch && typeof setAppToast === 'function') setAppToast('선택된 초안을 찾을 수 없어요. 카드를 다시 눌러 주세요.', { duration: 4000, variant: 'err' });
+  return false;
 }
 var jobTopic = draft0.topic;
 
@@ -3961,7 +4393,6 @@ try {
 const blogGuide = getCatPrompt(catId, 'blog');
 const instaGuide = getCatPrompt(catId, 'insta');
 const communityGuide = getCatPrompt(catId, 'community');
-const notebookLMGuide = getCatPrompt(catId, 'notebookLM');
 const threadGuide = getCatPrompt(catId, 'thread');
 const baseInfo = getBasePrompt();
 const imagePromptGuide = buildImagePromptGuide(draft.topic, draft.angle);
@@ -3969,11 +4400,8 @@ const imagePromptGuide = buildImagePromptGuide(draft.topic, draft.angle);
 const imgJsonTail = `
 "images": {
 "gptVisuals": [
-{"title":"① 대표 이미지 (썸네일 겸)","prompt":"영문 단일 문자열. 위 [이미지 5장] 규칙·공통 스타일·① 역할. Korean-style interior or local PT studio, soft daylight, sage and beige, photorealistic editorial thumbnail, no people, no text — 주제에 맞게 새로 작성."},
-{"title":"② 공감 유도","prompt":"영문 단일 문자열. East Asian adult in everyday Korean home or compact wellness studio, natural skin, modest neutral clothing, subtle fatigue matching topic (neck, shoulder, jaw, lower back, etc.), soft window light, realistic slice-of-life, not Western stock-photo glam."},
-{"title":"③ 전문 설명 보조","prompt":"영문 단일 문자열. One minimal clean infographic or soft medical illustration matching topic; soft sage and cream palette; no readable text labels; non-graphic."},
-{"title":"④ 셀프 케어 동작","prompt":"영문 단일 문자열. Same stretch or exercise as in this article's self-care tip (from blog draft, notebookLM Q&A 실천 답변, or thread self-suggestion). Korean apartment wood floor or studio mat, top or side view, soft natural light — spell out exact pose."},
-{"title":"⑤ 마무리 감성","prompt":"영문 단일 문자열. Herbal tea in matte cup, small green plant, warm late-afternoon light on cream wall, cozy Korean apartment corner still-life, no text."}
+{"title":"① 전문 설명 보조","prompt":"영문 단일 문자열. 위 [이미지 2장] 규칙·① 역할. Minimal clean infographic or soft medical illustration matching topic; sage and cream palette; no readable text labels."},
+{"title":"② 셀프케어 동작","prompt":"영문 단일 문자열. Same self-care stretch or exercise as in blog·insta 본문. Korean home floor or studio mat, East Asian adult, modest clothing, top or side view, soft natural light — spell out exact pose."}
 ]
 }
 }`;
@@ -3992,11 +4420,11 @@ ${threadGuide}
 
 이 카테고리는 **일상 일기·생활 나눔 한 덩어리**만 만듭니다. 전문 강의·임상 설명·홍보 톤 금지. 응답 JSON에는 **thread 키 하나만** 넣으세요.
 
-2026년 5~6월 — 주제·각도·사진에 맞을 때만 계절·날씨·산책·냉방 등을 자연스럽게. JSON만 출력:
+2026년 5~6월 — 주제·각도·사진에 맞을 때만 계절·날씨를 자연스럽게. JSON만 출력:
 {
   "thread": {
-    "topicTitle": "오늘의 한 줄 (질문·감탄·장면·날씨)",
-    "summary": "topicTitle에 이어지는 연속 본문. 3~7문장. 공감·느낌·여유·일상. 구어체. 번호·소제목·불릿·전문 용어 나열 금지."
+    "topicTitle": "오늘의 한 줄 (평서·감탄·장면 — 질문형·독자에게 묻는 말 금지)",
+    "summary": "topicTitle에 이어지는 연속 본문. 3~7문장. 관찰·느낌·일기 톤. 억지 공감·질문 없음. 구어체. 번호·불릿 금지."
   }
 }
 
@@ -4054,12 +4482,9 @@ ${blogGuide}
 [인스타 작성 지침]
 ${instaGuide}
 
-[NotebookLM 강의·스크립트용 Q&A 작성 지침]
-${notebookLMGuide}
-
 ${imagePromptGuide}
 
-워크플로: ② 여기서 만든 **심층 Q&A**를 복사 → ③ **Google NotebookLM**에 소스로 올린 뒤 오디오 오버뷰·강의 카드·영상 대본을 생성.
+이 카테고리는 **blog**, **insta**, **images(2장)** 만 만듭니다. notebookLM, community, thread 키는 넣지 마세요.
 
 2026년 봄/초여름 트렌드 반영. JSON만 응답 (다른 텍스트 없이):
 {
@@ -4077,28 +4502,12 @@ ${imagePromptGuide}
 "carousel": [],
 "hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6","태그7","태그8","태그9","태그10"]
 },
-"notebookLM": {
-"oneLineForSource": "NotebookLM 소스 문서 맨 위에 붙일 한 줄 요약(주제+독자 이득)",
-"qa": [
-{"q": "듣는 사람이 궁금해할 질문 1", "a": "150~400자. 정의→이유→실천 또는 주의 한 줄. 말로 설명하듯 자연스럽게."},
-{"q": "질문 2", "a": "답변"},
-{"q": "질문 3", "a": "답변"},
-{"q": "질문 4", "a": "답변"},
-{"q": "질문 5", "a": "답변"},
-{"q": "질문 6", "a": "답변"},
-{"q": "질문 7", "a": "답변"}
-],
-"chapterTitles": ["모듈·슬라이드 후보 제목 1", "제목 2", "제목 3", "제목 4", "제목 5"],
-"videoIntroScript": "30~90초 분량 영상 오프닝으로 읽을 한 단락(3~6문장). 인사→왜 이 주제인지→이번에 다룰 질문 예고."
-},
 ${imgJsonTail}
 }
 
-notebookLM.qa는 **정확히 7개** 객체 배열. 각 q는 한 문장 질문, 각 a는 심층 답변. blog·insta와 **중복 복붙**하지 말고 강의·스크립트 관점에서 새로 구성. chapterTitles는 5개. videoIntroScript는 볼드·번호 목록 없이 말하듯.
+인스타는 **캐러셀(여러 장) 없이** caption 한 필드에 본문 전부. insta.carousel은 **반드시 빈 배열 []** 만.
 
-인스타는 **캐러셀(여러 장) 없이** caption 한 필드에 본문 전부를 넣습니다. insta.carousel은 **반드시 빈 배열 []** 만 출력(슬라이드 JSON 금지).
-
-반드시 images.gptVisuals는 정확히 5개. 각 prompt 필드는 완성된 영문 이미지 프롬프트 한 덩어리(구도·조명·소품·카메라 앵글·피할 요소 등). 위 JSON 예시의 한글 설명문은 설명용이며 출력 시에는 제거하고, 예시에 나온 영문 구절을 그대로 복사하지 말고 주제·각도·본문 셀프 팁에 맞춰 새로 쓸 것.`;
+반드시 images.gptVisuals는 **정확히 2개**(① 전문 설명 보조, ② 셀프케어 동작). ②번 동작은 blog·insta 본문의 셀프 팁과 일치. 각 prompt는 완성된 영문 한 덩어리.`;
 }
 
 var draftRefImage = (draft.refImage && draft.refImage.data) ? draft.refImage : null;
@@ -4120,7 +4529,7 @@ headers: {
 },
 body: JSON.stringify({
   model: 'claude-sonnet-4-20250514',
-  max_tokens: isThreadCategory(catId) ? 2048 : (isHeiljagyaeCategory(catId) ? 4096 : 8192),
+  max_tokens: isThreadCategory(catId) ? 2048 : (isHeiljagyaeCategory(catId) ? 4096 : 5500),
   messages: [{ role: 'user', content: buildClaudeMessageContent_(prompt, draftRefImage) }]
 })
 });
@@ -4148,9 +4557,12 @@ if(isThreadCategory(catId)){
   delete content.thread;
 } else {
   content.images = normalizeImagesBlock(content.images);
-  content.notebookLM = normalizeNotebookLMBlock(content.notebookLM);
-  content.community = null;
+  delete content.notebookLM;
   delete content.community;
+  delete content.thread;
+  if(content.images && content.images.gptVisuals){
+    content.images.gptVisuals = trimBlogInstaImages_(content.images.gptVisuals);
+  }
   if(content.insta){
     if(!Array.isArray(content.insta.carousel)) content.insta.carousel = [];
     const extra = formatCarouselKeyPointsForCaption_(content.insta.carousel);
@@ -4188,16 +4600,18 @@ try {
   }
   if(opts.dailyAuto){
     setAppToast('오늘의 발행 초안 완료\n«' + jobTopic + '»\n알림을 누르면 바로 열어요.', { duration: 7500, variant: 'ok' });
-  } else {
+  } else if(!opts.batch){
     setAppToast('초안 생성 완료\n«' + jobTopic + '»', { duration: 6500, variant: 'ok' });
   }
-  tryNotifyDraftDone(jobTopic, true, jobDraftId, jobCatId, !!opts.dailyAuto);
+  if(!opts.batch) tryNotifyDraftDone(jobTopic, true, jobDraftId, jobCatId, !!opts.dailyAuto);
+  return true;
 } catch (e) {
   var errMsg = (e && e.message) ? e.message : String(e);
-  if(!opts.dailyAuto){
+  if(!opts.dailyAuto && !opts.batch){
     setAppToast('초안 생성에 실패했어요.\n' + errMsg + '\n\n같은 화면에서 다시 시도해 주세요.', { duration: 9000, variant: 'err' });
   }
-  tryNotifyDraftDone(jobTopic, false, jobDraftId, jobCatId, !!opts.dailyAuto);
+  if(!opts.batch) tryNotifyDraftDone(jobTopic, false, jobDraftId, jobCatId, !!opts.dailyAuto);
+  return false;
 } finally {
   endGenIndicator();
 }

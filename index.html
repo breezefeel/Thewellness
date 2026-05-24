@@ -1016,6 +1016,7 @@ const CAT_TAB_SHORT = {
 };
 
 const SK = 'ht_v2';
+const MIN_PENDING_DRAFTS_PER_CAT = 5;
 /** 약수·피드백과 동일 웹앱 — code-full.gs 배포 URL */
 const PLANNER_GAS_URL = 'https://script.google.com/macros/s/AKfycbwVJSc6rY5tcBSB1VaRi4DBEXGyUBr1ADFfs6QEA9Z9bu0G-0mdMAv374-MdPVYMnSaeQ/exec';
 /** GitHub Pages 공개 주소 — Apps Script PLANNER_PAGE_URL 과 동일하게 유지 */
@@ -2316,6 +2317,14 @@ function draftIsPendingPublish_(d) {
 
 function draftHasContent(d) {
   return !!(d && d.id && (state.generatedOnly[d.id] || (state.published[d.id] && state.published[d.id].content)));
+}
+
+function countPendingDraftsInCat_(catId) {
+  const cat = CATEGORIES[catId];
+  if (!cat || !cat.drafts) return 0;
+  return cat.drafts.filter(function (d) {
+    return draftIsPendingPublish_(d);
+  }).length;
 }
 
 function sortDraftsForDisplay(drafts) {
@@ -3844,6 +3853,122 @@ function shouldRefinePromptsAfterPublish_(catId){
   return getLastPublishedSamples_(catId, 5).length >= 3;
 }
 
+function normalizeTopicKey_(topic){
+  return String(topic || '').replace(/\s+/g, '').toLowerCase();
+}
+
+function makeExtraDraftId_(catId, offset){
+  var base = Date.now() + (offset || 0);
+  var id = 'd' + catId + '-c' + base;
+  var cat = CATEGORIES[catId];
+  while(cat && cat.drafts && cat.drafts.some(function(d){ return d && d.id === id; })){
+    base++;
+    id = 'd' + catId + '-c' + base;
+  }
+  return id;
+}
+
+async function generateRelatedTopicsAfterPublish_(catId, sourceDraft, finalText, count){
+  var cat = CATEGORIES[catId];
+  if(!cat) return [];
+  var avoidTopics = (cat.drafts || [])
+    .map(function(d){ return d && d.topic ? d.topic : ''; })
+    .filter(Boolean)
+    .slice(0, 80);
+  var categoryGuide = isDailyShareCategory(catId)
+    ? '일상 공유용입니다. 전문 설명·치료 정보보다 생활 장면, 계절감, 컨디션, 공감 위주의 가벼운 후속 소재로 만드세요.'
+    : (isHeiljagyaeCategory(catId)
+      ? '힐자계 입주민용 아파트너 게시글입니다. 동네 일상 공감과 부담 없는 셀프 케어로 이어지는 후속 소재로 만드세요.'
+      : '블로그·인스타용입니다. 방금 발행한 글에서 자연스럽게 이어지는 후속, 심화, 오해 해소, 실천 팁 소재로 만드세요.');
+  var prompt =
+'당신은 콘텐츠 플래너입니다.\n' +
+'발행 완료 후에도 바로 쓸 수 있는 미발행 초안이 최소 ' + MIN_PENDING_DRAFTS_PER_CAT + '개 유지되도록, 방금 발행한 글과 연관된 새 주제를 만듭니다.\n\n' +
+'카테고리: ' + cat.name + ' (' + (cat.sub || '') + ')\n' +
+'독자: ' + cat.audience + '\n' +
+'방금 발행한 주제: ' + ((sourceDraft && sourceDraft.topic) || '') + '\n' +
+'방금 발행한 각도: ' + ((sourceDraft && sourceDraft.angle) || '') + '\n' +
+'작성 방향: ' + categoryGuide + '\n\n' +
+'[방금 발행한 최종본 일부]\n' + String(finalText || '').slice(0, 3200) + '\n\n' +
+'[이미 있는 주제 — 중복 금지]\n' + avoidTopics.map(function(t){ return ' - ' + t; }).join('\n') + '\n\n' +
+'[요청]\n' +
+'- 새 주제 정확히 ' + count + '개\n' +
+'- topic: 한국어 제목 한 줄. 기존 주제와 표현·핵심 소재가 겹치지 않게\n' +
+'- angle: 이 주제를 어떤 관점으로 풀지 한 줄\n' +
+'- 방금 발행한 글을 본 독자가 다음으로 궁금해할 만한 흐름\n\n' +
+'JSON 배열만 출력:\n' +
+'[\n' +
+'  {"topic":"...","angle":"..."}\n' +
+']';
+  var text = await callClaudePlanner_(prompt, { maxTokens: Math.max(800, count * 320) });
+  var raw = text.replace(/^```json\s*/i, '').replace(/```\s*$/g, '').trim();
+  var start = raw.indexOf('[');
+  var end = raw.lastIndexOf(']');
+  if(start < 0 || end <= start) throw new Error('관련 주제 JSON을 찾지 못했어요');
+  var arr = JSON.parse(raw.slice(start, end + 1));
+  if(!Array.isArray(arr)) throw new Error('관련 주제 응답 형식이 올바르지 않아요');
+  var seen = {};
+  avoidTopics.forEach(function(t){ seen[normalizeTopicKey_(t)] = true; });
+  var out = [];
+  arr.forEach(function(x){
+    if(!x || !x.topic) return;
+    var topic = String(x.topic || '').trim();
+    var key = normalizeTopicKey_(topic);
+    if(!topic || seen[key]) return;
+    seen[key] = true;
+    out.push({
+      topic: topic,
+      angle: String(x.angle || '발행본과 이어지는 후속 콘텐츠').trim()
+    });
+  });
+  return out.slice(0, count);
+}
+
+async function ensureMinimumPendingDraftsAfterPublish_(catId, sourceDraft, finalText){
+  var cat = CATEGORIES[catId];
+  if(!cat) return;
+  var missing = MIN_PENDING_DRAFTS_PER_CAT - countPendingDraftsInCat_(catId);
+  if(missing <= 0) return;
+  if(!state.apiKey){
+    setAppToast('미발행 초안이 ' + MIN_PENDING_DRAFTS_PER_CAT + '개보다 적어요.\nAPI 키를 설정하면 발행본과 이어지는 새 주제를 자동으로 채울 수 있어요.', { duration: 7000, variant: 'err' });
+    return;
+  }
+
+  setAppToast('발행본과 이어지는 새 주제 ' + missing + '건을 만들고 초안을 채우는 중이에요…', { duration: 5200, variant: 'ok' });
+
+  var created = [];
+  try {
+    var topics = await generateRelatedTopicsAfterPublish_(catId, sourceDraft, finalText, missing);
+    topics.forEach(function(t, i){
+      var draft = { id: makeExtraDraftId_(catId, i), topic: t.topic, angle: t.angle };
+      cat.drafts.push(draft);
+      created.push(draft);
+    });
+    if(!created.length) throw new Error('새로 추가할 관련 주제가 없어요');
+    renderTabs();
+    renderMain();
+    save({ driveImmediate: true, gasImmediate: true });
+  } catch(e){
+    setAppToast('관련 주제 생성에 실패했어요.\n' + ((e && e.message) || String(e)), { duration: 8000, variant: 'err' });
+    return;
+  }
+
+  var okCount = 0;
+  var failCount = 0;
+  for(var i = 0; i < created.length; i++){
+    if(countPendingDraftsInCat_(catId) >= MIN_PENDING_DRAFTS_PER_CAT) break;
+    var ok = await window.enqueueDraftGeneration(catId, created[i].id, { batch: true });
+    if(ok) okCount++;
+    else failCount++;
+  }
+  renderTabs();
+  renderMain();
+  if(okCount > 0){
+    setAppToast('새 관련 초안 ' + okCount + '건을 채웠어요.\n미발행 초안 ' + countPendingDraftsInCat_(catId) + '개를 유지합니다.', { duration: 7500, variant: 'ok' });
+  } else if(failCount > 0){
+    setAppToast('새 주제는 추가했지만 초안 생성에 실패했어요.\n카드에서 다시 생성해 주세요.', { duration: 8000, variant: 'err' });
+  }
+}
+
 window.openPublishModal = function(){
   var draftId = state.selectedId;
   if(!draftId){
@@ -3922,6 +4047,10 @@ window.confirmPublishFinal = async function(){
   renderMain();
   if(btn){ btn.disabled = false; btn.textContent = '발행 저장'; }
   setAppToast('발행본이 저장됐어요.', { duration: 4200, variant: 'ok' });
+
+  if(!wasPublished){
+    await ensureMinimumPendingDraftsAfterPublish_(catId, draft, text);
+  }
 
   if(!wasPublished && shouldRefinePromptsAfterPublish_(catId)){
     setAppToast('발행 ' + countPublishedInCat_(catId) + '건 · 프롬프트 분석 중…', { duration: 5000, variant: 'ok' });

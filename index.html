@@ -1251,6 +1251,11 @@ let state = {
   publishModalCatId: null,
 };
 
+var minDraftReplenishRunningByCat = {};
+var minDraftReplenishLastAttemptByCat = {};
+var minDraftReplenishTimerByCat = {};
+const MIN_DRAFT_REPLENISH_COOLDOWN_MS = 90 * 1000;
+
 // Load persisted
 try {
   const s = JSON.parse(localStorage.getItem(SK));
@@ -2422,7 +2427,14 @@ function renderMain() {
       </div>
     </div>`;
 
-  const batchHTML = (!state.showAdd && missingCount > 0) ? `
+  const lowDraftCount = genCount < MIN_PENDING_DRAFTS_PER_CAT;
+  const batchHTML = lowDraftCount ? `
+    <div class="batch-gen-row">
+      <button type="button" class="btn-batch-gen" ${batchBusy ? 'disabled' : ''} onclick="fillPendingDraftsForCurrentCat()">
+        <strong>초안 ${MIN_PENDING_DRAFTS_PER_CAT}개로 채우기 (${genCount}/${MIN_PENDING_DRAFTS_PER_CAT})</strong>
+        발행본과 이어지는 새 주제를 만들고 AI 초안까지 작성
+      </button>
+    </div>` : (!state.showAdd && missingCount > 0) ? `
     <div class="batch-gen-row">
       <button type="button" class="btn-batch-gen" ${batchBusy ? 'disabled' : ''} onclick="genAllMissingForCurrentCat(false)">
         <strong>미작성 ${missingCount}건 전부 생성</strong>
@@ -2460,6 +2472,7 @@ function renderMain() {
   const cardsHTML = drafts.length ? drafts.map(d=>draftCardHTML(d,cat,false)).join('') : '<div class="empty-note">조건에 맞는 초안이 없어요</div>';
 
   mc.innerHTML = alertHTML + statsHTML + batchHTML + searchHTML + `<div class="cards-wrap">${recHTML}${cardsHTML}</div>`;
+  scheduleMinimumPendingDraftsForCat_(state.currentCat, 'render');
 }
 
 function draftCardHTML(d, cat, isRec) {
@@ -4093,6 +4106,68 @@ async function ensureMinimumPendingDraftsAfterPublish_(catId, sourceDraft, final
     setAppToast('새 주제는 추가했지만 초안 생성에 실패했어요.\n카드에서 다시 생성해 주세요.', { duration: 8000, variant: 'err' });
   }
 }
+
+function getReplenishSeedForCat_(catId){
+  var samples = getLastPublishedSamples_(catId, 1);
+  if(samples.length){
+    return {
+      draft: { topic: samples[0].topic || '', angle: '최근 발행본과 이어지는 후속 주제' },
+      finalText: samples[0].finalText || ''
+    };
+  }
+  var cat = CATEGORIES[catId];
+  var seed = cat && (cat.drafts || []).find(function(d){ return d && d.topic; });
+  return {
+    draft: seed || { topic: cat ? cat.name : '', angle: cat ? (cat.sub || cat.audience || '') : '' },
+    finalText: ''
+  };
+}
+
+async function runMinimumPendingDraftsForCat_(catId, reason, force){
+  if(!state.apiKey){
+    if(force) openApiModal();
+    return;
+  }
+  if(state.showAdd && !force) return;
+  if(genBatchRunning || genPendingCount > 0 || genActiveJob){
+    if(force) setAppToast('이미 초안을 만들고 있어요. 끝난 뒤 다시 눌러 주세요.', { duration: 4000, variant: 'err' });
+    return;
+  }
+  var cat = CATEGORIES[catId];
+  if(!cat || !cat.drafts) return;
+  if(countPendingDraftsInCat_(catId) >= MIN_PENDING_DRAFTS_PER_CAT){
+    if(force) setAppToast('이미 초안이 ' + MIN_PENDING_DRAFTS_PER_CAT + '개 이상 있어요.', { duration: 3500, variant: 'ok' });
+    return;
+  }
+  if(minDraftReplenishRunningByCat[catId]) return;
+  var now = Date.now();
+  if(!force && minDraftReplenishLastAttemptByCat[catId] && now - minDraftReplenishLastAttemptByCat[catId] < MIN_DRAFT_REPLENISH_COOLDOWN_MS) return;
+  minDraftReplenishRunningByCat[catId] = true;
+  minDraftReplenishLastAttemptByCat[catId] = now;
+  try {
+    var seed = getReplenishSeedForCat_(catId);
+    await ensureMinimumPendingDraftsAfterPublish_(catId, seed.draft, seed.finalText);
+  } catch(e){
+    console.warn('[초안 자동 보충]', reason || '', e);
+    if(force) setAppToast('초안 5개 채우기에 실패했어요.\n' + ((e && e.message) || String(e)), { duration: 8000, variant: 'err' });
+  } finally {
+    minDraftReplenishRunningByCat[catId] = false;
+  }
+}
+
+function scheduleMinimumPendingDraftsForCat_(catId, reason){
+  if(minDraftReplenishTimerByCat[catId]) clearTimeout(minDraftReplenishTimerByCat[catId]);
+  minDraftReplenishTimerByCat[catId] = setTimeout(function(){
+    minDraftReplenishTimerByCat[catId] = null;
+    runMinimumPendingDraftsForCat_(catId, reason, false);
+  }, reason === 'load' ? 1200 : 500);
+}
+
+window.fillPendingDraftsForCurrentCat = async function(){
+  await runMinimumPendingDraftsForCat_(state.currentCat, 'manual', true);
+  renderTabs();
+  renderMain();
+};
 
 window.openPublishModal = function(){
   var draftId = state.selectedId;

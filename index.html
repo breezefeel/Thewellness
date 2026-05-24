@@ -622,6 +622,10 @@ padding: 12px 14px; border-radius: 12px; border: 1.5px solid #E5E7EB;
 font-size: 13px; line-height: 1.65; font-family: inherit; resize: vertical;
 }
 .publish-final-textarea:focus { border-color: #16A34A; outline: none; }
+.publish-field-section { margin-top: 14px; }
+.publish-field-section:first-child { margin-top: 0; }
+.publish-field-help { font-size: 11px; color: #9CA3AF; line-height: 1.55; margin: 4px 0 8px; }
+.publish-final-textarea.small { min-height: 130px; }
 .publish-modal-meta { font-size: 12px; color: #6B7280; line-height: 1.55; margin-bottom: 10px; }
 .publish-refine-note {
 margin-top: 12px; padding: 12px 14px; border-radius: 10px;
@@ -859,8 +863,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     </div>
     <div class="publish-modal-body">
       <div class="publish-modal-meta" id="publish-modal-meta"></div>
-      <label class="form-label" for="publish-final-text">실제에 올린(올릴) 글 — 직접 다듬은 최종본</label>
-      <textarea class="publish-final-textarea" id="publish-final-text" placeholder="블로그·인스타·게시판에 붙여 넣은 문장을 그대로 저장해 두세요."></textarea>
+      <div id="publish-fields-wrap"></div>
       <div class="publish-refine-note" id="publish-refine-note"></div>
     </div>
     <div class="prompt-modal-footer">
@@ -3887,26 +3890,26 @@ function getImagePromptTextForData_(content, catId){
   }).filter(Boolean).join('\n\n');
 }
 
-function buildPublishedPromptData_(draft, catId, content, finalText, activeTab){
+function buildPublishedPromptData_(draft, catId, content, finalTexts){
+  finalTexts = finalTexts || {};
   var data = {};
   var topic = draft && draft.topic ? draft.topic : '';
-  var finalVal = String(finalText || '').trim();
   if(content && content.blog){
-    data.blog = { topic: topic, generated: getTabCopyText('blog', content), finalText: activeTab === 'blog' ? finalVal : '' };
+    data.blog = { topic: topic, generated: getTabCopyText('blog', content), finalText: finalTexts.blog || '' };
   }
   if(content && content.insta){
-    data.insta = { topic: topic, generated: getTabCopyText('insta', content), finalText: activeTab === 'insta' ? finalVal : '' };
+    data.insta = { topic: topic, generated: getTabCopyText('insta', content), finalText: finalTexts.insta || '' };
   }
   var imageText = getImagePromptTextForData_(content, catId);
   if(imageText){
-    data.image = { topic: topic, generated: imageText, finalText: activeTab === 'images' ? finalVal : '' };
+    data.image = { topic: topic, generated: imageText, finalText: finalTexts.image || '' };
   }
   if(content && content.community){
-    data.community = { topic: topic, generated: formatCommunityPostText(content.community), finalText: activeTab === 'community' ? finalVal : '' };
+    data.community = { topic: topic, generated: formatCommunityPostText(content.community), finalText: finalTexts.community || '' };
   }
   var th = content ? normalizeThreadBlock(content.thread) : null;
   if(th && th.summary){
-    data.thread = { topic: topic, generated: getThreadPlainText(th), finalText: activeTab === 'thread' ? finalVal : '' };
+    data.thread = { topic: topic, generated: getThreadPlainText(th), finalText: finalTexts.thread || '' };
   }
   return data;
 }
@@ -3926,7 +3929,7 @@ function getLastPublishedPromptSamples_(catId, limit){
     var p = state.published[d.id];
     if(!p || !p.date) return;
     var content = p.content || state.generatedOnly[d.id];
-    var promptData = p.promptData || buildPublishedPromptData_(d, catId, content, p.finalText || '', '');
+    var promptData = p.promptData || buildPublishedPromptData_(d, catId, content, p.finalTexts || {});
     var hasData = ['blog','insta','image','community','thread'].some(function(key){
       return getPromptDataText_(promptData, key).length >= 20;
     });
@@ -3951,6 +3954,70 @@ function formatPromptDataSamplesBlock_(samples, promptTypes){
     });
     return parts.join('\n\n');
   }).join('\n\n');
+}
+
+function getPublishFieldConfigs_(catId, content){
+  if(isDailyShareCategory(catId)){
+    return [{ key: 'thread', label: '일상 공유 최종본', help: 'Threads·인스타 등에 실제로 올린 생활 나눔 글을 붙여 넣으세요.', placeholder: '실제로 올린 일상 공유 글을 붙여넣기' }];
+  }
+  if(isHeiljagyaeCategory(catId)){
+    return [
+      { key: 'community', label: '게시판 최종본', help: '아파트너 게시판에 실제로 올린 글을 저장합니다.', placeholder: '실제로 올린 게시판 글을 붙여넣기' },
+      { key: 'image', label: '이미지 생성 프롬프트', help: 'ChatGPT 이미지 생성에 사용한 최종 프롬프트를 저장합니다.', placeholder: '이미지 생성에 사용한 프롬프트를 붙여넣기', small: true }
+    ];
+  }
+  return [
+    { key: 'blog', label: '블로그 최종본', help: '네이버 블로그 등에 실제로 올린 글을 저장합니다.', placeholder: '블로그에 실제로 올린 글을 붙여넣기' },
+    { key: 'insta', label: '인스타 최종본', help: '인스타 캡션으로 실제로 올린 글을 저장합니다.', placeholder: '인스타에 실제로 올린 캡션을 붙여넣기' },
+    { key: 'image', label: '이미지 생성 프롬프트', help: 'ChatGPT 이미지 생성에 사용한 최종 프롬프트를 저장합니다.', placeholder: '이미지 생성에 사용한 프롬프트를 붙여넣기', small: true }
+  ];
+}
+
+function getLegacyPublishKey_(catId){
+  if(isDailyShareCategory(catId)) return 'thread';
+  if(isHeiljagyaeCategory(catId)) return 'community';
+  return state.activeTab === 'insta' ? 'insta' : (state.activeTab === 'images' ? 'image' : 'blog');
+}
+
+function getSavedPublishFieldText_(pub, key, catId){
+  if(!pub) return '';
+  if(pub.finalTexts && pub.finalTexts[key]) return String(pub.finalTexts[key]);
+  if(pub.promptData && pub.promptData[key] && pub.promptData[key].finalText) return String(pub.promptData[key].finalText);
+  if(pub.finalText && key === getLegacyPublishKey_(catId)) return String(pub.finalText);
+  return '';
+}
+
+function renderPublishFinalFields_(draftId, catId, content, isEdit){
+  var pub = state.published[draftId] || {};
+  var fields = getPublishFieldConfigs_(catId, content);
+  var html = fields.map(function(f){
+    var value = isEdit ? getSavedPublishFieldText_(pub, f.key, catId) : '';
+    return '<div class="publish-field-section">' +
+      '<label class="form-label" for="publish-final-' + f.key + '">' + escapeHtml(f.label) + '</label>' +
+      '<div class="publish-field-help">' + escapeHtml(f.help || '') + '</div>' +
+      '<textarea class="publish-final-textarea' + (f.small ? ' small' : '') + '" id="publish-final-' + f.key + '" data-publish-key="' + f.key + '" placeholder="' + escapeHtml(f.placeholder || '') + '">' + escapeHtml(value) + '</textarea>' +
+    '</div>';
+  }).join('');
+  var wrap = document.getElementById('publish-fields-wrap');
+  if(wrap) wrap.innerHTML = html;
+}
+
+function collectPublishFinalTexts_(){
+  var out = {};
+  var nodes = document.querySelectorAll('[data-publish-key]');
+  nodes.forEach(function(el){
+    var key = el.getAttribute('data-publish-key');
+    var val = (el.value || '').trim();
+    if(key && val) out[key] = val;
+  });
+  return out;
+}
+
+function buildCombinedFinalText_(finalTexts){
+  var labels = { blog: '블로그', insta: '인스타', image: '이미지 생성 프롬프트', community: '게시판', thread: '일상 공유' };
+  return Object.keys(finalTexts || {}).map(function(key){
+    return '[' + (labels[key] || key) + ']\n' + finalTexts[key];
+  }).join('\n\n---\n\n');
 }
 
 function countPublishedInCat_(catId){
@@ -4190,8 +4257,8 @@ window.openPublishModal = function(){
   document.getElementById('publish-modal-title').textContent = isEdit ? '발행본 수정' : '발행 완료 · 최종본 저장';
   document.getElementById('publish-modal-meta').innerHTML =
     '<strong>' + escapeHtml(cat ? cat.name : '') + '</strong> · ' + escapeHtml(draft ? draft.topic : '') +
-    '<br><span style="color:#9CA3AF;">이미지 프롬프트는 제외했어요. 실제 게시글만 저장합니다.</span>';
-  document.getElementById('publish-final-text').value = isEdit ? buildFinalPublishDefault_(draftId, catId) : '';
+    '<br><span style="color:#9CA3AF;">실제로 올린 최종본을 용도별로 저장합니다. 비워 둔 칸은 초안 원본을 기준으로 기억합니다.</span>';
+  renderPublishFinalFields_(draftId, catId, content, isEdit);
   document.getElementById('btn-publish-save').textContent = isEdit ? '저장' : '발행 저장';
   var refineNote = document.getElementById('publish-refine-note');
   refineNote.classList.remove('show');
@@ -4219,9 +4286,10 @@ window.confirmPublishFinal = async function(){
   var draftId = state.publishModalDraftId;
   var catId = state.publishModalCatId;
   if(draftId == null || catId == null) return;
-  var text = (document.getElementById('publish-final-text').value || '').trim();
+  var finalTexts = collectPublishFinalTexts_();
+  var text = buildCombinedFinalText_(finalTexts);
   if(!text){
-    setAppToast('최종본 글을 입력해 주세요.', { duration: 3500, variant: 'err' });
+    setAppToast('최종본 글을 하나 이상 입력해 주세요.', { duration: 3500, variant: 'err' });
     return;
   }
   var btn = document.getElementById('btn-publish-save');
@@ -4234,12 +4302,13 @@ window.confirmPublishFinal = async function(){
   state.published[draftId].date = today;
   state.published[draftId].savedAt = new Date().toISOString();
   state.published[draftId].finalText = text;
+  state.published[draftId].finalTexts = finalTexts;
   state.published[draftId].catId = catId;
   state.published[draftId].topic = draft ? draft.topic : '';
   if(!state.published[draftId].content && state.generatedOnly[draftId]){
     state.published[draftId].content = state.generatedOnly[draftId];
   }
-  state.published[draftId].promptData = buildPublishedPromptData_(draft, catId, state.published[draftId].content, text, state.activeTab);
+  state.published[draftId].promptData = buildPublishedPromptData_(draft, catId, state.published[draftId].content, finalTexts);
   delete state.generatedOnly[draftId];
   save({ driveImmediate: true, gasImmediate: true });
   closePublishModal();

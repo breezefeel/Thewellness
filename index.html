@@ -4191,7 +4191,7 @@ window.openPublishModal = function(){
   document.getElementById('publish-modal-meta').innerHTML =
     '<strong>' + escapeHtml(cat ? cat.name : '') + '</strong> · ' + escapeHtml(draft ? draft.topic : '') +
     '<br><span style="color:#9CA3AF;">이미지 프롬프트는 제외했어요. 실제 게시글만 저장합니다.</span>';
-  document.getElementById('publish-final-text').value = buildFinalPublishDefault_(draftId, catId);
+  document.getElementById('publish-final-text').value = isEdit ? buildFinalPublishDefault_(draftId, catId) : '';
   document.getElementById('btn-publish-save').textContent = isEdit ? '저장' : '발행 저장';
   var refineNote = document.getElementById('publish-refine-note');
   refineNote.classList.remove('show');

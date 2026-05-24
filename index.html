@@ -1232,6 +1232,11 @@ let state = {
   publishModalCatId: null,
 };
 
+var minDraftReplenishRunningByCat = {};
+var minDraftReplenishLastAttemptByCat = {};
+var minDraftReplenishTimerByCat = {};
+const MIN_DRAFT_REPLENISH_COOLDOWN_MS = 90 * 1000;
+
 // Load persisted
 try {
   const s = JSON.parse(localStorage.getItem(SK));
@@ -2441,6 +2446,7 @@ function renderMain() {
   const cardsHTML = drafts.length ? drafts.map(d=>draftCardHTML(d,cat,false)).join('') : '<div class="empty-note">조건에 맞는 초안이 없어요</div>';
 
   mc.innerHTML = alertHTML + statsHTML + batchHTML + searchHTML + `<div class="cards-wrap">${recHTML}${cardsHTML}</div>`;
+  scheduleMinimumPendingDraftsForCat_(state.currentCat, 'render');
 }
 
 function draftCardHTML(d, cat, isRec) {
@@ -3990,6 +3996,51 @@ async function ensureMinimumPendingDraftsAfterPublish_(catId, sourceDraft, final
   } else if(failCount > 0){
     setAppToast('새 주제는 추가했지만 초안 생성에 실패했어요.\n카드에서 다시 생성해 주세요.', { duration: 8000, variant: 'err' });
   }
+}
+
+function getReplenishSeedForCat_(catId){
+  var samples = getLastPublishedSamples_(catId, 1);
+  if(samples.length){
+    return {
+      draft: { topic: samples[0].topic || '', angle: '최근 발행본과 이어지는 후속 주제' },
+      finalText: samples[0].finalText || ''
+    };
+  }
+  var cat = CATEGORIES[catId];
+  var seed = cat && (cat.drafts || []).find(function(d){ return d && d.topic; });
+  return {
+    draft: seed || { topic: cat ? cat.name : '', angle: cat ? (cat.sub || cat.audience || '') : '' },
+    finalText: ''
+  };
+}
+
+function scheduleMinimumPendingDraftsForCat_(catId, reason){
+  if(!state.apiKey) return;
+  if(state.showAdd) return;
+  if(genBatchRunning || genPendingCount > 0 || genActiveJob) return;
+  var cat = CATEGORIES[catId];
+  if(!cat || !cat.drafts) return;
+  if(countPendingDraftsInCat_(catId) >= MIN_PENDING_DRAFTS_PER_CAT) return;
+  if(minDraftReplenishRunningByCat[catId]) return;
+  var now = Date.now();
+  if(minDraftReplenishLastAttemptByCat[catId] && now - minDraftReplenishLastAttemptByCat[catId] < MIN_DRAFT_REPLENISH_COOLDOWN_MS) return;
+  if(minDraftReplenishTimerByCat[catId]) clearTimeout(minDraftReplenishTimerByCat[catId]);
+  minDraftReplenishTimerByCat[catId] = setTimeout(async function(){
+    minDraftReplenishTimerByCat[catId] = null;
+    if(!state.apiKey || state.showAdd) return;
+    if(genBatchRunning || genPendingCount > 0 || genActiveJob) return;
+    if(countPendingDraftsInCat_(catId) >= MIN_PENDING_DRAFTS_PER_CAT) return;
+    minDraftReplenishRunningByCat[catId] = true;
+    minDraftReplenishLastAttemptByCat[catId] = Date.now();
+    try {
+      var seed = getReplenishSeedForCat_(catId);
+      await ensureMinimumPendingDraftsAfterPublish_(catId, seed.draft, seed.finalText);
+    } catch(e){
+      console.warn('[초안 자동 보충]', reason || '', e);
+    } finally {
+      minDraftReplenishRunningByCat[catId] = false;
+    }
+  }, reason === 'load' ? 1200 : 500);
 }
 
 window.openPublishModal = function(){

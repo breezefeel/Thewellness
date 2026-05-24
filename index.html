@@ -1165,6 +1165,18 @@ const DEFAULT_NOTEBOOKLM_PROMPT = `Google **NotebookLM**에 소스로 붙여 넣
 - 상업적 예약·센터 직접 홍보 문구, 과장·낚시 제목식 문장
 - "첫째 둘째 셋째" 식 **발표 자료 목차만 덩어리로** 나열 (내용은 풀어서)`;
 
+const DEFAULT_BLOG_INSTA_IMAGE_PROMPT = `이미지 생성 프롬프트는 블로그·인스타 본문과 같은 주제 흐름을 시각화합니다.
+- 정확히 2장: ① 전문 설명 보조(도식·인포그래픽·부드러운 medical illustration), ② 셀프케어 동작(본문의 동작과 정확히 일치)
+- 영문 한 덩어리 프롬프트, 80~200단어, 한 줄 요약·불릿 금지
+- Korean domestic visual language, warm beige·sage·cream palette, soft daylight, no text overlay, no logo, no watermark
+- 사람은 East Asian adult, modest everyday clothing, 자연스러운 피부와 자세`;
+
+const DEFAULT_HEILJAGYAE_IMAGE_PROMPT = `아파트너 게시글용 이미지 생성 프롬프트입니다.
+- 정확히 2장: ① 단지·동네에서 공감되는 일상 한 컷, ② 게시글 selfCare와 동일한 셀프 동작
+- 한국 아파트 복도·엘리베이터·거실·요가매트 등 입주민에게 익숙한 공간
+- Photorealistic editorial, warm beige·sage·cream palette, soft daylight, no text overlay, no logo, no watermark
+- 광고 느낌보다 옆집 이웃의 생활감·가벼운 컨디션 회복 분위기`;
+
 // ── 기본 프롬프트 (카테고리별 블로그/인스타/NotebookLM 등) ──
 const DEFAULT_PROMPTS = {
   base: `당신은 '미카닥 박준규' 원장님의 전담 콘텐츠 기획자입니다.
@@ -1175,38 +1187,45 @@ const DEFAULT_PROMPTS = {
     0: { // 도수치료
       blog: `네이버 SEO를 고려해 제목을 작성하세요. 일반 환자가 공감할 수 있는 증상 묘사로 시작하고, 도수치료의 원리를 쉽게 풀어 설명합니다. 전문 용어는 최소화하고 따뜻하고 신뢰감 있는 톤을 유지하세요.`,
       insta: `캐러셀(여러 장 슬라이드) 없이 **한 포스트 캡션**으로 끝내세요. 첫 줄 후킹에 이어, 본문 캡션 안에 통증→원인→해결 흐름의 **핵심 포인트**를 번호(1. 2.) 또는 • 불릿으로 넣어 한 번에 읽히게 하세요.`,
+      image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
     },
     1: { // 리:얼 Movement
       blog: `스트레칭이나 운동 루틴을 소개할 때는 단계별로 명확하게 설명하세요. '왜 이 동작인지'를 먼저 설명하고, 일상에서 쉽게 적용할 수 있는 팁을 제공하세요.`,
       insta: `캐러셀 없이 **한 포스트 캡션**에 동작·포인트·주의사항을 단계적으로 적습니다. 마지막에 저장·팔로우 유도 문장을 캡션 끝에 자연스럽게 넣으세요.`,
+      image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
     },
     2: { // 얼굴 관리
       blog: `얼굴 비대칭이나 윤곽에 관심 있는 20~40대 여성을 주 독자로 설정하세요. 과학적 근거를 바탕으로 하되 과도한 의학적 표현은 피하고, 공감과 희망을 주는 톤으로 작성하세요.`,
       insta: `캐러셀 없이 **한 포스트 캡션**으로 스토리텔링하세요. "이런 고민 있으신가요?"에 이어 문제→원인→해결→CTA를 캡션 안에서 줄바꿈으로 구분해 읽기 쉽게.`,
+      image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
     },
     3: { // CMT 전문가
       blog: `물리치료사, 카이로프랙터 등 임상 전문가를 대상으로 합니다. 이론과 실전의 간극을 좁히는 내용을 중심으로, 실제 케이스나 임상 경험을 자연스럽게 녹여주세요.`,
       insta: `전문가 타깃. 캐러셀 없이 **한 포스트 캡션**에 임상 인사이트·핵심 개념을 카드처럼 불릿으로 모아 동료에게 말하듯 밀도 있게.`,
+      image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
     },
     4: { // IFC 얼굴교육
       blog: `에스테틱과 의료의 경계에 있는 전문가들을 위한 콘텐츠입니다. IFC만의 차별점과 임상적 근거를 강조하고, 교육 참여를 자연스럽게 유도하세요.`,
       insta: `교육·전문성 중심. 캐러셀 없이 **한 포스트 캡션**에 수강생에게 도움 되는 포인트를 정리하고, 신뢰·차별화가 드러나게.`,
+      image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
     },
     5: { // 리:얼 Movement 전문가
       blog: `운동 전문가, 재활 치료사를 대상으로 합니다. 움직임 철학과 임상 적용 방법을 함께 다루며, 리:얼 Movement(Re:Al)만의 접근 방식이 왜 다른지 명확히 설명하세요.`,
       insta: `실습·교육 현장 느낌. 캐러셀 없이 **한 포스트 캡션**에 저장하고 싶은 핵심 개념을 불릿·짧은 문단으로 압축.`,
+      image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
     },
     6: { // 일상 공유 (thread JSON만 — 블로그/인스타/이미지 없음)
       thread: DEFAULT_DAILY_SHARE_PROMPT
     },
     7: { // 힐자계 — 아파트너 게시글 + 이미지 프롬프트 2개만 (블로그/인스타 없음)
-      community: DEFAULT_HEILJAGYAE_COMMUNITY_PROMPT
+      community: DEFAULT_HEILJAGYAE_COMMUNITY_PROMPT,
+      image: DEFAULT_HEILJAGYAE_IMAGE_PROMPT
     }
   }
 };
@@ -3659,9 +3678,10 @@ function formatNotebookLMExportText(nl){
   return lines.join('\n');
 }
 
-function buildImagePromptGuide(topic, angle){
+function buildImagePromptGuide(topic, angle, customGuide){
   const t = String(topic || '').trim();
   const a = String(angle || '').trim();
+  const g = String(customGuide || '').trim();
   return `
 [이미지 2장 — 주제 맞춤 생성 규칙]
 이번 초안 주제: "${t}"
@@ -3683,12 +3703,15 @@ function buildImagePromptGuide(topic, angle){
 
 ■ 공통
 Korean domestic visual language, warm beige sage cream, soft daylight, no text overlay, no logos, no watermarks.
+
+${g ? '[카테고리별 이미지 생성 지침]\n' + g : ''}
 `;
 }
 
-function buildHeiljagyaeImagePromptGuide(topic, angle){
+function buildHeiljagyaeImagePromptGuide(topic, angle, customGuide){
   const t = String(topic || '').trim();
   const a = String(angle || '').trim();
+  const g = String(customGuide || '').trim();
   return `
 [이미지 2장 — 아파트너 게시글용 추천 프롬프트]
 이번 주제: "${t}"
@@ -3702,6 +3725,8 @@ function buildHeiljagyaeImagePromptGuide(topic, angle){
 Photorealistic editorial, **Korean apartment / local wellness** authenticity, warm beige sage cream palette, soft daylight, no text overlay, no logos, no watermarks. East Asian adults, modest everyday clothing, natural skin — not Western stock-photo glam.
 
 각 gptVisuals.prompt는 **영문 한 덩어리** (역할당 약 80~200 단어). 한 줄 요약·불릿 금지.
+
+${g ? '[카테고리별 이미지 생성 지침]\n' + g : ''}
 `;
 }
 
@@ -3838,6 +3863,83 @@ function buildFinalPublishDefault_(draftId, catId){
   return parts.join('\n\n---\n\n');
 }
 
+function getImagePromptTextForData_(content, catId){
+  var im = content && content.images;
+  if(!im || !im.gptVisuals) return '';
+  var list = isHeiljagyaeCategory(catId)
+    ? (im.gptVisuals || []).filter(function(x){ return x && x.prompt; })
+    : trimBlogInstaImages_(im.gptVisuals || []);
+  return list.map(function(x, i){
+    return (i + 1) + '. ' + (x.title || '이미지') + '\n' + (x.prompt || '');
+  }).filter(Boolean).join('\n\n');
+}
+
+function buildPublishedPromptData_(draft, catId, content, finalText, activeTab){
+  var data = {};
+  var topic = draft && draft.topic ? draft.topic : '';
+  var finalVal = String(finalText || '').trim();
+  if(content && content.blog){
+    data.blog = { topic: topic, generated: getTabCopyText('blog', content), finalText: activeTab === 'blog' ? finalVal : '' };
+  }
+  if(content && content.insta){
+    data.insta = { topic: topic, generated: getTabCopyText('insta', content), finalText: activeTab === 'insta' ? finalVal : '' };
+  }
+  var imageText = getImagePromptTextForData_(content, catId);
+  if(imageText){
+    data.image = { topic: topic, generated: imageText, finalText: activeTab === 'images' ? finalVal : '' };
+  }
+  if(content && content.community){
+    data.community = { topic: topic, generated: formatCommunityPostText(content.community), finalText: activeTab === 'community' ? finalVal : '' };
+  }
+  var th = content ? normalizeThreadBlock(content.thread) : null;
+  if(th && th.summary){
+    data.thread = { topic: topic, generated: getThreadPlainText(th), finalText: activeTab === 'thread' ? finalVal : '' };
+  }
+  return data;
+}
+
+function getPromptDataText_(promptData, key){
+  var item = promptData && promptData[key];
+  if(!item) return '';
+  return String(item.finalText || item.generated || '').trim();
+}
+
+function getLastPublishedPromptSamples_(catId, limit){
+  limit = limit || 5;
+  var cat = CATEGORIES[catId];
+  if(!cat) return [];
+  var rows = [];
+  cat.drafts.forEach(function(d){
+    var p = state.published[d.id];
+    if(!p || !p.date) return;
+    var content = p.content || state.generatedOnly[d.id];
+    var promptData = p.promptData || buildPublishedPromptData_(d, catId, content, p.finalText || '', '');
+    var hasData = ['blog','insta','image','community','thread'].some(function(key){
+      return getPromptDataText_(promptData, key).length >= 20;
+    });
+    if(!hasData) return;
+    rows.push({
+      topic: d.topic,
+      date: p.date,
+      savedAt: p.savedAt || '',
+      promptData: promptData
+    });
+  });
+  rows.sort(function(a, b){ return (b.savedAt || '').localeCompare(a.savedAt || ''); });
+  return rows.slice(0, limit);
+}
+
+function formatPromptDataSamplesBlock_(samples, promptTypes){
+  return samples.map(function(s, i){
+    var parts = ['--- 발행본 ' + (i + 1) + ' · ' + s.topic + ' (' + s.date + ') ---'];
+    promptTypes.forEach(function(key){
+      var val = getPromptDataText_(s.promptData, key);
+      if(val) parts.push('[' + key + ' 데이터]\n' + val.slice(0, key === 'image' ? 2400 : 3500));
+    });
+    return parts.join('\n\n');
+  }).join('\n\n');
+}
+
 function countPublishedInCat_(catId){
   var cat = CATEGORIES[catId];
   if(!cat) return 0;
@@ -3873,7 +3975,7 @@ function shouldRefinePromptsAfterPublish_(catId){
   if(n < 5 || n % 5 !== 0) return false;
   if(!state.promptRefineMilestones) state.promptRefineMilestones = {};
   if(state.promptRefineMilestones[String(catId)] === n) return false;
-  return getLastPublishedSamples_(catId, 5).length >= 3;
+  return getLastPublishedPromptSamples_(catId, 5).length >= 3;
 }
 
 function normalizeTopicKey_(topic){
@@ -4062,6 +4164,7 @@ window.confirmPublishFinal = async function(){
   if(!state.published[draftId].content && state.generatedOnly[draftId]){
     state.published[draftId].content = state.generatedOnly[draftId];
   }
+  state.published[draftId].promptData = buildPublishedPromptData_(draft, catId, state.published[draftId].content, text, state.activeTab);
   delete state.generatedOnly[draftId];
   save({ driveImmediate: true, gasImmediate: true });
   closePublishModal();
@@ -4090,7 +4193,7 @@ async function refineCategoryPromptsFromPublished_(catId){
   if(!state.apiKey) return;
   var cat = CATEGORIES[catId];
   if(!cat) return;
-  var samples = getLastPublishedSamples_(catId, 5);
+  var samples = getLastPublishedPromptSamples_(catId, 5);
   if(samples.length < 3) return;
 
   if(!state.prompts) state.prompts = JSON.parse(JSON.stringify(DEFAULT_PROMPTS));
@@ -4099,37 +4202,41 @@ async function refineCategoryPromptsFromPublished_(catId){
   var curInsta = getCatPrompt(catId, 'insta');
   var curCommunity = getCatPrompt(catId, 'community');
   var curThread = getCatPrompt(catId, 'thread');
-
-  var sampleBlock = samples.map(function(s, i){
-    return '--- 발행본 ' + (i + 1) + ' · ' + s.topic + ' (' + s.date + ') ---\n' + s.finalText;
-  }).join('\n\n');
+  var curImage = getCatPrompt(catId, 'image');
 
   var promptTypes = [];
   if(isDailyShareCategory(catId)) promptTypes.push('thread');
-  else if(isHeiljagyaeCategory(catId)) promptTypes.push('community');
-  else { promptTypes.push('blog'); promptTypes.push('insta'); }
+  else if(isHeiljagyaeCategory(catId)) { promptTypes.push('community'); promptTypes.push('image'); }
+  else { promptTypes.push('blog'); promptTypes.push('insta'); promptTypes.push('image'); }
+
+  var sampleBlock = formatPromptDataSamplesBlock_(samples, promptTypes);
 
   var prompt = '당신은 콘텐츠 전략가입니다.\n' +
     '카테고리: ' + cat.name + ' (' + (cat.sub || '') + ')\n' +
-    '최근 실제 발행(게시)한 최종본 ' + samples.length + '개를 분석해, 아래 **현재 작성 지침**을 개선하세요.\n\n' +
+    '최근 실제 발행(게시) 데이터 ' + samples.length + '개를 분석해, 아래 **현재 작성 지침**을 개선하세요.\n' +
+    '데이터는 블로그용·인스타용·이미지 생성용처럼 탭별로 분리되어 있습니다. 각 지침은 해당 탭 데이터만 우선 반영하세요.\n\n' +
     '[현재 지침]\n' +
     (promptTypes.indexOf('blog') >= 0 ? 'blog:\n' + curBlog + '\n\n' : '') +
     (promptTypes.indexOf('insta') >= 0 ? 'insta:\n' + curInsta + '\n\n' : '') +
     (promptTypes.indexOf('community') >= 0 ? 'community:\n' + curCommunity + '\n\n' : '') +
     (promptTypes.indexOf('thread') >= 0 ? 'thread:\n' + curThread + '\n\n' : '') +
-    '[발행본 샘플]\n' + sampleBlock + '\n\n' +
+    (promptTypes.indexOf('image') >= 0 ? 'image:\n' + curImage + '\n\n' : '') +
+    '[탭별 발행 데이터]\n' + sampleBlock + '\n\n' +
     '[요청]\n' +
     '- 공통으로 드러난 **톤·문장 길이·구조·잘 된 표현·피할 패턴**을 반영\n' +
-    '- 기존 지침을 **통째로 갈아엎지 말고**, 발행본 스타일에 맞게 **보강·구체화**\n' +
+    '- blog는 블로그 데이터, insta는 인스타 데이터, image는 이미지 프롬프트 데이터 기준으로 각각 개선\n' +
+    '- image는 구도·색감·인물·장소·금지 요소·2장 역할이 더 선명해지도록 개선\n' +
+    '- 기존 지침을 통째로 갈아엎지 말고, 발행 데이터 스타일에 맞게 보강·구체화\n' +
     '- 변경이 거의 없으면 해당 키는 빈 문자열 ""\n\n' +
     'JSON만:\n{\n' +
     '"summary":"한국어 3~6문장. 무엇을 반영했는지",\n' +
-    '"blog":"개선된 blog 지침 전문 또는 """,\n' +
-    '"insta":"개선된 insta 지침 전문 또는 """,\n' +
-    '"community":"개선된 community 지침 전문 또는 """,\n' +
-    '"thread":"개선된 thread 지침 전문 또는 """\n}';
+    '"blog":"개선된 blog 지침 전문 또는 \"\"",\n' +
+    '"insta":"개선된 insta 지침 전문 또는 \"\"",\n' +
+    '"community":"개선된 community 지침 전문 또는 \"\"",\n' +
+    '"thread":"개선된 thread 지침 전문 또는 \"\"",\n' +
+    '"image":"개선된 image 지침 전문 또는 \"\""\n}';
 
-  var text = await callClaudePlanner_(prompt, { maxTokens: 2500 });
+  var text = await callClaudePlanner_(prompt, { maxTokens: 3200 });
   var raw = text.replace(/^```json\s*/i, '').replace(/```\s*$/g, '').trim();
   var start = raw.indexOf('{');
   var end = raw.lastIndexOf('}');
@@ -4137,7 +4244,7 @@ async function refineCategoryPromptsFromPublished_(catId){
   var obj = JSON.parse(raw.slice(start, end + 1));
 
   var changed = [];
-  ['blog', 'insta', 'community', 'thread'].forEach(function(key){
+  ['blog', 'insta', 'community', 'thread', 'image'].forEach(function(key){
     if(promptTypes.indexOf(key) < 0) return;
     var next = obj[key] != null ? String(obj[key]).trim() : '';
     if(next.length < 20) return;
@@ -4150,7 +4257,7 @@ async function refineCategoryPromptsFromPublished_(catId){
   save({ driveImmediate: true, gasImmediate: true });
 
   var summary = obj.summary ? String(obj.summary).trim() : '발행본 스타일을 반영했습니다.';
-  var keysLabel = { blog: '블로그', insta: '인스타', community: '아파트너', thread: '일상 공유' };
+  var keysLabel = { blog: '블로그', insta: '인스타', community: '아파트너', thread: '일상 공유', image: '이미지' };
   var changedKr = changed.map(function(k){ return keysLabel[k] || k; }).join(', ');
   setAppToast(
     '「' + cat.name + '」프롬프트 개선 완료\n' + summary + (changedKr ? '\n반영: ' + changedKr : '') + '\n\n프롬프트 메뉴에서 확인할 수 있어요.',
@@ -4208,6 +4315,7 @@ function renderPromptModal() {
   const instaVal = getCatPrompt(state.editingCatId, 'insta');
   const communityVal = getCatPrompt(state.editingCatId, 'community');
   const threadVal = getCatPrompt(state.editingCatId, 'thread');
+  const imageVal = getCatPrompt(state.editingCatId, 'image');
   const baseVal = getBasePrompt();
   const pt = state.promptTab;
   const threadCat = isThreadCategory(state.editingCatId);
@@ -4227,10 +4335,12 @@ function renderPromptModal() {
         <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">공통 기본</button>
         ` : heiljCat ? `
         <button class="prompt-tab${pt==='community'?' active':''}" onclick="switchPromptTab('community')">아파트너 게시판</button>
+        <button class="prompt-tab${pt==='image'?' active':''}" onclick="switchPromptTab('image')">이미지</button>
         <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">공통 기본</button>
         ` : `
         <button class="prompt-tab${pt==='blog'?' active':''}" onclick="switchPromptTab('blog')">블로그</button>
         <button class="prompt-tab${pt==='insta'?' active':''}" onclick="switchPromptTab('insta')">인스타</button>
+        <button class="prompt-tab${pt==='image'?' active':''}" onclick="switchPromptTab('image')">이미지</button>
         <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">공통 기본</button>
         `}
       </div>
@@ -4276,6 +4386,16 @@ ${pt==='community' && heiljCat ? `
   <div class="prompt-hint">옆집 이웃 톤·공감 질문→3줄→비유 설명→👉 셀프케어. 계절 주제는 각도에 맞을 때만. 이미지 프롬프트 2장.</div>
 </div>` : ''}
 
+${pt==='image' && !threadCat ? `
+<div class="prompt-section">
+  <div class="prompt-section-label">
+    이미지 생성 지침
+    <button class="prompt-reset-btn" onclick="resetPrompt('image')">기본값으로</button>
+  </div>
+  <textarea class="prompt-textarea" id="pt-image" style="min-height:200px;" placeholder="이미지 생성용 프롬프트 톤, 구도, 색감, 금지 요소, 2장 역할 등을 입력하세요...">${escapeHtml(imageVal)}</textarea>
+  <div class="prompt-hint">이미지 탭의 ChatGPT 프롬프트 생성 규칙입니다. 발행 데이터의 이미지 프롬프트를 기준으로 5건마다 자동 개선됩니다.</div>
+</div>` : ''}
+
 ${pt==='base' ? `
 <div class="prompt-section">
   <div class="prompt-section-label">
@@ -4308,7 +4428,7 @@ function schedulePromptCloudSave_(){
 }
 
 function bindPromptTextareaAutosave_(){
-  ['pt-blog', 'pt-insta', 'pt-community', 'pt-thread', 'pt-base'].forEach(function(id){
+  ['pt-blog', 'pt-insta', 'pt-community', 'pt-thread', 'pt-image', 'pt-base'].forEach(function(id){
     var el = document.getElementById(id);
     if(!el || el.__htPromptAutosave) return;
     el.__htPromptAutosave = true;
@@ -4319,7 +4439,7 @@ function bindPromptTextareaAutosave_(){
 window.switchPromptCat = function(i) {
 flushPromptCloudSave_();
 state.editingCatId = i;
-if(isThreadCategory(i) && (state.promptTab === 'community' || state.promptTab === 'blog' || state.promptTab === 'insta' || state.promptTab === 'notebooklm')) state.promptTab = 'thread';
+if(isThreadCategory(i) && (state.promptTab === 'community' || state.promptTab === 'blog' || state.promptTab === 'insta' || state.promptTab === 'image' || state.promptTab === 'notebooklm')) state.promptTab = 'thread';
 if(isHeiljagyaeCategory(i) && (state.promptTab === 'thread' || state.promptTab === 'blog' || state.promptTab === 'insta' || state.promptTab === 'notebooklm')) state.promptTab = 'community';
 if(isBlogInstaCategory(i) && (state.promptTab === 'thread' || state.promptTab === 'community' || state.promptTab === 'notebooklm')) state.promptTab = 'blog';
 renderPromptModal();
@@ -4338,12 +4458,14 @@ const instaEl = document.getElementById('pt-insta');
 const communityEl = document.getElementById('pt-community');
 const notebookLMEl = document.getElementById('pt-notebooklm');
 const threadEl = document.getElementById('pt-thread');
+const imageEl = document.getElementById('pt-image');
 const baseEl = document.getElementById('pt-base');
 if(blogEl) state.prompts.categories[state.editingCatId].blog = blogEl.value;
 if(instaEl) state.prompts.categories[state.editingCatId].insta = instaEl.value;
 if(communityEl) state.prompts.categories[state.editingCatId].community = communityEl.value;
 if(notebookLMEl) state.prompts.categories[state.editingCatId].notebookLM = notebookLMEl.value;
 if(threadEl) state.prompts.categories[state.editingCatId].thread = threadEl.value;
+if(imageEl) state.prompts.categories[state.editingCatId].image = imageEl.value;
 if(baseEl) state.prompts.base = baseEl.value;
 }
 
@@ -4561,8 +4683,9 @@ const blogGuide = getCatPrompt(catId, 'blog');
 const instaGuide = getCatPrompt(catId, 'insta');
 const communityGuide = getCatPrompt(catId, 'community');
 const threadGuide = getCatPrompt(catId, 'thread');
+const imageGuide = getCatPrompt(catId, 'image');
 const baseInfo = getBasePrompt();
-const imagePromptGuide = buildImagePromptGuide(draft.topic, draft.angle);
+const imagePromptGuide = buildImagePromptGuide(draft.topic, draft.angle, imageGuide);
 
 const imgJsonTail = `
 "images": {
@@ -4597,7 +4720,7 @@ ${threadGuide}
 
 thread.summary는 **하나의 문자열**만.`;
 } else if(isHeiljagyaeCategory(catId)){
-  const hjImgGuide = buildHeiljagyaeImagePromptGuide(draft.topic, draft.angle);
+  const hjImgGuide = buildHeiljagyaeImagePromptGuide(draft.topic, draft.angle, imageGuide);
   const heiljagyaeImgJsonTail = `
 "images": {
 "gptVisuals": [

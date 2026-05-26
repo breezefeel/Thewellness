@@ -1521,6 +1521,7 @@ function save(opts) {
 // ── Google Drive (앱 데이터 폴더, 단일 JSON) ──
 const DRIVE_SYNC_FILENAME = 'planner-sync-v1.json';
 const DRIVE_CONNECTED_KEY = 'ht_drive_connected';
+const DRIVE_LAST_SYNC_KEY = 'ht_drive_last_sync_ok';
 /** Google OAuth 웹 클라이언트 ID — 비밀이 아니므로 내장. 다른 ID로 덮어쓰려면 Drive 모달에서 입력( ht_gdrive_cid 저장 ) */
 const GOOGLE_OAUTH_WEB_CLIENT_ID = '442956975507-a6qqamnjlhuqflflfdknq20slb16jrmc.apps.googleusercontent.com';
 let driveTokenWaiters = [];
@@ -1955,7 +1956,7 @@ async function driveUploadNow(){
     var tx = await r.text();
     throw new Error(tx || ('HTTP ' + r.status));
   }
-  markDriveUploadOk();
+  markDriveSyncOk_();
   schedulePlannerGasPush_(true);
 }
 function scheduleDriveUpload(immediate){
@@ -2001,7 +2002,7 @@ function updateDriveButtonState(){
   var dot = document.getElementById('drive-dot');
   if(!b) return;
   var lastIso = '';
-  try { lastIso = localStorage.getItem('ht_drive_last_upload_ok') || ''; } catch(e0){}
+  try { lastIso = localStorage.getItem(DRIVE_LAST_SYNC_KEY) || ''; } catch(e0){}
   var lastFmt = formatDriveTimeShort(lastIso);
   var hasConnection = hasDriveConnection_();
   var exp = readDriveAuthExpiryMs();
@@ -2011,8 +2012,8 @@ function updateDriveButtonState(){
   if(!hasConnection){
     b.classList.remove('linked');
     if(status) status.textContent = 'Drive';
-    if(sub) sub.textContent = lastFmt ? ('연동 안 됨 · 업로드 ' + lastFmt) : '연동 안 됨';
-    b.title = lastFmt ? ('Drive 미연동 — 마지막 클라우드 업로드 ' + lastFmt) : 'Google Drive 동기화';
+    if(sub) sub.textContent = lastFmt ? ('연동 안 됨 · 동기화 ' + lastFmt) : '연동 안 됨';
+    b.title = lastFmt ? ('Drive 미연동 — 마지막 동기화 ' + lastFmt) : 'Google Drive 동기화';
     return;
   }
   b.classList.add('linked');
@@ -2021,11 +2022,11 @@ function updateDriveButtonState(){
   if(state === 'soon') b.classList.add('warn');
   if(dot) dot.classList.add(state === 'soon' ? 'warn' : 'on');
   if(status) status.textContent = 'Drive 연결됨';
-  if(sub) sub.textContent = '연결됨' + (lastFmt ? (' · ' + lastFmt) : '');
-  b.title = 'Drive 연결됨' + (lastFmt ? (' — 마지막 업로드(성공) ' + lastFmt) : '');
+  if(sub) sub.textContent = lastFmt ? ('동기화됨 · ' + lastFmt) : '동기화 대기';
+  b.title = 'Drive 연결됨' + (lastFmt ? (' — 마지막 동기화 ' + lastFmt) : ' — 아직 동기화 기록 없음');
 }
-function markDriveUploadOk(){
-  try { localStorage.setItem('ht_drive_last_upload_ok', new Date().toISOString()); } catch(e){}
+function markDriveSyncOk_(){
+  try { localStorage.setItem(DRIVE_LAST_SYNC_KEY, new Date().toISOString()); } catch(e){}
   updateDriveButtonState();
 }
 function maybeRequestNotificationAfterDrive(){
@@ -2120,6 +2121,7 @@ async function driveDownloadCloudPayload_(token){
   var text = await r.text();
   if(!r.ok) throw new Error(text || 'Drive 다운로드 실패');
   var data = JSON.parse(text);
+  markDriveSyncOk_();
   return { fileId: fileId, data: data };
 }
 

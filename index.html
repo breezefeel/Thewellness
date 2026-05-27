@@ -3885,6 +3885,7 @@ function onReturnFromBackgroundForInsta_(){
 
 function enqueueInstaFromBlog_(draftId, catId, topic, blog, opts){
   opts = opts || {};
+  var retryCount = opts.retryCount || 0;
   if(instaBgByDraft[draftId]) return;
   if(!state.apiKey) return;
   var startedMs = Date.now();
@@ -3928,9 +3929,17 @@ function enqueueInstaFromBlog_(draftId, catId, topic, blog, opts){
       }
     } catch(err){
       console.warn('[인스타 백그라운드]', err);
+      var msg = (err && err.message) ? err.message : String(err);
+      var retryable = /응답 시간이|Failed to fetch|NetworkError|Load failed|network/i.test(msg);
+      var shouldRetry = !opts.resume && retryCount < 1 && retryable;
       var failContent = getDraftContent_(draftId);
       if(failContent){
-        clearInstaPendingMeta_(failContent);
+        if(document.hidden || shouldRetry){
+          var retryStartMs = Date.now();
+          setInstaPendingMeta_(failContent, draftId, catId, topic, retryStartMs, retryStartMs + INSTA_BG_ESTIMATE_MS);
+        } else {
+          clearInstaPendingMeta_(failContent);
+        }
         persistDraftContent_(draftId, failContent);
         if(state.selectedId === draftId){
           var ovFail = document.getElementById('detail-overlay');
@@ -3939,9 +3948,17 @@ function enqueueInstaFromBlog_(draftId, catId, topic, blog, opts){
           }
         }
       }
-      var msg = (err && err.message) ? err.message : String(err);
-      tryNotifyInstaReady_(topic, draftId, catId, false, msg);
-      if(!document.hidden){
+      if(!shouldRetry && !document.hidden){
+        tryNotifyInstaReady_(topic, draftId, catId, false, msg);
+      }
+      if(shouldRetry){
+        setTimeout(function(){
+          enqueueInstaFromBlog_(draftId, catId, topic, blogSnapshot, { resume: true, retryCount: retryCount + 1 });
+        }, 1200);
+        if(!document.hidden){
+          setAppToast('인스타 캡션 생성이 끊겨 다시 시도하고 있어요.', { duration: 5000, variant: 'ok' });
+        }
+      } else if(!document.hidden){
         setAppToast((opts.resume ? '중단됐던 인스타 캡션 재시도가 실패했어요.\n' : '인스타 캡션 생성에 실패했어요.\n') + msg, { duration: 9000, variant: 'err' });
       }
     } finally {

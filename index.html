@@ -1586,6 +1586,10 @@ function hasDriveConnection_(){
     return localStorage.getItem(DRIVE_CONNECTED_KEY) === '1' || !!localStorage.getItem('ht_drive_oauth');
   } catch(e){ return false; }
 }
+/** 실제로 API 호출 가능한 유효 토큰 (만료 전) */
+function hasDriveValidToken_(){
+  return !!readCachedDriveToken_();
+}
 function flushDriveTokenWaiters(ok, val){
   var w = driveTokenWaiters.slice();
   driveTokenWaiters = [];
@@ -1990,7 +1994,7 @@ async function driveUploadNow(){
 }
 function scheduleDriveUpload(immediate){
   try {
-    if(!hasDriveConnection_()) return;
+    if(!hasDriveValidToken_()) return;
   } catch(e3){ return; }
   clearTimeout(driveUploadTimer);
   driveUploadTimer = null;
@@ -2033,12 +2037,14 @@ function updateDriveButtonState(){
   var lastIso = '';
   try { lastIso = localStorage.getItem(DRIVE_LAST_SYNC_KEY) || ''; } catch(e0){}
   var lastFmt = formatDriveTimeShort(lastIso);
-  var hasConnection = hasDriveConnection_();
+  var hasLink = hasDriveConnection_();
+  var hasValid = hasDriveValidToken_();
   var exp = readDriveAuthExpiryMs();
   var now = Date.now();
   b.classList.remove('warn');
+  b.removeAttribute('data-drive-sync-pending');
   if(dot) dot.className = 'drive-dot';
-  if(!hasConnection){
+  if(!hasLink){
     b.classList.remove('linked');
     if(status) status.textContent = 'Drive';
     if(sub) sub.textContent = lastFmt ? ('연동 안 됨 · 동기화 ' + lastFmt) : '연동 안 됨';
@@ -2046,36 +2052,55 @@ function updateDriveButtonState(){
     return;
   }
   b.classList.add('linked');
+  if(status) status.textContent = 'Drive';
+  if(!hasValid){
+    b.classList.add('warn');
+    if(dot) dot.classList.add('warn');
+    if(sub) sub.textContent = '로그인 갱신 필요';
+    b.title = '로그인이 만료됐어요. 탭하면 다시 연결·동기화';
+    b.setAttribute('data-drive-sync-pending', '1');
+    return;
+  }
   var state = 'ok';
   if(exp && exp > now && exp - now < 8 * 60 * 1000) state = 'soon';
   if(state === 'soon') b.classList.add('warn');
   if(dot) dot.classList.add(state === 'soon' ? 'warn' : 'on');
-  if(status) status.textContent = 'Drive';
   if(sub) sub.textContent = lastFmt ? ('동기화됨 · ' + lastFmt) : '동기화 대기';
   b.title = lastFmt
     ? ('Drive 연결됨 — 마지막 동기화 ' + lastFmt)
     : 'Drive 연결됨 — 탭하면 지금 동기화';
   if(!lastFmt) b.setAttribute('data-drive-sync-pending', '1');
-  else b.removeAttribute('data-drive-sync-pending');
 }
 function isDriveSyncPending_(){
-  if(!hasDriveConnection_()) return false;
+  if(!hasDriveValidToken_()) return false;
   try { return !localStorage.getItem(DRIVE_LAST_SYNC_KEY); } catch(e){ return false; }
+}
+function isDriveNeedsReauth_(){
+  return hasDriveConnection_() && !hasDriveValidToken_();
 }
 window.onDriveButtonClick = async function(){
   if(location.protocol === 'file:'){
     alert('Drive 연동은 https 또는 http로 이 페이지를 연 뒤에만 동작합니다.');
     return;
   }
-  if(!isDriveSyncPending_()){
+  var btn = document.getElementById('btn-drive-sync');
+  var sub = document.getElementById('drive-btn-sub');
+  var needsReauth = isDriveNeedsReauth_();
+  var syncPending = isDriveSyncPending_();
+
+  if(!needsReauth && !syncPending){
     openDriveModal();
     return;
   }
-  var btn = document.getElementById('btn-drive-sync');
-  var sub = document.getElementById('drive-btn-sub');
+
   if(btn) btn.disabled = true;
-  if(sub) sub.textContent = '동기화 중…';
+  if(sub) sub.textContent = needsReauth ? '로그인 중…' : '동기화 중…';
   try {
+    if(needsReauth){
+      var loginResult = await driveLoginInteractive_('upload', hasDriveConnection_() ? 'none' : 'consent');
+      if(loginResult === false) return;
+      return;
+    }
     await driveUploadNow();
     if(typeof setAppToast === 'function'){
       setAppToast('Drive에 동기화했어요.', { duration: 4200, variant: 'ok' });
@@ -3530,8 +3555,8 @@ function tryNotifyInstaReady_(topic, draftId, catId, ok, errMsg){
       requireInteraction: !!ok
     };
     var onClick = function(){
-      state.activeTab = 'insta';
       focusPlannerAndOpenDraft_(draftId, catId);
+      showInstaContentWhenReady_(draftId, catId);
     };
     if(document.hidden && navigator.serviceWorker){
       navigator.serviceWorker.ready.then(function(reg){
@@ -3550,14 +3575,34 @@ function tryNotifyInstaReady_(topic, draftId, catId, ok, errMsg){
 var instaBgByDraft = {};
 var instaBgDoneWhileHidden_ = {};
 
+function showInstaContentWhenReady_(draftId, catId){
+  var content = getDraftContent_(draftId);
+  if(!content || !content.insta) return;
+  var ov = document.getElementById('detail-overlay');
+  var sheetOpen = ov && ov.classList.contains('open');
+  state.selectedCatId = catId;
+  state.activeTab = 'insta';
+  if(sheetOpen && state.selectedId === draftId){
+    renderSheetContent(content);
+    return;
+  }
+  if(state.selectedId === draftId){
+    openDetail(draftId, catId);
+    state.activeTab = 'insta';
+    renderSheetContent(content);
+  }
+}
+
 function onReturnFromBackgroundForInsta_(){
   var keys = Object.keys(instaBgDoneWhileHidden_);
   if(keys.length){
     keys.forEach(function(did){
       var topic = instaBgDoneWhileHidden_[did];
+      var catId = getCatIdFromDraftId_(did);
       delete instaBgDoneWhileHidden_[did];
+      showInstaContentWhenReady_(did, catId);
       if(typeof setAppToast === 'function'){
-        setAppToast('인스타 캡션 준비됐어요.\n«' + (topic || '') + '»\n카드를 열어 인스타 탭을 확인하세요.', { duration: 6500, variant: 'ok' });
+        setAppToast('인스타 캡션 준비됐어요.\n«' + (topic || '') + '»', { duration: 6500, variant: 'ok' });
       }
     });
   }
@@ -3582,8 +3627,11 @@ function enqueueInstaFromBlog_(draftId, catId, topic, blog){
   if(pendingContent){
     pendingContent.instaPending = true;
     persistDraftContent_(draftId, pendingContent);
-    if(state.selectedId === draftId && state.activeTab === 'insta'){
-      renderSheetContent(pendingContent);
+    if(state.selectedId === draftId){
+      var ovPending = document.getElementById('detail-overlay');
+      if(ovPending && ovPending.classList.contains('open')){
+        renderSheetContent(pendingContent);
+      }
     }
   }
 
@@ -3596,17 +3644,14 @@ function enqueueInstaFromBlog_(draftId, catId, topic, blog){
         delete content.instaPending;
         persistDraftContent_(draftId, content);
       }
-      if(state.selectedId === draftId && document.getElementById('detail-overlay').classList.contains('open')){
-        state.activeTab = 'insta';
-        renderSheetContent(content);
-      }
       renderTabs();
       renderMain();
+      showInstaContentWhenReady_(draftId, catId);
       tryNotifyInstaReady_(topic, draftId, catId, true);
       if(document.hidden){
         instaBgDoneWhileHidden_[draftId] = topic || '';
       } else {
-        setAppToast('인스타 캡션 준비됐어요.\n«' + (topic || '') + '»\n인스타 탭에서 확인하세요.', { duration: 6500, variant: 'ok' });
+        setAppToast('인스타 캡션 준비됐어요.\n«' + (topic || '') + '»', { duration: 6500, variant: 'ok' });
       }
     } catch(err){
       console.warn('[인스타 백그라운드]', err);
@@ -3614,6 +3659,12 @@ function enqueueInstaFromBlog_(draftId, catId, topic, blog){
       if(failContent){
         delete failContent.instaPending;
         persistDraftContent_(draftId, failContent);
+        if(state.selectedId === draftId){
+          var ovFail = document.getElementById('detail-overlay');
+          if(ovFail && ovFail.classList.contains('open')){
+            renderSheetContent(failContent);
+          }
+        }
       }
       var msg = (err && err.message) ? err.message : String(err);
       tryNotifyInstaReady_(topic, draftId, catId, false, msg);

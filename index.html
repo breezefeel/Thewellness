@@ -2381,6 +2381,11 @@ function sortDraftsForDisplay(drafts) {
   return (drafts || []).slice().sort(function (a, b) {
     const ap = draftIsPublished_(a.id) ? 1 : 0;
     const bp = draftIsPublished_(b.id) ? 1 : 0;
+    if (ap === 1 && bp === 1) {
+      const aSaved = (state.published[a.id] && state.published[a.id].savedAt) ? String(state.published[a.id].savedAt) : '';
+      const bSaved = (state.published[b.id] && state.published[b.id].savedAt) ? String(state.published[b.id].savedAt) : '';
+      if (aSaved !== bSaved) return bSaved.localeCompare(aSaved);
+    }
     if (ap !== bp) return ap - bp;
     const ag = draftIsPendingPublish_(a) ? 1 : 0;
     const bg = draftIsPendingPublish_(b) ? 1 : 0;
@@ -3404,6 +3409,24 @@ function copyAndOpenInstagram_(text){
   }
 }
 
+function copyTextOnly_(text, done){
+  if(!text){
+    if(done) done(false);
+    return;
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){
+      if(done) done(true);
+    }).catch(function(){
+      window.prompt('복사할 내용:', text);
+      if(done) done(true);
+    });
+    return;
+  }
+  window.prompt('복사할 내용:', text);
+  if(done) done(true);
+}
+
 window.openExternalInstagramForPost_ = function(){
   const u = EXT_INSTAGRAM_WEB;
   if(!isPhoneOrTablet()){
@@ -4021,6 +4044,28 @@ window.onSheetPublishComplete = async function(){
   var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
   var tab = state.activeTab;
   var pubBtn = document.querySelector('.sheet-actions .btn-pub');
+  var key = getPublishKeyForTab_(tab, catId);
+  var tabSaved = !!(key && state.published[draftId] && state.published[draftId].tabPublished && state.published[draftId].tabPublished[key]);
+
+  if(tabSaved){
+    if(pubBtn){ pubBtn.disabled = true; pubBtn.textContent = '저장·복사 중…'; }
+    try {
+      var quickResult = commitSheetTabPublish_(draftId, catId, tab);
+      var quickContent = getDraftContent_(draftId);
+      var quickText = buildFinalTextForKey_(quickContent, catId, quickResult.key);
+      renderSheetContent(quickContent);
+      renderTabs();
+      renderMain();
+      copyTextOnly_(quickText, function(){
+        setAppToast('수정본 저장 후 복사했어요.', { duration: 3600, variant: 'ok' });
+      });
+    } catch(err){
+      setAppToast(((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
+    } finally {
+      if(pubBtn) pubBtn.disabled = false;
+    }
+    return;
+  }
 
   if(tab === 'blog' && isBlogInstaCategory(catId)){
     if(!state.apiKey){
@@ -4098,7 +4143,6 @@ window.onSheetPublishComplete = async function(){
     setAppToast('초안이 없어요. 먼저 초안을 생성해 주세요.', { duration: 4000, variant: 'err' });
     return;
   }
-  var key = getPublishKeyForTab_(tab, catId);
   if(!key){
     setAppToast('이 탭에서는 발행완료를 사용할 수 없어요.', { duration: 4000, variant: 'err' });
     return;

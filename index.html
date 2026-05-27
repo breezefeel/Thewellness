@@ -2563,17 +2563,10 @@ function getSortedCatTabOrder() {
 }
 
 function renderTabs() {
-  function doneCountForCat(idx) {
-    const cat = CATEGORIES[idx];
-    if (!cat || !cat.drafts) return 0;
-    return cat.drafts.filter(function (d) {
-      return draftIsPendingPublish_(d);
-    }).length;
-  }
   function cellHTML(idx) {
     const c = CATEGORIES[idx];
     const label = CAT_TAB_SHORT[idx] || c.name;
-    const done = doneCountForCat(idx);
+    const written = countWrittenDraftsForCat_(idx);
     return (
       '<button type="button" class="cat-tab' +
       (state.currentCat === idx ? ' active' : '') +
@@ -2581,8 +2574,8 @@ function renderTabs() {
       idx +
       ')"><span class="cat-tab-label">' +
       label +
-      '</span><span class="cat-tab-badge" title="미발행 초안">' +
-      done +
+      '</span><span class="cat-tab-badge" title="AI로 작성된 초안 수">' +
+      written +
       '</span></button>'
     );
   }
@@ -2612,6 +2605,15 @@ function draftIsPendingPublish_(d) {
 
 function draftHasContent(d) {
   return !!(d && d.id && (state.generatedOnly[d.id] || (state.published[d.id] && state.published[d.id].content)));
+}
+
+/** 상단 탭 배지 — AI로 본문이 작성된 초안 수 (주제만 있는 카드·추천·발행완료 건수와 무관) */
+function countWrittenDraftsForCat_(catIdx) {
+  const cat = CATEGORIES[catIdx];
+  if (!cat || !cat.drafts) return 0;
+  return cat.drafts.filter(function (d) {
+    return draftHasContent(d);
+  }).length;
 }
 
 function countPendingDraftsInCat_(catId) {

@@ -1402,7 +1402,7 @@ async function syncAllSourcesIfNewer_(reason){
   var bestMs = 0;
   var bestSource = '';
 
-  if(hasDriveConnection_()){
+  if(hasDriveValidToken_()){
     try {
       var token = await getDriveAccessToken({ forcePrompt: false });
       var out = await driveDownloadCloudPayload_(token);
@@ -1554,6 +1554,7 @@ const DRIVE_LAST_SYNC_KEY = 'ht_drive_last_sync_ok';
 /** Google OAuth 웹 클라이언트 ID — 비밀이 아니므로 내장. 다른 ID로 덮어쓰려면 Drive 모달에서 입력( ht_gdrive_cid 저장 ) */
 const GOOGLE_OAUTH_WEB_CLIENT_ID = '442956975507-a6qqamnjlhuqflflfdknq20slb16jrmc.apps.googleusercontent.com';
 let driveTokenWaiters = [];
+let driveOAuthPopupInFlight = false;
 let driveUploadTimer = null;
 let promptCloudSaveTimer = null;
 
@@ -1638,12 +1639,25 @@ function isDrivePreferRedirect_(){
   if(navigator.maxTouchPoints > 0 && window.innerWidth < 960) return true;
   return false;
 }
+function isPlannerGithubDeploy_(){
+  return location.hostname === 'breezefeel.github.io' && (location.pathname || '').indexOf('/Thewellness') !== -1;
+}
+/** OAuth·주소창 정리용 (GitHub Pages: 항상 /Thewellness/) */
+function getPlannerCleanUrl_(){
+  if(isPlannerGithubDeploy_()) return '/Thewellness/';
+  return (location.pathname || '/') + (location.search || '');
+}
 function getDriveRedirectUri_(){
-  if(location.hostname === 'breezefeel.github.io' && location.pathname.indexOf('/Thewellness') !== -1){
-    return PLANNER_PUBLIC_URL.replace(/\/?$/, '/');
-  }
-  var u = location.origin + (location.pathname || '/');
-  return u.replace(/#.*$/, '').replace(/\?.*$/, '').replace(/\/?$/, '/') ;
+  if(isPlannerGithubDeploy_()) return PLANNER_PUBLIC_URL.replace(/\/?$/, '/');
+  var path = location.pathname || '/';
+  var u = (location.origin + path).replace(/#.*$/, '').replace(/\?.*$/, '');
+  if(/\.html$/i.test(u)) return u;
+  return u.replace(/\/?$/, '/');
+}
+function normalizeDriveOAuthPrompt_(prompt){
+  var p = prompt || 'consent';
+  if(!readCachedDriveToken_() && (p === 'none' || p === '')) return 'consent';
+  return p;
 }
 function showDriveOAuthBusy_(msg){
   var el = document.getElementById('drive-oauth-busy');
@@ -1668,7 +1682,7 @@ function readDriveOAuthHash_(){
 function checkDriveOAuthStuck_(){
   var started = 0;
   try { started = parseInt(sessionStorage.getItem('ht_drive_oauth_started') || '0', 10); } catch(e){}
-  if(!started || Date.now() - started < 90000) return;
+  if(!started || Date.now() - started < 20000) return;
   if(readCachedDriveToken_()){ hideDriveOAuthBusy_(); return; }
   hideDriveOAuthBusy_();
   try { sessionStorage.removeItem('ht_drive_oauth_started'); } catch(e2){}
@@ -1676,6 +1690,19 @@ function checkDriveOAuthStuck_(){
   if(errEl) errEl.textContent = '';
   if(typeof setAppToast === 'function'){
     setAppToast('Drive 로그인이 완료되지 않았어요.\n① Safari·Chrome에서 열기 ② Google Cloud에 리디렉션 URI 등록\n' + getDriveRedirectUri_(), { duration: 9000, variant: 'err' });
+  }
+}
+function checkDriveOAuthFailedReturn_(){
+  var started = 0;
+  try { started = parseInt(sessionStorage.getItem('ht_drive_oauth_started') || '0', 10); } catch(e){}
+  if(!started || readCachedDriveToken_()) return;
+  if(Date.now() - started > 120000) return;
+  var h = readDriveOAuthHash_();
+  if(h.indexOf('access_token=') !== -1 || h.indexOf('error=') !== -1) return;
+  hideDriveOAuthBusy_();
+  try { sessionStorage.removeItem('ht_drive_oauth_started'); } catch(e2){}
+  if(typeof setAppToast === 'function'){
+    setAppToast('Google 로그인이 끝나지 않았어요.\n다시 Drive를 누르고, 로그인 화면에서 계정 선택·허용까지 진행해 주세요.\n(Safari·Chrome 권장)', { duration: 9000, variant: 'err' });
   }
 }
 function ensureDriveTokenClient_(useRedirect){
@@ -1705,7 +1732,7 @@ function consumeDriveOAuthRedirect_(){
   showDriveOAuthBusy_('Drive 연동을 마무리하는 중…');
   var qs = h.indexOf('#') === 0 ? h.slice(1) : h;
   var params = new URLSearchParams(qs);
-  var cleanUrl = location.pathname + (location.search || '');
+  var cleanUrl = getPlannerCleanUrl_();
   try { sessionStorage.removeItem('ht_drive_oauth_hash'); } catch(e0){}
   if(params.get('error')){
     hideDriveOAuthBusy_();
@@ -1742,6 +1769,7 @@ function startDriveRedirectAuth_(prompt, pendingAction){
   if(isInAppBrowser_()){
     return Promise.reject(new Error('카카오톡·인스타 등 앱 안 브라우저에서는 Google 로그인이 안 될 수 있어요.\n링크를 복사해 Safari 또는 Chrome에서 열어 주세요.'));
   }
+  prompt = normalizeDriveOAuthPrompt_(prompt);
   if(pendingAction){
     try { sessionStorage.setItem('ht_drive_pending_action', pendingAction); } catch(e){}
   }
@@ -1768,16 +1796,20 @@ async function driveLoginInteractive_(pendingAction, promptMode){
   if(isInAppBrowser_()){
     throw new Error('카카오톡·인스타 등 앱 안 브라우저에서는 Google 로그인이 안 될 수 있어요.\n링크를 복사해 Safari 또는 Chrome에서 열어 주세요.');
   }
-  var pr = promptMode || 'consent';
+  var pr = normalizeDriveOAuthPrompt_(promptMode || 'consent');
   var errEl = document.getElementById('drive-modal-err');
   if(errEl) errEl.textContent = '';
+  if(!readCachedDriveToken_()){
+    await startDriveRedirectAuth_(pr, pendingAction);
+    return false;
+  }
   try {
     await getDriveAccessToken({ forcePrompt: pr, desktopPopup: true });
   } catch(popErr){
     var popMsg = String((popErr && popErr.message) || popErr || '');
-    var useRedirect = isDrivePreferRedirect_() && (
+    var useRedirect = (
       popMsg === 'POPUP_CLOSED' ||
-      /popup|blocked|closed|user_cancel|access_denied/i.test(popMsg)
+      /popup|blocked|closed|user_cancel|access_denied|popup_busy/i.test(popMsg)
     );
     if(!useRedirect) throw popErr;
     await startDriveRedirectAuth_(pr, pendingAction);
@@ -1861,6 +1893,13 @@ function onDriveTokenReceived(resp){
   }
 }
 function requestDriveTokenOnce_(promptMode){
+  if(driveOAuthPopupInFlight){
+    return Promise.reject(new Error('POPUP_BUSY'));
+  }
+  if(!readCachedDriveToken_()){
+    return Promise.reject(new Error('POPUP_CLOSED'));
+  }
+  driveOAuthPopupInFlight = true;
   return new Promise(function(resolve, reject){
     driveTokenWaiters.push({ resolve: resolve, reject: reject });
     loadGsiScript().then(function(){
@@ -1870,20 +1909,21 @@ function requestDriveTokenOnce_(promptMode){
       if(hint) req.hint = hint;
       window.__htDriveTokenClient.requestAccessToken(req);
     }).catch(function(e2){
+      driveOAuthPopupInFlight = false;
       flushDriveTokenWaiters(false, e2);
     });
+  }).finally(function(){
+    driveOAuthPopupInFlight = false;
   });
 }
 function requestDriveTokenChain_(promptModes){
   var modes = promptModes.slice();
   function attempt(i){
     if(i >= modes.length){
-      if(isDrivePreferRedirect_()){
-        return Promise.reject(new Error('모바일: 「Google 로그인 · 연동」 버튼을 눌러 주세요. (팝업 대신 로그인 페이지로 이동합니다)'));
-      }
-      return Promise.reject(new Error('Drive 로그인이 필요해요. Drive 메뉴에서 다시 연결해 주세요.'));
+      return Promise.reject(new Error('Drive 로그인이 필요해요. Drive 버튼을 눌러 주세요.'));
     }
     return requestDriveTokenOnce_(modes[i]).catch(function(err){
+      if(i >= modes.length - 1) return Promise.reject(err);
       return attempt(i + 1);
     });
   }
@@ -1893,18 +1933,20 @@ function getDriveAccessToken(options){
   options = options || {};
   var cached = readCachedDriveToken_();
   if(cached && !options.forcePrompt) return Promise.resolve(cached);
+  if(!cached){
+    return Promise.reject(new Error('Drive 로그인이 필요해요. 상단 Drive 버튼을 눌러 주세요.'));
+  }
   if(isDrivePreferRedirect_() && !options.desktopPopup){
     return Promise.reject(new Error('모바일: Drive 메뉴에서 「Google 로그인 · 연동」을 눌러 주세요.'));
   }
   var wantConsent = options.forcePrompt === true || options.forcePrompt === 'consent';
   var modes;
   if(wantConsent) modes = ['consent'];
-  else if(hasDriveConnection_()) modes = ['none', ''];
   else modes = [''];
   return requestDriveTokenChain_(modes);
 }
 function driveSilentWarmup_(){
-  if(location.protocol === 'file:' || !hasDriveConnection_()) return;
+  if(location.protocol === 'file:' || !hasDriveValidToken_()) return;
   getDriveAccessToken({}).then(function(tok){
     return fetchAndSaveDriveHintEmail_(tok);
   }).then(function(){
@@ -1915,7 +1957,7 @@ var driveRefreshTimer = null;
 function startDriveTokenRefreshLoop_(){
   if(driveRefreshTimer) return;
   driveRefreshTimer = setInterval(function(){
-    if(!hasDriveConnection_()) return;
+    if(!hasDriveValidToken_()) return;
     var exp = readDriveAuthExpiryMs();
     if(!exp) return;
     var left = exp - Date.now();
@@ -1972,18 +2014,8 @@ async function driveUploadNow(){
   });
   if(r.status === 401){
     try { localStorage.removeItem('ht_drive_oauth'); } catch(e401){}
-    token = await getDriveAccessToken({ forcePrompt: false });
-    fileId = await driveEnsureFileId(token);
-    uploadUrl = 'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media';
-    r = await fetch(uploadUrl, {
-      method: 'PATCH',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: body
-    });
-  }
-  if(r.status === 401){
     updateDriveButtonState();
-    throw new Error('Drive 인증을 새로 받아야 해요. Drive 메뉴에서 다시 로그인해 주세요.');
+    throw new Error('Drive 로그인이 만료됐어요. 상단 Drive 버튼을 눌러 다시 연결해 주세요.');
   }
   if(!r.ok){
     var tx = await r.text();
@@ -2097,7 +2129,7 @@ window.onDriveButtonClick = async function(){
   if(sub) sub.textContent = needsReauth ? '로그인 중…' : '동기화 중…';
   try {
     if(needsReauth){
-      var loginResult = await driveLoginInteractive_('upload', hasDriveConnection_() ? 'none' : 'consent');
+      var loginResult = await driveLoginInteractive_('upload', 'consent');
       if(loginResult === false) return;
       return;
     }
@@ -2207,8 +2239,8 @@ async function driveDownloadCloudPayload_(token){
   var r = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', { headers: { Authorization: 'Bearer ' + token } });
   if(r.status === 401){
     try { localStorage.removeItem('ht_drive_oauth'); } catch(e401){}
-    token = await getDriveAccessToken({ forcePrompt: false });
-    r = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media', { headers: { Authorization: 'Bearer ' + token } });
+    updateDriveButtonState();
+    throw new Error('Drive 로그인이 만료됐어요. 상단 Drive 버튼을 눌러 다시 연결해 주세요.');
   }
   var text = await r.text();
   if(!r.ok) throw new Error(text || 'Drive 다운로드 실패');
@@ -2278,8 +2310,12 @@ window.driveDisconnect = function(){
 
 // ── Init ──
 window.onload = () => {
+  var oauthHashEarly = readDriveOAuthHash_();
+  var pendingOAuth = oauthHashEarly.indexOf('access_token=') !== -1 || oauthHashEarly.indexOf('error=') !== -1;
+  if(!pendingOAuth) hideDriveOAuthBusy_();
   checkDriveOAuthStuck_();
   var oauthReturned = consumeDriveOAuthRedirect_();
+  if(!oauthReturned) checkDriveOAuthFailedReturn_();
   if(state.apiKey){ document.getElementById('api-modal').classList.remove('open'); updateApiBadge(); }
   updateDriveButtonState();
   renderTabs();
@@ -2288,9 +2324,15 @@ window.onload = () => {
     handleDrivePendingActionAfterRedirect_();
   }
   window.addEventListener('pageshow', function(ev){
-    if(!ev.persisted && !(location.hash || '').match(/access_token=|error=/)) return;
+    var hasOAuthHash = !!(location.hash || '').match(/access_token=|error=/);
+    try {
+      var saved = sessionStorage.getItem('ht_drive_oauth_hash') || '';
+      if(saved.indexOf('access_token=') !== -1 || saved.indexOf('error=') !== -1) hasOAuthHash = true;
+    } catch(e){}
+    if(!hasOAuthHash && !ev.persisted) return;
     var again = consumeDriveOAuthRedirect_();
     if(again) handleDrivePendingActionAfterRedirect_();
+    else if(!readCachedDriveToken_()) checkDriveOAuthFailedReturn_();
   });
   if('serviceWorker' in navigator && location.protocol !== 'file:'){
     navigator.serviceWorker.register('planner-sw.js').catch(function(e){ console.warn('[SW]', e); });

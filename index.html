@@ -536,6 +536,11 @@ resize: vertical; min-height: 2.5em;
 background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 12px; padding: 16px 14px;
 font-size: 13px; color: #166534; line-height: 1.65; margin-top: 8px;
 }
+.sheet-insta-pending-countdown {
+display: inline-flex; align-items: center; gap: 4px; margin: 8px 0 4px; padding: 5px 9px;
+border-radius: 999px; background: rgba(22, 101, 52, 0.08); color: #14532D;
+font-size: 12px; font-weight: 800;
+}
 .carousel-item {
 background: #F8F7F4; border-radius: 8px; padding: 10px 12px;
 margin-bottom: 6px; display: flex; gap: 10px;
@@ -2469,12 +2474,14 @@ window.onload = () => {
   syncAllSourcesIfNewer_('load');
   if(!oauthReturned) consumeDeepLinkFromHash_();
   else setTimeout(function(){ consumeDeepLinkFromHash_(); }, 300);
+  setTimeout(function(){ reconcileInstaPendingJobs_('load'); }, 600);
   scheduleDailyAutoDraft_();
   setInterval(function(){ maybeRunDailyAutoDraft_('interval'); }, 2 * 60 * 1000);
   setTimeout(function(){ maybeRunDailyAutoDraft_('load'); }, 4000);
   window.addEventListener('focus', function(){
     syncAllSourcesIfNewer_('focus');
     maybeRunDailyAutoDraft_('focus');
+    reconcileInstaPendingJobs_('focus');
   });
   let hiddenAt = 0;
   document.addEventListener('visibilitychange', function(){
@@ -2486,6 +2493,7 @@ window.onload = () => {
     syncAllSourcesIfNewer_('visibility');
     maybeRunDailyAutoDraft_('visibility');
     onReturnFromBackgroundForInsta_();
+    reconcileInstaPendingJobs_('visibility');
     if(hiddenAt){
       var sec = Math.floor((Date.now() - hiddenAt) / 1000);
       hiddenAt = 0;
@@ -2813,11 +2821,24 @@ async function callClaudePlanner_(prompt, options){
     },
     body: body
   };
+  var timeoutTimer = null;
+  if(options.timeoutMs && typeof AbortController !== 'undefined'){
+    var controller = new AbortController();
+    fetchOpts.signal = controller.signal;
+    timeoutTimer = setTimeout(function(){ controller.abort(); }, options.timeoutMs);
+  }
   if(options.keepalive) fetchOpts.keepalive = true;
-  var res = await fetch('https://api.anthropic.com/v1/messages', fetchOpts);
-  var data = await res.json();
-  if(!res.ok) throw new Error((data.error && data.error.message) ? data.error.message : ('HTTP ' + res.status));
-  return (data.content || []).filter(function(b){ return b.type === 'text'; }).map(function(b){ return b.text; }).join('');
+  try {
+    var res = await fetch('https://api.anthropic.com/v1/messages', fetchOpts);
+    var data = await res.json();
+    if(!res.ok) throw new Error((data.error && data.error.message) ? data.error.message : ('HTTP ' + res.status));
+    return (data.content || []).filter(function(b){ return b.type === 'text'; }).map(function(b){ return b.text; }).join('');
+  } catch(e){
+    if(e && e.name === 'AbortError') throw new Error('응답 시간이 길어져 인스타 캡션 생성을 중단했어요. 다시 시도해 주세요.');
+    throw e;
+  } finally {
+    if(timeoutTimer) clearTimeout(timeoutTimer);
+  }
 }
 
 async function generateTopicFromKeywords_(catId, keywords, imagePayload){
@@ -3223,14 +3244,29 @@ function scheduleDailyAutoDraft_(){
     scheduleDailyAutoDraft_();
   }, msUntilNextDailyAuto_());
 }
-function openDetailFromDeepLink_(draftId, catId){
+function normalizeSheetTabForCategory_(tab, catId){
+  tab = String(tab || '').toLowerCase();
+  if(isThreadCategory(catId)) return tab === 'thread' ? 'thread' : '';
+  if(isHeiljagyaeCategory(catId)) return (tab === 'community' || tab === 'images') ? tab : '';
+  if(isBlogInstaCategory(catId)) return (tab === 'blog' || tab === 'insta' || tab === 'images') ? tab : '';
+  return '';
+}
+function setOpenDetailHash_(draftId, catId, tab){
+  try {
+    var h = 'open/' + encodeURIComponent(draftId) + '/' + catId;
+    var safeTab = normalizeSheetTabForCategory_(tab, catId);
+    if(safeTab) h += '/' + safeTab;
+    location.hash = h;
+  } catch(e){}
+}
+function openDetailFromDeepLink_(draftId, catId, tab){
   if(catId != null && state.currentCat !== catId){
     state.currentCat = catId;
     renderTabs();
   }
   renderMain();
-  openDetail(draftId, catId);
-  try { location.hash = 'open/' + encodeURIComponent(draftId) + '/' + catId; } catch(e){}
+  openDetail(draftId, catId, tab);
+  setOpenDetailHash_(draftId, catId, tab);
 }
 function openNextPublishRecommendationFromEntry_(fallbackDraftId, fallbackCatId){
   var rec = getNextPublishRecommendation();
@@ -3250,10 +3286,15 @@ function openNextPublishRecommendationFromEntry_(fallbackDraftId, fallbackCatId)
 }
 function consumeDeepLinkFromHash_(){
   var h = (location.hash || '').replace(/^#/, '');
-  var m = h.match(/^open\/([^/]+)\/(\d+)$/);
+  var m = h.match(/^open\/([^/]+)\/(\d+)(?:\/([a-z]+))?$/);
   if(!m) return;
   var draftId = decodeURIComponent(m[1]);
   var catId = parseInt(m[2], 10);
+  var tab = normalizeSheetTabForCategory_(m[3], catId);
+  if(tab){
+    openDetailFromDeepLink_(draftId, catId, tab);
+    return;
+  }
   if(draftIsPublished_(draftId)){
     openNextPublishRecommendationFromEntry_(draftId, catId);
     return;
@@ -3341,6 +3382,9 @@ function openDetail(draftId, catId) {
   state.selectedId = draftId;
   state.selectedCatId = catId;
   state.activeTab = isThreadCategory(catId) ? 'thread' : (isHeiljagyaeCategory(catId) ? 'community' : 'blog');
+  if(arguments.length > 2){
+    state.activeTab = normalizeSheetTabForCategory_(arguments[2], catId) || state.activeTab;
+  }
   document.getElementById('sheet-title').textContent = draft.topic;
   const pub = state.published[draftId];
   const content = pub?.content || state.generatedOnly[draftId];
@@ -3399,8 +3443,7 @@ function renderSheetContent(content) {
   } else if(tab==='insta'){
     const ig = content.insta;
     if(content.instaPending || instaBgByDraft[state.selectedId]){
-      bodyHTML = tabsHTML +
-        '<div class="sheet-insta-pending"><strong>인스타 캡션을 만들고 있어요…</strong><br>블로그 앱에서 글을 올리는 동안 백그라운드에서 생성합니다. 완료되면 알림·토스트로 알려드려요.</div>';
+      bodyHTML = tabsHTML + buildInstaPendingBox_(content, state.selectedId);
     } else if(!ig || (!ig.hook && !ig.caption && !(ig.hashtags && ig.hashtags.length))){
       bodyHTML = tabsHTML +
         '<div class="sheet-insta-pending"><strong>인스타 캡션은 아직 없어요.</strong><br>블로그 탭에서 <strong>발행완료</strong>를 누르거나, 블로그 초안이 있으면 하단 <strong>재생성</strong>으로 만들 수 있어요.</div>';
@@ -3745,6 +3788,63 @@ function tryNotifyInstaReady_(topic, draftId, catId, ok, errMsg){
 
 var instaBgByDraft = {};
 var instaBgDoneWhileHidden_ = {};
+const INSTA_BG_ESTIMATE_MS = 45000;
+const INSTA_BG_TIMEOUT_MS = 90000;
+const INSTA_PENDING_RESTART_WINDOW_MS = 30 * 60 * 1000;
+
+function getInstaBgJob_(draftId){
+  var job = instaBgByDraft[draftId];
+  if(!job) return null;
+  if(job === true) return { startedMs: Date.now(), endMs: Date.now() + INSTA_BG_ESTIMATE_MS };
+  return job;
+}
+function setInstaPendingMeta_(content, draftId, catId, topic, startedMs, endMs){
+  if(!content) return;
+  content.instaPending = true;
+  content.instaPendingStartedAt = startedMs;
+  content.instaPendingEndMs = endMs;
+  content.instaPendingTopic = topic || '';
+  content.instaPendingCatId = catId;
+}
+function clearInstaPendingMeta_(content){
+  if(!content) return;
+  delete content.instaPending;
+  delete content.instaPendingStartedAt;
+  delete content.instaPendingEndMs;
+  delete content.instaPendingTopic;
+  delete content.instaPendingCatId;
+}
+function getInstaPendingEndMs_(content, draftId){
+  var job = getInstaBgJob_(draftId);
+  if(job && job.endMs) return job.endMs;
+  var endMs = parseInt(content && content.instaPendingEndMs, 10);
+  if(endMs) return endMs;
+  var startedMs = parseInt(content && content.instaPendingStartedAt, 10);
+  return startedMs ? startedMs + INSTA_BG_ESTIMATE_MS : Date.now() + INSTA_BG_ESTIMATE_MS;
+}
+function getInstaPendingCountdownText_(content, draftId){
+  var activeJob = !!getInstaBgJob_(draftId);
+  var leftSec = (getInstaPendingEndMs_(content, draftId) - Date.now()) / 1000;
+  if(leftSec > 0) return '예상 남은 시간 약 ' + formatRoughCountdown(leftSec);
+  if(activeJob) return '예상 시간을 지나 마무리 중이에요';
+  return '브라우저 복귀 후 생성 상태를 다시 확인하고 있어요';
+}
+function buildInstaPendingBox_(content, draftId){
+  var endMs = getInstaPendingEndMs_(content, draftId);
+  return '<div class="sheet-insta-pending">' +
+    '<strong>인스타 캡션을 만들고 있어요…</strong><br>' +
+    '<span class="sheet-insta-pending-countdown" id="insta-pending-countdown" data-end-ms="' + endMs + '">' +
+    escapeHtml(getInstaPendingCountdownText_(content, draftId)) +
+    '</span><br>' +
+    '블로그 앱에서 글을 올리는 동안 백그라운드에서 생성합니다. 완료되면 이 글의 인스타 탭으로 바로 보여드려요.</div>';
+}
+function updateInstaPendingCountdown_(){
+  var el = document.getElementById('insta-pending-countdown');
+  if(!el || !state.selectedId) return;
+  var content = getDraftContent_(state.selectedId);
+  if(!content || !content.instaPending) return;
+  el.textContent = getInstaPendingCountdownText_(content, state.selectedId);
+}
 
 function showInstaContentWhenReady_(draftId, catId){
   var content = getDraftContent_(draftId);
@@ -3753,14 +3853,13 @@ function showInstaContentWhenReady_(draftId, catId){
   var sheetOpen = ov && ov.classList.contains('open');
   state.selectedCatId = catId;
   state.activeTab = 'insta';
+  setOpenDetailHash_(draftId, catId, 'insta');
   if(sheetOpen && state.selectedId === draftId){
     renderSheetContent(content);
     return;
   }
   if(state.selectedId === draftId){
-    openDetail(draftId, catId);
-    state.activeTab = 'insta';
-    renderSheetContent(content);
+    openDetail(draftId, catId, 'insta');
   }
 }
 
@@ -3784,19 +3883,23 @@ function onReturnFromBackgroundForInsta_(){
   renderMain();
 }
 
-function enqueueInstaFromBlog_(draftId, catId, topic, blog){
+function enqueueInstaFromBlog_(draftId, catId, topic, blog, opts){
+  opts = opts || {};
+  var retryCount = opts.retryCount || 0;
   if(instaBgByDraft[draftId]) return;
   if(!state.apiKey) return;
-  instaBgByDraft[draftId] = true;
+  var startedMs = Date.now();
+  var endMs = startedMs + INSTA_BG_ESTIMATE_MS;
+  instaBgByDraft[draftId] = { startedMs: startedMs, endMs: endMs, topic: topic || '', catId: catId };
   beginGenIndicator();
   var blogSnapshot = JSON.parse(JSON.stringify(blog || {}));
   var label = String(topic || '인스타');
   if(label.length > 34) label = label.slice(0, 34) + '…';
-  genActiveJob = { topic: label, endMs: Date.now() + 28000, kind: 'insta' };
+  genActiveJob = { topic: label, endMs: endMs, kind: 'insta' };
   updateGenIndicator();
   var pendingContent = getDraftContent_(draftId);
   if(pendingContent){
-    pendingContent.instaPending = true;
+    setInstaPendingMeta_(pendingContent, draftId, catId, topic, startedMs, endMs);
     persistDraftContent_(draftId, pendingContent);
     if(state.selectedId === draftId){
       var ovPending = document.getElementById('detail-overlay');
@@ -3812,7 +3915,7 @@ function enqueueInstaFromBlog_(draftId, catId, topic, blog){
       var content = getDraftContent_(draftId);
       if(content){
         content.insta = insta;
-        delete content.instaPending;
+        clearInstaPendingMeta_(content);
         persistDraftContent_(draftId, content);
       }
       renderTabs();
@@ -3826,9 +3929,17 @@ function enqueueInstaFromBlog_(draftId, catId, topic, blog){
       }
     } catch(err){
       console.warn('[인스타 백그라운드]', err);
+      var msg = (err && err.message) ? err.message : String(err);
+      var retryable = /응답 시간이|Failed to fetch|NetworkError|Load failed|network/i.test(msg);
+      var shouldRetry = !opts.resume && retryCount < 1 && retryable;
       var failContent = getDraftContent_(draftId);
       if(failContent){
-        delete failContent.instaPending;
+        if(document.hidden || shouldRetry){
+          var retryStartMs = Date.now();
+          setInstaPendingMeta_(failContent, draftId, catId, topic, retryStartMs, retryStartMs + INSTA_BG_ESTIMATE_MS);
+        } else {
+          clearInstaPendingMeta_(failContent);
+        }
         persistDraftContent_(draftId, failContent);
         if(state.selectedId === draftId){
           var ovFail = document.getElementById('detail-overlay');
@@ -3837,10 +3948,18 @@ function enqueueInstaFromBlog_(draftId, catId, topic, blog){
           }
         }
       }
-      var msg = (err && err.message) ? err.message : String(err);
-      tryNotifyInstaReady_(topic, draftId, catId, false, msg);
-      if(!document.hidden){
-        setAppToast('인스타 캡션 생성에 실패했어요.\n' + msg, { duration: 9000, variant: 'err' });
+      if(!shouldRetry && !document.hidden){
+        tryNotifyInstaReady_(topic, draftId, catId, false, msg);
+      }
+      if(shouldRetry){
+        setTimeout(function(){
+          enqueueInstaFromBlog_(draftId, catId, topic, blogSnapshot, { resume: true, retryCount: retryCount + 1 });
+        }, 1200);
+        if(!document.hidden){
+          setAppToast('인스타 캡션 생성이 끊겨 다시 시도하고 있어요.', { duration: 5000, variant: 'ok' });
+        }
+      } else if(!document.hidden){
+        setAppToast((opts.resume ? '중단됐던 인스타 캡션 재시도가 실패했어요.\n' : '인스타 캡션 생성에 실패했어요.\n') + msg, { duration: 9000, variant: 'err' });
       }
     } finally {
       delete instaBgByDraft[draftId];
@@ -3848,6 +3967,51 @@ function enqueueInstaFromBlog_(draftId, catId, topic, blog){
       endGenIndicator();
     }
   })();
+}
+
+function reconcileInstaPendingJobs_(reason){
+  if(!state.apiKey || genActiveJob || genPendingCount > 0) return false;
+  var now = Date.now();
+  var candidates = [];
+  (CATEGORIES || []).forEach(function(cat){
+    (cat.drafts || []).forEach(function(d){
+      var content = getDraftContent_(d.id);
+      if(!content || !content.instaPending || content.insta || !content.blog || instaBgByDraft[d.id]) return;
+      var startedMs = parseInt(content.instaPendingStartedAt, 10) || 0;
+      if(startedMs && now - startedMs > INSTA_PENDING_RESTART_WINDOW_MS){
+        clearInstaPendingMeta_(content);
+        persistDraftContent_(d.id, content);
+        return;
+      }
+      candidates.push({
+        draftId: d.id,
+        catId: cat.id,
+        topic: d.topic || content.instaPendingTopic || '',
+        blog: content.blog,
+        startedMs: startedMs
+      });
+    });
+  });
+  if(!candidates.length) return false;
+  candidates.sort(function(a, b){
+    if(a.draftId === state.selectedId) return -1;
+    if(b.draftId === state.selectedId) return 1;
+    return (b.startedMs || 0) - (a.startedMs || 0);
+  });
+  var job = candidates[0];
+  enqueueInstaFromBlog_(job.draftId, job.catId, job.topic, job.blog, { resume: true });
+  if(state.selectedId === job.draftId){
+    state.selectedCatId = job.catId;
+    state.activeTab = 'insta';
+    setOpenDetailHash_(job.draftId, job.catId, 'insta');
+    var content = getDraftContent_(job.draftId);
+    var ov = document.getElementById('detail-overlay');
+    if(content && ov && ov.classList.contains('open')) renderSheetContent(content);
+  }
+  if(reason && reason !== 'load' && typeof setAppToast === 'function'){
+    setAppToast('중단됐던 인스타 캡션 생성을 다시 이어서 시작했어요.', { duration: 4500, variant: 'ok' });
+  }
+  return true;
 }
 
 window.openExternalInstagram = function(){
@@ -4300,7 +4464,7 @@ async function generateInstaFromBlog_(catId, blog, topic){
     'JSON만:\n{"insta":{"hook":"...","caption":"...","carousel":[],"hashtags":["t1","t2"]}}\n\n' +
     '[블로그 원문]\n' + buildBlogSourceText_(blog);
 
-  var text = await callClaudePlanner_(prompt, { maxTokens: 2200, keepalive: true });
+  var text = await callClaudePlanner_(prompt, { maxTokens: 2200, timeoutMs: INSTA_BG_TIMEOUT_MS });
   var raw = text.replace(/^```json\s*/i, '').replace(/```\s*$/g, '').trim();
   var parsed = JSON.parse(raw);
   var ig = parsed.insta || parsed;
@@ -4361,13 +4525,15 @@ window.onSheetPublishComplete = async function(){
       var draft = cat && cat.drafts.find(function(d){ return d.id === draftId; });
       content = getDraftContent_(draftId);
       ensureNotifyForInstaBg_();
-      copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog));
-      closeSheet();
+      state.activeTab = 'insta';
+      setOpenDetailHash_(draftId, catId, 'insta');
+      enqueueInstaFromBlog_(draftId, catId, draft ? draft.topic : '', content.blog);
+      renderSheetContent(getDraftContent_(draftId) || content);
       renderTabs();
       renderMain();
-      enqueueInstaFromBlog_(draftId, catId, draft ? draft.topic : '', content.blog);
+      copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog));
       afterTabPublishSaved_(saveResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
-      setAppToast('블로그 저장 · 복사 · 앱 이동\n인스타 캡션은 백그라운드에서 만들고 있어요.', { duration: 5500, variant: 'ok' });
+      setAppToast('블로그 저장 · 복사 · 앱 이동\n돌아오면 이 글의 인스타 탭을 바로 보여드려요.', { duration: 5500, variant: 'ok' });
     } catch(err){
       console.warn('[블로그 발행]', err);
       setAppToast(((err && err.message) || String(err)), { duration: 9000, variant: 'err' });
@@ -4751,6 +4917,9 @@ window.switchTab = function(t){
   state.activeTab = t;
   const content = getDraftContent_(state.selectedId);
   if(content) renderSheetContent(content);
+  if(state.selectedId && state.selectedCatId != null){
+    setOpenDetailHash_(state.selectedId, state.selectedCatId, t);
+  }
 };
 
 function sheetCloseActionsPrefix_(){
@@ -5654,6 +5823,7 @@ function endGenIndicator() {
   if (genPendingCount === 0 && !genActiveJob) stopGenUiTimer();
 }
 function updateGenIndicator() {
+  updateInstaPendingCountdown_();
   var el = document.getElementById('gen-status-bar');
   if (!el) return;
   var busy = genPendingCount > 0 || genActiveJob;

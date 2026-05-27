@@ -22,50 +22,62 @@ body { font-family: 'Noto Sans KR', sans-serif; background: #F8F7F4; color: #1A1
 background: #1A1A1A;
 padding: 14px 20px;
 display: flex; align-items: center; justify-content: space-between;
+flex-wrap: nowrap; gap: 10px;
 }
 .planner-head-left {
   display: flex; align-items: center; gap: 10px;
-  flex-shrink: 0;
+  flex: 1 1 auto;
   min-width: 0;
 }
-.planner-head-left > div { min-width: 0; }
+.planner-head-left > div { min-width: 0; overflow: hidden; }
 .logo-icon { display: none; }
 .logo-text {
   color: #fff; font-weight: 700; font-size: 15px; letter-spacing: -.3px;
   white-space: nowrap;
   word-break: keep-all;
   line-height: 1.25;
+  overflow: hidden; text-overflow: ellipsis;
 }
 .logo-sub {
   color: #9CA3AF; font-size: 11px; margin-top: 1px;
   white-space: nowrap;
   word-break: keep-all;
   line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis;
 }
-.planner-head-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.planner-head-right {
+  display: flex; gap: 6px; align-items: center; flex-wrap: nowrap;
+  justify-content: flex-end; flex-shrink: 0;
+}
 @media (max-width: 720px) {
   .planner-head {
-    flex-wrap: wrap;
-    align-items: center;
-    row-gap: 10px;
-    padding: 12px 14px;
+    padding: 10px 12px;
+    gap: 8px;
   }
-  .planner-head-left {
-    flex: 1 1 auto;
-    min-width: min-content;
-    max-width: 100%;
-  }
-  .planner-head-right {
-    flex: 1 1 100%;
-    justify-content: flex-start;
-    gap: 6px;
-  }
+  .logo-text { font-size: 14px; }
+  .logo-sub { font-size: 10px; }
+  .planner-head-right { gap: 5px; }
   .planner-head-right .api-badge,
   .planner-head-right .btn-prompt-settings,
   .planner-head-right .btn-drive-sync,
   .planner-head-right .btn-add {
     font-size: 10px;
-    padding: 5px 8px;
+    padding: 5px 7px;
+  }
+  .btn-drive-sync { min-width: 0; padding: 4px 7px; }
+  .drive-btn-main { font-size: 10px; gap: 4px; }
+  .drive-btn-sub { font-size: 8px; max-width: 72px; }
+  .btn-add { padding: 5px 10px; }
+}
+@media (max-width: 340px) {
+  .planner-head {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .planner-head-right {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 .api-badge {
@@ -499,11 +511,12 @@ font-size: 13px; color: #374151; display: flex; gap: 8px;
 .outline-num { color: #2DD4BF; font-weight: 800; min-width: 18px; }
 .sheet-edit {
 width: 100%; box-sizing: border-box; background: #F8F7F4; border: 1px solid #E5E7EB; border-radius: 10px;
-padding: 12px 14px; font-size: 13px; line-height: 1.75; color: #374151; font-family: inherit;
+padding: 12px 14px; font-size: 16px; line-height: 1.75; color: #374151; font-family: inherit;
 resize: vertical; min-height: 2.5em;
+-webkit-text-size-adjust: 100%;
 }
 .sheet-edit:focus { outline: none; border-color: #2DD4BF; background: #fff; }
-.sheet-edit-title { font-size: 15px; font-weight: 700; color: #1A1A1A; }
+.sheet-edit-title { font-size: 16px; font-weight: 700; color: #1A1A1A; }
 .sheet-insta-pending {
 background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 12px; padding: 16px 14px;
 font-size: 13px; color: #166534; line-height: 1.65; margin-top: 8px;
@@ -638,7 +651,7 @@ transform: translateY(100%); transition: transform 0.3s;
 .publish-final-textarea {
 width: 100%; min-height: 220px; max-height: 50vh;
 padding: 12px 14px; border-radius: 12px; border: 1.5px solid #E5E7EB;
-font-size: 13px; line-height: 1.65; font-family: inherit; resize: vertical;
+font-size: 16px; line-height: 1.65; font-family: inherit; resize: vertical;
 }
 .publish-final-textarea:focus { border-color: #16A34A; outline: none; }
 .publish-field-section { margin-top: 14px; }
@@ -922,7 +935,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       <span id="api-status">API 키 설정</span>
     </button>
     <button class="btn-prompt-settings" onclick="openPromptModal()">프롬프트</button>
-    <button type="button" class="btn-drive-sync" id="btn-drive-sync" onclick="openDriveModal()">
+    <button type="button" class="btn-drive-sync" id="btn-drive-sync" onclick="onDriveButtonClick()">
       <span class="drive-btn-main" id="drive-btn-main"><span class="drive-dot" id="drive-dot"></span><span id="drive-status">Drive</span></span>
       <span class="drive-btn-sub" id="drive-btn-sub">연동 안 됨</span>
     </button>
@@ -2039,8 +2052,46 @@ function updateDriveButtonState(){
   if(dot) dot.classList.add(state === 'soon' ? 'warn' : 'on');
   if(status) status.textContent = 'Drive';
   if(sub) sub.textContent = lastFmt ? ('동기화됨 · ' + lastFmt) : '동기화 대기';
-  b.title = 'Drive 연결됨' + (lastFmt ? (' — 마지막 동기화 ' + lastFmt) : ' — 아직 동기화 기록 없음');
+  b.title = lastFmt
+    ? ('Drive 연결됨 — 마지막 동기화 ' + lastFmt)
+    : 'Drive 연결됨 — 탭하면 지금 동기화';
+  if(!lastFmt) b.setAttribute('data-drive-sync-pending', '1');
+  else b.removeAttribute('data-drive-sync-pending');
 }
+function isDriveSyncPending_(){
+  if(!hasDriveConnection_()) return false;
+  try { return !localStorage.getItem(DRIVE_LAST_SYNC_KEY); } catch(e){ return false; }
+}
+window.onDriveButtonClick = async function(){
+  if(location.protocol === 'file:'){
+    alert('Drive 연동은 https 또는 http로 이 페이지를 연 뒤에만 동작합니다.');
+    return;
+  }
+  if(!isDriveSyncPending_()){
+    openDriveModal();
+    return;
+  }
+  var btn = document.getElementById('btn-drive-sync');
+  var sub = document.getElementById('drive-btn-sub');
+  if(btn) btn.disabled = true;
+  if(sub) sub.textContent = '동기화 중…';
+  try {
+    await driveUploadNow();
+    if(typeof setAppToast === 'function'){
+      setAppToast('Drive에 동기화했어요.', { duration: 4200, variant: 'ok' });
+    }
+  } catch(err){
+    var msg = (err && err.message) ? err.message : String(err);
+    if(typeof setAppToast === 'function'){
+      setAppToast('Drive 동기화에 실패했어요.\n' + msg, { duration: 8000, variant: 'err' });
+    } else {
+      alert(msg);
+    }
+  } finally {
+    if(btn) btn.disabled = false;
+    updateDriveButtonState();
+  }
+};
 function markDriveSyncOk_(){
   try { localStorage.setItem(DRIVE_LAST_SYNC_KEY, new Date().toISOString()); } catch(e){}
   updateDriveButtonState();
@@ -3156,15 +3207,14 @@ function renderSheetContent(content) {
         '<div class="sheet-insta-pending"><strong>인스타 캡션을 만들고 있어요…</strong><br>블로그 앱에서 글을 올리는 동안 백그라운드에서 생성합니다. 완료되면 알림·토스트로 알려드려요.</div>';
     } else if(!ig || (!ig.hook && !ig.caption && !(ig.hashtags && ig.hashtags.length))){
       bodyHTML = tabsHTML +
-        '<div class="sheet-insta-pending"><strong>인스타 캡션은 아직 없어요.</strong><br>블로그 탭에서 글을 수정한 뒤 <strong>발행완료</strong>를 누르면, 블로그 핵심·후킹만 담은 짧은 인스타 글이 생성돼요.</div>' +
-        '<button type="button" class="btn-gen-big" onclick="switchTab(\'blog\')" style="width:100%;margin-top:12px;">블로그 탭으로</button>';
+        '<div class="sheet-insta-pending"><strong>인스타 캡션은 아직 없어요.</strong><br>블로그 탭에서 <strong>발행완료</strong>를 누르거나, 블로그 초안이 있으면 하단 <strong>재생성</strong>으로 만들 수 있어요.</div>';
     } else {
       var instaCaption = String(ig.caption || '').trim() || getInstaCaptionBodyMerged_(ig);
       bodyHTML = tabsHTML +
         sheetEditField_('첫 줄 후킹', 'sheet-insta-hook', ig.hook, { rows: 2, title: true }) +
         sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10 }) +
         sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).map(function(h){ return String(h).replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분' }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">수정한 뒤 <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동해요.</p>';
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">수정한 뒤 <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동해요. <strong>재생성</strong>은 블로그 글 기준으로 인스타만 다시 만듭니다.</p>';
     }
   } else if(tab==='notebooklm'){
     const nl = content.notebookLM;
@@ -5713,7 +5763,32 @@ window.genContent = async function(){
     if(typeof setAppToast === 'function') setAppToast('먼저 초안 카드를 선택해 주세요.', { duration: 3500, variant: 'err' });
     return;
   }
-  await window.enqueueDraftGeneration(state.selectedCatId, state.selectedId, { userInitiated: true });
+  var draftId = state.selectedId;
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  var tab = state.activeTab;
+
+  if(isBlogInstaCategory(catId) && tab === 'insta'){
+    if(!state.apiKey){
+      openApiModal();
+      return;
+    }
+    if(instaBgByDraft[draftId]){
+      setAppToast('인스타 캡션을 만들고 있어요.\n잠시만 기다려 주세요.', { duration: 4500, variant: 'ok' });
+      return;
+    }
+    var igContent = getDraftContent_(draftId);
+    if(!igContent || !igContent.blog || !igContent.blog.title || !igContent.blog.draft){
+      setAppToast('블로그 초안이 없어요.\n블로그·이미지 탭에서 먼저 초안을 생성해 주세요.', { duration: 5000, variant: 'err' });
+      return;
+    }
+    var cat = CATEGORIES[catId];
+    var draft = cat && cat.drafts.find(function(d){ return d.id === draftId; });
+    enqueueInstaFromBlog_(draftId, catId, draft ? draft.topic : '', igContent.blog);
+    setAppToast('블로그 글 기준으로 인스타 캡션을 다시 만들고 있어요…', { duration: 5000, variant: 'ok' });
+    return;
+  }
+
+  await window.enqueueDraftGeneration(catId, draftId, { userInitiated: true });
 };
 </script>
 

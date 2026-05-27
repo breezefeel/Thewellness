@@ -2037,7 +2037,7 @@ function updateDriveButtonState(){
   if(exp && exp > now && exp - now < 8 * 60 * 1000) state = 'soon';
   if(state === 'soon') b.classList.add('warn');
   if(dot) dot.classList.add(state === 'soon' ? 'warn' : 'on');
-  if(status) status.textContent = 'Drive 연결됨';
+  if(status) status.textContent = 'Drive';
   if(sub) sub.textContent = lastFmt ? ('동기화됨 · ' + lastFmt) : '동기화 대기';
   b.title = 'Drive 연결됨' + (lastFmt ? (' — 마지막 동기화 ' + lastFmt) : ' — 아직 동기화 기록 없음');
 }
@@ -2309,7 +2309,7 @@ function openApiModal() {
 }
 function updateApiBadge() {
   document.getElementById('api-dot').className = 'api-dot' + (state.apiKey ? ' on' : '');
-  document.getElementById('api-status').textContent = state.apiKey ? 'API 연결됨' : 'API 키 설정';
+  document.getElementById('api-status').textContent = state.apiKey ? 'API' : 'API 키 설정';
 }
 
 // ── Tabs ──

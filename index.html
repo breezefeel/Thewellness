@@ -3159,7 +3159,7 @@ function renderSheetContent(content) {
         sheetEditField_('첫 줄 후킹', 'sheet-insta-hook', ig.hook, { rows: 2, title: true }) +
         sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10 }) +
         sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).map(function(h){ return String(h).replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분' }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">수정한 뒤 <strong>발행완료</strong>를 누르면 인스타 최종본이 저장돼요.</p>';
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">수정한 뒤 <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동해요.</p>';
     }
   } else if(tab==='notebooklm'){
     const nl = content.notebookLM;
@@ -3393,6 +3393,56 @@ function copyAndOpenNaverBlog_(text){
     open();
   }
 }
+
+function copyAndOpenInstagram_(text){
+  var open = function(){ openExternalInstagramForPost_(); };
+  if(!text){ open(); return; }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(open).catch(open);
+  } else {
+    open();
+  }
+}
+
+window.openExternalInstagramForPost_ = function(){
+  const u = EXT_INSTAGRAM_WEB;
+  if(!isPhoneOrTablet()){
+    window.open(u, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  if(isAndroidDevice()){
+    window.location.href =
+      'intent:#Intent;package=com.instagram.android;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end';
+    setTimeout(function(){
+      if(document.hidden) return;
+      window.location.href =
+        'intent://www.instagram.com/#Intent;scheme=https;package=com.instagram.android;S.browser_fallback_url=' +
+        encodeURIComponent(u) + ';end';
+    }, 450);
+    setTimeout(function(){
+      if(document.hidden) return;
+      window.open(u, '_blank', 'noopener,noreferrer');
+    }, 1100);
+    return;
+  }
+  if(isIOSLikeDevice()){
+    window.location.href = 'instagram://camera';
+    setTimeout(function(){
+      if(document.hidden) return;
+      window.location.href = 'instagram://app';
+    }, 400);
+    setTimeout(function(){
+      if(document.hidden) return;
+      window.location.href = u;
+    }, 900);
+    setTimeout(function(){
+      if(document.hidden) return;
+      window.open(u, '_blank', 'noopener,noreferrer');
+    }, 1400);
+    return;
+  }
+  openExternalInstagram();
+};
 
 function tryNotifyInstaReady_(topic, draftId, catId, ok, errMsg){
   ok = ok !== false;
@@ -4028,11 +4078,13 @@ window.onSheetPublishComplete = async function(){
     if(pubBtn){ pubBtn.disabled = true; pubBtn.textContent = '저장 중…'; }
     try {
       var instaResult = commitSheetTabPublish_(draftId, catId, 'insta');
-      renderSheetContent(getDraftContent_(draftId));
+      var savedContent = getDraftContent_(draftId);
+      copyAndOpenInstagram_(savedContent && savedContent.insta ? getInstaFullPasteText_(savedContent.insta) : '');
+      closeSheet();
       renderTabs();
       renderMain();
-      await afterTabPublishSaved_(instaResult, draftId);
-      setAppToast('인스타 최종본이 저장됐어요.', { duration: 4200, variant: 'ok' });
+      afterTabPublishSaved_(instaResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
+      setAppToast('인스타 저장 · 복사 · 앱 이동\n캡션 입력란에 붙여넣기 하세요.', { duration: 5500, variant: 'ok' });
     } catch(err){
       setAppToast(((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
     } finally {

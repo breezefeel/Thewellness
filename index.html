@@ -4,6 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <title>콘텐츠 플래너</title>
 <script>
 (function(){
@@ -31,6 +32,10 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Noto Sans KR', sans-serif; background: #F8F7F4; color: #1A1A1A; min-height: 100vh; }
+img.ht-img-fallback {
+  background: linear-gradient(135deg, #EEF2FF, #F8F7F4);
+  object-fit: contain !important;
+}
 
 /* ── Planner header (scrolls away) ── */
 .planner-head {
@@ -2431,8 +2436,138 @@ window.driveDisconnect = function(){
   if(typeof setAppToast === 'function') setAppToast('Drive에서 로그아웃했어요.', { duration: 3500, variant: 'ok' });
 };
 
+// ── Image loading resilience ──
+const IMAGE_FALLBACK_SVG_ = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#EEF2FF"/><stop offset="1" stop-color="#F8F7F4"/></linearGradient></defs><rect width="640" height="420" rx="36" fill="url(#g)"/><g fill="none" stroke="#94A3B8" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"><rect x="190" y="120" width="260" height="180" rx="22"/><path d="M225 260l62-62 47 47 31-31 50 50"/><circle cx="378" cy="166" r="20"/></g><text x="320" y="344" fill="#64748B" font-family="Arial, sans-serif" font-size="26" font-weight="700" text-anchor="middle">Image unavailable</text></svg>';
+const IMAGE_FALLBACK_SRC_ = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(IMAGE_FALLBACK_SVG_);
+
+function getImageSource_(img){
+  return img ? (img.getAttribute('src') || img.currentSrc || img.getAttribute('data-src') || '') : '';
+}
+
+function isHttpImageSource_(src){
+  try {
+    const u = new URL(String(src || ''), location.href);
+    return /^https?:$/i.test(u.protocol);
+  } catch(e){
+    return false;
+  }
+}
+
+function shouldCacheBustImage_(src, retryCount){
+  try {
+    const u = new URL(src, location.href);
+    if(!/^https?:$/i.test(u.protocol)) return false;
+    if(/(^|[?&])(X-Amz-Signature|Expires|Signature|Policy|Key-Pair-Id)=/i.test(u.search)) return false;
+    const h = u.hostname.toLowerCase();
+    if(h === location.hostname) return true;
+    if(/(^|\.)pstatic\.net$/.test(h) || /(^|\.)naver\.com$/.test(h)) return true;
+    return retryCount > 1 && u.search.length < 160;
+  } catch(e){
+    return false;
+  }
+}
+
+function buildRetryImageSource_(src, retryCount){
+  if(!isHttpImageSource_(src)) return '';
+  try {
+    const u = new URL(src, location.href);
+    if(u.protocol === 'http:'){
+      u.protocol = 'https:';
+      return u.href;
+    }
+    if(shouldCacheBustImage_(u.href, retryCount)){
+      u.searchParams.set('_ht_img_retry', String(retryCount));
+      return u.href;
+    }
+  } catch(e){}
+  return src;
+}
+
+function applyImageFallback_(img){
+  if(!img || img.getAttribute('data-img-fallback-applied') === '1') return;
+  img.setAttribute('data-img-fallback-applied', '1');
+  img.classList.add('ht-img-fallback');
+  if(!img.getAttribute('alt')) img.setAttribute('alt', '이미지를 불러오지 못했어요');
+  img.removeAttribute('srcset');
+  img.src = IMAGE_FALLBACK_SRC_;
+}
+
+function onPlannerImageLoad_(){
+  if((this.getAttribute('src') || '') === IMAGE_FALLBACK_SRC_) return;
+  this.setAttribute('data-img-retry-count', '0');
+  this.classList.remove('ht-img-fallback');
+  this.removeAttribute('data-img-fallback-applied');
+}
+
+function onPlannerImageError_(){
+  const img = this;
+  if(!img || img.getAttribute('data-img-fallback-applied') === '1') return;
+  const original = img.getAttribute('data-img-original-src') || getImageSource_(img);
+  if(!isHttpImageSource_(original)){
+    applyImageFallback_(img);
+    return;
+  }
+  const retryCount = Math.min(parseInt(img.getAttribute('data-img-retry-count') || '0', 10) || 0, 3) + 1;
+  img.setAttribute('data-img-retry-count', String(retryCount));
+  if(retryCount <= 2){
+    img.referrerPolicy = 'no-referrer';
+    img.removeAttribute('crossorigin');
+    img.removeAttribute('srcset');
+    const nextSrc = buildRetryImageSource_(original, retryCount);
+    setTimeout(function(){
+      if(img.getAttribute('data-img-fallback-applied') === '1') return;
+      img.src = nextSrc || original;
+    }, 250 * retryCount);
+    return;
+  }
+  applyImageFallback_(img);
+}
+
+function preparePlannerImage_(img){
+  if(!img || img.nodeType !== 1) return;
+  const lazySrc = img.getAttribute('data-src');
+  if(!img.getAttribute('src') && lazySrc) img.setAttribute('src', lazySrc);
+  const src = getImageSource_(img);
+  if(src && !img.getAttribute('data-img-original-src') && src !== IMAGE_FALLBACK_SRC_){
+    img.setAttribute('data-img-original-src', src);
+  }
+  if(!img.getAttribute('loading')) img.setAttribute('loading', 'lazy');
+  if(!img.getAttribute('decoding')) img.setAttribute('decoding', 'async');
+  if(isHttpImageSource_(src)) img.referrerPolicy = 'no-referrer';
+  if(img.getAttribute('data-img-enhanced') === '1') return;
+  img.setAttribute('data-img-enhanced', '1');
+  img.setAttribute('data-img-retry-count', '0');
+  img.addEventListener('load', onPlannerImageLoad_);
+  img.addEventListener('error', onPlannerImageError_);
+  if(img.complete && src && img.naturalWidth === 0) onPlannerImageError_.call(img);
+}
+
+function enhancePlannerImages_(root){
+  const scope = root || document;
+  if(scope.nodeType === 1 && scope.tagName === 'IMG') preparePlannerImage_(scope);
+  const imgs = scope.querySelectorAll ? scope.querySelectorAll('img') : [];
+  imgs.forEach(preparePlannerImage_);
+}
+
+let plannerImageObserverStarted_ = false;
+function startPlannerImageObserver_(){
+  if(plannerImageObserverStarted_) return;
+  plannerImageObserverStarted_ = true;
+  enhancePlannerImages_(document);
+  if(!('MutationObserver' in window)) return;
+  const obs = new MutationObserver(function(records){
+    records.forEach(function(rec){
+      rec.addedNodes.forEach(function(node){
+        if(node.nodeType === 1) enhancePlannerImages_(node);
+      });
+    });
+  });
+  obs.observe(document.documentElement, { childList: true, subtree: true });
+}
+
 // ── Init ──
 window.onload = () => {
+  startPlannerImageObserver_();
   if(readCachedDriveToken_()) hideDriveOAuthBusy_();
   var oauthHashEarly = readDriveOAuthHash_();
   var pendingOAuth = oauthHashEarly.indexOf('access_token=') !== -1 || oauthHashEarly.indexOf('error=') !== -1;

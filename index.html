@@ -1100,6 +1100,23 @@ function isAndroidDevice(){
 function isPhoneOrTablet(){
   return isIOSLikeDevice() || isAndroidDevice();
 }
+/** iOS: location.href 대신 iframe으로 scheme 호출 — 플래너 탭이 웹 URL로 바뀌지 않음 */
+function openIOSAppScheme_(schemeUrl){
+  if(!schemeUrl) return;
+  try {
+    var ifr = document.createElement('iframe');
+    ifr.setAttribute('aria-hidden', 'true');
+    ifr.style.cssText = 'display:none;width:0;height:0;border:0';
+    ifr.src = schemeUrl;
+    (document.body || document.documentElement).appendChild(ifr);
+    setTimeout(function(){
+      try { if(ifr.parentNode) ifr.parentNode.removeChild(ifr); } catch(e){}
+    }, 2500);
+  } catch(e){}
+}
+function openNaverBlogAppOnIOS_(){
+  openIOSAppScheme_('naverblog://');
+}
 function getThreadsProfileUsername(){
   const m = String(EXT_THREADS).match(/@([^/?#]+)/);
   return m ? m[1] : 'dr.park_dc.pt';
@@ -1220,6 +1237,31 @@ const DEFAULT_NOTEBOOKLM_PROMPT = `Google **NotebookLM**에 소스로 붙여 넣
 - 상업적 예약·센터 직접 홍보 문구, 과장·낚시 제목식 문장
 - "첫째 둘째 셋째" 식 **발표 자료 목차만 덩어리로** 나열 (내용은 풀어서)`;
 
+const DEFAULT_THREADS_SNS_PROMPT = `당신은 의료/건강 콘텐츠를 **Threads(쓰레드) 스타일**로 변환하는 전문가입니다.
+
+[말투]
+- 격식체(~습니다) → 구어체(~임, ~거임, ~됨)
+- 설명하는 말투 → 혼잣말처럼 툭 던지는 말투
+- 전문가가 동료한테 말하는 느낌
+
+[구조]
+- 첫 줄: 반전 or 의문 → 짧게 끊기
+- 중간: 핵심 근거 1~3줄 (→ 로 흐름 연결 가능)
+- 마지막: 임상 경험 기반 한 줄 결론
+
+[형식]
+- 문장은 최대 1~2줄
+- 줄바꿈으로 리듬 만들기
+- 이모지 최대 1~2개, 자연스러운 위치에
+- 해시태그 없음
+- 불릿(•), 볼드, 헤더 없음
+
+[금지]
+- "~하세요" 같은 지시형
+- 리스트 나열
+- 과한 설명
+- 인스타 해시태그·불릿·번호 목록을 그대로 옮기기`;
+
 const DEFAULT_BLOG_INSTA_IMAGE_PROMPT = `이미지 생성 프롬프트는 블로그·인스타 본문과 같은 주제 흐름을 시각화합니다.
 - 정확히 2장: ① 전문 설명 보조(도식·인포그래픽·부드러운 medical illustration), ② 셀프케어 동작(본문의 동작과 정확히 일치)
 - 영문 한 덩어리 프롬프트, 80~200단어, 한 줄 요약·불릿 금지
@@ -1279,37 +1321,43 @@ const DEFAULT_PROMPTS = {
       blog: `네이버 SEO를 고려해 제목을 작성하세요. PSP 기준: 평가(증상·통증 질)→Fascia·Muscle·Joint 도수→움직임·셀프 순으로 풀되, 환자가 이해하는 쉬운 말로. 과장·즉효 약속 금지. 따뜻하고 신뢰감 있는 톤.`,
       insta: `캐러셀(여러 장 슬라이드) 없이 **한 포스트 캡션**으로 끝내세요. 첫 줄 후킹에 이어, 본문 캡션 안에 통증→원인→해결 흐름의 **핵심 포인트**를 번호(1. 2.) 또는 • 불릿으로 넣어 한 번에 읽히게 하세요.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
-      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
+      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
+      threads: DEFAULT_THREADS_SNS_PROMPT
     },
     1: { // 리:얼 Movement
       blog: `PSP Movement 관점: Passive Stretching(P-ROM)→P·A·R, Position 1(누움)→2(앉음)→3(서기) 흐름을 환자 언어로. '왜 이 동작인지' 먼저, 초·회·분·무리 금지. 편안한 호흡·긴장 조절을 강조.`,
       insta: `캐러셀 없이 **한 포스트 캡션**에 동작·포인트·주의사항을 단계적으로 적습니다. 마지막에 저장·팔로우 유도 문장을 캡션 끝에 자연스럽게 넣으세요.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
-      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
+      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
+      threads: DEFAULT_THREADS_SNS_PROMPT
     },
     2: { // 얼굴 관리
       blog: `얼굴 비대칭이나 윤곽에 관심 있는 20~40대 여성을 주 독자로 설정하세요. 과학적 근거를 바탕으로 하되 과도한 의학적 표현은 피하고, 공감과 희망을 주는 톤으로 작성하세요.`,
       insta: `캐러셀 없이 **한 포스트 캡션**으로 스토리텔링하세요. "이런 고민 있으신가요?"에 이어 문제→원인→해결→CTA를 캡션 안에서 줄바꿈으로 구분해 읽기 쉽게.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
-      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
+      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
+      threads: DEFAULT_THREADS_SNS_PROMPT
     },
     3: { // CMT 전문가
       blog: `임상 전문가 대상. PSP(평가 4종·Fascia→Muscle→Joint·P-A-R·VAS 분기) 용어와 순서를 존중. 이론-실전 연결, 케이스는 평가→중재 흐름이 보이게.`,
       insta: `전문가 타깃. 캐러셀 없이 **한 포스트 캡션**에 임상 인사이트·핵심 개념을 카드처럼 불릿으로 모아 동료에게 말하듯 밀도 있게.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
-      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
+      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
+      threads: DEFAULT_THREADS_SNS_PROMPT
     },
     4: { // IFC 얼굴교육
       blog: `에스테틱과 의료의 경계에 있는 전문가들을 위한 콘텐츠입니다. IFC만의 차별점과 임상적 근거를 강조하고, 교육 참여를 자연스럽게 유도하세요.`,
       insta: `교육·전문성 중심. 캐러셀 없이 **한 포스트 캡션**에 수강생에게 도움 되는 포인트를 정리하고, 신뢰·차별화가 드러나게.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
-      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
+      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
+      threads: DEFAULT_THREADS_SNS_PROMPT
     },
     5: { // 리:얼 Movement 전문가
       blog: `운동·재활 전문가 대상. PSP Movement(Position 1~3, P-A-R, 근막경선)와 Re:Al 접근의 차이·연결을 명확히. 평가 없이 운동만 강조하지 말 것.`,
       insta: `실습·교육 현장 느낌. 캐러셀 없이 **한 포스트 캡션**에 저장하고 싶은 핵심 개념을 불릿·짧은 문단으로 압축.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
-      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT
+      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
+      threads: DEFAULT_THREADS_SNS_PROMPT
     },
     6: { // 일상 공유 (thread JSON만 — 블로그/인스타/이미지 없음)
       thread: DEFAULT_DAILY_SHARE_PROMPT
@@ -2474,7 +2522,10 @@ window.onload = () => {
   syncAllSourcesIfNewer_('load');
   if(!oauthReturned) consumeDeepLinkFromHash_();
   else setTimeout(function(){ consumeDeepLinkFromHash_(); }, 300);
-  setTimeout(function(){ reconcileInstaPendingJobs_('load'); }, 600);
+  setTimeout(function(){
+    reconcileInstaPendingJobs_('load');
+    reconcileThreadsPendingJobs_('load');
+  }, 600);
   scheduleDailyAutoDraft_();
   setInterval(function(){ maybeRunDailyAutoDraft_('interval'); }, 2 * 60 * 1000);
   setTimeout(function(){ maybeRunDailyAutoDraft_('load'); }, 4000);
@@ -2482,6 +2533,7 @@ window.onload = () => {
     syncAllSourcesIfNewer_('focus');
     maybeRunDailyAutoDraft_('focus');
     reconcileInstaPendingJobs_('focus');
+    reconcileThreadsPendingJobs_('focus');
   });
   let hiddenAt = 0;
   document.addEventListener('visibilitychange', function(){
@@ -2494,6 +2546,7 @@ window.onload = () => {
     maybeRunDailyAutoDraft_('visibility');
     onReturnFromBackgroundForInsta_();
     reconcileInstaPendingJobs_('visibility');
+    reconcileThreadsPendingJobs_('visibility');
     if(hiddenAt){
       var sec = Math.floor((Date.now() - hiddenAt) / 1000);
       hiddenAt = 0;
@@ -3248,7 +3301,7 @@ function normalizeSheetTabForCategory_(tab, catId){
   tab = String(tab || '').toLowerCase();
   if(isThreadCategory(catId)) return tab === 'thread' ? 'thread' : '';
   if(isHeiljagyaeCategory(catId)) return (tab === 'community' || tab === 'images') ? tab : '';
-  if(isBlogInstaCategory(catId)) return (tab === 'blog' || tab === 'insta' || tab === 'images') ? tab : '';
+  if(isBlogInstaCategory(catId)) return (tab === 'blog' || tab === 'insta' || tab === 'threads' || tab === 'images') ? tab : '';
   return '';
 }
 function setOpenDetailHash_(draftId, catId, tab){
@@ -3400,7 +3453,7 @@ function renderSheetEmpty(draft, cat) {
     ? 'AI가 <strong>일상 일기·생활 나눔</strong> 톤으로<br><strong>한 줄 + 3~7문장</strong> 글을 만들어드려요 (사진이 있으면 장면에 맞춰요)'
     : isHeiljagyaeCategory(cat.id)
     ? 'AI가 <strong>아파트너 게시판 글</strong>과 <strong>추천 이미지 프롬프트 2개</strong>만<br>만들어드려요'
-    : 'AI가 <strong>블로그</strong>와 이미지 프롬프트 <strong>2장</strong>을 만들어드려요.<br>인스타는 블로그 탭에서 <strong>발행완료</strong> 후 짧게 생성돼요';
+    : 'AI가 <strong>블로그</strong>와 이미지 프롬프트 <strong>2장</strong>을 만들어드려요.<br>인스타는 블로그 <strong>발행완료</strong> 후, 쓰레드는 인스타 <strong>발행완료</strong> 후 생성돼요';
   document.getElementById('sheet-body').innerHTML = `
     <div style="padding:10px 0 20px;font-size:13px;color:#9CA3AF;line-height:1.7;">${draft.angle}</div>
     <div style="background:#F8F7F4;border-radius:12px;padding:28px 20px;text-align:center;">
@@ -3442,7 +3495,7 @@ function renderSheetContent(content) {
       '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">글을 다듬은 뒤 <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요. 인스타 캡션은 그동안 백그라운드에서 만들어져요.</p>';
   } else if(tab==='insta'){
     const ig = content.insta;
-    if(content.instaPending || instaBgByDraft[state.selectedId]){
+    if(shouldShowInstaPending_(content, state.selectedId)){
       bodyHTML = tabsHTML + buildInstaPendingBox_(content, state.selectedId);
     } else if(!ig || (!ig.hook && !ig.caption && !(ig.hashtags && ig.hashtags.length))){
       bodyHTML = tabsHTML +
@@ -3453,7 +3506,19 @@ function renderSheetContent(content) {
         sheetEditField_('첫 줄 후킹', 'sheet-insta-hook', ig.hook, { rows: 2, title: true }) +
         sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10 }) +
         sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).map(function(h){ return String(h).replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분' }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">수정한 뒤 <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동해요. <strong>재생성</strong>은 블로그 글 기준으로 인스타만 다시 만듭니다.</p>';
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">수정한 뒤 <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동해요. 쓰레드 글은 그동안 백그라운드에서 만들어져요. <strong>재생성</strong>은 블로그 글 기준으로 인스타만 다시 만듭니다.</p>';
+    }
+  } else if(tab==='threads'){
+    var ths = content.threads;
+    if(shouldShowThreadsPending_(content, state.selectedId)){
+      bodyHTML = tabsHTML + buildThreadsPendingBox_(content, state.selectedId);
+    } else if(!ths || !String(ths.text || '').trim()){
+      bodyHTML = tabsHTML +
+        '<div class="sheet-insta-pending"><strong>쓰레드 글은 아직 없어요.</strong><br>인스타 탭에서 <strong>발행완료</strong>를 누르거나, 인스타 캡션이 있으면 하단 <strong>재생성</strong>으로 만들 수 있어요.</div>';
+    } else {
+      bodyHTML = tabsHTML +
+        sheetEditField_('쓰레드 본문', 'sheet-threads-body', ths.text || '', { rows: 14 }) +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">수정한 뒤 <strong>발행완료</strong>를 누르면 저장·복사 후 Threads 앱으로 이동해요. <strong>재생성</strong>은 인스타 캡션 기준으로 쓰레드만 다시 만듭니다.</p>';
     }
   } else if(tab==='notebooklm'){
     const nl = content.notebookLM;
@@ -3561,7 +3626,7 @@ function getSheetGoButtonHTML(tab){
   if(tab === 'insta') return `<button type="button" class="btn-sheet-link" onclick="openExternalInstagram()">인스타 가기</button>`;
   if(tab === 'community') return `<button type="button" class="btn-sheet-link" onclick="openApartnerApp()">아파트너 열기</button>`;
   if(tab === 'notebooklm') return `<button type="button" class="btn-sheet-link" onclick="openNotebookLM()">NotebookLM 열기</button>`;
-  if(tab === 'thread') return `<button type="button" class="btn-sheet-link" onclick="openExternalThreads()">Threads 가기</button>`;
+  if(tab === 'thread' || tab === 'threads') return `<button type="button" class="btn-sheet-link" onclick="openExternalThreads()">Threads 가기</button>`;
   return '';
 }
 
@@ -3577,6 +3642,11 @@ function getTabCopyText(tab, content){
     const ig = content.insta;
     if(!ig) return '';
     return '[인스타]\n' + getInstaFullPasteText_(ig);
+  }
+  if(tab === 'threads'){
+    const ths = content.threads;
+    if(!ths || !ths.text) return '';
+    return String(ths.text).trim();
   }
   if(tab === 'community'){
     const c = content.community;
@@ -3631,15 +3701,7 @@ window.openExternalNaverBlog = function(){
     return;
   }
   if(isIOSLikeDevice()){
-    window.location.href = 'naverblog://';
-    setTimeout(function(){
-      if(document.hidden) return;
-      window.location.href = u;
-    }, 450);
-    setTimeout(function(){
-      if(document.hidden) return;
-      window.open(u, '_blank', 'noopener,noreferrer');
-    }, 1100);
+    openNaverBlogAppOnIOS_();
     return;
   }
   const naverApp = 'naversearchapp://inappbrowser?url=' + encodeURIComponent(u) + '&target=new&version=6';
@@ -3846,9 +3908,37 @@ function updateInstaPendingCountdown_(){
   el.textContent = getInstaPendingCountdownText_(content, state.selectedId);
 }
 
+function instaContentReady_(content){
+  var ig = content && content.insta;
+  return !!(ig && (ig.hook || ig.caption || (ig.hashtags && ig.hashtags.length)));
+}
+function shouldShowInstaPending_(content, draftId){
+  if(instaContentReady_(content)) return false;
+  return !!(content && (content.instaPending || instaBgByDraft[draftId]));
+}
+function threadsContentReady_(content){
+  return !!getThreadsSnsPlainText_(content && content.threads);
+}
+function shouldShowThreadsPending_(content, draftId){
+  if(threadsContentReady_(content)) return false;
+  return !!(content && (content.threadsPending || threadsBgByDraft[draftId]));
+}
+function refreshSheetIfViewingDraft_(draftId, catId, tab){
+  if(state.selectedId !== draftId) return;
+  var content = getDraftContent_(draftId);
+  if(!content) return;
+  var ov = document.getElementById('detail-overlay');
+  if(!ov || !ov.classList.contains('open')) return;
+  state.selectedCatId = catId;
+  if(tab) state.activeTab = tab;
+  if(tab) setOpenDetailHash_(draftId, catId, tab);
+  renderSheetContent(content);
+}
+
 function showInstaContentWhenReady_(draftId, catId){
   var content = getDraftContent_(draftId);
-  if(!content || !content.insta) return;
+  if(!content || !instaContentReady_(content)) return;
+  delete instaBgByDraft[draftId];
   var ov = document.getElementById('detail-overlay');
   var sheetOpen = ov && ov.classList.contains('open');
   state.selectedCatId = catId;
@@ -3876,7 +3966,19 @@ function onReturnFromBackgroundForInsta_(){
       }
     });
   }
-  if(Object.keys(instaBgByDraft).length){
+  var tKeys = Object.keys(threadsBgDoneWhileHidden_);
+  if(tKeys.length){
+    tKeys.forEach(function(did){
+      var topic = threadsBgDoneWhileHidden_[did];
+      var catId = getCatIdFromDraftId_(did);
+      delete threadsBgDoneWhileHidden_[did];
+      showThreadsContentWhenReady_(did, catId);
+      if(typeof setAppToast === 'function'){
+        setAppToast('쓰레드 글 준비됐어요.\n«' + (topic || '') + '»', { duration: 6500, variant: 'ok' });
+      }
+    });
+  }
+  if(Object.keys(instaBgByDraft).length || Object.keys(threadsBgByDraft).length){
     updateGenIndicator();
   }
   renderTabs();
@@ -3918,9 +4020,11 @@ function enqueueInstaFromBlog_(draftId, catId, topic, blog, opts){
         clearInstaPendingMeta_(content);
         persistDraftContent_(draftId, content);
       }
+      delete instaBgByDraft[draftId];
       renderTabs();
       renderMain();
       showInstaContentWhenReady_(draftId, catId);
+      refreshSheetIfViewingDraft_(draftId, catId, 'insta');
       tryNotifyInstaReady_(topic, draftId, catId, true);
       if(document.hidden){
         instaBgDoneWhileHidden_[draftId] = topic || '';
@@ -4012,6 +4116,289 @@ function reconcileInstaPendingJobs_(reason){
     setAppToast('중단됐던 인스타 캡션 생성을 다시 이어서 시작했어요.', { duration: 4500, variant: 'ok' });
   }
   return true;
+}
+
+var threadsBgByDraft = {};
+var threadsBgDoneWhileHidden_ = {};
+const THREADS_BG_ESTIMATE_MS = 40000;
+const THREADS_BG_TIMEOUT_MS = 90000;
+const THREADS_PENDING_RESTART_WINDOW_MS = 30 * 60 * 1000;
+
+function getThreadsBgJob_(draftId){
+  var job = threadsBgByDraft[draftId];
+  if(!job) return null;
+  if(job === true) return { startedMs: Date.now(), endMs: Date.now() + THREADS_BG_ESTIMATE_MS };
+  return job;
+}
+function setThreadsPendingMeta_(content, draftId, catId, topic, startedMs, endMs){
+  if(!content) return;
+  content.threadsPending = true;
+  content.threadsPendingStartedAt = startedMs;
+  content.threadsPendingEndMs = endMs;
+  content.threadsPendingTopic = topic || '';
+  content.threadsPendingCatId = catId;
+}
+function clearThreadsPendingMeta_(content){
+  if(!content) return;
+  delete content.threadsPending;
+  delete content.threadsPendingStartedAt;
+  delete content.threadsPendingEndMs;
+  delete content.threadsPendingTopic;
+  delete content.threadsPendingCatId;
+}
+function getThreadsPendingEndMs_(content, draftId){
+  var job = getThreadsBgJob_(draftId);
+  if(job && job.endMs) return job.endMs;
+  var endMs = parseInt(content && content.threadsPendingEndMs, 10);
+  if(endMs) return endMs;
+  var startedMs = parseInt(content && content.threadsPendingStartedAt, 10);
+  return startedMs ? startedMs + THREADS_BG_ESTIMATE_MS : Date.now() + THREADS_BG_ESTIMATE_MS;
+}
+function getThreadsPendingCountdownText_(content, draftId){
+  var activeJob = !!getThreadsBgJob_(draftId);
+  var leftSec = (getThreadsPendingEndMs_(content, draftId) - Date.now()) / 1000;
+  if(leftSec > 0) return '예상 남은 시간 약 ' + formatRoughCountdown(leftSec);
+  if(activeJob) return '예상 시간을 지나 마무리 중이에요';
+  return '브라우저 복귀 후 생성 상태를 다시 확인하고 있어요';
+}
+function buildThreadsPendingBox_(content, draftId){
+  var endMs = getThreadsPendingEndMs_(content, draftId);
+  return '<div class="sheet-insta-pending">' +
+    '<strong>쓰레드 글을 만들고 있어요…</strong><br>' +
+    '<span class="sheet-insta-pending-countdown" id="threads-pending-countdown" data-end-ms="' + endMs + '">' +
+    escapeHtml(getThreadsPendingCountdownText_(content, draftId)) +
+    '</span><br>' +
+    '인스타 앱에서 올리는 동안 백그라운드에서 생성합니다. 완료되면 이 글의 쓰레드 탭으로 바로 보여드려요.</div>';
+}
+function updateThreadsPendingCountdown_(){
+  var el = document.getElementById('threads-pending-countdown');
+  if(!el || !state.selectedId) return;
+  var content = getDraftContent_(state.selectedId);
+  if(!content || !content.threadsPending) return;
+  el.textContent = getThreadsPendingCountdownText_(content, state.selectedId);
+}
+function normalizeThreadsSnsBlock_(raw){
+  if(!raw || typeof raw !== 'object') return null;
+  var text = String(raw.text != null ? raw.text : raw.body || raw.summary || '').trim();
+  if(!text) return null;
+  return { text: text };
+}
+function getThreadsSnsPlainText_(ths){
+  return ths && ths.text ? String(ths.text).trim() : '';
+}
+function buildInstaSourceText_(ig){
+  if(!ig) return '';
+  var tags = (ig.hashtags || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
+  return (
+    '후킹: ' + (ig.hook || '') + '\n\n' +
+    '캡션:\n' + getInstaCaptionBodyMerged_(ig) + '\n\n' +
+    (tags ? '해시태그: ' + tags : '')
+  ).trim();
+}
+function showThreadsContentWhenReady_(draftId, catId){
+  var content = getDraftContent_(draftId);
+  if(!content || !threadsContentReady_(content)) return;
+  delete threadsBgByDraft[draftId];
+  var ov = document.getElementById('detail-overlay');
+  var sheetOpen = ov && ov.classList.contains('open');
+  state.selectedCatId = catId;
+  state.activeTab = 'threads';
+  setOpenDetailHash_(draftId, catId, 'threads');
+  if(sheetOpen && state.selectedId === draftId){
+    renderSheetContent(content);
+    return;
+  }
+  if(state.selectedId === draftId){
+    openDetail(draftId, catId, 'threads');
+  }
+}
+function tryNotifyThreadsReady_(topic, draftId, catId, ok, errMsg){
+  ok = ok !== false;
+  try {
+    if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+    var title = ok ? '쓰레드 글 준비됐어요' : '쓰레드 글 생성 실패';
+    var body = ok ? String(topic || '쓰레드') : String(errMsg || topic || '다시 시도해 주세요');
+    var opts = {
+      body: body,
+      tag: 'ht-threads-' + String(draftId),
+      data: { draftId: draftId, catId: catId, tab: 'threads' },
+      requireInteraction: !!ok
+    };
+    var onClick = function(){
+      focusPlannerAndOpenDraft_(draftId, catId);
+      showThreadsContentWhenReady_(draftId, catId);
+    };
+    if(document.hidden && navigator.serviceWorker){
+      navigator.serviceWorker.ready.then(function(reg){
+        return reg.showNotification(title, opts);
+      }).catch(function(){
+        var n = new Notification(title, opts);
+        n.onclick = function(){ n.close(); onClick(); };
+      });
+      return;
+    }
+    var n = new Notification(title, opts);
+    n.onclick = function(){ n.close(); onClick(); };
+  } catch(e){}
+}
+async function generateThreadsFromInsta_(catId, insta, topic){
+  var threadsGuide = getCatPrompt(catId, 'threads') || DEFAULT_THREADS_SNS_PROMPT;
+  var baseInfo = getBasePrompt();
+  var prompt = baseInfo + '\n\n' +
+    '카테고리: ' + (CATEGORIES[catId] ? CATEGORIES[catId].name : '') + '\n' +
+    '주제: "' + (topic || '') + '"\n\n' +
+    '[쓰레드 변환 지침]\n' + threadsGuide + '\n\n' +
+    '아래는 **확정·수정된 인스타 캡션**입니다. 인스타 형식(해시태그·불릿·번호)을 그대로 옮기지 말고, 위 규칙대로 **Threads 한 포스트**로만 변환하세요.\n\n' +
+    'JSON만:\n{"threads":{"text":"쓰레드 본문 전체(줄바꿈 포함)"}}\n\n' +
+    '[인스타 원문]\n' + buildInstaSourceText_(insta);
+
+  var text = await callClaudePlanner_(prompt, { maxTokens: 2000, timeoutMs: THREADS_BG_TIMEOUT_MS });
+  var raw = text.replace(/^```json\s*/i, '').replace(/```\s*$/g, '').trim();
+  var parsed = JSON.parse(raw);
+  var block = parsed.threads || parsed;
+  return normalizeThreadsSnsBlock_(block);
+}
+function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
+  opts = opts || {};
+  var retryCount = opts.retryCount || 0;
+  if(threadsBgByDraft[draftId]) return;
+  if(!state.apiKey) return;
+  var startedMs = Date.now();
+  var endMs = startedMs + THREADS_BG_ESTIMATE_MS;
+  threadsBgByDraft[draftId] = { startedMs: startedMs, endMs: endMs, topic: topic || '', catId: catId };
+  beginGenIndicator();
+  var instaSnapshot = JSON.parse(JSON.stringify(insta || {}));
+  var label = String(topic || '쓰레드');
+  if(label.length > 34) label = label.slice(0, 34) + '…';
+  genActiveJob = { topic: label, endMs: endMs, kind: 'threads' };
+  updateGenIndicator();
+  var pendingContent = getDraftContent_(draftId);
+  if(pendingContent){
+    setThreadsPendingMeta_(pendingContent, draftId, catId, topic, startedMs, endMs);
+    persistDraftContent_(draftId, pendingContent);
+    if(state.selectedId === draftId){
+      var ovPending = document.getElementById('detail-overlay');
+      if(ovPending && ovPending.classList.contains('open')){
+        renderSheetContent(pendingContent);
+      }
+    }
+  }
+
+  (async function(){
+    try {
+      var threads = await generateThreadsFromInsta_(catId, instaSnapshot, topic);
+      var content = getDraftContent_(draftId);
+      if(content){
+        content.threads = threads;
+        clearThreadsPendingMeta_(content);
+        persistDraftContent_(draftId, content);
+      }
+      delete threadsBgByDraft[draftId];
+      renderTabs();
+      renderMain();
+      showThreadsContentWhenReady_(draftId, catId);
+      refreshSheetIfViewingDraft_(draftId, catId, 'threads');
+      tryNotifyThreadsReady_(topic, draftId, catId, true);
+      if(document.hidden){
+        threadsBgDoneWhileHidden_[draftId] = topic || '';
+      } else {
+        setAppToast('쓰레드 글 준비됐어요.\n«' + (topic || '') + '»', { duration: 6500, variant: 'ok' });
+      }
+    } catch(err){
+      console.warn('[쓰레드 백그라운드]', err);
+      var msg = (err && err.message) ? err.message : String(err);
+      var retryable = /응답 시간이|Failed to fetch|NetworkError|Load failed|network/i.test(msg);
+      var shouldRetry = !opts.resume && retryCount < 1 && retryable;
+      var failContent = getDraftContent_(draftId);
+      if(failContent){
+        if(document.hidden || shouldRetry){
+          var retryStartMs = Date.now();
+          setThreadsPendingMeta_(failContent, draftId, catId, topic, retryStartMs, retryStartMs + THREADS_BG_ESTIMATE_MS);
+        } else {
+          clearThreadsPendingMeta_(failContent);
+        }
+        persistDraftContent_(draftId, failContent);
+        if(state.selectedId === draftId){
+          var ovFail = document.getElementById('detail-overlay');
+          if(ovFail && ovFail.classList.contains('open')){
+            renderSheetContent(failContent);
+          }
+        }
+      }
+      if(!shouldRetry && !document.hidden){
+        tryNotifyThreadsReady_(topic, draftId, catId, false, msg);
+      }
+      if(shouldRetry){
+        setTimeout(function(){
+          enqueueThreadsFromInsta_(draftId, catId, topic, instaSnapshot, { resume: true, retryCount: retryCount + 1 });
+        }, 1200);
+        if(!document.hidden){
+          setAppToast('쓰레드 글 생성이 끊겨 다시 시도하고 있어요.', { duration: 5000, variant: 'ok' });
+        }
+      } else if(!document.hidden){
+        setAppToast((opts.resume ? '중단됐던 쓰레드 생성 재시도가 실패했어요.\n' : '쓰레드 글 생성에 실패했어요.\n') + msg, { duration: 9000, variant: 'err' });
+      }
+    } finally {
+      delete threadsBgByDraft[draftId];
+      genActiveJob = null;
+      endGenIndicator();
+    }
+  })();
+}
+function reconcileThreadsPendingJobs_(reason){
+  if(!state.apiKey || genActiveJob || genPendingCount > 0) return false;
+  var now = Date.now();
+  var candidates = [];
+  (CATEGORIES || []).forEach(function(cat){
+    if(!isBlogInstaCategory(cat.id)) return;
+    (cat.drafts || []).forEach(function(d){
+      var content = getDraftContent_(d.id);
+      if(!content || !content.threadsPending || getThreadsSnsPlainText_(content.threads) || !content.insta || threadsBgByDraft[d.id]) return;
+      var startedMs = parseInt(content.threadsPendingStartedAt, 10) || 0;
+      if(startedMs && now - startedMs > THREADS_PENDING_RESTART_WINDOW_MS){
+        clearThreadsPendingMeta_(content);
+        persistDraftContent_(d.id, content);
+        return;
+      }
+      candidates.push({
+        draftId: d.id,
+        catId: cat.id,
+        topic: d.topic || content.threadsPendingTopic || '',
+        insta: content.insta,
+        startedMs: startedMs
+      });
+    });
+  });
+  if(!candidates.length) return false;
+  candidates.sort(function(a, b){
+    if(a.draftId === state.selectedId) return -1;
+    if(b.draftId === state.selectedId) return 1;
+    return (b.startedMs || 0) - (a.startedMs || 0);
+  });
+  var job = candidates[0];
+  enqueueThreadsFromInsta_(job.draftId, job.catId, job.topic, job.insta, { resume: true });
+  if(state.selectedId === job.draftId){
+    state.selectedCatId = job.catId;
+    state.activeTab = 'threads';
+    setOpenDetailHash_(job.draftId, job.catId, 'threads');
+    var content = getDraftContent_(job.draftId);
+    var ov = document.getElementById('detail-overlay');
+    if(content && ov && ov.classList.contains('open')) renderSheetContent(content);
+  }
+  if(reason && reason !== 'load' && typeof setAppToast === 'function'){
+    setAppToast('중단됐던 쓰레드 글 생성을 다시 이어서 시작했어요.', { duration: 4500, variant: 'ok' });
+  }
+  return true;
+}
+
+function copyAndOpenThreads_(text){
+  var open = function(){ openExternalThreads(); };
+  if(!text){ open(); return; }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(open).catch(open);
+  } else {
+    open();
+  }
 }
 
 window.openExternalInstagram = function(){
@@ -4314,6 +4701,15 @@ function applySheetInstaEdits_(content){
   return content;
 }
 
+function applySheetThreadsEdits_(content){
+  if(!content) return content;
+  var bodyEl = document.getElementById('sheet-threads-body');
+  if(!bodyEl) return content;
+  if(!content.threads) content.threads = { text: '' };
+  content.threads.text = String(bodyEl.value || '').trim();
+  return content;
+}
+
 function applySheetImageEdits_(content){
   if(!content || !content.images) return content;
   var nodes = document.querySelectorAll('[data-image-index]');
@@ -4344,6 +4740,7 @@ function applySheetEditsForTab_(content, tab){
   if(!content) return content;
   if(tab === 'blog') return applySheetBlogEdits_(content);
   if(tab === 'insta') return applySheetInstaEdits_(content);
+  if(tab === 'threads') return applySheetThreadsEdits_(content);
   if(tab === 'images') return applySheetImageEdits_(content);
   if(tab === 'thread') return applySheetThreadEdits_(content);
   return content;
@@ -4353,6 +4750,7 @@ function getPublishKeyForTab_(tab, catId){
   if(tab === 'images') return 'image';
   if(tab === 'blog') return 'blog';
   if(tab === 'insta') return 'insta';
+  if(tab === 'threads') return 'threads';
   if(tab === 'community') return 'community';
   if(tab === 'thread') return 'thread';
   return null;
@@ -4362,6 +4760,7 @@ function buildFinalTextForKey_(content, catId, key){
   if(!content) return '';
   if(key === 'blog') return content.blog ? getTabCopyText('blog', content) : '';
   if(key === 'insta') return content.insta ? getInstaFullPasteText_(content.insta) : '';
+  if(key === 'threads') return content.threads ? getThreadsSnsPlainText_(content.threads) : '';
   if(key === 'image') return getImagePromptTextForData_(content, catId);
   if(key === 'community') return content.community ? formatCommunityPostText(content.community) : '';
   if(key === 'thread'){
@@ -4558,16 +4957,60 @@ window.onSheetPublishComplete = async function(){
       setAppToast('후킹 또는 캡션을 입력해 주세요.', { duration: 4000, variant: 'err' });
       return;
     }
+    if(!state.apiKey){
+      openApiModal();
+      return;
+    }
     if(pubBtn){ pubBtn.disabled = true; pubBtn.textContent = '저장 중…'; }
     try {
       var instaResult = commitSheetTabPublish_(draftId, catId, 'insta');
+      var catIg = CATEGORIES[catId];
+      var draftIg = catIg && catIg.drafts.find(function(d){ return d.id === draftId; });
       var savedContent = getDraftContent_(draftId);
+      state.activeTab = 'threads';
+      setOpenDetailHash_(draftId, catId, 'threads');
+      if(savedContent && savedContent.insta){
+        enqueueThreadsFromInsta_(draftId, catId, draftIg ? draftIg.topic : '', savedContent.insta);
+      }
+      renderSheetContent(getDraftContent_(draftId) || savedContent);
+      renderTabs();
+      renderMain();
       copyAndOpenInstagram_(savedContent && savedContent.insta ? getInstaFullPasteText_(savedContent.insta) : '');
+      afterTabPublishSaved_(instaResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
+      setAppToast('인스타 저장 · 복사 · 앱 이동\n돌아오면 이 글의 쓰레드 탭을 바로 보여드려요.', { duration: 5500, variant: 'ok' });
+    } catch(err){
+      setAppToast(((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
+    } finally {
+      if(pubBtn) pubBtn.disabled = false;
+    }
+    return;
+  }
+
+  if(tab === 'threads' && isBlogInstaCategory(catId)){
+    var thContent = getDraftContent_(draftId);
+    if(thContent && (thContent.threadsPending || threadsBgByDraft[draftId])){
+      setAppToast('쓰레드 글을 만들고 있어요.\n인스타 앱에서 올린 뒤, 잠시 후 쓰레드 탭을 확인해 주세요.', { duration: 5000, variant: 'ok' });
+      return;
+    }
+    if(!thContent || !getThreadsSnsPlainText_(thContent.threads)){
+      setAppToast('쓰레드 글이 없어요.\n인스타 탭에서 발행완료를 먼저 눌러 주세요.', { duration: 4500, variant: 'err' });
+      return;
+    }
+    applySheetThreadsEdits_(thContent);
+    if(!getThreadsSnsPlainText_(thContent.threads)){
+      setAppToast('쓰레드 본문을 입력해 주세요.', { duration: 4000, variant: 'err' });
+      return;
+    }
+    if(pubBtn){ pubBtn.disabled = true; pubBtn.textContent = '저장 중…'; }
+    try {
+      var threadsResult = commitSheetTabPublish_(draftId, catId, 'threads');
+      var savedTh = getDraftContent_(draftId);
+      copyAndOpenThreads_(savedTh && savedTh.threads ? getThreadsSnsPlainText_(savedTh.threads) : '');
       closeSheet();
       renderTabs();
       renderMain();
-      afterTabPublishSaved_(instaResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
-      setAppToast('인스타 저장 · 복사 · 앱 이동\n캡션 입력란에 붙여넣기 하세요.', { duration: 5500, variant: 'ok' });
+      afterTabPublishSaved_(threadsResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
+      setAppToast('쓰레드 저장 · 복사 · 앱 이동\n글 입력란에 붙여넣기 하세요.', { duration: 5500, variant: 'ok' });
     } catch(err){
       setAppToast(((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
     } finally {
@@ -4592,7 +5035,7 @@ window.onSheetPublishComplete = async function(){
     renderTabs();
     renderMain();
     await afterTabPublishSaved_(result, draftId);
-    var tabNames = { image: '이미지', community: '게시판', thread: '일상 공유' };
+    var tabNames = { image: '이미지', community: '게시판', thread: '일상 공유', threads: '쓰레드' };
     setAppToast('「' + (tabNames[result.key] || result.key) + '」최종본이 저장됐어요.', { duration: 4200, variant: 'ok' });
   } catch(err){
     setAppToast(((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
@@ -4621,6 +5064,7 @@ function buildSheetTabsHTML(tab){
     <button type="button" class="sheet-tab${tab==='images'?' active':''}" onclick="switchTab('images')">이미지 (2)</button>
     <button type="button" class="sheet-tab${tab==='blog'?' active':''}" onclick="switchTab('blog')">블로그</button>
     <button type="button" class="sheet-tab${tab==='insta'?' active':''}" onclick="switchTab('insta')">인스타</button>
+    <button type="button" class="sheet-tab${tab==='threads'?' active':''}" onclick="switchTab('threads')">쓰레드</button>
   </div></div>`;
 }
 
@@ -4905,7 +5349,7 @@ window.switchTab = function(t){
   if(isHeiljagyaeCategory(state.selectedCatId) && t !== 'community' && t !== 'images') return;
   if(isBlogInstaCategory(state.selectedCatId)){
     if(t === 'notebooklm' || t === 'community' || t === 'thread') t = 'blog';
-    if(t !== 'blog' && t !== 'insta' && t !== 'images') return;
+    if(t !== 'blog' && t !== 'insta' && t !== 'threads' && t !== 'images') return;
   }
   if(state.activeTab !== t){
     var c0 = getDraftContent_(state.selectedId);
@@ -4956,10 +5400,12 @@ function buildFinalPublishDefault_(draftId, catId){
   }
   var tab = state.activeTab;
   if(tab === 'insta' && content.insta) return getTabCopyText('insta', content);
+  if(tab === 'threads' && content.threads) return getTabCopyText('threads', content);
   if(tab === 'blog' && content.blog) return getTabCopyText('blog', content);
   var parts = [];
   if(content.blog && content.blog.title) parts.push(getTabCopyText('blog', content));
   if(content.insta) parts.push(getTabCopyText('insta', content));
+  if(content.threads && getThreadsSnsPlainText_(content.threads)) parts.push(getTabCopyText('threads', content));
   return parts.join('\n\n---\n\n');
 }
 
@@ -4983,6 +5429,9 @@ function buildPublishedPromptData_(draft, catId, content, finalTexts){
   }
   if(content && content.insta){
     data.insta = { topic: topic, generated: getTabCopyText('insta', content), finalText: finalTexts.insta || '' };
+  }
+  if(content && content.threads && getThreadsSnsPlainText_(content.threads)){
+    data.threads = { topic: topic, generated: getThreadsSnsPlainText_(content.threads), finalText: finalTexts.threads || '' };
   }
   var imageText = getImagePromptTextForData_(content, catId);
   if(imageText){
@@ -5014,7 +5463,7 @@ function getLastPublishedPromptSamples_(catId, limit){
     if(!p || !p.date) return;
     var content = p.content || state.generatedOnly[d.id];
     var promptData = p.promptData || buildPublishedPromptData_(d, catId, content, p.finalTexts || {});
-    var hasData = ['blog','insta','image','community','thread'].some(function(key){
+    var hasData = ['blog','insta','threads','image','community','thread'].some(function(key){
       return getPromptDataText_(promptData, key).length >= 20;
     });
     if(!hasData) return;
@@ -5053,6 +5502,9 @@ function getPublishFieldConfigs_(catId, content, activeTab){
   if(activeTab === 'insta' && isBlogInstaCategory(catId)){
     return [{ key: 'insta', label: '인스타 최종본', help: '인스타 캡션으로 실제로 올린 글을 저장합니다.', placeholder: '인스타에 실제로 올린 캡션을 붙여넣기' }];
   }
+  if(activeTab === 'threads' && isBlogInstaCategory(catId)){
+    return [{ key: 'threads', label: '쓰레드 최종본', help: 'Threads에 실제로 올린 글을 저장합니다.', placeholder: 'Threads에 실제로 올린 글을 붙여넣기' }];
+  }
   if(activeTab === 'community' && isHeiljagyaeCategory(catId)){
     return [{ key: 'community', label: '게시판 최종본', help: '아파트너 게시판에 실제로 올린 글을 저장합니다.', placeholder: '실제로 올린 게시판 글을 붙여넣기' }];
   }
@@ -5072,6 +5524,7 @@ function getPublishFieldConfigs_(catId, content, activeTab){
   return [
     { key: 'blog', label: '블로그 최종본', help: '네이버 블로그 등에 실제로 올린 글을 저장합니다.', placeholder: '블로그에 실제로 올린 글을 붙여넣기' },
     { key: 'insta', label: '인스타 최종본', help: '인스타 캡션으로 실제로 올린 글을 저장합니다.', placeholder: '인스타에 실제로 올린 캡션을 붙여넣기' },
+    { key: 'threads', label: '쓰레드 최종본', help: 'Threads에 실제로 올린 글을 저장합니다.', placeholder: 'Threads에 실제로 올린 글을 붙여넣기' },
     imageField
   ];
 }
@@ -5121,7 +5574,7 @@ function collectPublishFinalTexts_(){
 }
 
 function buildCombinedFinalText_(finalTexts){
-  var labels = { blog: '블로그', insta: '인스타', image: '이미지 생성 프롬프트', community: '게시판', thread: '일상 공유' };
+  var labels = { blog: '블로그', insta: '인스타', threads: '쓰레드', image: '이미지 생성 프롬프트', community: '게시판', thread: '일상 공유' };
   return Object.keys(finalTexts || {}).map(function(key){
     return '[' + (labels[key] || key) + ']\n' + finalTexts[key];
   }).join('\n\n---\n\n');
@@ -5369,7 +5822,7 @@ window.openPublishModal = function(){
   document.getElementById('publish-modal-meta').innerHTML = fromImages
     ? ''
     : '<strong>' + escapeHtml(cat ? cat.name : '') + '</strong> · ' + escapeHtml(draft ? draft.topic : '') +
-      '<br><span style="color:#9CA3AF;">현재 탭(' + escapeHtml(state.activeTab === 'blog' ? '블로그' : state.activeTab === 'insta' ? '인스타' : state.activeTab === 'community' ? '게시판' : state.activeTab === 'thread' ? '일상 공유' : '이미지') + ')에 맞는 최종본을 저장합니다.</span>';
+      '<br><span style="color:#9CA3AF;">현재 탭(' + escapeHtml(state.activeTab === 'blog' ? '블로그' : state.activeTab === 'insta' ? '인스타' : state.activeTab === 'threads' ? '쓰레드' : state.activeTab === 'community' ? '게시판' : state.activeTab === 'thread' ? '일상 공유' : '이미지') + ')에 맞는 최종본을 저장합니다.</span>';
   document.getElementById('publish-modal-meta').style.display = fromImages ? 'none' : '';
   renderPublishFinalFields_(draftId, catId, content, isEdit);
   document.getElementById('btn-publish-save').textContent = isEdit ? '저장' : '발행 저장';
@@ -5824,6 +6277,7 @@ function endGenIndicator() {
 }
 function updateGenIndicator() {
   updateInstaPendingCountdown_();
+  updateThreadsPendingCountdown_();
   var el = document.getElementById('gen-status-bar');
   if (!el) return;
   var busy = genPendingCount > 0 || genActiveJob;
@@ -5850,7 +6304,9 @@ function updateGenIndicator() {
   if (genPendingCount > 1) {
     parts.push('요청 ' + genPendingCount + '건');
   }
-  var prefix = (genActiveJob && genActiveJob.kind === 'insta') ? '인스타 캡션 작성 중' : '초안 작성 중';
+  var prefix = '초안 작성 중';
+  if(genActiveJob && genActiveJob.kind === 'insta') prefix = '인스타 캡션 작성 중';
+  else if(genActiveJob && genActiveJob.kind === 'threads') prefix = '쓰레드 글 작성 중';
   el.textContent = prefix + ' · ' + parts.join(' · ');
 }
 
@@ -6105,6 +6561,7 @@ if(isThreadCategory(catId)){
     content.images.gptVisuals = trimBlogInstaImages_(content.images.gptVisuals);
   }
   delete content.insta;
+  delete content.threads;
 }
 
 if(!state.published[jobDraftId]) state.published[jobDraftId]={};
@@ -6114,7 +6571,9 @@ save({ driveImmediate: true, gasImmediate: true });
 var nextTab = isThreadCategory(catId) ? 'thread' : (isHeiljagyaeCategory(catId) ? 'community' : 'blog');
 var ov = document.getElementById('detail-overlay');
 if(ov && ov.classList.contains('open') && state.selectedId === jobDraftId && state.selectedCatId === jobCatId){
-  state.activeTab = nextTab;
+  var stayTab = normalizeSheetTabForCategory_(state.activeTab, jobCatId) || nextTab;
+  state.activeTab = stayTab;
+  setOpenDetailHash_(jobDraftId, jobCatId, stayTab);
   renderSheetContent(content);
 }
 renderTabs();
@@ -6177,6 +6636,27 @@ window.genContent = async function(){
     var draft = cat && cat.drafts.find(function(d){ return d.id === draftId; });
     enqueueInstaFromBlog_(draftId, catId, draft ? draft.topic : '', igContent.blog);
     setAppToast('블로그 글 기준으로 인스타 캡션을 다시 만들고 있어요…', { duration: 5000, variant: 'ok' });
+    return;
+  }
+
+  if(isBlogInstaCategory(catId) && tab === 'threads'){
+    if(!state.apiKey){
+      openApiModal();
+      return;
+    }
+    if(threadsBgByDraft[draftId]){
+      setAppToast('쓰레드 글을 만들고 있어요.\n잠시만 기다려 주세요.', { duration: 4500, variant: 'ok' });
+      return;
+    }
+    var thIgContent = getDraftContent_(draftId);
+    if(!thIgContent || !thIgContent.insta){
+      setAppToast('인스타 캡션이 없어요.\n인스타 탭에서 발행완료를 먼저 누르거나 인스타를 만들어 주세요.', { duration: 5000, variant: 'err' });
+      return;
+    }
+    var catTh = CATEGORIES[catId];
+    var draftTh = catTh && catTh.drafts.find(function(d){ return d.id === draftId; });
+    enqueueThreadsFromInsta_(draftId, catId, draftTh ? draftTh.topic : '', thIgContent.insta);
+    setAppToast('인스타 캡션 기준으로 쓰레드 글을 다시 만들고 있어요…', { duration: 5000, variant: 'ok' });
     return;
   }
 

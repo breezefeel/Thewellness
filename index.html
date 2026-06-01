@@ -3,7 +3,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
 <title>콘텐츠 플래너</title>
 <script>
 (function(){
@@ -30,7 +30,27 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Noto Sans KR', sans-serif; background: #F8F7F4; color: #1A1A1A; min-height: 100vh; }
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body {
+  font-family: 'Noto Sans KR', sans-serif; background: #F8F7F4; color: #1A1A1A; min-height: 100vh;
+  touch-action: manipulation;
+}
+/* iOS·Android: 입력 포커스 시 16px 미만이면 화면이 자동 확대됨 */
+textarea,
+select,
+input[type="text"],
+input[type="search"],
+input[type="password"],
+input[type="email"],
+input[type="tel"],
+input[type="url"],
+input[type="number"],
+input:not([type]) {
+  font-size: 16px;
+}
 
 /* ── Planner header (scrolls away) ── */
 .planner-head {
@@ -224,7 +244,7 @@ border: 2px solid #E5E7EB; transition: all 0.15s;
 .search-wrap { padding: 12px 16px 0; }
 .search-input {
 width: 100%; padding: 10px 14px; border-radius: 10px;
-border: 1.5px solid #E5E7EB; font-size: 13px; outline: none;
+border: 1.5px solid #E5E7EB; font-size: 16px; outline: none;
 background: #fff; font-family: inherit;
 }
 .search-input:focus { border-color: #2DD4BF; }
@@ -280,27 +300,43 @@ background: var(--cc, #2DD4BF);
 .draft-card.recommended { border-color: #F59E0B; }
 .draft-card.recommended::before { background: #F59E0B; }
 
-.draft-card-refresh-mini {
+.draft-card-actions {
 position: absolute;
 top: 10px;
 right: 10px;
 z-index: 2;
+display: flex;
+gap: 5px;
+align-items: center;
+}
+.draft-card-refresh-mini,
+.draft-card-delete-mini {
 font-size: 9px;
 font-weight: 800;
 padding: 4px 7px;
 border-radius: 6px;
 border: 1px solid #E5E7EB;
 background: #fff;
-color: #6B7280;
 cursor: pointer;
 font-family: inherit;
 line-height: 1.2;
 letter-spacing: -0.02em;
 box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
+.draft-card-refresh-mini {
+color: #6B7280;
+}
 .draft-card-refresh-mini:hover {
 border-color: var(--cc, #2DD4BF);
 color: #0F766E;
+}
+.draft-card-delete-mini {
+color: #9CA3AF;
+}
+.draft-card-delete-mini:hover {
+border-color: #FCA5A5;
+color: #DC2626;
+background: #FEF2F2;
 }
 
 .card-badges { display: flex; gap: 5px; margin-bottom: 8px; flex-wrap: wrap; }
@@ -312,7 +348,7 @@ font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700;
 .badge-pub { background: #F3F4F6; color: #9CA3AF; }
 .badge-gen { background: #DBEAFE; color: #2563EB; }
 
-.card-topic { font-weight: 700; font-size: 14px; color: #1A1A1A; margin-bottom: 5px; line-height: 1.45; padding-right: 72px; }
+.card-topic { font-weight: 700; font-size: 14px; color: #1A1A1A; margin-bottom: 5px; line-height: 1.45; padding-right: 128px; }
 .card-angle { font-size: 12px; color: #9CA3AF; line-height: 1.55; }
 .card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
 .card-date { font-size: 11px; color: #C0C0C0; }
@@ -528,7 +564,6 @@ font-size: 13px; color: #374151; display: flex; gap: 8px;
 width: 100%; box-sizing: border-box; background: #F8F7F4; border: 1px solid #E5E7EB; border-radius: 10px;
 padding: 12px 14px; font-size: 16px; line-height: 1.75; color: #374151; font-family: inherit;
 resize: vertical; min-height: 2.5em;
--webkit-text-size-adjust: 100%;
 }
 .sheet-edit:focus { outline: none; border-color: #2DD4BF; background: #fff; }
 .sheet-edit-title { font-size: 16px; font-weight: 700; color: #1A1A1A; }
@@ -602,7 +637,7 @@ max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,.2);
 .modal-desc { font-size: 13px; color: #6B7280; line-height: 1.7; margin-bottom: 20px; }
 .modal-input {
 width: 100%; padding: 12px 14px; border-radius: 10px;
-border: 1.5px solid #E5E7EB; font-size: 13px; outline: none;
+border: 1.5px solid #E5E7EB; font-size: 16px; outline: none;
 font-family: monospace; margin-bottom: 8px;
 }
 .modal-input:focus { border-color: #2DD4BF; }
@@ -621,10 +656,14 @@ cursor: pointer; font-family: inherit;
 .form-label { font-size: 12px; font-weight: 700; color: #6B7280; margin-bottom: 6px; display: block; }
 .form-input, .form-select {
 width: 100%; padding: 10px 14px; border-radius: 10px;
-border: 1.5px solid #E5E7EB; font-size: 14px; outline: none;
+border: 1.5px solid #E5E7EB; font-size: 16px; outline: none;
 font-family: inherit; background: #fff;
 }
 .form-input:focus, .form-select:focus { border-color: #2DD4BF; }
+.form-textarea {
+  min-height: 148px; line-height: 1.55; resize: vertical;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
 .aud-row { display: flex; gap: 8px; }
 .aud-btn {
 flex: 1; padding: 10px; border-radius: 10px; border: 2px solid #E5E7EB;
@@ -746,7 +785,7 @@ border-radius: 4px; padding: 2px 7px; cursor: pointer; font-family: inherit;
 .prompt-textarea {
 width: 100%; min-height: 140px; padding: 12px 14px;
 border: 1.5px solid #E5E7EB; border-radius: 10px;
-font-size: 12px; line-height: 1.7; font-family: inherit;
+font-size: 16px; line-height: 1.7; font-family: inherit;
 resize: vertical; outline: none; color: #374151; background: #FAFAFA;
 }
 .prompt-textarea:focus { border-color: #2DD4BF; background: #fff; }
@@ -1071,7 +1110,8 @@ const CAT_TAB_SHORT = {
 };
 
 const SK = 'ht_v2';
-const MIN_PENDING_DRAFTS_PER_CAT = 5;
+/** 카테고리당 유지할 주제 카드 수 (발행·AI 초안 유무와 무관) */
+const MIN_TOPICS_PER_CAT = 5;
 /** 약수·피드백과 동일 웹앱 — code-full.gs 배포 URL */
 const PLANNER_GAS_URL = 'https://script.google.com/macros/s/AKfycbwVJSc6rY5tcBSB1VaRi4DBEXGyUBr1ADFfs6QEA9Z9bu0G-0mdMAv374-MdPVYMnSaeQ/exec';
 /** GitHub Pages 공개 주소 — Apps Script PLANNER_PAGE_URL 과 동일하게 유지 */
@@ -1691,6 +1731,10 @@ function hasDriveConnection_(){
     return localStorage.getItem(DRIVE_CONNECTED_KEY) === '1' || !!localStorage.getItem('ht_drive_oauth');
   } catch(e){ return false; }
 }
+function getDriveInteractivePrompt_(){
+  // 첫 연결은 동의 화면(consent), 재연결은 가능한 한 무프롬프트로 시도
+  return hasDriveConnection_() ? '' : 'consent';
+}
 /** 실제로 API 호출 가능한 유효 토큰 (만료 전) */
 function hasDriveValidToken_(){
   return !!readCachedDriveToken_();
@@ -2305,7 +2349,7 @@ window.onDriveButtonClick = async function(){
   if(sub) sub.textContent = needsReauth ? '로그인 중…' : '동기화 중…';
   try {
     if(needsReauth){
-      var loginResult = await driveLoginInteractive_('upload', 'consent');
+      var loginResult = await driveLoginInteractive_('upload', getDriveInteractivePrompt_());
       if(loginResult === false) return;
       return;
     }
@@ -2373,7 +2417,7 @@ window.driveLoginAndUpload = async function(){
       window.__htDriveTokenClientCid = null;
     }
     if(!readCachedDriveToken_()){
-      var ok = await driveLoginInteractive_('upload', firstConnect ? 'consent' : 'consent');
+      var ok = await driveLoginInteractive_('upload', firstConnect ? 'consent' : getDriveInteractivePrompt_());
       if(!ok) return;
       maybeRequestNotificationAfterDrive();
       return;
@@ -2396,7 +2440,7 @@ window.driveManualUploadOnly = async function(){
   if(errEl) errEl.textContent = '';
   try{
     if(!readCachedDriveToken_()){
-      var done = await driveLoginInteractive_('upload', 'consent');
+      var done = await driveLoginInteractive_('upload', getDriveInteractivePrompt_());
       if(!done) return;
     }
     await driveUploadNow();
@@ -2445,7 +2489,7 @@ window.drivePullFromCloud = async function(){
   if(errEl) errEl.textContent = '';
   try{
     if(!readCachedDriveToken_()){
-      var pulled = await driveLoginInteractive_('pull', 'consent');
+      var pulled = await driveLoginInteractive_('pull', getDriveInteractivePrompt_());
       if(!pulled) return;
       return;
     }
@@ -2685,6 +2729,13 @@ function countPendingDraftsInCat_(catId) {
   }).length;
 }
 
+/** 카테고리에 생성된 주제 카드 수 (발행·초안 본문 유무와 무관) */
+function countTopicsInCat_(catId) {
+  const cat = CATEGORIES[catId];
+  if (!cat || !cat.drafts) return 0;
+  return cat.drafts.filter(function (d) { return d && d.id; }).length;
+}
+
 function sortDraftsForDisplay(drafts) {
   return (drafts || []).slice().sort(function (a, b) {
     const ap = draftIsPublished_(a.id) ? 1 : 0;
@@ -2732,7 +2783,7 @@ function renderMain() {
   const cat = CATEGORIES[state.currentCat];
   const mc = document.getElementById('main-content');
 
-  if(state.showAdd){ mc.innerHTML = renderAddForm(); return; }
+  if(state.showAdd){ mc.innerHTML = renderAddForm(); bindNewItemTopicInput_(); return; }
 
   // Alert: upcoming — choose from all categories so the next topic suggestion is not tied to the open tab.
   const nextRec = getNextPublishRecommendation();
@@ -2765,11 +2816,12 @@ function renderMain() {
       </div>
     </div>`;
 
-  const lowDraftCount = genCount < MIN_PENDING_DRAFTS_PER_CAT;
-  const batchHTML = lowDraftCount ? `
+  const topicCount = countTopicsInCat_(state.currentCat);
+  const lowTopicCount = topicCount < MIN_TOPICS_PER_CAT;
+  const batchHTML = lowTopicCount ? `
     <div class="batch-gen-row">
       <button type="button" class="btn-batch-gen" ${batchBusy ? 'disabled' : ''} onclick="fillPendingDraftsForCurrentCat()">
-        <strong>초안 ${MIN_PENDING_DRAFTS_PER_CAT}개로 채우기 (${genCount}/${MIN_PENDING_DRAFTS_PER_CAT})</strong>
+        <strong>주제 ${MIN_TOPICS_PER_CAT}개로 채우기 (${topicCount}/${MIN_TOPICS_PER_CAT})</strong>
         발행본과 이어지는 새 주제를 만들고 AI 초안까지 작성
       </button>
     </div>` : (!state.showAdd && missingCount > 0) ? `
@@ -2825,7 +2877,10 @@ function draftCardHTML(d, cat, isRec) {
     isPub ? '<span class="badge badge-pub">발행완료</span>' : '',
   ].filter(Boolean).join('');
   return `<div class="draft-card${isPub?' published':''}${isRec?' recommended':''}" style="--cc:${color}" onclick="openDetail('${d.id}',${cat.id})">
-    <button type="button" class="draft-card-refresh-mini" title="이 주제의 제목·각도만 다시 받기" onclick="event.stopPropagation();refreshTopicsForDraft(${cat.id},'${d.id}')">주제 변경</button>
+    <div class="draft-card-actions">
+      <button type="button" class="draft-card-delete-mini" title="이 주제 카드 삭제" onclick="event.stopPropagation();deleteDraft(${cat.id},'${d.id}')">삭제</button>
+      <button type="button" class="draft-card-refresh-mini" title="이 주제의 제목·각도만 다시 받기" onclick="event.stopPropagation();refreshTopicsForDraft(${cat.id},'${d.id}')">주제 변경</button>
+    </div>
     <div class="card-badges">${badges}</div>
     <div class="card-topic">${d.topic}</div>
     <div class="card-angle">${d.angle}</div>
@@ -2906,13 +2961,13 @@ async function generateTopicFromKeywords_(catId, keywords, imagePayload){
       : '\n[첨부 참고 사진이 있습니다. 사진에 보이는 자세·부위·상황을 topic·angle에 반영하세요.]';
   }
   var kwLine = keywords
-    ? ('입력 키워드: ' + keywords)
-    : (isDaily && imagePayload && imagePayload.data ? '입력 키워드: (없음 — 사진만 참고)' : '입력 키워드: ');
+    ? ('입력 (키워드·아이디어·문장): ' + keywords)
+    : (isDaily && imagePayload && imagePayload.data ? '입력 (키워드·아이디어·문장): (없음 — 사진만 참고)' : '입력 (키워드·아이디어·문장): ');
   var topicGuide = isDaily
     ? ('일상 공유용 주제 1개. 축: 일상·계절·날씨·건강·여행·공감·느낌·최근 이슈(가볍게).\n' +
        '- topic: 일기 제목 한 줄 (15~32자, 질문·감탄·오늘의 장면)\n' +
        '- angle: 어떤 느낌으로 쓸지 한 줄 (공감·여유·계절·여행 등, 전문·임상 톤 금지)\n')
-    : ('키워드를 바탕으로 블로그·SNS에 쓸 주제 1개를 만드세요.\n' +
+    : ('입력한 키워드·아이디어·문장을 바탕으로 블로그·SNS에 쓸 주제 1개를 만드세요.\n' +
        '- topic: 한국어 제목 한 줄 (15~36자, 후킹·질문형 가능)\n' +
        '- angle: 어떤 관점으로 풀지 한 줄 (메커니즘·실천·오해 해소 등)\n');
   var prompt =
@@ -2964,13 +3019,13 @@ function renderAddForm(){
   const addIntro = isDaily
     ? '「일상 공유」에 올릴 <strong>생활 일기·느낌</strong> 주제를 만듭니다. 사진만 올려도 되고, 키워드와 함께 써도 돼요.'
     : '추가한 주제는 <strong>선택한 카테고리 탭</strong>의 「전체 초안」 목록 맨 아래에 카드로 생깁니다.';
-  const kwLabel = isDaily ? '키워드 (선택)' : '키워드';
+  const kwLabel = isDaily ? '키워드 · 아이디어 (선택)' : '키워드 · 아이디어';
   const kwPlaceholder = isDaily
-    ? '예: 봄 산책, 비 오는 날, 여행 (비우고 사진만 가능)'
-    : '예: 거북목, 어깨 결림, 재택 근무 (쉼표로 구분)';
+    ? '키워드, 짧은 문장, 떠오른 장면을 자유롭게 적어 주세요 (비우고 사진만 가능)'
+    : '키워드, 짧은 문장, 여러 아이디어를 자유롭게 적어 주세요';
   const kwHint = isDaily
-    ? '비우면 <strong>사진만</strong>으로 주제·일상 글을 만듭니다. 키워드가 있으면 함께 반영해요.'
-    : 'AI가 키워드로 <strong>주제 제목</strong>과 <strong>각도</strong>를 만든 뒤 목록에 넣습니다.';
+    ? '비우면 <strong>사진만</strong>으로 주제·일상 글을 만듭니다. 적은 내용은 모두 반영해요.'
+    : 'AI가 적어 주신 <strong>키워드·문장</strong>으로 <strong>주제 제목</strong>과 <strong>각도</strong>를 만든 뒤 목록에 넣습니다.';
   const btnLabel = isDaily && hasPhoto ? '사진으로 일상 글 추가' : (isDaily ? '주제 추가 · 일상 글 만들기' : '키워드로 주제 만들기');
   return `<div class="add-form">
     <div class="form-title">새 주제 추가</div>
@@ -2982,7 +3037,7 @@ function renderAddForm(){
     </div>
     <div class="form-field">
       <label class="form-label">${kwLabel}</label>
-      <input class="form-input" value="${escapeHtml(state.newItem.topic)}" oninput="state.newItem.topic=this.value" placeholder="${kwPlaceholder}" />
+      <textarea id="new-item-topic-input" class="form-input form-textarea" rows="6" oninput="state.newItem.topic=this.value" placeholder="${kwPlaceholder}">${escapeHtml(state.newItem.topic)}</textarea>
       <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">${kwHint}</div>
     </div>
     <div class="form-field">
@@ -2992,6 +3047,55 @@ function renderAddForm(){
     </div>
     <button type="button" class="btn-submit" id="btn-add-draft-submit" onclick="addDraft()">${btnLabel}</button>
   </div>`;
+}
+function scrollTextareaCaretIntoView_(ta){
+  if(!ta || ta.tagName !== 'TEXTAREA') return;
+  var pos = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length;
+  var cs = window.getComputedStyle(ta);
+  var mirror = document.createElement('div');
+  var mirrorStyle = ['boxSizing','width','paddingTop','paddingRight','paddingBottom','paddingLeft',
+    'borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth',
+    'fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','textIndent','whiteSpace','wordWrap','overflowWrap'];
+  mirrorStyle.forEach(function(k){ mirror.style[k] = cs[k]; });
+  mirror.style.position = 'absolute';
+  mirror.style.visibility = 'hidden';
+  mirror.style.top = '0';
+  mirror.style.left = '-9999px';
+  mirror.style.whiteSpace = 'pre-wrap';
+  mirror.style.wordWrap = 'break-word';
+  mirror.style.overflowWrap = 'break-word';
+  mirror.style.width = ta.clientWidth + 'px';
+  mirror.style.overflow = 'hidden';
+  var before = document.createTextNode(ta.value.substring(0, pos));
+  var marker = document.createElement('span');
+  marker.textContent = '\u200b';
+  mirror.appendChild(before);
+  mirror.appendChild(marker);
+  document.body.appendChild(mirror);
+  var caretTop = marker.offsetTop;
+  var caretH = marker.offsetHeight || (parseFloat(cs.lineHeight) || 20);
+  document.body.removeChild(mirror);
+  var padTop = parseFloat(cs.paddingTop) || 0;
+  var padBot = parseFloat(cs.paddingBottom) || 0;
+  var viewTop = ta.scrollTop;
+  var viewBot = viewTop + ta.clientHeight - padTop - padBot;
+  var caretBot = caretTop + caretH;
+  if(caretTop < viewTop + padTop){
+    ta.scrollTop = Math.max(0, caretTop - padTop - 6);
+  } else if(caretBot > viewBot){
+    ta.scrollTop = caretBot - ta.clientHeight + padTop + padBot + 6;
+  }
+}
+function bindNewItemTopicInput_(){
+  var el = document.getElementById('new-item-topic-input');
+  if(!el || el._caretScrollBound) return;
+  el._caretScrollBound = true;
+  var sync = function(){ scrollTextareaCaretIntoView_(el); };
+  ['click','keyup','keydown','select','input','focus','touchend'].forEach(function(ev){
+    el.addEventListener(ev, function(){
+      requestAnimationFrame(function(){ requestAnimationFrame(sync); });
+    });
+  });
 }
 function setNewCat(v){ state.newItem.catId=parseInt(v,10); renderMain(); }
 
@@ -3146,6 +3250,41 @@ ${ids.join(', ')}`;
     const msg = String((e && e.message) ? e.message : e);
     if(typeof setAppToast === 'function') setAppToast('주제 리프레쉬에 실패했어요.\n' + msg, { duration: 6500, variant: 'err' });
   }
+};
+
+window.deleteDraft = function(catId, draftId){
+  var cat = CATEGORIES[catId];
+  if(!cat || !draftId) return;
+  var d = (cat.drafts || []).find(function(x){ return x && x.id === draftId; });
+  if(!d){
+    if(typeof setAppToast === 'function') setAppToast('주제를 찾을 수 없어요.', { duration: 3200 });
+    return;
+  }
+  var t0 = d.topic || '주제';
+  var short = t0.length > 28 ? t0.slice(0, 28) + '…' : t0;
+  var hasExtra = draftHasContent(d) || draftIsPublished_(draftId);
+  var msg = hasExtra
+    ? '「' + short + '」와 작성된 초안·발행 정보를 삭제합니다.\n되돌릴 수 없어요. 계속할까요?'
+    : '「' + short + '」 주제를 목록에서 삭제할까요?';
+  if(!confirm(msg)) return;
+
+  cat.drafts = (cat.drafts || []).filter(function(x){ return !x || x.id !== draftId; });
+  delete state.published[draftId];
+  delete state.generatedOnly[draftId];
+  if(typeof instaBgByDraft !== 'undefined') delete instaBgByDraft[draftId];
+  if(typeof threadsBgByDraft !== 'undefined') delete threadsBgByDraft[draftId];
+
+  if(state.selectedId === draftId){
+    closeSheet();
+    state.selectedId = null;
+    try {
+      if(location.hash && /^#open\//.test(location.hash)) history.replaceState(null, '', location.pathname + (location.search || ''));
+    } catch(e){}
+  }
+
+  save();
+  renderMain();
+  if(typeof setAppToast === 'function') setAppToast('「' + short + '」을(를) 삭제했어요.', { duration: 3200, variant: 'ok' });
 };
 
 window.refreshTopicsForDraft = async function(catId, draftId){
@@ -5647,7 +5786,7 @@ async function generateRelatedTopicsAfterPublish_(catId, sourceDraft, finalText,
       : '블로그·인스타용입니다. 방금 발행한 글에서 자연스럽게 이어지는 후속, 심화, 오해 해소, 실천 팁 소재로 만드세요.');
   var prompt =
 '당신은 콘텐츠 플래너입니다.\n' +
-'발행 완료 후에도 바로 쓸 수 있는 미발행 초안이 최소 ' + MIN_PENDING_DRAFTS_PER_CAT + '개 유지되도록, 방금 발행한 글과 연관된 새 주제를 만듭니다.\n\n' +
+'이 카테고리에 생성된 주제 카드가 최소 ' + MIN_TOPICS_PER_CAT + '개 유지되도록, 방금 발행한 글과 연관된 새 주제를 만듭니다.\n\n' +
 '카테고리: ' + cat.name + ' (' + (cat.sub || '') + ')\n' +
 '독자: ' + cat.audience + '\n' +
 '방금 발행한 주제: ' + ((sourceDraft && sourceDraft.topic) || '') + '\n' +
@@ -5691,13 +5830,15 @@ async function generateRelatedTopicsAfterPublish_(catId, sourceDraft, finalText,
 async function ensureMinimumPendingDraftsAfterPublish_(catId, sourceDraft, finalText){
   var cat = CATEGORIES[catId];
   if(!cat) return;
-  var missing = MIN_PENDING_DRAFTS_PER_CAT - countPendingDraftsInCat_(catId);
+  if(minDraftReplenishRunningByCat[catId]) return;
+  var missing = MIN_TOPICS_PER_CAT - countTopicsInCat_(catId);
   if(missing <= 0) return;
   if(!state.apiKey){
-    setAppToast('미발행 초안이 ' + MIN_PENDING_DRAFTS_PER_CAT + '개보다 적어요.\nAPI 키를 설정하면 발행본과 이어지는 새 주제를 자동으로 채울 수 있어요.', { duration: 7000, variant: 'err' });
+    setAppToast('생성된 주제가 ' + MIN_TOPICS_PER_CAT + '개보다 적어요.\nAPI 키를 설정하면 발행본과 이어지는 새 주제를 자동으로 채울 수 있어요.', { duration: 7000, variant: 'err' });
     return;
   }
 
+  minDraftReplenishRunningByCat[catId] = true;
   setAppToast('발행본과 이어지는 새 주제 ' + missing + '건을 만들고 초안을 채우는 중이에요…', { duration: 5200, variant: 'ok' });
 
   var created = [];
@@ -5715,12 +5856,14 @@ async function ensureMinimumPendingDraftsAfterPublish_(catId, sourceDraft, final
   } catch(e){
     setAppToast('관련 주제 생성에 실패했어요.\n' + ((e && e.message) || String(e)), { duration: 8000, variant: 'err' });
     return;
+  } finally {
+    minDraftReplenishRunningByCat[catId] = false;
   }
 
   var okCount = 0;
   var failCount = 0;
   for(var i = 0; i < created.length; i++){
-    if(countPendingDraftsInCat_(catId) >= MIN_PENDING_DRAFTS_PER_CAT) break;
+    if(draftHasContent(created[i])) continue;
     var ok = await window.enqueueDraftGeneration(catId, created[i].id, { batch: true });
     if(ok) okCount++;
     else failCount++;
@@ -5728,9 +5871,11 @@ async function ensureMinimumPendingDraftsAfterPublish_(catId, sourceDraft, final
   renderTabs();
   renderMain();
   if(okCount > 0){
-    setAppToast('새 관련 초안 ' + okCount + '건을 채웠어요.\n미발행 초안 ' + countPendingDraftsInCat_(catId) + '개를 유지합니다.', { duration: 7500, variant: 'ok' });
+    setAppToast('새 주제 ' + created.length + '건 · AI 초안 ' + okCount + '건을 채웠어요.\n이 탭 주제 ' + countTopicsInCat_(catId) + '개를 유지합니다.', { duration: 7500, variant: 'ok' });
   } else if(failCount > 0){
     setAppToast('새 주제는 추가했지만 초안 생성에 실패했어요.\n카드에서 다시 생성해 주세요.', { duration: 8000, variant: 'err' });
+  } else if(created.length > 0){
+    setAppToast('새 주제 ' + created.length + '건을 추가했어요.\n이 탭 주제 ' + countTopicsInCat_(catId) + '개입니다.', { duration: 5500, variant: 'ok' });
   }
 }
 
@@ -5762,23 +5907,20 @@ async function runMinimumPendingDraftsForCat_(catId, reason, force){
   }
   var cat = CATEGORIES[catId];
   if(!cat || !cat.drafts) return;
-  if(countPendingDraftsInCat_(catId) >= MIN_PENDING_DRAFTS_PER_CAT){
-    if(force) setAppToast('이미 초안이 ' + MIN_PENDING_DRAFTS_PER_CAT + '개 이상 있어요.', { duration: 3500, variant: 'ok' });
+  if(countTopicsInCat_(catId) >= MIN_TOPICS_PER_CAT){
+    if(force) setAppToast('이미 주제가 ' + MIN_TOPICS_PER_CAT + '개 이상 있어요.', { duration: 3500, variant: 'ok' });
     return;
   }
   if(minDraftReplenishRunningByCat[catId]) return;
   var now = Date.now();
   if(!force && minDraftReplenishLastAttemptByCat[catId] && now - minDraftReplenishLastAttemptByCat[catId] < MIN_DRAFT_REPLENISH_COOLDOWN_MS) return;
-  minDraftReplenishRunningByCat[catId] = true;
   minDraftReplenishLastAttemptByCat[catId] = now;
   try {
     var seed = getReplenishSeedForCat_(catId);
     await ensureMinimumPendingDraftsAfterPublish_(catId, seed.draft, seed.finalText);
   } catch(e){
-    console.warn('[초안 자동 보충]', reason || '', e);
-    if(force) setAppToast('초안 5개 채우기에 실패했어요.\n' + ((e && e.message) || String(e)), { duration: 8000, variant: 'err' });
-  } finally {
-    minDraftReplenishRunningByCat[catId] = false;
+    console.warn('[주제 자동 보충]', reason || '', e);
+    if(force) setAppToast('주제 5개 채우기에 실패했어요.\n' + ((e && e.message) || String(e)), { duration: 8000, variant: 'err' });
   }
 }
 

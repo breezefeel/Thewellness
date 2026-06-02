@@ -1108,6 +1108,8 @@ const CAT_TAB_SHORT = {
   4: 'IFC 과정',
   6: '일상 공유'
 };
+/** 추가 폼 카테고리 선택 순서 */
+const ADD_FORM_CAT_ORDER = [0, 3, 1, 5, 2, 4, 7, 6];
 
 const SK = 'ht_v2';
 /** 카테고리당 유지할 주제 카드 수 (발행·AI 초안 유무와 무관) */
@@ -2862,7 +2864,9 @@ function renderMain() {
   const cardsHTML = drafts.length ? drafts.map(d=>draftCardHTML(d,cat,false)).join('') : '<div class="empty-note">조건에 맞는 초안이 없어요</div>';
 
   mc.innerHTML = alertHTML + statsHTML + batchHTML + searchHTML + `<div class="cards-wrap">${recHTML}${cardsHTML}</div>`;
-  scheduleMinimumPendingDraftsForCat_(state.currentCat, 'render');
+  if(isAutoTopicReplenishEnabled_()){
+    scheduleMinimumPendingDraftsForCat_(state.currentCat, 'render');
+  }
 }
 
 function draftCardHTML(d, cat, isRec) {
@@ -3010,7 +3014,10 @@ function renderAddForm(){
   const cat = CATEGORIES[state.newItem.catId] || CATEGORIES[0];
   const isDaily = isDailyShareCategory(state.newItem.catId);
   const hasPhoto = !!(state.newItem.refImage && state.newItem.refImage.data);
-  const catOpts = CATEGORIES.map((c,i)=>`<option value="${i}"${state.newItem.catId===i?' selected':''}>${c.name} · ${c.audience}</option>`).join('');
+  const catOpts = ADD_FORM_CAT_ORDER
+    .map((i) => CATEGORIES[i] ? `<option value="${i}"${state.newItem.catId===i?' selected':''}>${CATEGORIES[i].name} · ${CATEGORIES[i].audience}</option>` : '')
+    .filter(Boolean)
+    .join('');
   const imgHint = hasPhoto
     ? '<span style="font-size:11px;color:#0F766E;">참고 사진: ' + escapeHtml(state.newItem.refImage.name) + (isDaily ? ' — 일기 톤으로 글을 씁니다' : '') + '</span>'
     : (isDaily
@@ -3042,7 +3049,7 @@ function renderAddForm(){
     </div>
     <div class="form-field">
       <label class="form-label">참고 사진${isDaily ? ' (일상 공유에 추천)' : ' (선택)'}</label>
-      <input class="form-input" type="file" accept="image/*" capture="environment" onchange="onNewItemImage(this)" style="padding:8px;" />
+      <input class="form-input" type="file" accept="image/*" onchange="onNewItemImage(this)" style="padding:8px;" />
       <div style="margin-top:4px;">${imgHint}</div>
     </div>
     <button type="button" class="btn-submit" id="btn-add-draft-submit" onclick="addDraft()">${btnLabel}</button>
@@ -3378,6 +3385,7 @@ const DAILY_AUTO_HOUR = 8;
 const DAILY_AUTO_MINUTE = 30;
 const DAILY_AUTO_LAST_KEY = 'ht_daily_auto_last';
 const DAILY_AUTO_ENABLED_KEY = 'ht_daily_auto_enabled';
+const AUTO_TOPIC_REPLENISH_ENABLED_KEY = 'ht_auto_topic_replenish_enabled';
 var dailyAutoTimer = null;
 
 function isDailyAutoEnabled_(){
@@ -3386,6 +3394,11 @@ function isDailyAutoEnabled_(){
     if(v === '0') return false;
     return true;
   } catch(e){ return true; }
+}
+function isAutoTopicReplenishEnabled_(){
+  try {
+    return localStorage.getItem(AUTO_TOPIC_REPLENISH_ENABLED_KEY) === '1';
+  } catch(e){ return false; }
 }
 function getSeoulMinutesNow_(){
   try {
@@ -4947,7 +4960,7 @@ function commitSheetTabPublish_(draftId, catId, tab){
 async function afterTabPublishSaved_(result, draftId){
   var catId = result.catId;
   var draft = CATEGORIES[catId] && CATEGORIES[catId].drafts.find(function(d){ return d.id === draftId; });
-  if(result.wasFirstPublish){
+  if(result.wasFirstPublish && isAutoTopicReplenishEnabled_()){
     await ensureMinimumPendingDraftsAfterPublish_(catId, draft, (state.published[draftId] && state.published[draftId].finalText) || '');
   }
   if(shouldRefinePromptsAfterPublish_(catId)){
@@ -5896,6 +5909,7 @@ function getReplenishSeedForCat_(catId){
 }
 
 async function runMinimumPendingDraftsForCat_(catId, reason, force){
+  if(!force && !isAutoTopicReplenishEnabled_()) return;
   if(!state.apiKey){
     if(force) openApiModal();
     return;
@@ -5925,6 +5939,7 @@ async function runMinimumPendingDraftsForCat_(catId, reason, force){
 }
 
 function scheduleMinimumPendingDraftsForCat_(catId, reason){
+  if(!isAutoTopicReplenishEnabled_()) return;
   if(minDraftReplenishTimerByCat[catId]) clearTimeout(minDraftReplenishTimerByCat[catId]);
   minDraftReplenishTimerByCat[catId] = setTimeout(function(){
     minDraftReplenishTimerByCat[catId] = null;
@@ -6030,7 +6045,7 @@ window.confirmPublishFinal = async function(){
   if(btn){ btn.disabled = false; btn.textContent = '발행 저장'; }
   setAppToast('발행본이 저장됐어요.', { duration: 4200, variant: 'ok' });
 
-  if(!wasPublished){
+  if(!wasPublished && isAutoTopicReplenishEnabled_()){
     await ensureMinimumPendingDraftsAfterPublish_(catId, draft, text);
   }
 

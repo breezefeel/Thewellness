@@ -352,6 +352,7 @@ font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700;
 .card-angle { font-size: 12px; color: #9CA3AF; line-height: 1.55; }
 .card-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
 .card-date { font-size: 11px; color: #C0C0C0; }
+.card-created-date { font-size: 11px; color: #9CA3AF; font-weight: 600; }
 .card-arrow { font-size: 15px; color: #C0C0C0; transition: transform 0.15s; }
 .draft-card:hover .card-arrow { transform: translateX(3px); color: #1A1A1A; }
 
@@ -2738,6 +2739,30 @@ function countTopicsInCat_(catId) {
   return cat.drafts.filter(function (d) { return d && d.id; }).length;
 }
 
+function getDraftCreatedAtMs_(d) {
+  if (!d) return 0;
+  if (d.createdAt) {
+    var t = Date.parse(d.createdAt);
+    if (!isNaN(t)) return t;
+  }
+  var m = String(d.id || '').match(/-c(\d+)$/);
+  if (m) {
+    var n = parseInt(m[1], 10);
+    if (!isNaN(n)) return n;
+  }
+  return 0;
+}
+
+function getDraftCreatedDateLabel_(d) {
+  var ms = getDraftCreatedAtMs_(d);
+  if (!ms) return '-';
+  try {
+    return new Date(ms).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
+  } catch (e) {
+    return '-';
+  }
+}
+
 function sortDraftsForDisplay(drafts) {
   return (drafts || []).slice().sort(function (a, b) {
     const ap = draftIsPublished_(a.id) ? 1 : 0;
@@ -2750,7 +2775,11 @@ function sortDraftsForDisplay(drafts) {
     if (ap !== bp) return ap - bp;
     const ag = draftIsPendingPublish_(a) ? 1 : 0;
     const bg = draftIsPendingPublish_(b) ? 1 : 0;
-    return bg - ag;
+    if (ag !== bg) return bg - ag;
+    const aCreated = getDraftCreatedAtMs_(a);
+    const bCreated = getDraftCreatedAtMs_(b);
+    if (aCreated !== bCreated) return bCreated - aCreated;
+    return 0;
   });
 }
 
@@ -2874,8 +2903,10 @@ function draftCardHTML(d, cat, isRec) {
   const hasDraft = draftIsPendingPublish_(d);
   const isPub = draftIsPublished_(d.id);
   const color = cat.color;
+  const audienceBadge = String(cat.audience || '').includes('전문가') ? '전문가' : (String(cat.audience || '').includes('일반') ? '일반인' : cat.audience);
+  const createdDateLabel = getDraftCreatedDateLabel_(d);
   const badges = [
-    `<span class="badge badge-aud">${cat.audience}</span>`,
+    `<span class="badge badge-aud">${audienceBadge}</span>`,
     isRec && d.recType==='related' ? '<span class="badge badge-rec">관련</span>' : '',
     hasDraft ? '<span class="badge badge-gen">초안있음</span>' : '',
     isPub ? '<span class="badge badge-pub">발행완료</span>' : '',
@@ -2890,7 +2921,7 @@ function draftCardHTML(d, cat, isRec) {
     <div class="card-angle">${d.angle}</div>
     <div class="card-footer">
       <div class="card-date">${isPub?'발행: '+pub.date:'미발행'}</div>
-      <div class="card-arrow">→</div>
+      <div class="card-created-date">생성: ${createdDateLabel}</div>
     </div>
   </div>`;
 }
@@ -3126,7 +3157,7 @@ window.addDraft = async function(){
     var gen = await generateTopicFromKeywords_(state.newItem.catId, keywords, state.newItem.refImage);
     var cat = CATEGORIES[state.newItem.catId];
     var id = 'd' + state.newItem.catId + '-c' + Date.now();
-    var draft = { id: id, topic: gen.topic, angle: gen.angle };
+    var draft = { id: id, topic: gen.topic, angle: gen.angle, createdAt: new Date().toISOString() };
     if(state.newItem.refImage && state.newItem.refImage.data){
       draft.refImage = {
         mediaType: state.newItem.refImage.mediaType,

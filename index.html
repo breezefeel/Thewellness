@@ -1369,7 +1369,7 @@ ${DEFAULT_EXPERT_COURSE_SCOPE_RULE}
 - 해시태그 **최소화**(3~5개), 본문 흐름을 방해하지 않게
 
 [형식]
-- 길이: **중간**(본문 500~850자)
+- 길이: **짧은 중간**(본문 350~500자)
 - 마무리: 수강·등록·예약 유도보다 **"이 관점이 현장에 도움이 됐으면"**, **"한 번 적용해 보시고"** 식의 가벼운 마무리`;
 
 const DEFAULT_EXPERT_COURSE_INSTA_PROMPT = `전문가 과정 **강연·영상 공유**용 인스타 캡션입니다. 블로그보다 짧고 밀도 있게.
@@ -5710,7 +5710,12 @@ window.onSheetPublishComplete = async function(){
 
   if(tab === 'insta' && isBlogInstaCategory(catId)){
     var igContent = getDraftContent_(draftId);
-    if(igContent && (igContent.instaPending || instaBgByDraft[draftId])){
+    if(igContent && instaContentReady_(igContent)){
+      clearInstaPendingMeta_(igContent);
+      delete instaBgByDraft[draftId];
+      persistDraftContent_(draftId, igContent);
+    }
+    if(shouldShowInstaPending_(igContent, draftId)){
       setAppToast('인스타 캡션을 만들고 있어요.\n블로그 앱에서 글을 올린 뒤, 잠시 후 인스타 탭을 확인해 주세요.', { duration: 5000, variant: 'ok' });
       return;
     }
@@ -5754,7 +5759,12 @@ window.onSheetPublishComplete = async function(){
 
   if(tab === 'threads' && isBlogInstaCategory(catId)){
     var thContent = getDraftContent_(draftId);
-    if(thContent && (thContent.threadsPending || threadsBgByDraft[draftId])){
+    if(thContent && threadsContentReady_(thContent)){
+      clearThreadsPendingMeta_(thContent);
+      delete threadsBgByDraft[draftId];
+      persistDraftContent_(draftId, thContent);
+    }
+    if(shouldShowThreadsPending_(thContent, draftId)){
       setAppToast('쓰레드 글을 만들고 있어요.\n인스타 앱에서 올린 뒤, 잠시 후 쓰레드 탭을 확인해 주세요.', { duration: 5000, variant: 'ok' });
       return;
     }
@@ -7304,7 +7314,7 @@ ${imgJsonTail}
 if(!isDailyShareCategory(catId) && !isHeiljagyaeCategory(catId) && isExpertCourseCategory(catId)){
   prompt = prompt.replace(
     '"title": "네이버 SEO 최적화 후킹 제목 (35자 이내, 숫자나 물음표 활용)",\n"hook": "공감→문제제기→해결암시 흐름의 오프닝 2~3문장",\n"outline": ["소제목1","소제목2","소제목3","소제목4"],\n"draft": "본문 초안 700~900자. 따뜻하고 전문적인 원장님 톤. 실제 임상 경험 느낌. 단락 구분 포함.",\n"cta": "마무리 행동 유도 (힐링트리 센터 자연스럽게 언급)",\n"hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6"]',
-    '"title": "전문가 독자용 한 줄 (35자 내외, 과장·낚시 금지)",\n"hook": "현장에서 공감되는 오프닝 2~3문장. 강의 말투",\n"outline": ["테크닉/개념","핵심 포인트1","핵심 포인트2","현장 적용"],\n"draft": "500~850자. 참고 메모·영상 분석 **범위 안만**. 테크닉/개념→핵심 포인트 1~3개→짧은 원리·현장 적용. 참고에 없는 평가·케이스·부위로 확장 금지",\n"cta": "수강·등록 유도 금지. 이 관점이 현장에 도움이 됐으면 식 마무리",\n"hashtags": ["3~5개만","전문 키워드"]'
+    '"title": "전문가 독자용 한 줄 (35자 내외, 과장·낚시 금지)",\n"hook": "현장에서 공감되는 오프닝 2~3문장. 강의 말투",\n"outline": ["테크닉/개념","핵심 포인트1","핵심 포인트2","현장 적용"],\n"draft": "350~500자. 참고 메모·영상 분석 **범위 안만**. 테크닉/개념→핵심 포인트 1~3개→짧은 원리·현장 적용. 참고에 없는 평가·케이스·부위로 확장 금지",\n"cta": "수강·등록 유도 금지. 이 관점이 현장에 도움이 됐으면 식 마무리",\n"hashtags": ["3~5개만","전문 키워드"]'
   );
 }
 

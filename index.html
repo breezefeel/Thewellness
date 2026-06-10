@@ -1206,9 +1206,10 @@ const DEFAULT_CHATGPT_IMAGE_PROJECT_URL = 'https://chatgpt.com/g/g-p-6a005d9f06c
 
 const COMMUNITY_FIXED_GREETING = `안녕하세요, 입주민 여러분 😊
 힐자계 커뮤니티 내 힐링트리 센터입니다.
-매주 한 번, 일상에서 바로 도움이 되는 건강 이야기를 나눠드리고 있습니다.`;
+매주 한 번, 일상에서 바로 쓸 수 있는 건강 이야기를 나눠드리고 있어요.`;
 
-const COMMUNITY_FIXED_CLOSING = `궁금한 점이 있으시면 언제든 편하게 문의해 주세요 😊`;
+const COMMUNITY_FIXED_CLOSING = `궁금한 점은 언제든 편하게 문의해 주세요 😊
+힐링트리 센터 드림`;
 
 const DEFAULT_HEILJAGYAE_COMMUNITY_PROMPT = `힐스테이트 자이 계양 **아파트너(힐자계) 게시판**에 올라가는 글입니다.
 
@@ -1228,23 +1229,33 @@ const DEFAULT_HEILJAGYAE_COMMUNITY_PROMPT = `힐스테이트 자이 계양 **아
 [고정 요소 — JSON에 넣지 말 것]
 인사말·마무리는 앱에서 고정 문구로 붙입니다.
 
+[글 흐름 — 반드시 이 순서]
+1. **문제 제기** (problem): 일상 장면에서 공감되는 불편·궁금증을 **자연스러운 문장 2~4개**로. 불릿·번호 나열 금지. 마지막 문장에서 **짧은 시간·일상 공간으로 해결 가능**하다는 뉘앙스로 이어지기.
+2. **해결책 제시** (selfCare): **👉 로 시작**. 동작·자세·**초·회·분** 숫자를 앞쪽에 배치해 핵심이 먼저 보이게. "지금 바로 해보세요" 같은 가벼운 멘트 OK. "아 시원하다" 지점에서 멈추라는 뉘앙스.
+3. **원리 설명** (explanation): 동작 **뒤에** 왜 도움이 되는지 **2~5문장**. 정의 한 줄 + **비유 한 줄**(쿠션 털기, 고양이 기지개 등) + 복잡하지 않다·도구 필요 없다는 마무리.
+
 [형식]
 - title: 🌿 로 시작, 질문형·공감형 한 줄 (낚시·과장 금지)
-- empathyLead: **공감 질문 한 줄** (예: "스트레칭 하다가 '아 이게 맞나?' 싶을 때 있죠?")
-- empathyBullets: 정확히 3개. 각 줄 **이모지 1개 + 짧은 한 줄** (• 접두어는 앱이 붙임)
-- explanation: **2~4문장**. 짧은 단락 2개도 OK. 정의 한 줄 + **비유 한 줄**(고양이 기지개, 몸이 허락하는 선 등) + 억지로 당기지 말 것 한 줄.
-- selfCare: **반드시 👉** 로 시작. 동작·자세·**초·회·분** 숫자 필수. "아 시원하다" 지점에서 멈추라는 뉘앙스.
+- problem: 문제 제기 단락 (위 1번)
+- selfCare: 해결책·동작 단락 (위 2번)
+- explanation: 원리 설명 단락 (위 3번)
 
 [완성 톤 참고 — 구조·말투만 따르고 문장은 주제에 맞게 새로 쓸 것]
-🌿 P-스트레칭이 뭔가요?
+🌿 엘리베이터 기다리는 30초, 그냥 보낼 건가요?
 (인사 — 앱 고정)
-스트레칭 하다가 '아 이게 맞나?' 싶을 때 있죠?
-• 💭 억지로 당겨야 효과 있는 건 아닐까…
-• 😅 남들만 유연한 것 같고…
-• 🤔 방법을 몰라 아예 안 하게 되고…
-P-스트레칭은 패시브, 수동적 이완이에요. …
-스트레칭은 고양이가 기지개 켜듯, '아 시원하다' 선에서 멈추면 됩니다. …
-👉 앉아서 … 20~30초 … 양쪽 2~3회.
+하루 종일 앉아 있다가 일어설 때, 골반이 뻐근하고 묵직한 느낌 드신 적 있으신가요?
+그 불편함, 엘리베이터 기다리는 30초로 해결할 수 있습니다.
+👉 지금 바로 해보세요
+엘리베이터 앞 벽에 등을 살짝 대고 서서,
+한쪽 무릎을 가슴 쪽으로 천천히 당겨주세요.
+⏱ 15초 × 양쪽 교대 × 2~3회
+억지로 힘줄 필요 없어요.
+몸이 "아, 시원하다" 싶은 선에서 멈추면 딱 맞아요.
+오래 앉아 있으면 골반 주변 근육이 조금씩 굳고 틀어집니다.
+이 동작은 그 긴장을 풀어주는 골반 리셋 스트레칭이에요.
+마치 오래 눌린 쿠션을 탁탁 털어 제자리로 돌려놓는 것처럼요.
+복잡하지 않아요. 도구도 필요 없어요.
+엘리베이터 앞, 30초면 충분합니다. 🙂
 (마무리 — 앱 고정)`;
 
 const DEFAULT_DAILY_SHARE_PROMPT = `**일상 공유** 탭용 글입니다. Threads·인스타 등에 올리는 **생활 일기·오늘의 한마디** 톤으로 써 주세요.
@@ -3746,21 +3757,21 @@ function renderSheetContent(content) {
       bodyHTML = tabsHTML + `<p class="empty-note" style="padding:12px 0;">커뮤니티 초안이 없어요. 초안을 다시 생성하면 함께 만들어져요.</p>
         <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:8px;">초안 다시 생성</button>`;
     } else {
-      const fullPost = formatCommunityPostText(co);
-      const bulletsHtml = (co.empathyBullets && co.empathyBullets.length)
-        ? co.empathyBullets.map(b=>`<div class="cb-box" style="padding:8px 12px;margin-bottom:6px;">${escapeHtml(b)}</div>`).join('')
-        : '<p class="empty-note" style="padding:8px 0;">불릿이 비어 있어요.</p>';
+      const coNorm = normalizeCommunityBlock(co);
+      const problemText = getCommunityProblemText_(coNorm);
+      const fullPost = formatCommunityPostText(coNorm);
       bodyHTML = tabsHTML + `
-        ${cb('제목', `<div class="cb-box cb-title">${escapeHtml(co.title)}</div>`, co.title)}
-        ${cb('인사말 (고정)', `<div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">${escapeHtml(COMMUNITY_FIXED_GREETING)}</div>`, COMMUNITY_FIXED_GREETING)}
-        <div class="cb"><div class="cb-label">공감 <button class="copy-btn" onclick="cp(this,\`${esc((co.empathyLead||'')+'\n\n'+((co.empathyBullets||[]).join('\n')))}\`)">이 섹션 복사</button></div>
-        <div class="cb-box" style="white-space:pre-wrap;margin-bottom:8px;">${escapeHtml(co.empathyLead || '')}</div>
-        ${bulletsHtml}</div>
-        ${cb('설명', `<div class="cb-box" style="white-space:pre-wrap;line-height:1.7;">${escapeHtml(co.explanation || '')}</div>`, co.explanation || '')}
-        ${cb('셀프 케어', `<div class="cb-box" style="white-space:pre-wrap;line-height:1.7;">${escapeHtml(co.selfCare || '')}</div>`, co.selfCare || '')}
-        ${cb('마무리 (고정)', `<div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">${escapeHtml(COMMUNITY_FIXED_CLOSING)}</div>`, COMMUNITY_FIXED_CLOSING)}
-        ${cb('게시판 붙여넣기 (전체)', `<div class="cb-box" style="white-space:pre-wrap;font-size:12px;line-height:1.7;max-height:240px;overflow-y:auto;">${escapeHtml(fullPost)}</div>`, fullPost)}
-        <p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;"><strong>발행완료</strong>를 누르면 게시판 최종본이 저장돼요.</p>`;
+        ${sheetEditField_('제목', 'sheet-community-title', coNorm.title || '', { rows: 2, title: true })}
+        <div class="cb"><div class="cb-label">인사말 (고정)</div>
+          <div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">${escapeHtml(COMMUNITY_FIXED_GREETING)}</div></div>
+        ${sheetEditField_('문제 제기', 'sheet-community-problem', problemText, { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지, 자연스러운 문장으로' })}
+        ${sheetEditField_('셀프 케어 (해결책)', 'sheet-community-selfcare', coNorm.selfCare || '', { rows: 8, help: '👉 로 시작 · 동작·초·회·분을 앞쪽에' })}
+        ${sheetEditField_('원리 설명', 'sheet-community-explanation', coNorm.explanation || '', { rows: 6 })}
+        <div class="cb"><div class="cb-label">마무리 (고정)</div>
+          <div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">${escapeHtml(COMMUNITY_FIXED_CLOSING)}</div></div>
+        <div class="cb"><div class="cb-label">게시판 붙여넣기 (전체) <button class="copy-btn" onclick="copyCommunityFullPost_(this)">복사</button></div>
+          <div class="cb-box" id="sheet-community-full-preview" style="white-space:pre-wrap;font-size:12px;line-height:1.7;max-height:240px;overflow-y:auto;">${escapeHtml(fullPost)}</div></div>
+        <p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 눌러 바로 수정할 수 있어요. <strong>발행완료</strong>를 누르면 게시판 최종본이 저장돼요.</p>`;
     }
   } else {
     bodyHTML = tabsHTML + '<p class="empty-note">탭을 선택해 주세요.</p>';
@@ -4924,6 +4935,29 @@ function applySheetThreadEdits_(content){
   return content;
 }
 
+function readSheetCommunityEdits_(){
+  if(!document.getElementById('sheet-community-title')) return null;
+  function v(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
+  return {
+    title: v('sheet-community-title'),
+    problem: v('sheet-community-problem'),
+    selfCare: v('sheet-community-selfcare'),
+    explanation: v('sheet-community-explanation'),
+  };
+}
+
+function applySheetCommunityEdits_(content){
+  if(!content) return content;
+  var edits = readSheetCommunityEdits_();
+  if(!edits) return content;
+  if(!content.community) content.community = {};
+  content.community.title = edits.title;
+  content.community.problem = edits.problem;
+  content.community.selfCare = edits.selfCare;
+  content.community.explanation = edits.explanation;
+  return content;
+}
+
 function applySheetEditsForTab_(content, tab){
   if(!content) return content;
   if(tab === 'blog') return applySheetBlogEdits_(content);
@@ -4931,6 +4965,7 @@ function applySheetEditsForTab_(content, tab){
   if(tab === 'threads') return applySheetThreadsEdits_(content);
   if(tab === 'images') return applySheetImageEdits_(content);
   if(tab === 'thread') return applySheetThreadEdits_(content);
+  if(tab === 'community') return applySheetCommunityEdits_(content);
   return content;
 }
 
@@ -5278,10 +5313,27 @@ function trimBlogInstaImages_(gptVisuals){
   return list.slice(0, 2);
 }
 
+function getCommunityProblemText_(c){
+  if(!c) return '';
+  if(c.problem && String(c.problem).trim()) return String(c.problem).trim();
+  var parts = [];
+  if(c.empathyLead && String(c.empathyLead).trim()) parts.push(String(c.empathyLead).trim());
+  if(c.empathyBullets && c.empathyBullets.length){
+    c.empathyBullets.forEach(function(b){
+      var t = String(b || '').replace(/^[\s•]+/, '').trim();
+      if(t) parts.push(t);
+    });
+  }
+  return parts.join('\n');
+}
+
 function normalizeCommunityBlock(raw){
   if(!raw || typeof raw !== 'object') return null;
+  var problem = raw.problem != null ? String(raw.problem).trim() : '';
+  if(!problem) problem = getCommunityProblemText_(raw);
   return {
     title: raw.title != null ? String(raw.title) : '',
+    problem: problem,
     empathyLead: raw.empathyLead != null ? String(raw.empathyLead) : '',
     empathyBullets: Array.isArray(raw.empathyBullets) ? raw.empathyBullets.filter(Boolean).slice(0, 3) : [],
     explanation: raw.explanation != null ? String(raw.explanation) : '',
@@ -5308,18 +5360,17 @@ function getThreadPlainText(th){
 
 function formatCommunityPostText(c){
   if(!c) return '';
-  const bullets = (c.empathyBullets || []).filter(function(x){ return x && String(x).trim(); }).map(function(x){ return '• ' + String(x).trim(); }).join('\n');
+  const co = normalizeCommunityBlock(c) || c;
   return [
-    (c.title || '').trim(),
+    (co.title || '').trim(),
     '',
     COMMUNITY_FIXED_GREETING,
     '',
-    (c.empathyLead || '').trim(),
-    bullets,
+    getCommunityProblemText_(co),
     '',
-    (c.explanation || '').trim(),
+    (co.selfCare || '').trim(),
     '',
-    (c.selfCare || '').trim(),
+    (co.explanation || '').trim(),
     '',
     COMMUNITY_FIXED_CLOSING
   ].join('\n');
@@ -5531,6 +5582,12 @@ window.cp = function(btn, text){
   navigator.clipboard.writeText(text.replace(/\\n/g,'\n'));
   btn.textContent='복사됨'; btn.classList.add('copied');
   setTimeout(()=>{ btn.textContent='복사'; btn.classList.remove('copied'); }, 1500);
+};
+
+window.copyCommunityFullPost_ = function(btn){
+  var edits = readSheetCommunityEdits_();
+  if(!edits){ setAppToast('복사할 내용이 없어요.', { duration: 3000, variant: 'err' }); return; }
+  cp(btn, formatCommunityPostText(edits));
 };
 window.switchTab = function(t){
   if(isThreadCategory(state.selectedCatId) && t !== 'thread') return;
@@ -6290,7 +6347,7 @@ ${pt==='community' && heiljCat ? `
     <button class="prompt-reset-btn" onclick="resetPrompt('community')">기본값으로</button>
   </div>
   <textarea class="prompt-textarea" id="pt-community" style="min-height:200px;" placeholder="아파트 게시판 톤, 고정 형식, 금지 사항 등...">${escapeHtml(communityVal)}</textarea>
-  <div class="prompt-hint">옆집 이웃 톤·공감 질문→3줄→비유 설명→👉 셀프케어. 계절 주제는 각도에 맞을 때만. 이미지 프롬프트 2장.</div>
+  <div class="prompt-hint">옆집 이웃 톤·문제 제기→👉 해결책(동작 앞쪽)→원리 설명. 불릿 없이 자연스러운 문장. 계절은 각도에 맞을 때만. 이미지 2장.</div>
 </div>` : ''}
 
 ${pt==='image' && !threadCat ? `
@@ -6658,15 +6715,14 @@ ${hjImgGuide}
 {
 "community": {
 "title": "🌿 질문형·공감형 한 줄",
-"empathyLead": "공감 질문 한 줄 (예: ~할 때 있죠?)",
-"empathyBullets": ["💭 한 줄", "😅 한 줄", "🤔 한 줄"],
-"explanation": "2~4문장, 정의+비유+억지 당기지 말 것. 옆집 이웃 톤",
-"selfCare": "👉 동작 … 초·회·분 … '시원한 지점에서 멈추기' 뉘앙스"
+"problem": "문제 제기 2~4문장. 불릿·번호 없이 자연스럽게. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스",
+"selfCare": "👉 로 시작. 동작·자세·초·회·분을 앞쪽에. '시원한 지점에서 멈추기' 뉘앙스",
+"explanation": "원리 설명 2~5문장. 왜 도움이 되는지+비유+복잡하지 않다는 마무리. 옆집 이웃 톤"
 },
 ${heiljagyaeImgJsonTail}
 }
 
-community에는 인사말·고정 마무리 넣지 말 것. empathyBullets 정확히 3개(각 이모지 1개). selfCare는 👉로 시작.
+community에는 인사말·고정 마무리 넣지 말 것. 글 흐름은 **문제 제기 → selfCare(해결책) → explanation(원리)** 순. selfCare는 👉로 시작.
 
 반드시 images.gptVisuals는 **정확히 2개**. 각 prompt는 완성된 영문 한 덩어리. 예시 영문은 그대로 복사하지 말고 주제·각도·selfCare에 맞게 새로 쓸 것.`;
 } else {

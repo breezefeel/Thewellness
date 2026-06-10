@@ -900,10 +900,12 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   <div class="modal-box">
     <div class="modal-logo" aria-hidden="true"></div>
     <div class="modal-title">콘텐츠 플래너</div>
-    <div class="modal-desc">Anthropic API 키를 입력하면 Claude AI가 블로그 & 인스타 초안을 자동으로 만들어드려요. 키는 브라우저에만 저장돼요.</div>
-    <input class="modal-input" type="text" id="api-input" placeholder="API 키를 붙여넣으세요" />
+    <div class="modal-desc">Claude API 키는 브라우저에 저장됩니다. <strong>유튜브 분석용 Gemini 키</strong>는 Apps Script <strong>스크립트 속성 GEMINI_API_KEY</strong>에 넣어 주세요.</div>
+    <div style="font-size:11px;font-weight:700;color:#6B7280;letter-spacing:.5px;margin-bottom:4px;">Claude API (필수)</div>
+    <input class="modal-input" type="text" id="api-input" placeholder="sk-ant-…" autocomplete="off" />
+    <div class="modal-hint" style="margin-bottom:10px;"><a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></div>
+    <div id="gemini-server-status" style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:10px;padding:10px 12px;background:#F8F7F4;border-radius:8px;">유튜브 분석(Gemini): 확인 중…</div>
     <div id="api-error" style="font-size:12px;color:#EF4444;min-height:18px;margin-bottom:8px;"></div>
-    <div class="modal-hint"><a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>에서 발급받으세요</div>
     <div style="margin-top:18px;padding-top:14px;border-top:1px solid #E5E7EB;">
       <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">ChatGPT 이미지 프로젝트 열기 주소 (선택)</div>
       <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:8px;">ChatGPT 웹에서 「이미지 생성」 프로젝트를 연 뒤 <strong>주소창 URL</strong>을 붙여넣으세요 (예: <code style="font-size:10px;background:#F3F4F6;padding:2px 4px;border-radius:4px;">https://chatgpt.com/g/g-p-…/project</code>). <strong>같은 채팅 스레드에 이미지를 모으려면</strong> 프로젝트 안에서 그 대화를 연 상태의 주소(<code style="font-size:10px;">…/c/…</code>)를 저장하는 편이 좋습니다. 비우면 기본 홈으로 열립니다.</div>
@@ -1327,6 +1329,50 @@ const DEFAULT_BLOG_INSTA_IMAGE_PROMPT = `이미지 생성 프롬프트는 블로
 - Korean domestic visual language, warm beige·sage·cream palette, soft daylight, no text overlay, no logo, no watermark
 - 사람은 East Asian adult, modest everyday clothing, 자연스러운 피부와 자세`;
 
+const DEFAULT_EXPERT_COURSE_BLOG_PROMPT = `물리치료사·트레이너 등 **움직임 전문가**를 독자로 하는 SNS·블로그 글입니다. 전문가 과정을 운영하는 **임상가가 강연·교육 영상·실습 내용을 공유**하는 톤으로 씁니다.
+
+[역할]
+- 독자: PT, 트레이너, 움직임에 관심 있는 현장 전문가
+- 이 카테고리는 보통 **강연·교육 영상·시연**을 SNS·블로그로 풀어낼 때 사용합니다
+
+[콘텐츠에 담을 것 — 참고 메모·주제·각도에서 추출]
+- **다루는 테크닉/개념** (예: 고관절 굴곡 제한의 평가와 P-A-R 적용)
+- **핵심 포인트 1~3개** (왜 단순 접근이 안 되는지, 무엇을 봐야 하는지)
+- **영상·이미지 내용** (평가 시연, 실습 장면 등 — 있으면 본문에 반영)
+
+[톤 & 스타일]
+- 과장·낚시·"꼭 해야 한다" 압박 금지. **내용으로 말하는** 느낌
+- 전문 용어는 쓰되, **한 줄 정도 풀어서** 설명
+- 강의 중 실제로 하는 **말하듯** 자연스럽게
+- 해시태그 **최소화**(3~5개), 본문 흐름을 방해하지 않게
+
+[형식]
+- 길이: **중간**(본문 500~850자)
+- 마무리: 수강·등록·예약 유도보다 **"이 관점이 현장에 도움이 됐으면"**, **"한 번 적용해 보시고"** 식의 가벼운 마무리`;
+
+const DEFAULT_EXPERT_COURSE_INSTA_PROMPT = `전문가 과정 **강연·영상 공유**용 인스타 캡션입니다. 블로그보다 짧고 밀도 있게.
+
+[역할·독자]
+- PT, 트레이너, 움직임 전문가 동료에게 말하듯
+
+[구성]
+- 테크닉/개념 한 줄 → 핵심 포인트 2~3개(짧은 문장, 불릿 남발 금지) → 현장 적용 한 줄
+- 참고 메모의 영상·시연 내용 반영
+
+[톤]
+- 과장 없이, 내용으로 말하기. 전문 용어는 한 줄 풀어쓰기
+- 강의 말투처럼 자연스럽게
+
+[형식]
+- hook: 기억에 남는 한 줄 (25자 내외)
+- caption: hook 제외 **200~400자**. 수강·등록 유도 금지
+- hashtags: **4~6개** 이내, 전문 키워드 위주`;
+
+const DEFAULT_EXPERT_COURSE_IMAGE_PROMPT = `전문가 과정·강연 공유용 이미지 생성 프롬프트입니다.
+- 정확히 2장: ① 전문 설명 보조(도식·인포그래픽·부드러운 medical illustration), ② **교육·시연 동작**(본문·참고 메모의 테크닉·평가 동작과 일치)
+- 영문 한 덩어리, 80~200단어. Korean clinic or seminar room, East Asian adult professional, modest clothing
+- warm beige·sage palette, soft daylight, no text overlay, no logo`;
+
 const DEFAULT_HEILJAGYAE_IMAGE_PROMPT = `아파트너 게시글용 이미지 생성 프롬프트입니다.
 - 정확히 2장: ① 단지·동네에서 공감되는 일상 한 컷, ② 게시글 selfCare와 동일한 셀프 동작
 - 한국 아파트 복도·엘리베이터·거실·요가매트 등 입주민에게 익숙한 공간
@@ -1398,23 +1444,23 @@ const DEFAULT_PROMPTS = {
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     3: { // CMT 전문가
-      blog: `임상 전문가 대상. PSP(평가 4종·Fascia→Muscle→Joint·P-A-R·VAS 분기) 용어와 순서를 존중. 이론-실전 연결, 케이스는 평가→중재 흐름이 보이게.`,
-      insta: `전문가 타깃. 캐러셀 없이 **한 포스트 캡션**에 임상 인사이트·핵심 개념을 카드처럼 불릿으로 모아 동료에게 말하듯 밀도 있게.`,
-      image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
+      blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[CMT 맥락]\n- PSP(평가 4종·Fascia→Muscle→Joint·P-A-R·VAS 분기) 용어와 순서 존중\n- 촉진·관절가동술 타이밍, 이론-실전 연결. 케이스는 **평가→중재** 흐름이 보이게`,
+      insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[CMT] 촉진·관절가동·PSP 평가 흐름이 드러나게.`,
+      image: DEFAULT_EXPERT_COURSE_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     4: { // IFC 얼굴교육
-      blog: `에스테틱과 의료의 경계에 있는 전문가들을 위한 콘텐츠입니다. IFC만의 차별점과 임상적 근거를 강조하고, 교육 참여를 자연스럽게 유도하세요.`,
-      insta: `교육·전문성 중심. 캐러셀 없이 **한 포스트 캡션**에 수강생에게 도움 되는 포인트를 정리하고, 신뢰·차별화가 드러나게.`,
-      image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
+      blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[IFC 맥락]\n- 구조적 접근 vs 표면 접근, 경추·교합·턱관절 연결\n- 에스테틱·얼굴 교정 현장 전문가 독자. IFC만의 평가·중재 관점`,
+      insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[IFC] 구조적 얼굴 교정·평가 포인트 중심.`,
+      image: DEFAULT_EXPERT_COURSE_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     5: { // 리:얼 Movement 전문가
-      blog: `운동·재활 전문가 대상. PSP Movement(Position 1~3, P-A-R, 근막경선)와 Re:Al 접근의 차이·연결을 명확히. 평가 없이 운동만 강조하지 말 것.`,
-      insta: `실습·교육 현장 느낌. 캐러셀 없이 **한 포스트 캡션**에 저장하고 싶은 핵심 개념을 불릿·짧은 문단으로 압축.`,
-      image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
+      blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[Re:Al Movement 맥락]\n- PSP Movement(Position 1~3, P-A-R, 근막경선)와 Re:Al 접근의 차이·연결\n- **평가 없이 운동만** 강조하지 말 것`,
+      insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[Re:Al] 평가→이완→기능운동 연결이 보이게.`,
+      image: DEFAULT_EXPERT_COURSE_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
@@ -1436,8 +1482,9 @@ let state = {
   generatedOnly: {},
   localSavedAt: '',
   showAdd: false,
-  newItem: { date:'', topic:'', catId:0, refImage:null },
+  newItem: { date:'', topic:'', catId:0, refImage:null, refNote:'' },
   apiKey: '',
+  geminiYoutubeEnabled: false,
   chatgptOpenUrl: '',
   selectedId: null,
   activeTab: 'blog',
@@ -1588,6 +1635,7 @@ async function syncAllSourcesIfNewer_(reason){
         body: JSON.stringify({ action: 'plannerSyncPull' })
       });
       var data = await r.json();
+      applyPlannerServerCaps_(data);
       if(data.result === 'success' && data.payload){
         var ms2 = getPayloadSavedMs_(data.payload);
         if(ms2 > bestMs){ best = data.payload; bestMs = ms2; bestSource = '서버'; }
@@ -1645,7 +1693,14 @@ function collectExtraDrafts(){
   CATEGORIES.forEach(function(cat, i){
     var extras = cat.drafts.filter(function(d){ return /^d\d+-c\d+$/.test(d.id); });
     if(extras.length){
-      out[i] = extras.map(function(d){ return { id: d.id, topic: d.topic, angle: d.angle || '' }; });
+      out[i] = extras.map(function(d){
+        return {
+          id: d.id, topic: d.topic, angle: d.angle || '',
+          sourceNote: d.sourceNote || '',
+          youtubeAnalysis: d.youtubeAnalysis || '',
+          youtubeUrls: d.youtubeUrls || []
+        };
+      });
     }
   });
   return out;
@@ -1658,7 +1713,14 @@ function mergeExtraDrafts(byCat){
     (byCat[ki] || []).forEach(function(d){
       if(!d || !d.id) return;
       var exists = CATEGORIES[i].drafts.some(function(x){ return x.id === d.id; });
-      if(!exists) CATEGORIES[i].drafts.push({ id: d.id, topic: d.topic || '', angle: d.angle || '' });
+      if(!exists){
+        CATEGORIES[i].drafts.push({
+          id: d.id, topic: d.topic || '', angle: d.angle || '',
+          sourceNote: d.sourceNote || '',
+          youtubeAnalysis: d.youtubeAnalysis || '',
+          youtubeUrls: d.youtubeUrls || []
+        });
+      }
     });
   });
 }
@@ -2558,6 +2620,7 @@ window.onload = () => {
   if(readCachedDriveToken_()) hideDriveOAuthBusy_();
   if(!oauthReturned) checkDriveOAuthFailedReturn_();
   if(state.apiKey){ document.getElementById('api-modal').classList.remove('open'); updateApiBadge(); }
+  refreshPlannerServerCaps_();
   updateDriveButtonState();
   renderTabs();
   renderMain();
@@ -2652,12 +2715,58 @@ function getChatgptOpenUrl(){
   return 'https://chatgpt.com/';
 }
 
+function applyPlannerServerCaps_(data){
+  if(!data || typeof data.geminiYoutube === 'undefined') return;
+  state.geminiYoutubeEnabled = !!data.geminiYoutube;
+  updateGeminiServerStatusUI_();
+  updateApiBadge();
+}
+
+function isGeminiYoutubeAvailable_(){
+  return !!state.geminiYoutubeEnabled;
+}
+
+function updateGeminiServerStatusUI_(){
+  var el = document.getElementById('gemini-server-status');
+  if(!el) return;
+  if(!getPlannerGasUrl_() || location.protocol === 'file:'){
+    el.innerHTML = '유튜브 분석(Gemini): <strong>웹 배포 페이지</strong>에서 서버와 연결되면 사용할 수 있어요. 키는 GAS 스크립트 속성 <code style="font-size:10px;background:#E5E7EB;padding:1px 4px;border-radius:4px;">GEMINI_API_KEY</code>';
+    return;
+  }
+  if(state.geminiYoutubeEnabled){
+    el.innerHTML = '유튜브 분석(Gemini): <strong style="color:#0F766E;">서버에 키 설정됨</strong> · 공개 유튜브 URL 분석 가능';
+  } else {
+    el.innerHTML = '유튜브 분석(Gemini): <strong style="color:#B45309;">미설정</strong> — Apps Script → 프로젝트 설정 → 스크립트 속성에 <code style="font-size:10px;background:#E5E7EB;padding:1px 4px;border-radius:4px;">GEMINI_API_KEY</code> 추가 후 배포를 새로 해 주세요';
+  }
+}
+
+async function refreshPlannerServerCaps_(){
+  var url = getPlannerGasUrl_();
+  if(!url || location.protocol === 'file:'){
+    updateGeminiServerStatusUI_();
+    return;
+  }
+  try {
+    var r = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'plannerSyncPull' })
+    });
+    var data = await r.json();
+    applyPlannerServerCaps_(data);
+  } catch(e){
+    console.warn('[서버 caps]', e);
+    updateGeminiServerStatusUI_();
+  }
+}
+
 function saveKey() {
   const v = document.getElementById('api-input').value.trim();
   const urlIn = document.getElementById('chatgpt-open-url') ? document.getElementById('chatgpt-open-url').value : '';
   const errEl = document.getElementById('api-error');
   errEl.textContent = '';
-  if(!v && !state.apiKey){ errEl.textContent = 'API 키를 입력해주세요'; return; }
+  if(!v && !state.apiKey){ errEl.textContent = 'Claude API 키를 입력해 주세요'; return; }
   if(v) state.apiKey = v;
   const nu = normalizeChatgptOpenUrl(urlIn);
   if(nu === '__invalid__'){
@@ -2674,11 +2783,17 @@ function openApiModal() {
   document.getElementById('api-input').value = state.apiKey;
   const uEl = document.getElementById('chatgpt-open-url');
   if(uEl) uEl.value = state.chatgptOpenUrl || DEFAULT_CHATGPT_IMAGE_PROJECT_URL;
+  updateGeminiServerStatusUI_();
+  refreshPlannerServerCaps_();
   document.getElementById('api-modal').classList.add('open');
 }
 function updateApiBadge() {
   document.getElementById('api-dot').className = 'api-dot' + (state.apiKey ? ' on' : '');
-  document.getElementById('api-status').textContent = state.apiKey ? 'API' : 'API 키 설정';
+  var label = 'API 키 설정';
+  if(state.apiKey){
+    label = isGeminiYoutubeAvailable_() ? 'API · 유튜브' : 'API';
+  }
+  document.getElementById('api-status').textContent = label;
 }
 
 // ── Tabs ──
@@ -3000,7 +3115,81 @@ async function callClaudePlanner_(prompt, options){
   }
 }
 
-async function generateTopicFromKeywords_(catId, keywords, imagePayload){
+function buildDraftSourceNote_(keywords, refNote){
+  var kw = String(keywords || '').trim();
+  var rn = String(refNote || '').trim();
+  if(kw && rn) return kw + '\n\n' + rn;
+  return kw || rn;
+}
+
+function extractYoutubeUrlsFromText_(text){
+  if(!text) return [];
+  var found = [];
+  var re = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?(?:[^\s]*&)?v=|shorts\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/gi;
+  var m;
+  while((m = re.exec(String(text))) !== null){
+    found.push('https://www.youtube.com/watch?v=' + m[1]);
+  }
+  return found.filter(function(u, i, arr){ return arr.indexOf(u) === i; });
+}
+
+function getDraftReferenceText_(draft){
+  if(!draft) return '';
+  var parts = [];
+  if(draft.sourceNote && String(draft.sourceNote).trim()) parts.push(String(draft.sourceNote).trim());
+  if(draft.youtubeAnalysis && String(draft.youtubeAnalysis).trim()){
+    parts.push('[YouTube 영상 분석 — Gemini]\n' + String(draft.youtubeAnalysis).trim());
+  }
+  return parts.join('\n\n');
+}
+
+function appendDraftReferenceToPrompt_(prompt, draft){
+  var ref = getDraftReferenceText_(draft);
+  if(!ref) return prompt;
+  var via = draft.youtubeAnalysis ? '메모 + YouTube 분석' : '메모';
+  return prompt + '\n\n[작성자 참고 — ' + via + ']\n' + ref +
+    '\n위 내용의 테크닉·개념·시연 장면을 topic·본문에 반영하세요.';
+}
+
+async function analyzeYoutubeWithGemini_(url, catId){
+  var gasUrl = getPlannerGasUrl_();
+  if(!gasUrl || location.protocol === 'file:'){
+    throw new Error('유튜브 분석은 웹 배포 페이지에서 서버(GAS) 연결이 필요해요.');
+  }
+  var cat = CATEGORIES[catId];
+  var res = await fetch(gasUrl, {
+    method: 'POST',
+    mode: 'cors',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'plannerAnalyzeYoutube',
+      url: url,
+      catId: catId,
+      catName: cat ? cat.name : ''
+    })
+  });
+  var data = await res.json();
+  applyPlannerServerCaps_(data);
+  if(data.result !== 'success' || !data.analysis){
+    throw new Error(data.message || '유튜브 분석에 실패했어요');
+  }
+  return String(data.analysis).trim();
+}
+
+async function ensureDraftYoutubeAnalysis_(draft, catId){
+  if(!draft || (draft.youtubeAnalysis && String(draft.youtubeAnalysis).trim())) return draft.youtubeAnalysis || '';
+  if(!isGeminiYoutubeAvailable_()) return '';
+  var urls = draft.youtubeUrls && draft.youtubeUrls.length
+    ? draft.youtubeUrls
+    : extractYoutubeUrlsFromText_(draft.sourceNote || '');
+  if(!urls.length) return '';
+  var analysis = await analyzeYoutubeWithGemini_(urls[0], catId);
+  draft.youtubeAnalysis = analysis;
+  draft.youtubeUrls = [urls[0]];
+  return analysis;
+}
+
+async function generateTopicFromKeywords_(catId, keywords, imagePayload, sourceNote, youtubeAnalysis){
   var cat = CATEGORIES[catId];
   if(!cat) throw new Error('카테고리를 찾을 수 없어요');
   var isDaily = isDailyShareCategory(catId);
@@ -3011,21 +3200,34 @@ async function generateTopicFromKeywords_(catId, keywords, imagePayload){
       ? '\n[첨부 사진] 장면·분위기·오늘의 느낌을 topic·angle에 반영. 몸·날씨 맥락이 보이면 가벼운 근골격계 시선 한 스푼. 교육·세미나 사진이면 일기·생활 나눔 각도로.'
       : '\n[첨부 참고 사진이 있습니다. 사진에 보이는 자세·부위·상황을 topic·angle에 반영하세요.]';
   }
+  var noteBlock = '';
+  if(sourceNote && String(sourceNote).trim()){
+    noteBlock = '\n[참고 메모 — 영상·테크닉·링크 등]\n' + String(sourceNote).trim();
+    if(!youtubeAnalysis) noteBlock += '\n(AI는 영상 파일을 직접 볼 수 없습니다. 메모·링크 설명을 바탕으로 topic·angle을 만드세요.)';
+  }
+  if(youtubeAnalysis && String(youtubeAnalysis).trim()){
+    noteBlock += '\n\n[YouTube 영상 분석 — Gemini]\n' + String(youtubeAnalysis).trim();
+  }
   var kwLine = keywords
     ? ('입력 (키워드·아이디어·문장): ' + keywords)
-    : (isDaily && imagePayload && imagePayload.data ? '입력 (키워드·아이디어·문장): (없음 — 사진만 참고)' : '입력 (키워드·아이디어·문장): ');
+    : (isDaily && imagePayload && imagePayload.data ? '입력 (키워드·아이디어·문장): (없음 — 사진만 참고)' : (sourceNote ? '입력 (키워드·아이디어·문장): (없음 — 참고 메모만)' : '입력 (키워드·아이디어·문장): '));
   var topicGuide = isDaily
     ? ('일상 공유용 주제 1개. 축: 일상·계절·날씨·몸 느낌·여행·공감·느낌·최근 이슈(가볍게).\n' +
        '- topic: 일기 제목 한 줄 (15~32자, 질문·감탄·오늘의 장면)\n' +
        '- angle: 어떤 느낌으로 쓸지 한 줄. 날씨·피로·움직임 등 **근골격계 전문가 시선 한 스푼** 가능 (강의·임상 톤 금지)\n')
-    : ('입력한 키워드·아이디어·문장을 바탕으로 블로그·SNS에 쓸 주제 1개를 만드세요.\n' +
-       '- topic: 한국어 제목 한 줄 (15~36자, 후킹·질문형 가능)\n' +
-       '- angle: 어떤 관점으로 풀지 한 줄 (메커니즘·실천·오해 해소 등)\n');
+    : (isExpertCourseCategory(catId)
+      ? ('전문가 과정 **강연·교육 영상·실습 공유**용 주제 1개.\n' +
+         '- topic: PT·트레이너 동료에게 건네는 한 줄 (15~40자, 과장·낚시 금지)\n' +
+         '- angle: **다룰 테크닉/개념 + 핵심 포인트 1~3개**가 드러나는 각도 한 줄\n' +
+         '  (예: "고관절 굴곡 제한 — 단순 스트레칭이 안 되는 이유와 PAR 적용 포인트")\n')
+      : ('입력한 키워드·아이디어·문장을 바탕으로 블로그·SNS에 쓸 주제 1개를 만드세요.\n' +
+         '- topic: 한국어 제목 한 줄 (15~36자, 후킹·질문형 가능)\n' +
+         '- angle: 어떤 관점으로 풀지 한 줄 (메커니즘·실천·오해 해소 등)\n'));
   var prompt =
 '당신은 콘텐츠 기획자입니다.\n' +
 '카테고리: ' + cat.name + ' (' + (cat.sub || '') + ')\n' +
 '독자: ' + cat.audience + ' (카테고리 기본 독자 — 별도 선택 없음)\n' +
-kwLine + imgNote + '\n\n' + topicGuide + '\n' +
+kwLine + noteBlock + imgNote + '\n\n' + topicGuide + '\n' +
 '기존 주제와 겹치지 않게:\n' + avoidTopics.map(function(t){ return ' - ' + t; }).join('\n') + '\n\n' +
 'JSON만 출력:\n{"topic":"...","angle":"..."}';
   var text = await callClaudePlanner_(prompt, { image: imagePayload, maxTokens: 800 });
@@ -3060,6 +3262,7 @@ window.onNewItemImage = function(input){
 function renderAddForm(){
   const cat = CATEGORIES[state.newItem.catId] || CATEGORIES[0];
   const isDaily = isDailyShareCategory(state.newItem.catId);
+  const isExpert = isExpertCourseCategory(state.newItem.catId);
   const hasPhoto = !!(state.newItem.refImage && state.newItem.refImage.data);
   const catOpts = ADD_FORM_CAT_ORDER
     .map((i) => CATEGORIES[i] ? `<option value="${i}"${state.newItem.catId===i?' selected':''}>${CATEGORIES[i].name} · ${CATEGORIES[i].audience}</option>` : '')
@@ -3072,14 +3275,31 @@ function renderAddForm(){
       : '<span style="font-size:11px;color:#9CA3AF;">올리면 주제·초안 작성 시 사진을 참고합니다 (이 기기에만 유지)</span>');
   const addIntro = isDaily
     ? '「일상 공유」에 올릴 <strong>생활 일기·느낌</strong> 주제를 만듭니다. 사진만 올려도 되고, 키워드와 함께 써도 돼요.'
-    : '추가한 주제는 <strong>선택한 카테고리 탭</strong>의 「전체 초안」 목록 맨 아래에 카드로 생깁니다.';
-  const kwLabel = isDaily ? '키워드 · 아이디어 (선택)' : '키워드 · 아이디어';
+    : (isExpert
+      ? '강연·교육 <strong>영상·실습 내용</strong>을 PT·트레이너 동료에게 공유할 주제를 만듭니다. 테크닉/개념·핵심 포인트·영상 메모를 적어 주세요.'
+      : '추가한 주제는 <strong>선택한 카테고리 탭</strong>의 「전체 초안」 목록 맨 아래에 카드로 생깁니다.');
+  const kwLabel = isDaily ? '키워드 · 아이디어 (선택)' : (isExpert ? '테크닉 · 개념' : '키워드 · 아이디어');
   const kwPlaceholder = isDaily
     ? '키워드, 짧은 문장, 떠오른 장면을 자유롭게 적어 주세요 (비우고 사진만 가능)'
-    : '키워드, 짧은 문장, 여러 아이디어를 자유롭게 적어 주세요';
+    : (isExpert
+      ? '예: 고관절 굴곡 제한의 평가와 PAR 적용'
+      : '키워드, 짧은 문장, 여러 아이디어를 자유롭게 적어 주세요');
   const kwHint = isDaily
     ? '비우면 <strong>사진만</strong>으로 주제·일상 글을 만듭니다. 적은 내용은 모두 반영해요.'
-    : 'AI가 적어 주신 <strong>키워드·문장</strong>으로 <strong>주제 제목</strong>과 <strong>각도</strong>를 만든 뒤 목록에 넣습니다.';
+    : (isExpert
+      ? '다룰 <strong>테크닉/개념</strong>을 한 줄로. 핵심 포인트·영상 내용은 아래 참고 메모에 적어 주세요.'
+      : 'AI가 적어 주신 <strong>키워드·문장</strong>으로 <strong>주제 제목</strong>과 <strong>각도</strong>를 만든 뒤 목록에 넣습니다.');
+  const refNoteLabel = isDaily ? '참고 메모 (선택)' : (isExpert ? '핵심 포인트 · 영상 메모' : '참고 영상 · 메모 (선택)');
+  const refNotePlaceholder = isDaily
+    ? '영상 링크, 오늘의 장면, 떠오른 설명을 자유롭게…'
+    : (isExpert
+      ? '핵심 포인트 1~3개, 영상 링크, 시연 타임스탬프, 평가·동작 요령…'
+      : '영상 링크, 테크닉 이름, 동작 요령, 타임스탬프(예: 2:30~), 자막·핵심 메모…');
+  const refNoteHint = isDaily
+    ? '키워드와 함께 쓰거나, 메모만으로도 주제를 만들 수 있어요. 초안 작성 때도 그대로 전달됩니다.'
+    : (isExpert
+      ? '공개 <strong>유튜브 URL</strong>이 있으면 서버(Gemini)가 영상을 분석해요. GAS 스크립트 속성 <code style="font-size:10px;">GEMINI_API_KEY</code> 필요. 비공개 영상은 자막·메모를 붙여 주세요.'
+      : '공개 유튜브 URL → 서버(Gemini) 분석. 그 외는 <strong>링크·메모</strong>가 초안까지 전달돼요.');
   const btnLabel = isDaily && hasPhoto ? '사진으로 일상 글 추가' : (isDaily ? '주제 추가 · 일상 글 만들기' : '키워드로 주제 만들기');
   return `<div class="add-form">
     <div class="form-title">새 주제 추가</div>
@@ -3093,6 +3313,11 @@ function renderAddForm(){
       <label class="form-label">${kwLabel}</label>
       <textarea id="new-item-topic-input" class="form-input form-textarea" rows="6" oninput="state.newItem.topic=this.value" placeholder="${kwPlaceholder}">${escapeHtml(state.newItem.topic)}</textarea>
       <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">${kwHint}</div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">${refNoteLabel}</label>
+      <textarea class="form-input form-textarea" rows="5" oninput="state.newItem.refNote=this.value" placeholder="${refNotePlaceholder}">${escapeHtml(state.newItem.refNote || '')}</textarea>
+      <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">${refNoteHint}</div>
     </div>
     <div class="form-field">
       <label class="form-label">참고 사진${isDaily ? ' (일상 공유에 추천)' : ' (선택)'}</label>
@@ -3155,25 +3380,49 @@ function setNewCat(v){ state.newItem.catId=parseInt(v,10); renderMain(); }
 
 window.addDraft = async function(){
   var keywords = (state.newItem.topic || '').trim();
+  var refNote = (state.newItem.refNote || '').trim();
+  var sourceNote = buildDraftSourceNote_(keywords, refNote);
   var isDaily = isDailyShareCategory(state.newItem.catId);
   var hasPhoto = !!(state.newItem.refImage && state.newItem.refImage.data);
-  if(!keywords && !(isDaily && hasPhoto)){
-    if(typeof setAppToast === 'function') setAppToast(isDaily ? '키워드를 입력하거나 사진을 올려 주세요.' : '키워드를 입력해 주세요.', { duration: 3500, variant: 'err' });
-    else alert(isDaily ? '키워드 또는 사진이 필요합니다' : '키워드를 입력해주세요');
+  if(!sourceNote && !(isDaily && hasPhoto)){
+    if(typeof setAppToast === 'function') setAppToast(isDaily ? '키워드·메모를 입력하거나 사진을 올려 주세요.' : '키워드 또는 참고 메모를 입력해 주세요.', { duration: 3500, variant: 'err' });
+    else alert(isDaily ? '키워드·메모 또는 사진이 필요합니다' : '키워드 또는 참고 메모를 입력해주세요');
     return;
   }
   if(!state.apiKey){ openApiModal(); return; }
+  var youtubeUrls = extractYoutubeUrlsFromText_(sourceNote);
+  if(youtubeUrls.length && !isGeminiYoutubeAvailable_()){
+    if(typeof setAppToast === 'function'){
+      setAppToast('유튜브 URL이 있어요.\nApps Script 스크립트 속성에 GEMINI_API_KEY를 넣고 배포를 새로 해 주세요.', { duration: 6000, variant: 'ok' });
+    }
+  }
   var btn = document.getElementById('btn-add-draft-submit');
-  if(btn){ btn.disabled = true; btn.textContent = isDaily && hasPhoto ? '일상 글 준비 중…' : '주제 생성 중…'; }
+  var youtubeAnalysis = '';
+  if(btn){ btn.disabled = true; btn.textContent = isDaily && hasPhoto ? '일상 글 준비 중…' : (youtubeUrls.length && isGeminiYoutubeAvailable_() ? '유튜브 분석 중…' : '주제 생성 중…'); }
   if(typeof setAppToast === 'function') setAppToast(
-    isDaily && hasPhoto ? '사진을 보고 주제·일상 글을 만들고 있어요…' : '주제 제목·각도를 만들고 있어요…',
-    { duration: 2800, variant: 'ok' }
+    youtubeUrls.length && isGeminiYoutubeAvailable_() ? '공개 유튜브 영상을 분석한 뒤 주제를 만들고 있어요…' :
+    (isDaily && hasPhoto ? '사진을 보고 주제·일상 글을 만들고 있어요…' : '주제 제목·각도를 만들고 있어요…'),
+    { duration: 3200, variant: 'ok' }
   );
   try {
-    var gen = await generateTopicFromKeywords_(state.newItem.catId, keywords, state.newItem.refImage);
+    if(youtubeUrls.length && isGeminiYoutubeAvailable_()){
+      try {
+        youtubeAnalysis = await analyzeYoutubeWithGemini_(youtubeUrls[0], state.newItem.catId);
+      } catch(ytErr){
+        var ytMsg = (ytErr && ytErr.message) ? ytErr.message : String(ytErr);
+        if(typeof setAppToast === 'function') setAppToast('유튜브 분석 실패 — 메모만으로 주제를 만들게요.\n' + ytMsg, { duration: 7000, variant: 'err' });
+      }
+    }
+    if(btn) btn.textContent = '주제 생성 중…';
+    var gen = await generateTopicFromKeywords_(state.newItem.catId, keywords, state.newItem.refImage, sourceNote, youtubeAnalysis);
     var cat = CATEGORIES[state.newItem.catId];
     var id = 'd' + state.newItem.catId + '-c' + Date.now();
     var draft = { id: id, topic: gen.topic, angle: gen.angle, createdAt: new Date().toISOString() };
+    if(sourceNote) draft.sourceNote = sourceNote;
+    if(youtubeAnalysis){
+      draft.youtubeAnalysis = youtubeAnalysis;
+      draft.youtubeUrls = [youtubeUrls[0]];
+    }
     if(state.newItem.refImage && state.newItem.refImage.data){
       draft.refImage = {
         mediaType: state.newItem.refImage.mediaType,
@@ -3184,7 +3433,7 @@ window.addDraft = async function(){
     cat.drafts.push(draft);
     var autoGenDaily = isDaily && draft.refImage && draft.refImage.data;
     var savedCatId = state.newItem.catId;
-    state.newItem = { date:'', topic:'', catId: savedCatId, refImage: null };
+    state.newItem = { date:'', topic:'', catId: savedCatId, refImage: null, refNote: '' };
     state.showAdd = false;
     document.getElementById('add-toggle-btn').textContent = '추가';
     state.currentCat = cat.id;
@@ -3195,7 +3444,10 @@ window.addDraft = async function(){
       if(typeof setAppToast === 'function') setAppToast('「' + gen.topic + '」\n사진을 반영해 일상 글 초안을 만들고 있어요…', { duration: 5200, variant: 'ok' });
       await window.enqueueDraftGeneration(cat.id, id, {});
     } else if(typeof setAppToast === 'function') {
-      setAppToast('「' + gen.topic + '」 주제가 추가됐어요.\n카드를 눌러 초안 생성하세요.', { duration: 5500, variant: 'ok' });
+      var addedMsg = '「' + gen.topic + '」 주제가 추가됐어요.';
+      if(youtubeAnalysis) addedMsg += '\n유튜브 분석 내용이 반영됐어요.';
+      addedMsg += '\n카드를 눌러 초안 생성하세요.';
+      setAppToast(addedMsg, { duration: 5500, variant: 'ok' });
     }
   } catch(e){
     var msg = (e && e.message) ? e.message : String(e);
@@ -3653,8 +3905,22 @@ function renderSheetEmpty(draft, cat) {
     : isHeiljagyaeCategory(cat.id)
     ? 'AI가 <strong>아파트너 게시판 글</strong>과 <strong>추천 이미지 프롬프트 2개</strong>만<br>만들어드려요'
     : 'AI가 <strong>블로그</strong>와 이미지 프롬프트 <strong>2장</strong>을 만들어드려요.<br>인스타는 블로그 <strong>발행완료</strong> 후, 쓰레드는 인스타 <strong>발행완료</strong> 후 생성돼요';
+  const sourceNoteHtml = draft.sourceNote
+    ? `<div style="margin-bottom:16px;padding:12px 14px;background:#F0FDFA;border:1px solid #CCFBF1;border-radius:10px;">
+        <div style="font-size:10px;font-weight:700;color:#0F766E;letter-spacing:.6px;margin-bottom:6px;">참고 메모 (영상·테크닉)</div>
+        <div style="font-size:12px;color:#374151;line-height:1.65;white-space:pre-wrap;max-height:120px;overflow-y:auto;">${escapeHtml(draft.sourceNote)}</div>
+      </div>`
+    : '';
+  const ytAnalysisHtml = draft.youtubeAnalysis
+    ? `<div style="margin-bottom:16px;padding:12px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;">
+        <div style="font-size:10px;font-weight:700;color:#1D4ED8;letter-spacing:.6px;margin-bottom:6px;">YouTube 분석 (Gemini)</div>
+        <div style="font-size:12px;color:#374151;line-height:1.65;white-space:pre-wrap;max-height:160px;overflow-y:auto;">${escapeHtml(draft.youtubeAnalysis)}</div>
+      </div>`
+    : '';
   document.getElementById('sheet-body').innerHTML = `
     <div style="padding:10px 0 20px;font-size:13px;color:#9CA3AF;line-height:1.7;">${draft.angle}</div>
+    ${sourceNoteHtml}
+    ${ytAnalysisHtml}
     <div style="background:#F8F7F4;border-radius:12px;padding:28px 20px;text-align:center;">
       <div style="font-size:14px;color:#6B7280;line-height:1.7;margin-bottom:20px;">${genLine}</div>
       <button onclick="genContent()" style="background:linear-gradient(135deg,#2DD4BF,#0EA5E9);color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">초안 생성하기</button>
@@ -6248,6 +6514,8 @@ function getCatPrompt(catId, type) {
 function isDailyShareCategory(catId){ return catId === 6; }
 function isThreadCategory(catId){ return isDailyShareCategory(catId); }
 function isHeiljagyaeCategory(catId){ return catId === 7; }
+/** CMT·IFC·Re:Al Movement 전문가 과정 — 강연·영상 공유 톤 */
+function isExpertCourseCategory(catId){ return catId === 3 || catId === 4 || catId === 5; }
 /** 블로그·인스타·이미지(2장) 워크플로 — 도수·리:얼·뷰티·교육 탭 */
 function isBlogInstaCategory(catId){ return catId !== 6 && catId !== 7; }
 function getImageSlotCount(catId){
@@ -6753,8 +7021,25 @@ ${imagePromptGuide}
 ${imgJsonTail}
 }
 
-반드시 images.gptVisuals는 **정확히 2개**(① 전문 설명 보조, ② 셀프케어 동작). ②번 동작은 blog 본문의 셀프 팁과 일치. 각 prompt는 완성된 영문 한 덩어리.`;
+반드시 images.gptVisuals는 **정확히 2개**(① 전문 설명 보조, ② ${isExpertCourseCategory(catId) ? '교육·시연 동작' : '셀프케어 동작'}). ②번 동작은 blog 본문${isExpertCourseCategory(catId) ? '·참고 메모의 테크닉' : '의 셀프 팁'}과 일치. 각 prompt는 완성된 영문 한 덩어리.`;
 }
+
+if(!isDailyShareCategory(catId) && !isHeiljagyaeCategory(catId) && isExpertCourseCategory(catId)){
+  prompt = prompt.replace(
+    '"title": "네이버 SEO 최적화 후킹 제목 (35자 이내, 숫자나 물음표 활용)",\n"hook": "공감→문제제기→해결암시 흐름의 오프닝 2~3문장",\n"outline": ["소제목1","소제목2","소제목3","소제목4"],\n"draft": "본문 초안 700~900자. 따뜻하고 전문적인 원장님 톤. 실제 임상 경험 느낌. 단락 구분 포함.",\n"cta": "마무리 행동 유도 (힐링트리 센터 자연스럽게 언급)",\n"hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6"]',
+    '"title": "전문가 독자용 한 줄 (35자 내외, 과장·낚시 금지)",\n"hook": "현장에서 공감되는 오프닝 2~3문장. 강의 말투",\n"outline": ["테크닉/개념","핵심 포인트1","핵심 포인트2","현장 적용"],\n"draft": "500~850자. 중간 길이. 테크닉/개념→핵심 포인트 1~3개→임상 적용. 참고 메모(영상·시연) 반영. 전문 용어는 한 줄 풀어쓰기",\n"cta": "수강·등록 유도 금지. 이 관점이 현장에 도움이 됐으면 식 마무리",\n"hashtags": ["3~5개만","전문 키워드"]'
+  );
+}
+
+var prevYoutubeAnalysis = draft.youtubeAnalysis || '';
+try {
+  await ensureDraftYoutubeAnalysis_(draft, catId);
+  if(draft.youtubeAnalysis && draft.youtubeAnalysis !== prevYoutubeAnalysis) save();
+} catch(ytGenErr){
+  console.warn('[유튜브 분석]', ytGenErr);
+}
+
+prompt = appendDraftReferenceToPrompt_(prompt, draft);
 
 var draftRefImage = (draft.refImage && draft.refImage.data) ? draft.refImage : null;
 if(draftRefImage){

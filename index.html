@@ -1804,11 +1804,18 @@ function loadGsiScript(){
     var s = document.createElement('script');
     s.src = 'https://accounts.google.com/gsi/client';
     s.async = true;
-    s.onload = function(){ resolve(); };
+    s.onload = function(){
+      // GIS 내부 초기화가 onload 직후 끝나지 않을 수 있어 한 틱 대기
+      setTimeout(resolve, 0);
+    };
     s.onerror = function(){ reject(new Error('Google 로그인 스크립트를 불러오지 못했어요')); };
     document.head.appendChild(s);
   });
   return window.__htGsiLoadPromise;
+}
+function driveGsiWarmup_(){
+  if(location.protocol === 'file:') return;
+  loadGsiScript().catch(function(){});
 }
 function getDriveClientId(){
   var fromStore = (localStorage.getItem('ht_gdrive_cid') || '').trim();
@@ -2069,9 +2076,14 @@ function startDriveRedirectAuth_(prompt, pendingAction){
   }
   var redirecting = 0;
   try { redirecting = parseInt(sessionStorage.getItem('ht_drive_oauth_redirecting') || '0', 10); } catch(e0){}
+  var hashNow2 = readDriveOAuthHash_();
   if(redirecting && Date.now() - redirecting < 120000){
-    showDriveOAuthBusy_('Drive 연동을 마무리하는 중…');
-    return Promise.resolve(false);
+    if(hashNow2.indexOf('access_token=') !== -1 || hashNow2.indexOf('error=') !== -1){
+      showDriveOAuthBusy_('Drive 연동을 마무리하는 중…');
+      return Promise.resolve(false);
+    }
+    // 이전에 Google로 이동하지 못한 채 플래그만 남은 경우 — 재시도 허용
+    clearDriveOAuthInflight_();
   }
   if(pendingAction){
     try { sessionStorage.setItem('ht_drive_pending_action', pendingAction); } catch(e){}
@@ -2081,11 +2093,10 @@ function startDriveRedirectAuth_(prompt, pendingAction){
   }
   try {
     sessionStorage.setItem('ht_drive_oauth_started', String(Date.now()));
-    sessionStorage.setItem('ht_drive_oauth_redirecting', String(Date.now()));
     sessionStorage.setItem('ht_drive_redirect_uri', getDriveRedirectUri_());
   } catch(e3){}
   closeDriveModal();
-  showDriveOAuthBusy_('Google 로그인 화면으로 이동합니다…\n잠시만 기다려 주세요.');
+  showDriveOAuthBusy_('Google 연동을 준비하는 중…');
   window.__htDriveTokenClient = null;
   window.__htDriveTokenClientCid = null;
   if(window.__htDriveOAuthRedirectTimer) clearTimeout(window.__htDriveOAuthRedirectTimer);
@@ -2095,15 +2106,25 @@ function startDriveRedirectAuth_(prompt, pendingAction){
     hideDriveOAuthBusy_();
     clearDriveOAuthInflight_();
     if(typeof setAppToast === 'function'){
-      setAppToast('Google 로그인 페이지로 이동하지 못했어요.\n팝업 차단을 해제하거나 Chrome에서 다시 시도해 주세요.', { duration: 8000, variant: 'err' });
+      setAppToast('Google 로그인 페이지로 이동하지 못했어요.\n다시 Drive를 눌러 주세요. (Chrome·Safari 권장)', { duration: 8000, variant: 'err' });
     }
   }, 15000);
   return loadGsiScript().then(function(){
+    showDriveOAuthBusy_('Google 로그인 화면으로 이동합니다…\n잠시만 기다려 주세요.');
     ensureDriveTokenClient_(true);
     var req = { prompt: prompt || 'consent' };
     var hint = getDriveHintEmail_();
     if(hint) req.hint = hint;
+    try { sessionStorage.setItem('ht_drive_oauth_redirecting', String(Date.now())); } catch(e4){}
     window.__htDriveTokenClient.requestAccessToken(req);
+  }).catch(function(err){
+    hideDriveOAuthBusy_();
+    clearDriveOAuthInflight_();
+    var msg = (err && err.message) ? err.message : String(err);
+    if(typeof setAppToast === 'function'){
+      setAppToast('Google 로그인을 시작하지 못했어요.\n' + msg, { duration: 8000, variant: 'err' });
+    }
+    throw err;
   });
 }
 async function driveLoginInteractive_(pendingAction, promptMode){
@@ -2657,6 +2678,7 @@ window.onload = () => {
   if('serviceWorker' in navigator && location.protocol !== 'file:'){
     navigator.serviceWorker.register('planner-sw.js').catch(function(e){ console.warn('[SW]', e); });
   }
+  driveGsiWarmup_();
   driveSilentWarmup_();
   startDriveTokenRefreshLoop_();
   syncAllSourcesIfNewer_('load');

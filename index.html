@@ -913,7 +913,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       <div class="modal-title">콘텐츠 플래너</div>
       <button type="button" class="prompt-modal-close" onclick="closeApiModal()" aria-label="닫기">×</button>
     </div>
-    <div class="modal-desc">Claude API 키는 브라우저에 저장됩니다. <strong>유튜브 분석용 Gemini 키</strong>는 Apps Script <strong>스크립트 속성 GEMINI_API_KEY</strong>에 넣어 주세요.</div>
+    <div class="modal-desc">Claude API 키는 브라우저에 저장됩니다. <strong>유튜브 분석용 Gemini 키</strong>는 Apps Script <strong>스크립트 속성 GEMINI_API_KEY</strong>에 넣어 주세요. (모델 변경: <code style="font-size:10px;">GEMINI_MODEL</code>=<code style="font-size:10px;">gemini-2.5-flash</code>)</div>
     <div style="font-size:11px;font-weight:700;color:#6B7280;letter-spacing:.5px;margin-bottom:4px;">Claude API (필수)</div>
     <input class="modal-input" type="text" id="api-input" placeholder="sk-ant-…" autocomplete="off" />
     <div class="modal-hint" style="margin-bottom:10px;"><a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></div>
@@ -1343,16 +1343,24 @@ const DEFAULT_BLOG_INSTA_IMAGE_PROMPT = `이미지 생성 프롬프트는 블로
 - Korean domestic visual language, warm beige·sage·cream palette, soft daylight, no text overlay, no logo, no watermark
 - 사람은 East Asian adult, modest everyday clothing, 자연스러운 피부와 자세`;
 
+const DEFAULT_EXPERT_COURSE_SCOPE_RULE = `[범위·집중 — 최우선]
+- 이 글은 **이번 강연·교육 영상·실습에서 다룬 내용**을 동료에게 복기·공유하는 글입니다. 참고 메모·YouTube 분석·주제·각도가 **소스의 전부**입니다.
+- **써도 되는 것**: 해당 테크닉/개념 설명, 강의·영상의 **핵심 포인트**, 시연·동작·손 위치·주의사항, 참고에 나온 **짧은 원리 설명**.
+- **쓰지 말 것**: 참고에 없는 평가·질환·부위·테크닉으로 **확장**, PSP·임상 전체 흐름으로 **넓혀 쓰기**, "통상적으로는~" 식 **교과서적 부가 설명**, 영상과 무관한 **별도 케이스·일반론**.
+- 정보가 부족하면 억지로 채우지 말고, 참고에 있는 것만 **더 명확하게** 풀어라. 영상 본 동료와 대화하는 톤.`;
+
 const DEFAULT_EXPERT_COURSE_BLOG_PROMPT = `물리치료사·트레이너 등 **움직임 전문가**를 독자로 하는 SNS·블로그 글입니다. 전문가 과정을 운영하는 **임상가가 강연·교육 영상·실습 내용을 공유**하는 톤으로 씁니다.
+
+${DEFAULT_EXPERT_COURSE_SCOPE_RULE}
 
 [역할]
 - 독자: PT, 트레이너, 움직임에 관심 있는 현장 전문가
 - 이 카테고리는 보통 **강연·교육 영상·시연**을 SNS·블로그로 풀어낼 때 사용합니다
 
-[콘텐츠에 담을 것 — 참고 메모·주제·각도에서 추출]
-- **다루는 테크닉/개념** (예: 고관절 굴곡 제한의 평가와 P-A-R 적용)
-- **핵심 포인트 1~3개** (왜 단순 접근이 안 되는지, 무엇을 봐야 하는지)
-- **영상·이미지 내용** (평가 시연, 실습 장면 등 — 있으면 본문에 반영)
+[콘텐츠에 담을 것 — 참고 메모·주제·각도에서만 추출]
+- **다루는 테크닉/개념** (예: 어깨 관절 가동술 — 강의에서 시연한 접근)
+- **핵심 포인트 1~3개** (강의·영상에서 강조한 것만)
+- **영상·시연 내용** (평가·실습 장면 — 참고에 있을 때만)
 
 [톤 & 스타일]
 - 과장·낚시·"꼭 해야 한다" 압박 금지. **내용으로 말하는** 느낌
@@ -1366,12 +1374,14 @@ const DEFAULT_EXPERT_COURSE_BLOG_PROMPT = `물리치료사·트레이너 등 **�
 
 const DEFAULT_EXPERT_COURSE_INSTA_PROMPT = `전문가 과정 **강연·영상 공유**용 인스타 캡션입니다. 블로그보다 짧고 밀도 있게.
 
+${DEFAULT_EXPERT_COURSE_SCOPE_RULE}
+
 [역할·독자]
 - PT, 트레이너, 움직임 전문가 동료에게 말하듯
 
 [구성]
 - 테크닉/개념 한 줄 → 핵심 포인트 2~3개(짧은 문장, 불릿 남발 금지) → 현장 적용 한 줄
-- 참고 메모의 영상·시연 내용 반영
+- 참고 메모·영상 분석·블로그 원문 **범위 안**에서만. 없는 내용으로 확장 금지
 
 [톤]
 - 과장 없이, 내용으로 말하기. 전문 용어는 한 줄 풀어쓰기
@@ -1383,6 +1393,7 @@ const DEFAULT_EXPERT_COURSE_INSTA_PROMPT = `전문가 과정 **강연·영상 �
 - hashtags: **4~6개** 이내, 전문 키워드 위주`;
 
 const DEFAULT_EXPERT_COURSE_IMAGE_PROMPT = `전문가 과정·강연 공유용 이미지 생성 프롬프트입니다.
+- 참고 메모·영상·본문에 나온 테크닉·동작만 시각화. 참고에 없는 부위·동작·평가로 확장 금지
 - 정확히 2장: ① 전문 설명 보조(도식·인포그래픽·부드러운 medical illustration), ② **교육·시연 동작**(본문·참고 메모의 테크닉·평가 동작과 일치)
 - 영문 한 덩어리, 80~200단어. Korean clinic or seminar room, East Asian adult professional, modest clothing
 - warm beige·sage palette, soft daylight, no text overlay, no logo`;
@@ -1458,22 +1469,22 @@ const DEFAULT_PROMPTS = {
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     3: { // CMT 전문가
-      blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[CMT 맥락]\n- PSP(평가 4종·Fascia→Muscle→Joint·P-A-R·VAS 분기) 용어와 순서 존중\n- 촉진·관절가동술 타이밍, 이론-실전 연결. 케이스는 **평가→중재** 흐름이 보이게`,
-      insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[CMT] 촉진·관절가동·PSP 평가 흐름이 드러나게.`,
+      blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[CMT 맥락]\n- PSP 용어는 **참고·영상에서 다룬 범위** 안에서만. 무관한 평가·중재 전체 흐름으로 확장 금지\n- 촉진·관절가동술 등 **이번 강의 테크닉** 중심. 짧은 원리 설명은 괜찮으나 별도 케이스·부위로 넓히지 말 것`,
+      insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[CMT] 이번 강의·영상의 테크닉·포인트만. PSP는 참고 범위 안에서만.`,
       image: DEFAULT_EXPERT_COURSE_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     4: { // IFC 얼굴교육
-      blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[IFC 맥락]\n- 구조적 접근 vs 표면 접근, 경추·교합·턱관절 연결\n- 에스테틱·얼굴 교정 현장 전문가 독자. IFC만의 평가·중재 관점`,
-      insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[IFC] 구조적 얼굴 교정·평가 포인트 중심.`,
+      blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[IFC 맥락]\n- 구조적 접근은 **참고·영상에서 다룬 범위** 안에서만. 무관한 경추·교합·전신 이야기로 확장 금지\n- 이번 강의·시연의 테크닉·평가 포인트 중심`,
+      insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[IFC] 이번 강의·영상의 테크닉·포인트만.`,
       image: DEFAULT_EXPERT_COURSE_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     5: { // 리:얼 Movement 전문가
-      blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[Re:Al Movement 맥락]\n- PSP Movement(Position 1~3, P-A-R, 근막경선)와 Re:Al 접근의 차이·연결\n- **평가 없이 운동만** 강조하지 말 것`,
-      insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[Re:Al] 평가→이완→기능운동 연결이 보이게.`,
+      blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[Re:Al Movement 맥락]\n- Movement·P-A-R 등은 **참고·영상에서 다룬 내용** 안에서만 연결\n- 참고에 없는 평가·운동 처방·다른 부위로 확장 금지`,
+      insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[Re:Al] 이번 강의·영상의 테크닉·포인트만.`,
       image: DEFAULT_EXPERT_COURSE_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
@@ -1555,9 +1566,52 @@ function schedulePlannerGasPush_(immediate){
   if(immediate) run();
   else plannerGasPushTimer = setTimeout(run, 2500);
 }
+async function plannerPullRemoteIntoState_(){
+  var body = getPersistPayload();
+  var fpBefore = plannerSyncFingerprint_(body);
+  var remote = null;
+
+  var url = getPlannerGasUrl_();
+  if(url && location.protocol !== 'file:'){
+    try {
+      var pull = await fetch(url, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'plannerSyncPull' })
+      });
+      var pullData = await pull.json();
+      applyPlannerServerCaps_(pullData);
+      if(pullData.result === 'success' && pullData.payload){
+        remote = pullData.payload;
+      }
+    } catch(pullErr){
+      console.warn('[서버 동기화 pull]', pullErr);
+    }
+  }
+
+  if(hasDriveValidToken_()){
+    try {
+      var token = await getDriveAccessToken({ forcePrompt: false });
+      var out = await driveDownloadCloudPayload_(token);
+      if(out.data){
+        remote = remote ? mergePlannerPayloads_(remote, out.data) : out.data;
+      }
+    } catch(driveErr){
+      console.warn('[Drive 동기화 pull]', driveErr);
+    }
+  }
+
+  if(!remote) return false;
+  var merged = mergePlannerPayloads_(body, remote);
+  if(plannerSyncFingerprint_(body) === plannerSyncFingerprint_(merged)) return false;
+  applyPersistPayload(merged);
+  return true;
+}
 async function plannerGasPushNow_(){
   var url = getPlannerGasUrl_();
   if(!url) return;
+  await plannerPullRemoteIntoState_();
   var body = getPersistPayload();
   body.savedAt = new Date().toISOString();
   var r = await fetch(url, {
@@ -1568,26 +1622,104 @@ async function plannerGasPushNow_(){
   });
   var data = await r.json();
   if(data.result === 'conflict' && data.payload){
-    var serverAt = data.savedAt || (data.payload && data.payload.savedAt) || '';
-    var localAt = state.localSavedAt || '';
-    if(serverAt && (!localAt || new Date(serverAt) > new Date(localAt))){
-      var promptsBefore = promptsFingerprint_(state.prompts);
-      applyPersistPayload(data.payload);
-      save({ skipDriveUpload: true, skipGasPush: true });
-      if(data.payload.plannerLastAuto && typeof handleServerPlannerAuto_ === 'function'){
-        handleServerPlannerAuto_(data.payload);
-      }
-      renderTabs();
-      renderMain();
-      if(typeof setAppToast === 'function' && promptsBefore !== promptsFingerprint_(state.prompts)){
-        setAppToast('서버에 더 최신 프롬프트가 있어 반영했어요.', { duration: 4200, variant: 'ok' });
-      }
+    var promptsBefore = promptsFingerprint_(state.prompts);
+    var merged = mergePlannerPayloads_(getPersistPayload(), data.payload);
+    applyPersistPayload(merged);
+    save({ skipDriveUpload: true, skipGasPush: true });
+    if(data.payload.plannerLastAuto && typeof handleServerPlannerAuto_ === 'function'){
+      handleServerPlannerAuto_(data.payload);
     }
+    renderTabs();
+    renderMain();
+    if(typeof setAppToast === 'function' && promptsBefore !== promptsFingerprint_(state.prompts)){
+      setAppToast('서버 데이터와 합쳐 반영했어요.', { duration: 4200, variant: 'ok' });
+    }
+    schedulePlannerGasPush_(true);
   }
 }
 function getPayloadSavedMs_(payload){
   if(!payload) return 0;
   return parseIsoMs_(payload.savedAt || payload.localSavedAt);
+}
+
+function mergeExtraDraftsByCat_(a, b){
+  var out = {};
+  function addFrom(src){
+    Object.keys(src || {}).forEach(function(k){
+      if(!out[k]) out[k] = [];
+      (src[k] || []).forEach(function(d){
+        if(!d || !d.id) return;
+        var ix = out[k].findIndex(function(x){ return x.id === d.id; });
+        if(ix === -1) out[k].push(Object.assign({}, d));
+        else out[k][ix] = Object.assign({}, out[k][ix], d);
+      });
+    });
+  }
+  addFrom(a);
+  addFrom(b);
+  return out;
+}
+function mergePublishedMaps_(a, b, preferB){
+  var out = {};
+  function put(id, entry, fromB){
+    if(!entry) return;
+    if(!out[id]){ out[id] = entry; return; }
+    var existAt = parseIsoMs_(out[id].savedAt);
+    var nextAt = parseIsoMs_(entry.savedAt);
+    if(nextAt > existAt) out[id] = entry;
+    else if(nextAt === existAt && fromB && preferB) out[id] = entry;
+  }
+  Object.keys(a || {}).forEach(function(id){ put(id, a[id], false); });
+  Object.keys(b || {}).forEach(function(id){ put(id, b[id], true); });
+  return out;
+}
+function mergeGeneratedMaps_(a, b, preferB){
+  var out = Object.assign({}, a || {});
+  Object.keys(b || {}).forEach(function(id){
+    if(!Object.prototype.hasOwnProperty.call(out, id) || preferB) out[id] = b[id];
+  });
+  return out;
+}
+/** 두 기기·Drive·서버 payload를 합침 — 주제(extraDrafts)는 항상 합집합, 발행·초안은 더 최신 쪽 우선 */
+function mergePlannerPayloads_(local, remote){
+  if(!remote) return local || {};
+  if(!local) return Object.assign({}, remote);
+  var localMs = getPayloadSavedMs_(local);
+  var remoteMs = getPayloadSavedMs_(remote);
+  var preferRemote = remoteMs >= localMs;
+  var out = Object.assign({}, preferRemote ? remote : local, {
+    published: mergePublishedMaps_(local.published, remote.published, preferRemote),
+    generatedOnly: mergeGeneratedMaps_(local.generatedOnly, remote.generatedOnly, preferRemote),
+    extraDraftsByCat: mergeExtraDraftsByCat_(local.extraDraftsByCat, remote.extraDraftsByCat),
+    promptRefineMilestones: Object.assign({}, local.promptRefineMilestones || {}, remote.promptRefineMilestones || {}),
+  });
+  if(remote.prompts != null && (preferRemote || local.prompts == null)) out.prompts = remote.prompts;
+  else if(local.prompts != null) out.prompts = local.prompts;
+  if(remote.apiKey && !local.apiKey) out.apiKey = remote.apiKey;
+  else if(local.apiKey) out.apiKey = local.apiKey;
+  if(remote.chatgptOpenUrl && !local.chatgptOpenUrl) out.chatgptOpenUrl = remote.chatgptOpenUrl;
+  else if(local.chatgptOpenUrl) out.chatgptOpenUrl = local.chatgptOpenUrl;
+  if(remote.dailyAutoLast && (!local.dailyAutoLast || remote.dailyAutoLast > local.dailyAutoLast)) out.dailyAutoLast = remote.dailyAutoLast;
+  else if(local.dailyAutoLast) out.dailyAutoLast = local.dailyAutoLast;
+  var mergedMs = Math.max(localMs, remoteMs, Date.now());
+  out.savedAt = new Date(mergedMs).toISOString();
+  out.localSavedAt = out.savedAt;
+  return out;
+}
+function plannerSyncFingerprint_(payload){
+  if(!payload) return '';
+  try {
+    var ids = [];
+    var byCat = payload.extraDraftsByCat || {};
+    Object.keys(byCat).sort().forEach(function(k){
+      (byCat[k] || []).forEach(function(d){ if(d && d.id) ids.push(d.id); });
+    });
+    return JSON.stringify({
+      extra: ids.sort(),
+      pub: Object.keys(payload.published || {}).sort(),
+      gen: Object.keys(payload.generatedOnly || {}).sort(),
+    });
+  } catch(e){ return ''; }
 }
 
 function promptsFingerprint_(prompts){
@@ -1619,12 +1751,13 @@ function startPlannerIdleSync_() {
   armPlannerIdleSync_();
 }
 
-/** Drive(appData) · GAS 서버 백업 중 더 최신 JSON을 이 기기에 반영 (프롬프트·발행본 포함) */
+/** Drive(appData) · GAS 서버 백업을 이 기기와 합침 (주제·초안·발행본 누락 방지) */
 async function syncAllSourcesIfNewer_(reason){
-  var localMs = parseIsoMs_(state.localSavedAt);
-  var best = null;
-  var bestMs = 0;
-  var bestSource = '';
+  var localPayload = getPersistPayload();
+  var localMs = getPayloadSavedMs_(localPayload);
+  var remote = null;
+  var remoteMs = 0;
+  var remoteSource = '';
 
   if(hasDriveValidToken_()){
     try {
@@ -1632,7 +1765,14 @@ async function syncAllSourcesIfNewer_(reason){
       var out = await driveDownloadCloudPayload_(token);
       if(out.data){
         var ms = getPayloadSavedMs_(out.data);
-        if(ms > bestMs){ best = out.data; bestMs = ms; bestSource = 'Drive'; }
+        if(!remote || ms >= remoteMs){
+          remote = out.data;
+          remoteMs = ms;
+          remoteSource = 'Drive';
+        } else {
+          remote = mergePlannerPayloads_(remote, out.data);
+          remoteMs = getPayloadSavedMs_(remote);
+        }
       }
     } catch(e0){
       console.warn('[동기화 Drive]', reason || '', e0);
@@ -1652,34 +1792,54 @@ async function syncAllSourcesIfNewer_(reason){
       applyPlannerServerCaps_(data);
       if(data.result === 'success' && data.payload){
         var ms2 = getPayloadSavedMs_(data.payload);
-        if(ms2 > bestMs){ best = data.payload; bestMs = ms2; bestSource = '서버'; }
+        if(!remote){
+          remote = data.payload;
+          remoteMs = ms2;
+          remoteSource = '서버';
+        } else if(ms2 >= remoteMs){
+          remote = mergePlannerPayloads_(data.payload, remote);
+          remoteMs = getPayloadSavedMs_(remote);
+          remoteSource = remoteSource === 'Drive' ? 'Drive·서버' : '서버';
+        } else {
+          remote = mergePlannerPayloads_(remote, data.payload);
+          remoteMs = getPayloadSavedMs_(remote);
+          remoteSource = remoteSource === 'Drive' ? 'Drive·서버' : '서버';
+        }
       }
     } catch(e1){
       console.warn('[동기화 서버]', reason || '', e1);
     }
   }
 
-  if(!best || !bestMs || bestMs <= localMs + 1500) return false;
+  if(!remote) return false;
+
+  var merged = mergePlannerPayloads_(localPayload, remote);
+  var fpBefore = plannerSyncFingerprint_(localPayload);
+  var fpAfter = plannerSyncFingerprint_(merged);
+  var remoteNewer = remoteMs > localMs + 1500;
+  if(fpBefore === fpAfter && !remoteNewer) return false;
 
   var promptsBefore = promptsFingerprint_(state.prompts);
-  applyPersistPayload(best);
+  applyPersistPayload(merged);
   try {
-    if(best.dailyAutoLast) localStorage.setItem('ht_daily_auto_last', best.dailyAutoLast);
+    if(merged.dailyAutoLast) localStorage.setItem('ht_daily_auto_last', merged.dailyAutoLast);
   } catch(e2){}
-  save({ skipDriveUpload: true, skipGasPush: true });
+  save({ skipDriveUpload: false, skipGasPush: false, driveImmediate: false, gasImmediate: true });
   updateApiBadge();
   renderTabs();
   renderMain();
   updateDriveButtonState();
 
   var promptsChanged = promptsBefore !== promptsFingerprint_(state.prompts);
-  if(best.plannerLastAuto && best.plannerLastAuto.draftId != null){
-    handleServerPlannerAuto_(best);
+  var topicsAdded = fpBefore !== fpAfter;
+  if(merged.plannerLastAuto && merged.plannerLastAuto.draftId != null){
+    handleServerPlannerAuto_(merged);
     setTimeout(function(){
-      openNextPublishRecommendationFromEntry_(best.plannerLastAuto.draftId, best.plannerLastAuto.catId);
+      openNextPublishRecommendationFromEntry_(merged.plannerLastAuto.draftId, merged.plannerLastAuto.catId);
     }, 400);
-  } else if(typeof setAppToast === 'function'){
-    var msg = (bestSource === 'Drive' ? 'Drive' : '서버') + '에서 최신 데이터를 불러왔어요.';
+  } else if(typeof setAppToast === 'function' && (topicsAdded || remoteNewer)){
+    var msg = (remoteSource || '클라우드') + ' 데이터를 합쳐 반영했어요.';
+    if(topicsAdded) msg += '\n다른 기기에서 만든 주제가 있으면 함께 불러왔어요.';
     if(promptsChanged) msg += '\n프롬프트 설정도 반영됐어요.';
     setAppToast(msg, { duration: 4500, variant: 'ok' });
   }
@@ -2339,6 +2499,7 @@ function buildDriveFileBody(){
   return JSON.stringify(p);
 }
 async function driveUploadNow(){
+  await plannerPullRemoteIntoState_();
   var token = await getDriveAccessToken({ forcePrompt: false });
   var fileId = await driveEnsureFileId(token);
   var body = buildDriveFileBody();
@@ -2850,7 +3011,7 @@ function renderTabs() {
   function cellHTML(idx) {
     const c = CATEGORIES[idx];
     const label = CAT_TAB_SHORT[idx] || c.name;
-    const written = countWrittenDraftsForCat_(idx);
+    const active = countUnpublishedTopicsForCat_(idx);
     return (
       '<button type="button" class="cat-tab' +
       (state.currentCat === idx ? ' active' : '') +
@@ -2858,8 +3019,8 @@ function renderTabs() {
       idx +
       ')"><span class="cat-tab-label">' +
       label +
-      '</span><span class="cat-tab-badge" title="AI로 작성된 초안 수">' +
-      written +
+      '</span><span class="cat-tab-badge" title="진행 중 주제 수 (초안 있음+없음, 발행 완료 제외)">' +
+      active +
       '</span></button>'
     );
   }
@@ -2891,12 +3052,12 @@ function draftHasContent(d) {
   return !!(d && d.id && (state.generatedOnly[d.id] || (state.published[d.id] && state.published[d.id].content)));
 }
 
-/** 상단 탭 배지 — AI로 본문이 작성된 초안 수 (주제만 있는 카드·추천·발행완료 건수와 무관) */
-function countWrittenDraftsForCat_(catIdx) {
+/** 상단 탭 배지 — 발행 완료를 제외한 주제 수 (초안 있음 + 초안 없음) */
+function countUnpublishedTopicsForCat_(catIdx) {
   const cat = CATEGORIES[catIdx];
   if (!cat || !cat.drafts) return 0;
   return cat.drafts.filter(function (d) {
-    return draftHasContent(d);
+    return d && d.id && !draftIsPublished_(d.id);
   }).length;
 }
 
@@ -3188,12 +3349,15 @@ function getDraftReferenceText_(draft){
   return parts.join('\n\n');
 }
 
-function appendDraftReferenceToPrompt_(prompt, draft){
+function appendDraftReferenceToPrompt_(prompt, draft, catId){
   var ref = getDraftReferenceText_(draft);
   if(!ref) return prompt;
+  if(catId == null && draft && draft.id) catId = getCatIdFromDraftId_(draft.id);
   var via = draft.youtubeAnalysis ? '메모 + YouTube 분석' : '메모';
-  return prompt + '\n\n[작성자 참고 — ' + via + ']\n' + ref +
-    '\n위 내용의 테크닉·개념·시연 장면을 topic·본문에 반영하세요.';
+  var tail = isExpertCourseCategory(catId)
+    ? '\n위 참고·주제·각도 **범위 안에서만** 작성하세요. 테크닉 설명·핵심 포인트·짧은 원리는 괜찮지만, 영상·강의와 무관하게 **확장·일반화·다른 부위·케이스로 넓히지 마세요**. 부족하면 참고 내용을 더 명확히 복기하세요.'
+    : '\n위 내용의 테크닉·개념·시연 장면을 topic·본문에 반영하세요.';
+  return prompt + '\n\n[작성자 참고 — ' + via + ']\n' + ref + tail;
 }
 
 async function analyzeYoutubeWithGemini_(url, catId){
@@ -3264,7 +3428,8 @@ async function generateTopicFromKeywords_(catId, keywords, imagePayload, sourceN
       ? ('전문가 과정 **강연·교육 영상·실습 공유**용 주제 1개.\n' +
          '- topic: PT·트레이너 동료에게 건네는 한 줄 (15~40자, 과장·낚시 금지)\n' +
          '- angle: **다룰 테크닉/개념 + 핵심 포인트 1~3개**가 드러나는 각도 한 줄\n' +
-         '  (예: "고관절 굴곡 제한 — 단순 스트레칭이 안 되는 이유와 PAR 적용 포인트")\n')
+         '  (예: "어깨 관절 가동술 — 강의에서 시연한 접근 각도와 손 위치 포인트")\n' +
+         (noteBlock ? '- **참고 메모·영상 분석 범위 안**에서만 topic·angle을 잡을 것. 없는 내용·연관 질환·다른 부위로 확장 금지.\n' : ''))
       : ('입력한 키워드·아이디어·문장을 바탕으로 블로그·SNS에 쓸 주제 1개를 만드세요.\n' +
          '- topic: 한국어 제목 한 줄 (15~36자, 후킹·질문형 가능)\n' +
          '- angle: 어떤 관점으로 풀지 한 줄 (메커니즘·실천·오해 해소 등)\n'));
@@ -3383,18 +3548,18 @@ function renderAddForm(){
   const addIntro = isDaily
     ? '「일상 공유」에 올릴 <strong>생활 일기·느낌</strong> 주제를 만듭니다. 사진만 올려도 되고, 키워드와 함께 써도 돼요.'
     : (isExpert
-      ? '강연·교육 <strong>영상·실습 내용</strong>을 PT·트레이너 동료에게 공유할 주제를 만듭니다. 테크닉/개념·핵심 포인트·영상 메모를 적어 주세요.'
+      ? '강연·교육 <strong>영상·실습에서 다룬 내용</strong>을 동료에게 공유할 주제를 만듭니다. 글은 메모·영상 범위 안에서만 쓰여요 — 테크닉 설명·핵심 포인트·짧은 원리 정도가 적당합니다.'
       : '추가한 주제는 <strong>선택한 카테고리 탭</strong>의 「전체 초안」 목록 맨 아래에 카드로 생깁니다.');
   const kwLabel = isDaily ? '키워드 · 아이디어 (선택)' : (isExpert ? '테크닉 · 개념' : '키워드 · 아이디어');
   const kwPlaceholder = isDaily
     ? '키워드, 짧은 문장, 떠오른 장면을 자유롭게 적어 주세요 (비우고 사진만 가능)'
     : (isExpert
-      ? '예: 고관절 굴곡 제한의 평가와 PAR 적용'
+      ? '예: 어깨 관절 가동술 — 강의에서 시연한 접근'
       : '키워드, 짧은 문장, 여러 아이디어를 자유롭게 적어 주세요');
   const kwHint = isDaily
     ? '비우면 <strong>사진만</strong>으로 주제·일상 글을 만듭니다. 적은 내용은 모두 반영해요.'
     : (isExpert
-      ? '다룰 <strong>테크닉/개념</strong>을 한 줄로. 핵심 포인트·영상 내용은 아래 참고 메모에 적어 주세요.'
+      ? '다룰 <strong>테크닉/개념</strong>을 한 줄로. 핵심 포인트·시연 내용은 아래 메모에 — <strong>영상·강의에서 말한 것만</strong> 적어 주세요.'
       : 'AI가 적어 주신 <strong>키워드·문장</strong>으로 <strong>주제 제목</strong>과 <strong>각도</strong>를 만든 뒤 목록에 넣습니다.');
   const refNoteLabel = isDaily ? '참고 메모 (선택)' : (isExpert ? '핵심 포인트 · 영상 메모' : '참고 영상 · 메모 (선택)');
   const refNotePlaceholder = isDaily
@@ -3517,7 +3682,9 @@ window.addDraft = async function(){
         youtubeAnalysis = await analyzeYoutubeWithGemini_(youtubeUrls[0], state.newItem.catId);
       } catch(ytErr){
         var ytMsg = (ytErr && ytErr.message) ? ytErr.message : String(ytErr);
-        if(typeof setAppToast === 'function') setAppToast('유튜브 분석 실패 — 메모만으로 주제를 만들게요.\n' + ytMsg, { duration: 7000, variant: 'err' });
+        var ytToast = '유튜브 분석 실패 — 메모만으로 주제를 만들게요.';
+        if(ytMsg) ytToast += '\n' + ytMsg;
+        if(typeof setAppToast === 'function') setAppToast(ytToast, { duration: /할당량|quota|limit/i.test(ytMsg) ? 12000 : 7000, variant: 'err' });
       }
     }
     if(btn) btn.textContent = '주제 생성 중…';
@@ -5445,11 +5612,14 @@ function normalizeInstaBlock_(ig){
 async function generateInstaFromBlog_(catId, blog, topic){
   var instaGuide = getCatPrompt(catId, 'insta');
   var baseInfo = getBasePrompt();
+  var expertScope = isExpertCourseCategory(catId)
+    ? '\n- 전문가 과정: 블로그에 없는 내용을 **새로 추가하지 말고**, 블로그·참고 범위 안에서만 압축하세요.\n'
+    : '';
   var prompt = baseInfo + '\n\n' +
     '카테고리: ' + (CATEGORIES[catId] ? CATEGORIES[catId].name : '') + '\n' +
     '주제: "' + (topic || '') + '"\n\n' +
     '[인스타 작성 지침]\n' + instaGuide + '\n\n' +
-    '아래는 **확정·수정된 블로그 글**입니다. 블로그 전체를 옮기지 말고, **핵심과 후킹만** 짧은 인스타 한 포스트로 만드세요.\n\n' +
+    '아래는 **확정·수정된 블로그 글**입니다. 블로그 전체를 옮기지 말고, **핵심과 후킹만** 짧은 인스타 한 포스트로 만드세요.\n' + expertScope + '\n' +
     '요구사항:\n' +
     '- hook: 블로그 제목·후킹에서 **기억에 남는 한 줄** (이모지 1개 전후, 25자 내외 권장)\n' +
     '- caption: 공감 한 줄 → 핵심 포인트 **2~3개만**(번호 또는 •) → 실천 팁 1개 → 짧은 CTA. hook 제외 **180~380자** 목표\n' +
@@ -7134,7 +7304,7 @@ ${imgJsonTail}
 if(!isDailyShareCategory(catId) && !isHeiljagyaeCategory(catId) && isExpertCourseCategory(catId)){
   prompt = prompt.replace(
     '"title": "네이버 SEO 최적화 후킹 제목 (35자 이내, 숫자나 물음표 활용)",\n"hook": "공감→문제제기→해결암시 흐름의 오프닝 2~3문장",\n"outline": ["소제목1","소제목2","소제목3","소제목4"],\n"draft": "본문 초안 700~900자. 따뜻하고 전문적인 원장님 톤. 실제 임상 경험 느낌. 단락 구분 포함.",\n"cta": "마무리 행동 유도 (힐링트리 센터 자연스럽게 언급)",\n"hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6"]',
-    '"title": "전문가 독자용 한 줄 (35자 내외, 과장·낚시 금지)",\n"hook": "현장에서 공감되는 오프닝 2~3문장. 강의 말투",\n"outline": ["테크닉/개념","핵심 포인트1","핵심 포인트2","현장 적용"],\n"draft": "500~850자. 중간 길이. 테크닉/개념→핵심 포인트 1~3개→임상 적용. 참고 메모(영상·시연) 반영. 전문 용어는 한 줄 풀어쓰기",\n"cta": "수강·등록 유도 금지. 이 관점이 현장에 도움이 됐으면 식 마무리",\n"hashtags": ["3~5개만","전문 키워드"]'
+    '"title": "전문가 독자용 한 줄 (35자 내외, 과장·낚시 금지)",\n"hook": "현장에서 공감되는 오프닝 2~3문장. 강의 말투",\n"outline": ["테크닉/개념","핵심 포인트1","핵심 포인트2","현장 적용"],\n"draft": "500~850자. 참고 메모·영상 분석 **범위 안만**. 테크닉/개념→핵심 포인트 1~3개→짧은 원리·현장 적용. 참고에 없는 평가·케이스·부위로 확장 금지",\n"cta": "수강·등록 유도 금지. 이 관점이 현장에 도움이 됐으면 식 마무리",\n"hashtags": ["3~5개만","전문 키워드"]'
   );
 }
 
@@ -7146,7 +7316,7 @@ try {
   console.warn('[유튜브 분석]', ytGenErr);
 }
 
-prompt = appendDraftReferenceToPrompt_(prompt, draft);
+prompt = appendDraftReferenceToPrompt_(prompt, draft, catId);
 
 var draftRefImage = (draft.refImage && draft.refImage.data) ? draft.refImage : null;
 if(draftRefImage){

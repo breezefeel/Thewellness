@@ -821,10 +821,13 @@ padding: 13px 16px; font-size: 13px; font-weight: 700; cursor: pointer; font-fam
 /* 백그라운드 생성 안내 토스트 */
 .app-toast {
 position: fixed;
-bottom: 22px;
+bottom: calc(22px + env(safe-area-inset-bottom, 0px));
 left: 50%;
 transform: translateX(-50%) translateY(120%);
 max-width: min(420px, calc(100vw - 32px));
+max-height: min(38vh, 168px);
+overflow-y: auto;
+-webkit-overflow-scrolling: touch;
 z-index: 320;
 background: #1A1A1A;
 color: #fff;
@@ -836,17 +839,24 @@ line-height: 1.5;
 box-shadow: 0 10px 40px rgba(0,0,0,0.28);
 opacity: 0;
 pointer-events: none;
-transition: transform 0.28s ease, opacity 0.28s ease;
+transition: transform 0.28s ease, opacity 0.28s ease, bottom 0.2s ease;
 text-align: center;
 white-space: pre-line;
 }
 .app-toast.show {
 transform: translateX(-50%) translateY(0);
 opacity: 1;
-pointer-events: auto;
+pointer-events: none;
 }
 .app-toast--ok { border: 1px solid #2DD4BF; }
 .app-toast--err { border: 1px solid #F87171; }
+@media (max-width: 768px) {
+body:has(#detail-sheet.open) .app-toast.show,
+body:has(#publish-modal.open) .app-toast.show,
+body:has(#prompt-modal.open) .app-toast.show {
+bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+}
+}
 
 /* 프롬프트 설정 버튼 (planner header) */
 .btn-prompt-settings {
@@ -1026,7 +1036,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   <div class="cat-tabs-grid" id="cat-tabs-grid"></div>
 </div>
 
-<div id="app-toast" class="app-toast" role="status" aria-live="polite"></div>
+<div id="app-toast" class="app-toast" role="status" aria-live="off" aria-atomic="true"></div>
 
 <!-- Main content -->
 
@@ -1131,6 +1141,8 @@ const ADD_FORM_CAT_ORDER = [0, 3, 1, 5, 2, 4, 7, 6];
 const SK = 'ht_v2';
 /** 카테고리당 유지할 주제 카드 수 (발행·AI 초안 유무와 무관) */
 const MIN_TOPICS_PER_CAT = 5;
+const PROMPT_REFINE_EVERY_PUBLISH = 3;
+const PROMPT_REFINE_SAMPLE_COUNT = 3;
 /** 약수·피드백과 동일 웹앱 — code-full.gs 배포 URL */
 const PLANNER_GAS_URL = 'https://script.google.com/macros/s/AKfycbwVJSc6rY5tcBSB1VaRi4DBEXGyUBr1ADFfs6QEA9Z9bu0G-0mdMAv374-MdPVYMnSaeQ/exec';
 /** GitHub Pages 공개 주소 — Apps Script PLANNER_PAGE_URL 과 동일하게 유지 */
@@ -1369,6 +1381,7 @@ ${DEFAULT_EXPERT_COURSE_SCOPE_RULE}
 - 해시태그 **최소화**(3~5개), 본문 흐름을 방해하지 않게
 
 [형식]
+- 제목: 동료 전문가의 **궁금증·현장 질문**을 자극하는 한 줄 (35자 내외, 과장·낚시 금지)
 - 길이: **짧은 중간**(본문 350~500자)
 - 마무리: 수강·등록·예약 유도보다 **"이 관점이 현장에 도움이 됐으면"**, **"한 번 적용해 보시고"** 식의 가벼운 마무리`;
 
@@ -1404,41 +1417,72 @@ const DEFAULT_HEILJAGYAE_IMAGE_PROMPT = `아파트너 게시글용 이미지 생
 - Photorealistic editorial, warm beige·sage·cream palette, soft daylight, no text overlay, no logo, no watermark
 - 광고 느낌보다 옆집 이웃의 생활감·가벼운 컨디션 회복 분위기`;
 
-// ── PSP 임상 프로토콜 (https://breezefeel.github.io/drpark/ 컨셉과 동일) ──
+// ── PSP 임상 프로토콜 (프로필.html · https://breezefeel.github.io/drpark/ 와 동기화) ──
 const DEFAULT_PSP_CLINICAL_FRAMEWORK = `
 [PSP 임상 프로토콜 — 모든 초안의 임상·설명 뼈대]
-상세·구조 참고: https://breezefeel.github.io/drpark/ (PSP 컨셉). 아래 순서·용어와 모순되게 쓰지 말 것.
+상세·구조 참고: 프로필 PSP 건강 가이드 · https://breezefeel.github.io/drpark/
+아래 순서·용어·PAR 개념과 모순되게 쓰지 말 것. 일반 독자에게는 쉬운 비유로, 전문가에게는 정확한 용어로.
 
 ■ PSP = Philosophy · Science · Practice
-- Philosophy: 물질(구조)과 에너지(작동)의 균형. 이 콘텐츠에서 다루는 핵심 물질 영역은 근골격계.
-- Science: 원인을 이론으로 설명하고, 체계적 평가로 문제 조직·방향을 좁힌다.
+(Philosophy based Science, Science based Practice)
+- Philosophy: 기능하는 존재에게 **물질**(구조)과 **에너지**(작동)가 함께 맞물려야 한다. 이 프로토콜이 다루는 핵심 물질 영역은 **근골격계**. (에너지·자율신경·내장 등은 다른 체계가 필요할 수 있음)
+- Science: 원인을 이론(해부·생리·신경생리·생체역학·통증과학 등)으로 설명하고, 체계적 평가로 부위·조직을 좁힌다.
 - Practice: 평가에 맞는 Manual Therapy(도수)와 Movement(움직임·운동).
+- 궁극 목표: **먼저 구조를 해결하고, 기능을 회복**한다. 불필요한 긴장 없이 스스로 인지·조절할 수 있는 몸.
 
 ■ 기준선 · 두 영역
-- 편안한 상태 = 기준선. 통증·불편 있음 → 치료 영역(정상으로 되돌리기). 통증 없음 → 웰니스 영역(더 좋은 상태로 끌어올리기).
+- **편안한 상태 = 기준선**
+- 통증·불편 있음 → **치료 영역**(정상으로 되돌리기)
+- 통증 없음 → **웰니스 영역**(더 좋은 상태로 끌어올리기)
 
 ■ STEP 01 — 평가 (4가지, 시점에 맞게 유기적으로)
 History Taking · Inspection · Movement Test · Palpation
-- History: General Screen, OPPQRST. 통증의 질(뻐근·당김·찌릿·한 점 날카로움·찢어짐·저림 등)으로 근육·관절·신경·Fascia 방향을 가늠.
-- Inspection: 자세·체형·불균형·생활 패턴.
-- Movement: A/P-ROM, 동작 패턴, 필요 시 Muscle·Nerve Test.
+- History: General Screen, OPPQRST. 통증의 **질**(뻐근·당김·찌릿·한 점 날카로움·찢어짐·저림 등)으로 Muscle·Joint·신경·Fascia 방향을 가늠.
+- Inspection: 자세·체형·불균형·생활 패턴(장시간 자세·반복 동작·수면·업무 환경).
+- Movement: A-ROM·P-ROM, 동작 패턴, 필요 시 Muscle·Nerve Test.
 - Palpation: Fascia / Muscle / Joint를 직접 확인해 예상을 검증.
 
 ■ STEP 02 — Manual Therapy (VAS는 참고, 임상 판단 우선)
-- VAS 0~2: 원칙적으로 움직임·Passive Stretching. 단 찌릿·저림·날카로운 관절통·찢어짐 등 통증 질이 뚜렷하면 VAS가 낮아도 비침습 도수부터.
-- VAS 3~6: 비침습 Manual Therapy — Fascia → Muscle → Joint → Movement.
+- VAS 0~2: 원칙적으로 **움직임 평가 & Passive Stretching**. 단 찌릿·저림·날카로운 관절통·찢어짐 등 통증 질이 뚜렷하면 VAS가 낮아도 **비침습 도수**부터.
+- VAS 3~6: 비침습 Manual Therapy — **Fascia → Muscle → Joint → Movement**.
 - VAS 6+: 침습적 옵션을 단계적으로 고려(약물·주사·시술·수술 — 임상 판단·효과 없을 때).
-- 공통 원칙: 표층→심층, 중심(척추)→말단, Static→Motion. 사고 없이 생긴 문제도 Fascia→Muscle→Joint 순으로 찾고 치료하며 변화를 관찰.
+- Fascia: 근막층 활주 저하·유착(Adhesion). Muscle: 과긴장·트리거·뭉침. Joint: 저가동성·Hypomobility.
+- 공통 원칙: **표층→심층**, **중심(척추)→말단**, **Static→Motion**. 사고 없이 생긴 문제도 F→M→J 순으로 찾고 치료하며 변화를 관찰.
 
-■ STEP 03 — Movement
-- Passive Stretching(=P-ROM)에서 시작 → P·A·R(Passive · Assisted Active · Active).
-- Position 1 누움(Supine/Prone, 중력 최소) → 2 앉음(Sitting, 근막경선·부분 하중) → 3 서기(Standing, 완전 하중·기능).
-- 궁극 목표: 구조 해결 후 기능 회복. 편안한 호흡·긴장 자각·스스로 조절. 생활습관·자세 교육 후 기능운동.
+■ STEP 03 — Movement · PAR 시퀀스
+**Passive Stretching(=P-ROM)** 에서 안전한 움직임을 시작한다. 시행 자체가 관절 가동범위·질을 평가하는 과정이다.
+
+[PAR — 관절별 공통 순서]
+각 **관절마다** 아래를 진행한 뒤 다음 관절로 넘어간다. 매 순간 **통증·ROM**을 확인한다.
+
+**P · Passive (Passive Stretching)**
+- 말단 → 근위로 진행. 통증·ROM 매 순간 확인.
+- 통증 있음(Fascia/Muscle) → Pin & Stretching·소도구 자극 등 → 해소 후 ROM 재판단. (결합조직 손상 의심 시 **무통 범위만**, 통증 동작 자제)
+
+**AA · Assisted Active (Assisted Active Stretching)**
+- 통증 없음 + **ROM 감소(유연성 저하)** 일 때.
+- 단관절 ROM 회복: CIE · Hold & Relax · Pull & Push 등.
+
+**A · Active (Active Stretching)**
+- 통증 없음 + **ROM 정상**일 때 A-ROM 확인·강화.
+
+**R · Resistive**
+- 가동 정상·통증 없을 때 **근막경선**을 따라 저항 운동.
+- 방향 순서: **굴곡 → 신전 → 회전 → 외전 → 내전** (베이직: 근막경선 따라 / 어드밴스드: 기능 패턴 8종 등).
+- PAR 완료 후 → **생활습관·자세 교정**(장시간 자세·반복 동작·수면·업무 환경 등 통증 재생산 요인) → **기능운동**(보행·계단·들어올리기·일상 동작을 통증 없는 범위에서 회복).
+
+[Position — 하중을 올리며 일상에 가깝게]
+- **Position 1** Supine/Prone(누움): 중력 부하 최소 → **Passive Stretching**에서 PAR 시작.
+- **Position 2** Sitting(앉음): 부분 하중 → Position 1과 달리 **Active Stretching을 먼저** 시행하는 경우가 많음. 기준 미달 시 Passive 보완 후 통증·ROM 분기.
+- **Position 3** Standing(서기): 완전 하중·기능적 패턴. 일상 동작에 가까운 훈련.
 
 ■ 콘텐츠에 녹이는 방법
-- 일반 독자: 공감 → 왜 아픈지(평가·원인, 쉬운 비유) → 센터에서 무엇을 하는지(도수/움직임 순서) → 집 셀프(동작·초·회·분, 무리·재통증 주의).
-- 전문가 독자: 평가-치료 연결, PSP 순서 존중. 과장·즉효 약속·타 기관 비방 금지.
+- 일반 독자: 공감 → 왜 아픈지(평가·원인, 쉬운 비유) → 센터에서 무엇을 하는지(도수 F→M→J → 움직임 P→AA→A→생활습관→기능) → 집 셀프(동작·초·회·분, 무리·재통증 주의).
+- Movement·리:얼 카테고리: P-ROM·PAR·Position 1→2→3 순서를 환자 언어로. '왜 이 동작인지'·편안한 호흡·긴장 자각을 강조.
+- 전문가 독자: 평가-치료 연결, PSP·PAR 순서 존중. 과장·즉효 약속·타 기관 비방 금지.
 - 얼굴·웰니스: 구조→기능, 호흡·자세·긴장 조절 맥락 유지.`;
+
+const DEFAULT_BLOG_TITLE_HOOK_RULE = `제목은 **독자의 호기심·궁금증**을 자극하는 후킹 요소를 넣으세요. (예: "왜 ~일까?", "사실 ○○이 원인?", "○○ 안 하면 생기는 일", 숫자·흔한 오해·반전 한 줄). 네이버 SEO(검색 키워드 자연스럽게)도 고려하되, 과장·즉효 약속·낚시는 금지.`;
 
 // ── 기본 프롬프트 (카테고리별 블로그/인스타/NotebookLM 등) ──
 const DEFAULT_PROMPTS = {
@@ -1448,21 +1492,21 @@ const DEFAULT_PROMPTS = {
 인스타: @dr.park_dc.pt` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
   categories: {
     0: { // 도수치료
-      blog: `네이버 SEO를 고려해 제목을 작성하세요. PSP 기준: 평가(증상·통증 질)→Fascia·Muscle·Joint 도수→움직임·셀프 순으로 풀되, 환자가 이해하는 쉬운 말로. 과장·즉효 약속 금지. 따뜻하고 신뢰감 있는 톤.`,
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE} PSP·PAR 순서를 환자 언어로: 평가(증상·통증 질)→Fascia·Muscle·Joint 도수→Passive(P-ROM)→Assisted Active→Active→생활습관→기능. 따뜻하고 신뢰감 있는 톤.`,
       insta: `캐러셀(여러 장 슬라이드) 없이 **한 포스트 캡션**으로 끝내세요. 첫 줄 후킹에 이어, 본문 캡션 안에 통증→원인→해결 흐름의 **핵심 포인트**를 번호(1. 2.) 또는 • 불릿으로 넣어 한 번에 읽히게 하세요.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     1: { // 리:얼 Movement
-      blog: `PSP Movement 관점: Passive Stretching(P-ROM)→P·A·R, Position 1(누움)→2(앉음)→3(서기) 흐름을 환자 언어로. '왜 이 동작인지' 먼저, 초·회·분·무리 금지. 편안한 호흡·긴장 조절을 강조.`,
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE} PSP Movement·PAR: Passive Stretching(P-ROM) 시작 → 관절별 P→AA→A→Resistive → Position 1(누움)→2(앉음)→3(서기) → 생활습관·기능운동. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지를 환자 언어로.`,
       insta: `캐러셀 없이 **한 포스트 캡션**에 동작·포인트·주의사항을 단계적으로 적습니다. 마지막에 저장·팔로우 유도 문장을 캡션 끝에 자연스럽게 넣으세요.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     2: { // 얼굴 관리
-      blog: `얼굴 비대칭이나 윤곽에 관심 있는 20~40대 여성을 주 독자로 설정하세요. 과학적 근거를 바탕으로 하되 과도한 의학적 표현은 피하고, 공감과 희망을 주는 톤으로 작성하세요.`,
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE} 얼굴 비대칭이나 윤곽에 관심 있는 20~40대 여성을 주 독자로 설정하세요. 과학적 근거를 바탕으로 하되 과도한 의학적 표현은 피하고, 공감과 희망을 주는 톤으로 작성하세요.`,
       insta: `캐러셀 없이 **한 포스트 캡션**으로 스토리텔링하세요. "이런 고민 있으신가요?"에 이어 문제→원인→해결→CTA를 캡션 안에서 줄바꿈으로 구분해 읽기 쉽게.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
@@ -1516,7 +1560,7 @@ let state = {
   prompts: null, // null이면 DEFAULT_PROMPTS 사용
   promptTab: 'blog',
   editingCatId: 0,
-  promptRefineMilestones: {}, // catId → 마지막 반영한 발행 N건 (5, 10, …)
+  promptRefineMilestones: {}, // catId → 마지막 반영한 발행 N건 (3, 6, …)
   publishModalDraftId: null,
   publishModalCatId: null,
   deletedDraftIds: {},
@@ -2883,6 +2927,13 @@ window.onload = () => {
   scheduleDailyAutoDraft_();
   setInterval(function(){ maybeRunDailyAutoDraft_('interval'); }, 2 * 60 * 1000);
   setTimeout(function(){ maybeRunDailyAutoDraft_('load'); }, 4000);
+  var onToastViewportChange_ = function(){ scheduleAppToastLift_(); };
+  window.addEventListener('resize', onToastViewportChange_);
+  window.addEventListener('orientationchange', onToastViewportChange_);
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', onToastViewportChange_);
+    window.visualViewport.addEventListener('scroll', onToastViewportChange_);
+  }
   window.addEventListener('focus', function(){
     syncAllSourcesIfNewer_('focus');
     maybeRunDailyAutoDraft_('focus');
@@ -3395,14 +3446,42 @@ function getDraftReferenceText_(draft){
   return parts.join('\n\n');
 }
 
+function buildTopicGenFidelityBlock_(keywords, sourceNote, isDaily){
+  var kw = String(keywords || '').trim();
+  var hasNote = !!(sourceNote && String(sourceNote).trim());
+  if(!kw && !hasNote) return '';
+  var lines = [
+    '',
+    '[입력 충실도 — 최우선]',
+    'topic·angle은 아래 사용자 입력·참고 메모의 **핵심 키워드·의도·소재**를 중심으로 만드세요.',
+    '- 입력과 **다른 주제·질환·부위·케이스**로 바꾸지 마세요',
+    '- 후킹·질문형·SEO는 입력 범위 안에서만 다듬기',
+    '- 기존 카드 주제와 겹치지만 않으면 됨 (겹침만 피하고 **소재는 입력 우선**)'
+  ];
+  if(kw){
+    var preview = kw.length > 480 ? kw.slice(0, 480) + '…' : kw;
+    lines.splice(2, 0, '사용자 입력 원문: 「' + preview + '」');
+  }
+  if(isDaily) lines.push('- 사진·메모의 장면·느낌을 topic·angle에 직접 반영');
+  else if(hasNote) lines.push('- 참고 메모의 테크닉·관점·용어를 topic·angle에 반영');
+  return '\n' + lines.join('\n');
+}
+
 function appendDraftReferenceToPrompt_(prompt, draft, catId){
   var ref = getDraftReferenceText_(draft);
   if(!ref) return prompt;
   if(catId == null && draft && draft.id) catId = getCatIdFromDraftId_(draft.id);
-  var via = draft.youtubeAnalysis ? '메모 + YouTube 분석' : '메모';
-  var tail = isExpertCourseCategory(catId)
-    ? '\n위 참고·주제·각도 **범위 안에서만** 작성하세요. 테크닉 설명·핵심 포인트·짧은 원리는 괜찮지만, 영상·강의와 무관하게 **확장·일반화·다른 부위·케이스로 넓히지 마세요**. 부족하면 참고 내용을 더 명확히 복기하세요.'
-    : '\n위 내용의 테크닉·개념·시연 장면을 topic·본문에 반영하세요.';
+  var via = draft.youtubeAnalysis ? '키워드·메모 + YouTube 분석' : '키워드·메모';
+  var userAdded = isUserAddedDraftId_(draft && draft.id);
+  var tail;
+  if(isExpertCourseCategory(catId)){
+    tail = '\n위 참고·주제·각도 **범위 안에서만** 작성하세요. 테크닉 설명·핵심 포인트·짧은 원리는 괜찮지만, 영상·강의와 무관하게 **확장·일반화·다른 부위·케이스로 넓히지 마세요**. 부족하면 참고 내용을 더 명확히 복기하세요.';
+  } else if(userAdded){
+    tail = '\n위 내용은 사용자가 「추가」에 입력한 **원문**입니다. 주제 「' + (draft.topic || '') + '」·각도 「' + (draft.angle || '') + '」도 이 입력에서 나온 것입니다.\n' +
+      '**제목·후킹·목차·본문이 입력에서 크게 벗어나지 않게** 작성하세요. 입력에 없는 질환·부위·케이스·주장·소재를 새로 붙이지 말고, 표현만 읽기 쉽게 다듬으며 카테고리·PSP 흐름에 맞게 풀어쓰세요.';
+  } else {
+    tail = '\n위 내용의 테크닉·개념·시연 장면을 topic·본문에 반영하세요. 입력·메모와 무관한 새 소재로 확장하지 마세요.';
+  }
   return prompt + '\n\n[작성자 참고 — ' + via + ']\n' + ref + tail;
 }
 
@@ -3482,8 +3561,8 @@ async function generateTopicFromKeywords_(catId, keywords, imagePayload, sourceN
     ? ('입력 (키워드·아이디어·문장): ' + keywords)
     : (isDaily && images.length ? '입력 (키워드·아이디어·문장): (없음 — 사진·메모만 참고)' : (sourceNote ? '입력 (키워드·아이디어·문장): (없음 — 참고 메모만)' : '입력 (키워드·아이디어·문장): '));
   var topicGuide = isDaily
-    ? ('일상 공유용 주제 1개. 축: 일상·계절·날씨·몸 느낌·여행·공감·느낌·최근 이슈(가볍게).\n' +
-       '- topic: 일기 제목 한 줄 (15~32자, 질문·감탄·오늘의 장면)\n' +
+    ? ('일상 공유용 주제 1개. **입력·사진·메모의 장면·느낌**을 중심으로 (다른 일상 소재로 바꾸지 마세요).\n' +
+       '- topic: 일기 제목 한 줄 (15~32자, 질문·감탄·오늘의 장면). 입력 키워드·장면 반영\n' +
        '- angle: 어떤 느낌으로 쓸지 한 줄. 날씨·피로·움직임 등 **근골격계 전문가 시선 한 스푼** 가능 (강의·임상 톤 금지)\n')
     : (isExpertCourseCategory(catId)
       ? ('전문가 과정 **강연·교육 영상·실습 공유**용 주제 1개.\n' +
@@ -3491,14 +3570,15 @@ async function generateTopicFromKeywords_(catId, keywords, imagePayload, sourceN
          '- angle: **다룰 테크닉/개념 + 핵심 포인트 1~3개**가 드러나는 각도 한 줄\n' +
          '  (예: "어깨 관절 가동술 — 강의에서 시연한 접근 각도와 손 위치 포인트")\n' +
          (noteBlock ? '- **참고 메모·영상 분석 범위 안**에서만 topic·angle을 잡을 것. 없는 내용·연관 질환·다른 부위로 확장 금지.\n' : ''))
-      : ('입력한 키워드·아이디어·문장을 바탕으로 블로그·SNS에 쓸 주제 1개를 만드세요.\n' +
-         '- topic: 한국어 제목 한 줄 (15~36자, 후킹·질문형 가능)\n' +
-         '- angle: 어떤 관점으로 풀지 한 줄 (메커니즘·실천·오해 해소 등)\n'));
+      : ('입력한 키워드·아이디어·문장을 **중심 소재**로 블로그·SNS 주제 1개를 만드세요. 입력에서 벗어난 새 소재로 바꾸지 마세요.\n' +
+         '- topic: 한국어 제목 한 줄 (15~36자, **호기심·궁금증을 자극하는 후킹**·질문형 권장). **입력 핵심 키워드가 드러나게**\n' +
+         '- angle: 입력·메모의 관점·테크닉·메커니즘을 한 줄로 (입력에 없는 새 각도 금지)\n'));
+  var fidelityBlock = buildTopicGenFidelityBlock_(keywords, sourceNote, isDaily);
   var prompt =
 '당신은 콘텐츠 기획자입니다.\n' +
 '카테고리: ' + cat.name + ' (' + (cat.sub || '') + ')\n' +
 '독자: ' + cat.audience + ' (카테고리 기본 독자 — 별도 선택 없음)\n' +
-kwLine + noteBlock + imgNote + '\n\n' + topicGuide + '\n' +
+kwLine + noteBlock + imgNote + '\n\n' + topicGuide + fidelityBlock + '\n' +
 '기존 주제와 겹치지 않게:\n' + avoidTopics.map(function(t){ return ' - ' + t; }).join('\n') + '\n\n' +
 'JSON만 출력:\n{"topic":"...","angle":"..."}';
   var text = await callClaudePlanner_(prompt, { image: images.length ? images : null, maxTokens: 800 });
@@ -3653,10 +3733,10 @@ function renderAddForm(){
       ? '예: 어깨 관절 가동술 — 강의에서 시연한 접근'
       : '키워드, 짧은 문장, 여러 아이디어를 자유롭게 적어 주세요');
   const kwHint = isDaily
-    ? '비우면 <strong>사진만</strong>으로 주제·일상 글을 만듭니다. 적은 내용은 모두 반영해요.'
+    ? '비우면 <strong>사진만</strong>으로 주제·일상 글을 만듭니다. 적은 내용도 <strong>입력·사진에서 크게 벗어나지 않고</strong> 반영해요.'
     : (isExpert
       ? '다룰 <strong>테크닉/개념</strong>을 한 줄로. 핵심 포인트·시연 내용은 아래 메모에 — <strong>영상·강의에서 말한 것만</strong> 적어 주세요.'
-      : 'AI가 적어 주신 <strong>키워드·문장</strong>으로 <strong>주제 제목</strong>과 <strong>각도</strong>를 만든 뒤 목록에 넣습니다.');
+      : '적은 키워드·문장도 <strong>입력한 내용에서 크게 벗어나지 않고</strong> 주제·초안을 만듭니다.');
   const refNoteLabel = isDaily ? '참고 메모 (선택)' : (isExpert ? '핵심 포인트 · 영상 메모' : '참고 영상 · 메모 (선택)');
   const refNotePlaceholder = isDaily
     ? '영상 링크, 오늘의 장면, 떠오른 설명을 자유롭게…'
@@ -3820,7 +3900,6 @@ window.addDraft = async function(){
       };
     }
     cat.drafts.push(draft);
-    var autoGenDaily = isDaily && draft.refImage && draft.refImage.data;
     var savedCatId = state.newItem.catId;
     state.newItem = { date:'', topic:'', catId: savedCatId, refImages: [], refImage: null, refNote: '', imageAnalyzing: false };
     state.showAdd = false;
@@ -3829,15 +3908,15 @@ window.addDraft = async function(){
     renderTabs();
     renderMain();
     save();
-    if(autoGenDaily){
-      if(typeof setAppToast === 'function') setAppToast('「' + gen.topic + '」\n사진을 반영해 일상 글 초안을 만들고 있어요…', { duration: 5200, variant: 'ok' });
-      await window.enqueueDraftGeneration(cat.id, id, {});
-    } else if(typeof setAppToast === 'function') {
-      var addedMsg = '「' + gen.topic + '」 주제가 추가됐어요.';
-      if(youtubeAnalysis) addedMsg += '\n유튜브 분석 내용이 반영됐어요.';
-      addedMsg += '\n카드를 눌러 초안 생성하세요.';
-      setAppToast(addedMsg, { duration: 5500, variant: 'ok' });
+    var openTab = isThreadCategory(cat.id) ? 'thread' : (isHeiljagyaeCategory(cat.id) ? 'community' : 'blog');
+    var genLabel = openTab === 'blog' ? '블로그 초안' : (openTab === 'thread' ? '일상 글' : '게시판·이미지 초안');
+    if(btn) btn.textContent = genLabel + ' 작성 중…';
+    if(typeof setAppToast === 'function') {
+      var toastMsg = '「' + gen.topic + '」\n' + genLabel + '을 만들고 있어요…';
+      if(youtubeAnalysis) toastMsg += '\n유튜브 분석 내용이 반영됐어요.';
+      setAppToast(toastMsg, { duration: 5200, variant: 'ok' });
     }
+    await window.enqueueDraftGeneration(cat.id, id, { openDetailOnComplete: true, openDetailTab: openTab });
   } catch(e){
     var msg = (e && e.message) ? e.message : String(e);
     if(typeof setAppToast === 'function') setAppToast('주제 생성 실패\n' + msg, { duration: 7000, variant: 'err' });
@@ -3872,7 +3951,7 @@ window.refreshTopicsForCat = async function(catId){
 독자: ${cat.audience}
 
 아래 ID 목록 각각에 대해 "topic"과 "angle"을 새로 만들어 주세요.
-- topic: 한국어 한 줄(너무 길지 않게, 15~32자 정도, 후킹/질문형 가능)
+- topic: 한국어 한 줄(15~32자, **호기심·궁금증을 자극하는 후킹**·질문형 권장)
 - angle: 이 주제를 어떤 관점으로 풀지 한 줄(신뢰/오해해소/실천팁/메커니즘 등)
 
 [중복 금지]
@@ -4010,7 +4089,7 @@ window.refreshTopicsForDraft = async function(catId, draftId){
 독자: ${cat.audience}
 
 아래 ID 한 건에 대해 "topic"과 "angle"을 새로 만들어 주세요.
-- topic: 한국어 한 줄(너무 길지 않게, 15~32자 정도, 후킹/질문형 가능)
+- topic: 한국어 한 줄(15~32자, **호기심·궁금증을 자극하는 후킹**·질문형 권장)
 - angle: 이 주제를 어떤 관점으로 풀지 한 줄(신뢰/오해해소/실천팁/메커니즘 등)
 
 [중복 금지]
@@ -4287,7 +4366,10 @@ function openDetail(draftId, catId) {
   else { renderSheetEmpty(draft, cat); }
   document.getElementById('detail-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
-  setTimeout(function(){ document.getElementById('detail-sheet').classList.add('open'); }, 10);
+  setTimeout(function(){
+    document.getElementById('detail-sheet').classList.add('open');
+    scheduleAppToastLift_();
+  }, 10);
 }
 
 function renderSheetEmpty(draft, cat) {
@@ -4319,8 +4401,45 @@ function renderSheetEmpty(draft, cat) {
   setSheetActionsHtml_('');
 }
 
+function isSheetEditFocused_(){
+  var el = document.activeElement;
+  return !!(el && el.classList && el.classList.contains('sheet-edit'));
+}
+
+function captureTextFieldFocus_(){
+  var el = document.activeElement;
+  if(!el || (el.tagName !== 'TEXTAREA' && el.tagName !== 'INPUT')) return null;
+  if(!el.closest('#detail-sheet') && !el.closest('#prompt-modal')) return null;
+  return {
+    id: el.id || '',
+    start: el.selectionStart,
+    end: el.selectionEnd,
+    scrollTop: el.scrollTop
+  };
+}
+
+function restoreTextFieldFocus_(snap){
+  if(!snap || !snap.id) return;
+  requestAnimationFrame(function(){
+    var el = document.getElementById(snap.id);
+    if(!el) return;
+    try {
+      el.focus({ preventScroll: true });
+      if(snap.start != null && typeof el.setSelectionRange === 'function'){
+        el.setSelectionRange(snap.start, snap.end);
+      }
+      if(snap.scrollTop != null) el.scrollTop = snap.scrollTop;
+    } catch(e){}
+  });
+}
+
 function renderSheetContent(content) {
   const tab = state.activeTab;
+  var focusSnap = captureTextFieldFocus_();
+  if(focusSnap && content){
+    content = JSON.parse(JSON.stringify(content));
+    applySheetEditsForTab_(content, tab);
+  }
   const tabsHTML = buildSheetTabsHTML(tab);
 
   let bodyHTML = '';
@@ -4444,6 +4563,7 @@ function renderSheetContent(content) {
     '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
     '<button type="button" class="btn-pub"' + pubStyle + ' onclick="onSheetPublishComplete()">' + pubLabel + '</button>'
   );
+  restoreTextFieldFocus_(focusSnap);
 }
 
 window.getFullCopy = function(){
@@ -4772,15 +4892,37 @@ function shouldShowInstaPending_(content, draftId){
   if(instaContentReady_(content)) return false;
   return !!(content && (content.instaPending || instaBgByDraft[draftId]));
 }
+function getSheetThreadsTextFromDom_(){
+  var el = document.getElementById('sheet-threads-body');
+  return el ? String(el.value || '').trim() : '';
+}
+
+function hasThreadsDraftText_(content, draftId){
+  if(threadsContentReady_(content)) return true;
+  if(state.selectedId === draftId && state.activeTab === 'threads' && getSheetThreadsTextFromDom_()) return true;
+  return false;
+}
+
+function syncThreadsDraftFromDom_(content, draftId){
+  if(!content || state.selectedId !== draftId || state.activeTab !== 'threads') return content;
+  var domText = getSheetThreadsTextFromDom_();
+  if(!domText) return content;
+  if(!content.threads) content.threads = { text: '' };
+  content.threads.text = domText;
+  clearThreadsPendingMeta_(content);
+  return content;
+}
+
 function threadsContentReady_(content){
   return !!getThreadsSnsPlainText_(content && content.threads);
 }
 function shouldShowThreadsPending_(content, draftId){
-  if(threadsContentReady_(content)) return false;
+  if(hasThreadsDraftText_(content, draftId)) return false;
   return !!(content && (content.threadsPending || threadsBgByDraft[draftId]));
 }
 function refreshSheetIfViewingDraft_(draftId, catId, tab){
   if(state.selectedId !== draftId) return;
+  if(isSheetEditFocused_()) return;
   var content = getDraftContent_(draftId);
   if(!content) return;
   var ov = document.getElementById('detail-overlay');
@@ -4797,6 +4939,7 @@ function showInstaContentWhenReady_(draftId, catId){
   delete instaBgByDraft[draftId];
   var ov = document.getElementById('detail-overlay');
   var sheetOpen = ov && ov.classList.contains('open');
+  if(sheetOpen && state.selectedId === draftId && isSheetEditFocused_()) return;
   state.selectedCatId = catId;
   state.activeTab = 'insta';
   setOpenDetailHash_(draftId, catId, 'insta');
@@ -5057,6 +5200,7 @@ function showThreadsContentWhenReady_(draftId, catId){
   delete threadsBgByDraft[draftId];
   var ov = document.getElementById('detail-overlay');
   var sheetOpen = ov && ov.classList.contains('open');
+  if(sheetOpen && state.selectedId === draftId && isSheetEditFocused_()) return;
   state.selectedCatId = catId;
   state.activeTab = 'threads';
   setOpenDetailHash_(draftId, catId, 'threads');
@@ -5118,6 +5262,8 @@ function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
   opts = opts || {};
   var retryCount = opts.retryCount || 0;
   if(threadsBgByDraft[draftId]) return;
+  var existing = getDraftContent_(draftId);
+  if(hasThreadsDraftText_(existing, draftId) && !opts.force) return;
   if(!state.apiKey) return;
   var startedMs = Date.now();
   var endMs = startedMs + THREADS_BG_ESTIMATE_MS;
@@ -5209,7 +5355,7 @@ function reconcileThreadsPendingJobs_(reason){
     if(!isBlogInstaCategory(cat.id)) return;
     (cat.drafts || []).forEach(function(d){
       var content = getDraftContent_(d.id);
-      if(!content || !content.threadsPending || getThreadsSnsPlainText_(content.threads) || !content.insta || threadsBgByDraft[d.id]) return;
+      if(!content || !content.threadsPending || hasThreadsDraftText_(content, d.id) || !content.insta || threadsBgByDraft[d.id]) return;
       var startedMs = parseInt(content.threadsPendingStartedAt, 10) || 0;
       if(startedMs && now - startedMs > THREADS_PENDING_RESTART_WINDOW_MS){
         clearThreadsPendingMeta_(content);
@@ -5876,7 +6022,8 @@ window.onSheetPublishComplete = async function(){
 
   if(tab === 'threads' && isBlogInstaCategory(catId)){
     var thContent = getDraftContent_(draftId);
-    if(thContent && threadsContentReady_(thContent)){
+    if(thContent) syncThreadsDraftFromDom_(thContent, draftId);
+    if(hasThreadsDraftText_(thContent, draftId)){
       clearThreadsPendingMeta_(thContent);
       delete threadsBgByDraft[draftId];
       persistDraftContent_(draftId, thContent);
@@ -6286,12 +6433,14 @@ function sheetCloseActionsPrefix_(){
 }
 function setSheetActionsHtml_(inner){
   document.getElementById('sheet-actions').innerHTML = inner || '';
+  scheduleAppToastLift_();
 }
 function closeSheet(){
   document.getElementById('detail-sheet').classList.remove('open');
   setTimeout(function(){
     document.getElementById('detail-overlay').classList.remove('open');
     document.body.style.overflow = '';
+    scheduleAppToastLift_();
   }, 280);
 }
 function closeDetail(e){ if(e.target===document.getElementById('detail-overlay')) closeSheet(); }
@@ -6369,7 +6518,7 @@ function getPromptDataText_(promptData, key){
 }
 
 function getLastPublishedPromptSamples_(catId, limit){
-  limit = limit || 5;
+  limit = limit || PROMPT_REFINE_SAMPLE_COUNT;
   var cat = CATEGORIES[catId];
   if(!cat) return [];
   var rows = [];
@@ -6527,10 +6676,10 @@ function getLastPublishedSamples_(catId, limit){
 
 function shouldRefinePromptsAfterPublish_(catId){
   var n = countPublishedInCat_(catId);
-  if(n < 5 || n % 5 !== 0) return false;
+  if(n < PROMPT_REFINE_EVERY_PUBLISH || n % PROMPT_REFINE_EVERY_PUBLISH !== 0) return false;
   if(!state.promptRefineMilestones) state.promptRefineMilestones = {};
   if(state.promptRefineMilestones[String(catId)] === n) return false;
-  return getLastPublishedPromptSamples_(catId, 5).length >= 3;
+  return getLastPublishedPromptSamples_(catId, PROMPT_REFINE_SAMPLE_COUNT).length >= PROMPT_REFINE_SAMPLE_COUNT;
 }
 
 function normalizeTopicKey_(topic){
@@ -6750,12 +6899,15 @@ window.openPublishModal = function(){
   refineNote.classList.remove('show');
   refineNote.textContent = '';
   var nextN = countPublishedInCat_(catId) + (isEdit ? 0 : 1);
-  if(!isEdit && nextN % 5 === 0){
-    refineNote.textContent = '저장 후 「' + (cat ? cat.name : '') + '」 발행 ' + nextN + '건이 되면, 최근 발행본 5개를 분석해 프롬프트를 자동 개선합니다.';
+  if(!isEdit && nextN % PROMPT_REFINE_EVERY_PUBLISH === 0){
+    refineNote.textContent = '저장 후 「' + (cat ? cat.name : '') + '」 발행 ' + nextN + '건이 되면, 최근 발행본 ' + PROMPT_REFINE_SAMPLE_COUNT + '개를 분석해 프롬프트를 자동 개선합니다.';
     refineNote.classList.add('show');
   }
   document.getElementById('publish-modal-overlay').classList.add('open');
-  setTimeout(function(){ document.getElementById('publish-modal').classList.add('open'); }, 10);
+  setTimeout(function(){
+    document.getElementById('publish-modal').classList.add('open');
+    scheduleAppToastLift_();
+  }, 10);
   document.body.style.overflow = 'hidden';
 };
 
@@ -6765,6 +6917,7 @@ window.closePublishModal = function(e){
   setTimeout(function(){
     document.getElementById('publish-modal-overlay').classList.remove('open');
     document.body.style.overflow = '';
+    scheduleAppToastLift_();
   }, 280);
 };
 
@@ -6827,8 +6980,8 @@ async function refineCategoryPromptsFromPublished_(catId){
   if(!state.apiKey) return;
   var cat = CATEGORIES[catId];
   if(!cat) return;
-  var samples = getLastPublishedPromptSamples_(catId, 5);
-  if(samples.length < 3) return;
+  var samples = getLastPublishedPromptSamples_(catId, PROMPT_REFINE_SAMPLE_COUNT);
+  if(samples.length < PROMPT_REFINE_SAMPLE_COUNT) return;
 
   if(!state.prompts) state.prompts = JSON.parse(JSON.stringify(DEFAULT_PROMPTS));
   if(!state.prompts.categories[catId]) state.prompts.categories[catId] = {};
@@ -6935,7 +7088,10 @@ function openPromptModal(catId) {
   state.promptTab = isThreadCategory(state.editingCatId) ? 'thread' : (isHeiljagyaeCategory(state.editingCatId) ? 'community' : 'blog');
   renderPromptModal();
   document.getElementById('prompt-modal-overlay').classList.add('open');
-  setTimeout(()=>document.getElementById('prompt-modal').classList.add('open'), 10);
+  setTimeout(function(){
+    document.getElementById('prompt-modal').classList.add('open');
+    scheduleAppToastLift_();
+  }, 10);
 }
 
 function renderPromptModal() {
@@ -6989,7 +7145,7 @@ function renderPromptModal() {
         <button class="prompt-reset-btn" onclick="resetPrompt('blog')">기본값으로</button>
       </div>
       <textarea class="prompt-textarea" id="pt-blog" placeholder="블로그 글쓰기 스타일, 톤, 구조, 주의사항 등을 자유롭게 입력하세요...">${blogVal}</textarea>
-      <div class="prompt-hint">예: "네이버 SEO를 고려해 제목을 작성하세요. 전문 용어는 최소화하고..." — 이 지침이 Claude에게 전달돼 글쓰기 방향을 잡아요.</div>
+      <div class="prompt-hint">예: "제목에 호기심을 자극하는 질문·숫자를 넣고, 네이버 SEO를 고려해…" — 이 지침이 Claude에게 전달돼 글쓰기 방향을 잡아요.</div>
     </div>` : ''}
 
 ${!threadCat && !heiljCat && pt==='insta' ? `
@@ -7029,7 +7185,7 @@ ${pt==='image' && !threadCat ? `
     <button class="prompt-reset-btn" onclick="resetPrompt('image')">기본값으로</button>
   </div>
   <textarea class="prompt-textarea" id="pt-image" style="min-height:200px;" placeholder="이미지 생성용 프롬프트 톤, 구도, 색감, 금지 요소, 2장 역할 등을 입력하세요...">${escapeHtml(imageVal)}</textarea>
-  <div class="prompt-hint">이미지 탭의 ChatGPT 프롬프트 생성 규칙입니다. 발행 데이터의 이미지 프롬프트를 기준으로 5건마다 자동 개선됩니다.</div>
+  <div class="prompt-hint">이미지 탭의 ChatGPT 프롬프트 생성 규칙입니다. 발행 데이터의 이미지 프롬프트를 기준으로 ${PROMPT_REFINE_EVERY_PUBLISH}건마다 자동 개선됩니다.</div>
 </div>` : ''}
 
 ${pt==='base' ? `
@@ -7039,7 +7195,7 @@ ${pt==='base' ? `
     <button class="prompt-reset-btn" onclick="resetPrompt('base')">기본값으로</button>
   </div>
   <textarea class="prompt-textarea" id="pt-base" style="min-height:320px;" placeholder="원장님 소개, PSP 임상 프로토콜, 채널 정보 등...">${baseVal}</textarea>
-  <div class="prompt-hint">원장님 프로필·<a href="https://breezefeel.github.io/drpark/" target="_blank" rel="noopener">drpark PSP</a> 임상 뼈대가 포함돼요. 「기본값으로」를 누르면 최신 PSP 요약이 다시 들어갑니다.</div>
+  <div class="prompt-hint">원장님 프로필 PSP 건강 가이드·<a href="https://breezefeel.github.io/drpark/" target="_blank" rel="noopener">drpark PSP</a>와 동기화된 임상 뼈대(PAR·Position 등)가 포함돼요. 「기본값으로」를 누르면 최신 요약이 다시 들어갑니다.</div>
 </div>` : ''}
 `;
   bindPromptTextareaAutosave_();
@@ -7132,24 +7288,92 @@ if(typeof setAppToast === 'function'){
 function closePromptModal(e) {
 if(e && e.target !== document.getElementById('prompt-modal-overlay')) return;
 document.getElementById('prompt-modal').classList.remove('open');
-setTimeout(()=>document.getElementById('prompt-modal-overlay').classList.remove('open'), 280);
+setTimeout(function(){
+  document.getElementById('prompt-modal-overlay').classList.remove('open');
+  scheduleAppToastLift_();
+}, 280);
 }
 
 // ── Generate (백그라운드 + 탭 간 Web Locks 순차 처리) ──
 let appToastTimer = null;
+var APP_TOAST_GAP = 10;
+var APP_TOAST_BASE_BOTTOM = 22;
+
+function getAppToastBottomChromeRects_(){
+  var rects = [];
+  var sheet = document.getElementById('detail-sheet');
+  if(sheet && sheet.classList.contains('open')){
+    var actions = document.getElementById('sheet-actions');
+    if(actions){
+      var ra = actions.getBoundingClientRect();
+      if(ra.height > 0 && ra.bottom > (window.innerHeight || 0) * 0.45) rects.push(ra);
+    }
+  }
+  var pmOverlay = document.getElementById('prompt-modal-overlay');
+  if(pmOverlay && pmOverlay.classList.contains('open')){
+    var pmFooter = pmOverlay.querySelector('.prompt-modal-footer');
+    if(pmFooter){
+      var rp = pmFooter.getBoundingClientRect();
+      if(rp.height > 0) rects.push(rp);
+    }
+  }
+  var pubOverlay = document.getElementById('publish-modal-overlay');
+  if(pubOverlay && pubOverlay.classList.contains('open')){
+    var pubFooter = pubOverlay.querySelector('.prompt-modal-footer');
+    if(pubFooter){
+      var ru = pubFooter.getBoundingClientRect();
+      if(ru.height > 0) rects.push(ru);
+    }
+  }
+  return rects;
+}
+
+function updateAppToastLift_(){
+  var el = document.getElementById('app-toast');
+  if(!el) return;
+  if(!el.classList.contains('show')){
+    el.style.bottom = '';
+    return;
+  }
+  var vh = window.innerHeight || document.documentElement.clientHeight || 0;
+  var lift = 0;
+  var rects = getAppToastBottomChromeRects_();
+  for(var i = 0; i < rects.length; i++){
+    var chromeFromBottom = vh - rects[i].top + APP_TOAST_GAP;
+    if(chromeFromBottom > lift) lift = chromeFromBottom;
+  }
+  if(lift <= APP_TOAST_BASE_BOTTOM) el.style.bottom = '';
+  else el.style.bottom = Math.ceil(lift) + 'px';
+}
+
+function scheduleAppToastLift_(){
+  updateAppToastLift_();
+  requestAnimationFrame(function(){
+    updateAppToastLift_();
+    requestAnimationFrame(updateAppToastLift_);
+  });
+  setTimeout(updateAppToastLift_, 320);
+}
+
 function setAppToast(message, options) {
   options = options || {};
   var duration = options.duration !== undefined ? options.duration : 4200;
   var variant = options.variant || '';
   var el = document.getElementById('app-toast');
   if (!el) return;
+  var focusSnap = captureTextFieldFocus_();
   clearTimeout(appToastTimer);
   el.classList.remove('app-toast--ok', 'app-toast--err');
   if (variant === 'ok') el.classList.add('app-toast--ok');
   else if (variant === 'err') el.classList.add('app-toast--err');
   el.textContent = message;
   el.classList.add('show');
-  if (duration > 0) appToastTimer = setTimeout(function(){ el.classList.remove('show'); }, duration);
+  restoreTextFieldFocus_(focusSnap);
+  scheduleAppToastLift_();
+  if (duration > 0) appToastTimer = setTimeout(function(){
+    el.classList.remove('show');
+    el.style.bottom = '';
+  }, duration);
 }
 var genPendingCount = 0;
 var genActiveJob = null;
@@ -7415,7 +7639,7 @@ ${imagePromptGuide}
 2026년 봄/초여름 트렌드 반영. JSON만 응답 (다른 텍스트 없이):
 {
 "blog": {
-"title": "네이버 SEO 최적화 후킹 제목 (35자 이내, 숫자나 물음표 활용)",
+"title": "호기심·궁금증을 자극하는 후킹 제목 (35자 이내, 질문·숫자·흔한 오해·반전 활용, 과장 금지)",
 "hook": "공감→문제제기→해결암시 흐름의 오프닝 2~3문장",
 "outline": ["소제목1","소제목2","소제목3","소제목4"],
 "draft": "본문 초안 700~900자. 따뜻하고 전문적인 원장님 톤. 실제 임상 경험 느낌. 단락 구분 포함.",
@@ -7430,8 +7654,8 @@ ${imgJsonTail}
 
 if(!isDailyShareCategory(catId) && !isHeiljagyaeCategory(catId) && isExpertCourseCategory(catId)){
   prompt = prompt.replace(
-    '"title": "네이버 SEO 최적화 후킹 제목 (35자 이내, 숫자나 물음표 활용)",\n"hook": "공감→문제제기→해결암시 흐름의 오프닝 2~3문장",\n"outline": ["소제목1","소제목2","소제목3","소제목4"],\n"draft": "본문 초안 700~900자. 따뜻하고 전문적인 원장님 톤. 실제 임상 경험 느낌. 단락 구분 포함.",\n"cta": "마무리 행동 유도 (힐링트리 센터 자연스럽게 언급)",\n"hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6"]',
-    '"title": "전문가 독자용 한 줄 (35자 내외, 과장·낚시 금지)",\n"hook": "현장에서 공감되는 오프닝 2~3문장. 강의 말투",\n"outline": ["테크닉/개념","핵심 포인트1","핵심 포인트2","현장 적용"],\n"draft": "350~500자. 참고 메모·영상 분석 **범위 안만**. 테크닉/개념→핵심 포인트 1~3개→짧은 원리·현장 적용. 참고에 없는 평가·케이스·부위로 확장 금지",\n"cta": "수강·등록 유도 금지. 이 관점이 현장에 도움이 됐으면 식 마무리",\n"hashtags": ["3~5개만","전문 키워드"]'
+    '"title": "호기심·궁금증을 자극하는 후킹 제목 (35자 이내, 질문·숫자·흔한 오해·반전 활용, 과장 금지)",\n"hook": "공감→문제제기→해결암시 흐름의 오프닝 2~3문장",\n"outline": ["소제목1","소제목2","소제목3","소제목4"],\n"draft": "본문 초안 700~900자. 따뜻하고 전문적인 원장님 톤. 실제 임상 경험 느낌. 단락 구분 포함.",\n"cta": "마무리 행동 유도 (힐링트리 센터 자연스럽게 언급)",\n"hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6"]',
+    '"title": "전문가 독자용 한 줄 (35자 내외, 현장에서 궁금해할 질문·포인트 가능, 과장·낚시 금지)",\n"hook": "현장에서 공감되는 오프닝 2~3문장. 강의 말투",\n"outline": ["테크닉/개념","핵심 포인트1","핵심 포인트2","현장 적용"],\n"draft": "350~500자. 참고 메모·영상 분석 **범위 안만**. 테크닉/개념→핵심 포인트 1~3개→짧은 원리·현장 적용. 참고에 없는 평가·케이스·부위로 확장 금지",\n"cta": "수강·등록 유도 금지. 이 관점이 현장에 도움이 됐으면 식 마무리",\n"hashtags": ["3~5개만","전문 키워드"]'
   );
 }
 
@@ -7444,6 +7668,9 @@ try {
 }
 
 prompt = appendDraftReferenceToPrompt_(prompt, draft, catId);
+if(isUserAddedDraftId_(draft.id) && getDraftReferenceText_(draft)){
+  prompt += '\n\n[추가 입력 충실도]\n이 초안은 「추가」로 만든 주제입니다. 블로그/쓰레드/게시판 **제목·본문의 핵심 메시지**가 위 [작성자 참고]와 주제·각도에서 **벗어나지 않게** 하세요.';
+}
 
 var draftRefImages = getDraftRefImages_(draft);
 if(draftRefImages.length){
@@ -7529,12 +7756,15 @@ try {
   } else {
     await runDraftJob();
   }
-  if(opts.dailyAuto){
+  if(opts.openDetailOnComplete){
+    var detailTab = opts.openDetailTab || (isThreadCategory(jobCatId) ? 'thread' : (isHeiljagyaeCategory(jobCatId) ? 'community' : 'blog'));
+    openDetail(jobDraftId, jobCatId, detailTab);
+  } else if(opts.dailyAuto){
     setAppToast('오늘의 발행 초안 완료\n«' + jobTopic + '»\n알림을 누르면 바로 열어요.', { duration: 7500, variant: 'ok' });
   } else if(!opts.batch){
     setAppToast('초안 생성 완료\n«' + jobTopic + '»', { duration: 6500, variant: 'ok' });
   }
-  if(!opts.batch) tryNotifyDraftDone(jobTopic, true, jobDraftId, jobCatId, !!opts.dailyAuto);
+  if(!opts.batch && !opts.openDetailOnComplete) tryNotifyDraftDone(jobTopic, true, jobDraftId, jobCatId, !!opts.dailyAuto);
   return true;
 } catch (e) {
   var errMsg = (e && e.message) ? e.message : String(e);

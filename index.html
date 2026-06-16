@@ -3381,10 +3381,12 @@ function getDraftRefImages_(draft){
   return (draft.refImage && draft.refImage.data) ? [draft.refImage] : [];
 }
 
+const CLAUDE_PLANNER_MODEL = 'claude-sonnet-4-6';
+
 async function callClaudePlanner_(prompt, options){
   options = options || {};
   var body = JSON.stringify({
-    model: 'claude-sonnet-4-20250514',
+    model: CLAUDE_PLANNER_MODEL,
     max_tokens: options.maxTokens || 1200,
     messages: [{ role: 'user', content: buildClaudeMessageContent_(prompt, options.image) }]
   });
@@ -3977,7 +3979,7 @@ ${ids.join(', ')}`;
         'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: CLAUDE_PLANNER_MODEL,
         max_tokens: 1400,
         messages: [{ role: 'user', content: prompt }]
       })
@@ -4112,7 +4114,7 @@ ${avoidTopics.map(t=>' - '+t).join('\n')}
         'anthropic-dangerous-direct-browser-access': 'true'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: CLAUDE_PLANNER_MODEL,
         max_tokens: 800,
         messages: [{ role: 'user', content: prompt }]
       })
@@ -7690,7 +7692,7 @@ headers: {
   'anthropic-dangerous-direct-browser-access': 'true'
 },
 body: JSON.stringify({
-  model: 'claude-sonnet-4-20250514',
+  model: CLAUDE_PLANNER_MODEL,
   max_tokens: isThreadCategory(catId) ? 2048 : (isHeiljagyaeCategory(catId) ? 4096 : 4800),
   messages: [{ role: 'user', content: buildClaudeMessageContent_(prompt, draftRefImages.length ? draftRefImages : null) }]
 })

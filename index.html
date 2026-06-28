@@ -137,19 +137,34 @@ z-index: 100;
 background: #1A1A1A;
 }
 .gen-status-bar {
-display: none;
+display: block;
+position: absolute;
+left: 0;
+right: 0;
+top: 0;
+z-index: 3;
 text-align: center;
 font-size: 11px;
 font-weight: 700;
 color: #FBBF24;
 padding: 6px 12px;
-background: #141414;
+background: rgba(20, 20, 20, 0.96);
 border-bottom: 1px solid #2A2A2A;
 letter-spacing: 0.02em;
 line-height: 1.45;
 word-break: keep-all;
+opacity: 0;
+visibility: hidden;
+pointer-events: none;
+transform: translateY(-100%);
+transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0.18s;
 }
-.gen-status-bar.show { display: block; }
+.gen-status-bar.show {
+opacity: 1;
+visibility: visible;
+transform: translateY(0);
+transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s;
+}
 .cat-tabs-wrap {
 background: #1A1A1A;
 border-top: 1px solid #2A2A2A;
@@ -4408,30 +4423,51 @@ function isSheetEditFocused_(){
   return !!(el && el.classList && el.classList.contains('sheet-edit'));
 }
 
+var FOCUS_RESTORE_DELAYS_ = [0, 60, 150, 320];
+
+function isEditableTextField_(el){
+  if(!el) return false;
+  var tag = el.tagName;
+  if(tag !== 'TEXTAREA' && tag !== 'INPUT') return false;
+  var type = String(el.type || 'text').toLowerCase();
+  if(type === 'hidden' || type === 'file' || type === 'checkbox' || type === 'radio' || type === 'button' || type === 'submit') return false;
+  if(el.readOnly || el.disabled) return false;
+  return true;
+}
+
 function captureTextFieldFocus_(){
   var el = document.activeElement;
-  if(!el || (el.tagName !== 'TEXTAREA' && el.tagName !== 'INPUT')) return null;
-  if(!el.closest('#detail-sheet') && !el.closest('#prompt-modal')) return null;
+  if(!isEditableTextField_(el)) return null;
   return {
     id: el.id || '',
-    start: el.selectionStart,
-    end: el.selectionEnd,
+    start: typeof el.selectionStart === 'number' ? el.selectionStart : null,
+    end: typeof el.selectionEnd === 'number' ? el.selectionEnd : null,
     scrollTop: el.scrollTop
   };
 }
 
 function restoreTextFieldFocus_(snap){
   if(!snap || !snap.id) return;
-  requestAnimationFrame(function(){
+  function attempt(){
     var el = document.getElementById(snap.id);
-    if(!el) return;
+    if(!el || !isEditableTextField_(el) || !document.contains(el)) return;
     try {
-      el.focus({ preventScroll: true });
+      if(document.activeElement !== el) el.focus({ preventScroll: true });
       if(snap.start != null && typeof el.setSelectionRange === 'function'){
-        el.setSelectionRange(snap.start, snap.end);
+        var len = (el.value || '').length;
+        var s = Math.min(snap.start, len);
+        var e = Math.min(snap.end != null ? snap.end : s, len);
+        el.setSelectionRange(s, e);
       }
       if(snap.scrollTop != null) el.scrollTop = snap.scrollTop;
     } catch(e){}
+  }
+  FOCUS_RESTORE_DELAYS_.forEach(function(ms){
+    if(ms === 0){
+      requestAnimationFrame(function(){ requestAnimationFrame(attempt); });
+    } else {
+      setTimeout(attempt, ms);
+    }
   });
 }
 
@@ -7333,8 +7369,14 @@ function getAppToastBottomChromeRects_(){
 function updateAppToastLift_(){
   var el = document.getElementById('app-toast');
   if(!el) return;
+  var focusSnap = captureTextFieldFocus_();
   if(!el.classList.contains('show')){
     el.style.bottom = '';
+    restoreTextFieldFocus_(focusSnap);
+    return;
+  }
+  if(focusSnap){
+    restoreTextFieldFocus_(focusSnap);
     return;
   }
   var vh = window.innerHeight || document.documentElement.clientHeight || 0;
@@ -7349,12 +7391,19 @@ function updateAppToastLift_(){
 }
 
 function scheduleAppToastLift_(){
+  var focusSnap = captureTextFieldFocus_();
   updateAppToastLift_();
   requestAnimationFrame(function(){
     updateAppToastLift_();
-    requestAnimationFrame(updateAppToastLift_);
+    requestAnimationFrame(function(){
+      updateAppToastLift_();
+      restoreTextFieldFocus_(focusSnap);
+    });
   });
-  setTimeout(updateAppToastLift_, 320);
+  setTimeout(function(){
+    updateAppToastLift_();
+    restoreTextFieldFocus_(focusSnap);
+  }, 320);
 }
 
 function setAppToast(message, options) {
@@ -7373,8 +7422,10 @@ function setAppToast(message, options) {
   restoreTextFieldFocus_(focusSnap);
   scheduleAppToastLift_();
   if (duration > 0) appToastTimer = setTimeout(function(){
+    var hideFocusSnap = captureTextFieldFocus_();
     el.classList.remove('show');
-    el.style.bottom = '';
+    if(!hideFocusSnap) el.style.bottom = '';
+    restoreTextFieldFocus_(hideFocusSnap);
   }, duration);
 }
 var genPendingCount = 0;
@@ -7424,14 +7475,19 @@ function endGenIndicator() {
   if (genPendingCount === 0 && !genActiveJob) stopGenUiTimer();
 }
 function updateGenIndicator() {
+  var focusSnap = captureTextFieldFocus_();
   updateInstaPendingCountdown_();
   updateThreadsPendingCountdown_();
   var el = document.getElementById('gen-status-bar');
-  if (!el) return;
+  if (!el) {
+    restoreTextFieldFocus_(focusSnap);
+    return;
+  }
   var busy = genPendingCount > 0 || genActiveJob;
   if (!busy) {
     el.classList.remove('show');
     stopGenUiTimer();
+    restoreTextFieldFocus_(focusSnap);
     return;
   }
   el.classList.add('show');
@@ -7455,7 +7511,9 @@ function updateGenIndicator() {
   var prefix = '초안 작성 중';
   if(genActiveJob && genActiveJob.kind === 'insta') prefix = '인스타 캡션 작성 중';
   else if(genActiveJob && genActiveJob.kind === 'threads') prefix = '쓰레드 글 작성 중';
-  el.textContent = prefix + ' · ' + parts.join(' · ');
+  var nextText = prefix + ' · ' + parts.join(' · ');
+  if(el.textContent !== nextText) el.textContent = nextText;
+  restoreTextFieldFocus_(focusSnap);
 }
 
 function getMissingDraftsForCat_(catId){

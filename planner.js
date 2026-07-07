@@ -78,10 +78,13 @@ const CATEGORIES = [
       {id:"d7-6", topic:"에어컨 켜기 전, 목·어깨가 먼저 뻐근해질 때", angle:"초여름 실내 냉방·창문 바람 — 짧은 호흡·어깨 이완"},
       {id:"d7-7", topic:"꽃가루 시즌, 몸이 무겁고 피곤할 때", angle:"봄 피로·붓기 — 과장 없이 수면·가벼운 움직임·림프 톤"},
     ]},
+  { id:8, icon:"", name:"지점·브랜딩", color:"#6366F1", audience:"운영",
+    sub:"플래너 밖 작업 · 지점 오픈 · GEO 체크리스트",
+    drafts:[]},
 ];
 
 /** 상단 카테고리 탭: 두 줄 순서·표시명 (데이터 CATEGORIES 인덱스 기준) */
-const CAT_TAB_NAV_ROWS = [[0, 1, 2, 7], [3, 5, 4, 6]];
+const CAT_TAB_NAV_ROWS = [[0, 1, 2, 7], [3, 5, 4, 6, 8]];
 const CAT_TAB_SHORT = {
   0: '도수치료',
   1: '리:얼 움직임',
@@ -90,10 +93,515 @@ const CAT_TAB_SHORT = {
   3: 'CMT 과정',
   5: 'Re:Al 과정',
   4: 'IFC 과정',
-  6: '일상 공유'
+  6: '일상 공유',
+  8: '지점·브랜딩'
 };
 /** 추가 폼 카테고리 선택 순서 */
 const ADD_FORM_CAT_ORDER = [0, 3, 1, 5, 2, 4, 7, 6];
+
+/** 미카닥 박준규 프로필·PSP 가이드 공개 URL (프로필.html과 동기화) */
+const PROFILE_BRAND_URL = 'https://breezefeel.github.io/drpark/';
+const PROFILE_SYMPTOM_HUBS = [
+  { id: 'back', label: '허리', url: PROFILE_BRAND_URL + '?hub=back', keywords: ['허리', '요통', '디스크', '요추', '요추통증'] },
+  { id: 'neck', label: '목·거북목', url: PROFILE_BRAND_URL + '?hub=neck', keywords: ['거북목', '경추', '목 통증', '목통증', '목뻣뻣', '목 어깨'] },
+  { id: 'shoulder', label: '어깨', url: PROFILE_BRAND_URL + '?hub=shoulder', keywords: ['어깨', '오십견', '회전근개', '견갑'] },
+  { id: 'knee', label: '무릎', url: PROFILE_BRAND_URL + '?hub=knee', keywords: ['무릎', '무릎통증', '슬개건', '반월상', '관절염'] },
+  { id: 'pelvis', label: '골반·둔부', url: PROFILE_BRAND_URL + '?hub=pelvis', keywords: ['골반', '둔부', '좌골', '좌골신경', '이상근', '천골', '골반통증'] }
+];
+function buildSymptomHubLinksBlock_(){
+  return PROFILE_SYMPTOM_HUBS.map(function(h){ return h.label + ': ' + h.url; }).join('\n');
+}
+function guessSymptomHubForTopic_(topic){
+  var t = String(topic || '');
+  if(!t.trim()) return null;
+  var best = null;
+  var bestScore = 0;
+  PROFILE_SYMPTOM_HUBS.forEach(function(h){
+    var score = 0;
+    (h.keywords || []).forEach(function(kw){
+      if(t.indexOf(kw) >= 0) score += kw.length;
+    });
+    if(score > bestScore){ bestScore = score; best = h; }
+  });
+  return bestScore > 0 ? best : null;
+}
+function getSymptomHubCtaHintForTopic_(topic){
+  var hub = guessSymptomHubForTopic_(topic);
+  if(hub) return '「' + hub.label + '」증상 가이드: ' + hub.url;
+  return '증상별 안내(프로필): ' + PROFILE_BRAND_URL;
+}
+function buildBlogHubCtaSamples_(){
+  var lines = ['【블로그 말미 CTA 예시 — 복사 후 지역·지점명만 수정】', ''];
+  PROFILE_SYMPTOM_HUBS.forEach(function(h){
+    lines.push('■ ' + h.label);
+    lines.push('통증이 심하거나 저림·마비가 있으면 먼저 병원 진료를 받으시고, 안정되면 운동·재활 프로그램을 병행하는 흐름이 안전합니다. 증상별 자가 점검과 다음 단계는 아래 가이드에서 확인하실 수 있습니다.');
+    lines.push('👉 ' + h.label + ' 증상 가이드: ' + h.url);
+    lines.push('');
+  });
+  return lines.join('\n').trim();
+}
+
+/** 지점·브랜딩 탭 — 플래너 밖 운영·오픈 체크리스트 */
+const OPS_BRANCH_IDS = ['global', 'yaksu', 'jakjeon', 'new'];
+const OPS_BRANCH_LABELS = {
+  global: '공통 브랜딩',
+  yaksu: '약수 지점',
+  jakjeon: '작전 지점',
+  new: '신규 지점 (가상)'
+};
+const OPS_BRANCH_HINTS = {
+  global: '콘텐츠 플래너가 담지 못하는 브랜딩·GEO·법적 문구',
+  yaksu: '서울 약수 — 오픈·정비하면서 항목 채우기',
+  jakjeon: '인천 작전 — 오픈·정비하면서 항목 채우기',
+  new: '다음 지점 후보 — 상권·이름·할 일을 미리 정리'
+};
+function opsBranchItem_(id, text, hint){
+  return { id: id, text: text, hint: hint || '' };
+}
+function buildOpsGuideForItem_(item, branchId){
+  var byId = item && item.id ? String(item.id) : '';
+  var text = String(item && item.text || '').trim();
+  var hint = String(item && item.hint || '').trim();
+  if(!text) return null;
+  if(byId === 'ops-g-6'){
+    var g6 = [
+      '무엇을 하나요: Bing Webmaster Tools에 사이트맵을 제출해 검색 엔진 색인 기반을 만듭니다.',
+      '어떻게 하나요:',
+      '1) Bing Webmaster Tools 로그인 → 사이트 추가',
+      '2) URL Prefix에 프로필 공개 주소 입력',
+      '3) 소유권 확인(권장: HTML 태그 또는 DNS)',
+      '4) Sitemaps 메뉴에서 sitemap URL 제출',
+      '5) 1~2일 뒤 색인 상태/오류 확인',
+      '제안: 제출 후 "허리 통증", "목·거북목" 같은 핵심 키워드로 실제 노출 문장을 월 1회 기록하세요.',
+      '함께 기획/검토: 지금은 프로필 허브 중심 색인을 우선할지, 블로그 글 색인을 우선할지 우선순위를 같이 정합니다.'
+    ].join('\n');
+    return { short: g6, full: g6, long: true };
+  }
+  if(byId === 'ops-g-7'){
+    var g7 = [
+      '무엇을 하나요: Google Business Profile(지점별) 기본 정보를 점검해 검색·지도 노출 품질을 맞춥니다.',
+      '어떻게 하나요:',
+      '1) 지점별 프로필(약수/작전) 각각 접속',
+      '2) 카테고리·영업시간·전화·홈페이지 링크 확인',
+      '3) 소개글에 "병원 연계 + 운동·재활 병행" 톤 반영',
+      '4) 최근 사진 6~10장 업데이트(외관/내부/프로그램 흐름)',
+      '5) Q&A/리뷰 응답 문구 톤 통일',
+      '제안: 리뷰 답변 템플릿 2종(통증·재활 / 웰니스)을 미리 정해 운영 시간을 줄이세요.',
+      '함께 기획/검토: 지점별 타깃(직장인/입주민)에 따라 소개글 첫 문장을 다르게 갈지 결정합니다.'
+    ].join('\n');
+    return { short: g7, full: g7, long: true };
+  }
+  if(byId === 'ops-g-9'){
+    var g9 = [
+      '무엇을 하나요: 블로그 카테고리와 시리즈 흐름을 정리하고 글 말미 CTA를 허브 링크로 통일합니다.',
+      '어떻게 하나요:',
+      '1) 카테고리 3개 고정(통증·재활 / 움직임·자세 / 지점 안내)',
+      '2) 각 카테고리에서 주 1개 주제만 먼저 확정',
+      '3) 본문 구조를 문제 제기 → 셀프 케어 → 원리 설명으로 통일',
+      '4) 말미 CTA는 증상 허브 링크 1개 고정 삽입',
+      '5) 발행 후 검색어·문의 유입 키워드 메모',
+      '제안: 글 길이를 일정하게(짧은형/표준형) 두 가지 템플릿으로 나누면 유지가 쉽습니다.',
+      '함께 기획/검토: "허리/목/어깨/무릎/골반" 중 이번 달 우선 허브 2개를 정하고 집중 운영합니다.',
+      '참고 자료: ' + (hint || '허브 링크 목록')
+    ].join('\n');
+    return { short: g9, full: g9, long: true };
+  }
+  if(byId === 'ops-y-9' || byId === 'ops-j-9' || byId === 'ops-n-7'){
+    var geo = [
+      '무엇을 하나요: 지역×증상 롱테일 키워드를 정하고 프로필 허브·블로그를 연결합니다.',
+      '어떻게 하나요:',
+      '1) 지역명+증상 조합 3~5개 선정',
+      '2) 키워드별 대표 허브 1개 매칭',
+      '3) 블로그 제목/소제목/CTA에 동일 키워드 반복',
+      '4) 문의/예약에서 실제 사용된 표현을 다시 키워드에 반영',
+      '제안: "지역+통증+재활" 조합을 우선하면 상담 전환 의도가 높은 편입니다.',
+      '함께 기획/검토: 지점별 핵심 고객(직장인/입주민/운동초보)에 맞춰 키워드 톤을 분리할지 결정합니다.',
+      '참고 자료: ' + (hint || '허브 링크 목록')
+    ].join('\n');
+    return { short: geo, full: geo, long: true };
+  }
+  if(byId === 'ops-g-11'){
+    var deploy = [
+      '무엇을 하나요: 강사용·프로필·플래너의 URL/버전을 맞추고 배포 누락을 점검합니다.',
+      '어떻게 하나요:',
+      '1) 수정 파일 목록 고정(예: 강사용.html, 프로필.html, planner.js)',
+      '2) 업로드 후 강력 새로고침',
+      '3) 핵심 화면 3개 스모크 테스트(출석/허브/플래너)',
+      '4) 오류 문구·캡처를 메모에 남기고 원인 분류',
+      '제안: 배포 체크는 "파일 업로드 / 캐시 초기화 / 테스트 결과" 3줄 템플릿으로 남기세요.',
+      '함께 기획/검토: 다음 배포부터는 점검 항목을 자동화할지(간단 QA 스크립트) 함께 결정합니다.'
+    ].join('\n');
+    return { short: deploy, full: deploy, long: true };
+  }
+  if(byId === 'ops-y-6' || byId === 'ops-j-6'){
+    var place = [
+      '무엇을 하나요: 네이버 플레이스 기본 정보·소개글·사진을 지점 톤에 맞춰 정비합니다.',
+      '어떻게 하나요:',
+      '1) 지점 기본정보(상호/카테고리/전화/영업시간) 정확도 확인',
+      '2) 소개글 첫 문장에 포지셔닝 반영(병원 연계 + 운동·재활 병행)',
+      '3) 사진 6~10장 등록(외관/내부/프로그램 흐름/상담 공간)',
+      '4) 링크(프로필·블로그·예약 경로) 점검',
+      '5) 수정 후 모바일/PC 노출 화면 캡처 저장',
+      '제안: 소개글은 "누구를 돕는지 + 어떤 방식인지 + 어디서 이용 가능한지" 3문장 구조로 유지하세요.',
+      '함께 기획/검토: 약수/작전 소개글을 완전히 같게 갈지, 상권 특성에 맞춰 첫 문장만 다르게 갈지 결정합니다.'
+    ].join('\n');
+    return { short: place, full: place, long: true };
+  }
+  if(byId === 'ops-y-10' || byId === 'ops-j-10'){
+    var review = [
+      '무엇을 하나요: 리뷰 요청/응답 SOP를 만들어 증상 키워드가 자연스럽게 누적되도록 운영합니다.',
+      '어떻게 하나요:',
+      '1) 요청 타이밍 정의(첫 변화 체감 시점, 3~5회차 등)',
+      '2) 요청 문구 2종 준비(통증·재활형 / 웰니스형)',
+      '3) 금지 표현 체크(과장·완치 뉘앙스 방지)',
+      '4) 리뷰 답변 템플릿 작성(감사 + 경과 + 다음 관리 포인트)',
+      '5) 주 1회 리뷰 키워드 집계(허리/목/어깨 등) 후 콘텐츠 주제에 반영',
+      '제안: 요청은 길게 설명하지 말고 "핵심 변화 1개 + 생활 변화 1개"를 적어달라고 안내하면 품질이 좋아집니다.',
+      '함께 기획/검토: 지점별로 어떤 리뷰 톤이 신뢰를 더 주는지(전문형/친근형) 샘플 5개 기준으로 같이 정합니다.'
+    ].join('\n');
+    return { short: review, full: review, long: true };
+  }
+  var how = '담당자 1명 지정 → 완료 기준 1줄 정의 → 실행 후 링크/증빙을 메모에 남겨 다음 사람이 바로 이어서 할 수 있게 정리합니다.';
+  var suggest = '이번 주에 바로 끝낼 최소 단위 1개부터 처리하고, 완료 후 파생 작업 1개만 추가하세요.';
+  var discuss = '예산·우선순위·브랜드 톤에서 애매한 점이 있으면 메모에 질문형으로 남겨 다음 회의에서 함께 결정합니다.';
+
+  if(text.indexOf('키워드') >= 0){
+    how = '지역명+증상 조합 키워드를 3~5개 고른 뒤, 각 키워드를 프로필 허브/블로그 1:1로 연결합니다. 제목·소제목·CTA에 같은 키워드를 반복해 일관성을 맞춥니다.';
+    suggest = '검색량보다 전환 가능성이 높은 키워드(예: 지역+통증+재활)를 우선 선택하고, 허브 링크를 CTA에 반드시 1개 넣어 주세요.';
+  } else if(text.indexOf('플레이스') >= 0){
+    how = '플레이스 기본 정보(영업시간·전화·카테고리)를 먼저 고정하고, 소개글은 병원 연계+운동·재활 병행 포지셔닝 한 문장으로 통일합니다.';
+    suggest = '사진은 외관/내부/프로그램 흐름 순으로 6~10장 구성하고, 첫 3장은 브랜드 톤이 보이는 이미지로 배치하세요.';
+  } else if(text.indexOf('블로그') >= 0){
+    how = '주제별 카테고리를 먼저 나눈 뒤, 각 글 말미 CTA를 증상 허브 링크로 통일합니다. 글 구조는 문제 제기 → 셀프 케어 → 원리 설명 순서로 고정합니다.';
+    suggest = '운영 부담을 줄이려면 주 1회 고정 발행일을 정하고, 같은 주제에서 제목만 바꾼 변형 글 2개를 미리 준비하세요.';
+  } else if(text.indexOf('심의') >= 0 || text.indexOf('의료법') >= 0){
+    how = '금지 표현/권장 표현 체크리스트를 먼저 만들고, 프로필·플래너·블로그 문구를 한 번에 대조해 같은 톤으로 맞춥니다.';
+    suggest = '검토 시 "병원 우선 신호 안내 + 운동·재활 병행" 문장이 빠지지 않았는지 최종 확인 항목으로 넣어 주세요.';
+  } else if(text.indexOf('동기화') >= 0 || text.indexOf('배포') >= 0){
+    how = '수정 파일 목록을 먼저 고정하고, 업로드 → 강력 새로고침 → 핵심 화면 3개 스모크 테스트 순서로 진행합니다.';
+    suggest = '배포 후 실패 화면/오류 문구를 캡처해 메모에 남기면 다음 점검 시간이 크게 줄어듭니다.';
+  }
+
+  var lines = [
+    '무엇을 하나요: ' + text,
+    '어떻게 하나요: ' + how,
+    '제안: ' + suggest,
+    '함께 기획/검토: ' + discuss
+  ];
+  if(hint) lines.push('참고 자료: ' + hint);
+  var full = lines.join('\n');
+  return {
+    short: lines.slice(0, 2).join('\n'),
+    full: full,
+    long: full.length > 210
+  };
+}
+function buildOpsReviewDraft_(item, branchId){
+  var text = String(item && item.text || '').trim();
+  var byId = item && item.id ? String(item.id) : '';
+  var purpose = '이 항목의 목적은 "' + text + '"을 실제 운영 문장/설정으로 확정해 어디서나 동일하게 쓰는 기준을 만드는 것입니다.';
+  var intent = '병원 우선 신호는 명확히 안내하되, 기본 메시지는 운동·재활 프로그램 병행 관점이 드러나도록 정렬합니다.';
+  var todo = '해야 할 일\n1) 기준 문장 확정\n2) 채널별 문장 확정\n3) 금지/권장 표현 확인\n4) 반영 위치 체크\n5) 반영 완료 로그 기록';
+  var proposals = '제안 문장\n- 마스터 포지셔닝 1문장: 미카닥 박준규는 근골격계 문제를 병원 연계와 운동·재활 프로그램 병행 관점에서 안내합니다.\n- 프로필용: 병원 진료가 필요한 신호는 먼저 안내하고, 적신호를 제외하면 현재 상태에 맞는 운동·재활 프로그램을 병행하도록 돕습니다.\n- 블로그용: 증상 이해를 돕는 일반 정보와 함께 병원 우선 신호를 구분하고, 일상에서 병행 가능한 운동·재활 방향을 제시합니다.\n- 상담 결과/CTA용: 병원 우선 신호를 제외하면, 평가·상담을 통해 지금 가능한 운동·재활 프로그램부터 함께 시작해 보세요.\n- 플래너 프롬프트용: 병원 우선 신호를 분리 안내하고, 기본 톤은 운동·재활 프로그램 병행 관점으로 작성한다.';
+  var placement = '반영 위치 가이드\n- 프로필: 홈/FAQ/증상 가이드/결과\n- 플래너: base prompt, 의료법·GEO 문구\n- 상담: 결과 카드/CTA/문진 후 안내\n- 블로그: 본문 말미 CTA + 허브 링크';
+
+  if(byId === 'ops-g-6'){
+    purpose = 'Bing Webmaster Tools에 사이트맵을 제출해 허브/블로그 색인 기반을 확보합니다.';
+    intent = '검색 노출 누락을 줄이고, GEO 대응을 위한 기본 색인 품질을 안정화합니다.';
+    todo = '해야 할 일\n1) 사이트 소유권 인증\n2) 사이트맵 제출\n3) 색인 상태 확인\n4) 오류 URL 수정\n5) 월 1회 점검';
+    proposals = '제안 문장\n- 운영 메모: Bing 제출일·색인 상태·오류 URL·조치결과를 1줄 로그로 남깁니다.';
+    placement = '반영 위치 가이드\n- Webmaster 제출 기록\n- 플래너 메모(증빙 링크)\n- 월간 점검 로그';
+  } else if(byId === 'ops-g-7'){
+    purpose = 'Google Business Profile 지점 정보를 최신화해 지도/검색 전환을 높입니다.';
+    intent = '약수·작전 지점 정보 일관성과 신뢰도를 확보합니다.';
+    todo = '해야 할 일\n1) 기본 정보(시간/전화/카테고리) 점검\n2) 소개글 업데이트\n3) 사진 6~10장 정비\n4) 링크 점검\n5) 리뷰 응답 템플릿 통일';
+    proposals = '제안 문장\n- 소개글 첫 문장: 병원 우선 신호를 안내하고, 적신호를 제외하면 운동·재활 프로그램 병행을 제안합니다.';
+    placement = '반영 위치 가이드\n- Google Business Profile 소개글\n- 지점별 Q&A/리뷰 답변 템플릿';
+  } else if(byId === 'ops-g-9'){
+    purpose = '블로그 시리즈를 운영 가능한 구조로 정리하고 허브 링크 CTA를 표준화합니다.';
+    intent = '주제 누적과 상담 전환이 동시에 일어나도록 글 구조를 고정합니다.';
+    todo = '해야 할 일\n1) 카테고리 3개 고정\n2) 주간 주제 1개 확정\n3) 문제→셀프케어→원리 구조 유지\n4) CTA 허브 링크 삽입\n5) 발행 후 반응 메모';
+    proposals = '제안 문장\n- CTA: 병원 우선 신호를 제외하면, 평가·상담을 통해 현재 가능한 운동·재활 프로그램 병행 방향을 안내해 드립니다.';
+    placement = '반영 위치 가이드\n- 블로그 본문 마지막 단락\n- 블로그 템플릿/자동 프롬프트';
+  } else if(byId === 'ops-y-6' || byId === 'ops-j-6'){
+    purpose = '네이버 플레이스 정보를 지점 운영 현실에 맞게 정비합니다.';
+    intent = '검색 유입 후 방문/문의로 이어지는 신뢰 흐름을 만듭니다.';
+    todo = '해야 할 일\n1) 기본 정보 정확도 확인\n2) 소개글 문장 통일\n3) 사진 업데이트\n4) 링크/문의 경로 점검\n5) 모바일 화면 확인';
+    proposals = '제안 문장\n- 플레이스 소개글: 병원 진료가 필요한 경우를 먼저 안내하고, 그 외에는 운동·재활 프로그램 병행을 제안합니다.';
+    placement = '반영 위치 가이드\n- 네이버 플레이스 소개글\n- 프로필/블로그 지점 안내 문구';
+  } else if(byId === 'ops-y-10' || byId === 'ops-j-10'){
+    purpose = '리뷰 요청·응답 SOP를 만들어 증상 키워드가 자연스럽게 누적되게 합니다.';
+    intent = '과장 없이 신뢰도 높은 리뷰 자산을 장기적으로 축적합니다.';
+    todo = '해야 할 일\n1) 요청 타이밍 정의\n2) 요청 문구 2종 준비\n3) 금지 표현 체크\n4) 답변 템플릿 통일\n5) 주간 키워드 집계';
+    proposals = '제안 문장\n- 리뷰 요청: 느낀 변화 1개와 일상에서 편해진 점 1개를 간단히 남겨주시면 다음 프로그램 안내에 큰 도움이 됩니다.';
+    placement = '반영 위치 가이드\n- 메시지 템플릿\n- 리뷰 답변 템플릿\n- 운영 매뉴얼';
+  } else if(byId === 'ops-g-1'){
+    purpose = '브랜드 전 채널에서 동일하게 쓰는 기준 문장 세트를 완성합니다.';
+    intent = '마스터 포지셔닝 1문장을 중심으로 채널별 문장을 맞추고, 이후 수정/재생성으로 문장 품질을 높입니다.';
+    todo = '해야 할 일\n1) 마스터 포지셔닝 1문장 확정\n2) 채널별 적용 문구 4종 확정\n3) 금지/권장 표현 표 확정\n4) 반영 체크 로그 작성';
+    proposals = '제안 문장 세트\n[마스터 포지셔닝]\n미카닥 박준규는 근골격계 문제를 병원 연계와 운동·재활 프로그램 병행 관점에서 안내합니다.\n\n[프로필용]\n병원 진료가 필요한 신호는 먼저 안내하고, 적신호를 제외하면 현재 상태에 맞는 운동·재활 프로그램 병행 방향을 제안합니다.\n\n[블로그용]\n증상 이해를 돕는 일반 정보와 함께 병원 우선 신호를 구분하고, 일상에서 병행 가능한 운동·재활 프로그램을 안내합니다.\n\n[상담 결과/CTA용]\n병원 우선 신호를 제외하면, 평가·상담을 통해 지금 가능한 운동·재활 프로그램부터 함께 시작해 보세요.\n\n[플래너 프롬프트용]\n병원 우선 신호를 분리 안내하고, 기본 톤은 운동·재활 프로그램 병행 관점으로 작성한다.\n\n[금지/권장]\n금지: 완치, 진단 확정, 처방, 수술 대신\n권장: 병원 진료 권유 + 운동·재활 병행 안내';
+    placement = '반영 체크 로그\n- 프로필 홈/FAQ/결과\n- 증상 허브 프로그램 안내 블록\n- 플래너 base prompt/의료법·GEO 규칙\n- 상담 결과 카드/CTA';
+  }
+
+  var brief = opsPurposeIntent_(purpose, intent);
+  function opsPurposeIntent_(p, i){ return '목적: ' + p + '\n의도: ' + i; }
+  var proposalItems = [];
+  if(byId === 'ops-g-1'){
+    proposalItems = [
+      { id:'master', title:'마스터 포지셔닝 1문장',
+        brief: opsPurposeIntent_('전 채널의 기준이 되는 핵심 1문장을 확정합니다.', '근골격계·병원 연계·운동·재활 병행이 한 문장에 담기게 합니다.'),
+        text: opsProposalWithReason_('미카닥 박준규는 근골격계 문제를 병원 연계와 운동·재활 프로그램 병행 관점에서 안내합니다.', '마스터 문장은 이후 채널별 문장 톤·방향의 기준이 됩니다.') },
+      { id:'profile', title:'프로필용 문장',
+        brief: opsPurposeIntent_('프로필·FAQ·증상 허브에 쓸 고객-facing 문장을 만듭니다.', '병원 우선 신호 안내와 운동·재활 병행이 자연스럽게 이어지게 합니다.'),
+        text: opsProposalWithReason_('병원 진료가 필요한 신호는 먼저 안내하고, 적신호를 제외하면 현재 상태에 맞는 운동·재활 프로그램 병행 방향을 제안합니다.', '프로필·FAQ는 고객이 가장 먼저 읽는 구간이라 병원 안내와 병행 제안이 함께 드러나야 합니다.') },
+      { id:'blog', title:'블로그용 문장',
+        brief: opsPurposeIntent_('블로그 본문·말미 CTA에 쓸 문장을 만듭니다.', '정보 제공 톤을 유지하면서 병원 우선 신호와 병행 프로그램을 구분해 안내합니다.'),
+        text: opsProposalWithReason_('증상 이해를 돕는 일반 정보와 함께 병원 우선 신호를 구분하고, 일상에서 병행 가능한 운동·재활 프로그램을 안내합니다.', '일반 정보 톤을 유지하면서 상담 연결로 자연스럽게 이어져야 합니다.') },
+      { id:'cta', title:'상담 결과/CTA 문장',
+        brief: opsPurposeIntent_('상담 결과 카드·문진 후 안내에 쓸 전환 문장을 만듭니다.', '평가·상담 후 다음 행동(프로그램 시작)으로 이어지게 합니다.'),
+        text: opsProposalWithReason_('병원 우선 신호를 제외하면, 평가·상담을 통해 지금 가능한 운동·재활 프로그램부터 함께 시작해 보세요.', '상담 직후 다음 행동을 명확히 안내해 전환률을 높입니다.') },
+      { id:'prompt', title:'플래너 프롬프트용 기준 문장',
+        brief: opsPurposeIntent_('플래너 AI 프롬프트·의료법·GEO 규칙의 기준 문장을 만듭니다.', '자동 생성 콘텐츠가 같은 톤·경계를 지키게 합니다.'),
+        text: opsProposalWithReason_('병원 우선 신호를 분리 안내하고, 기본 톤은 운동·재활 프로그램 병행 관점으로 작성한다.', 'AI 생성 콘텐츠가 같은 경계·톤을 지키도록 프롬프트에 고정합니다.') },
+      { id:'lexicon', title:'금지/권장 표현',
+        brief: opsPurposeIntent_('채널 공통으로 쓰지 않을 표현과 권장 표현을 정리합니다.', '의료법·광고 심의 리스크를 줄이면서 메시지 일관성을 유지합니다.'),
+        text: opsProposalWithReason_('금지: 완치, 진단 확정, 처방, 수술 대신\n권장: 병원 진료 권유 + 운동·재활 병행 안내', '팀 전체가 같은 표현 경계를 쓰면 의료법·광고 심의 리스크를 줄일 수 있습니다.') }
+    ];
+  } else {
+    var proposalText = proposals.replace(/^제안 문장[^\n]*\n?/, '').trim().replace(/^\-\s*/, '');
+    var colonIdx = proposalText.indexOf(':');
+    var sentence = colonIdx >= 0 ? proposalText.slice(colonIdx + 1).trim() : proposalText;
+    proposalItems = [{
+      id:'main',
+      title:'제안 문장',
+      brief: brief,
+      text: opsProposalWithReason_(sentence, '이 제안은 위 목적·의도에 맞게 바로 적용할 수 있도록 정리한 문장입니다.')
+    }];
+  }
+  var placementChecks = String(placement || '')
+    .split('\n')
+    .map(function(l){ return l.replace(/^\-\s*/, '').trim(); })
+    .filter(function(l){ return l && l.indexOf('반영') !== 0 && l.indexOf('위치') !== 0; })
+    .map(function(label, i){ return { id: 'c' + (i + 1), label: label, done: false }; });
+  return {
+    brief: brief,
+    proposalItems: proposalItems,
+    placementChecks: placementChecks
+  };
+}
+function stripOpsTodoFromBrief_(s){
+  s = String(s || '');
+  var idx = s.indexOf('해야 할 일');
+  if(idx >= 0) s = s.slice(0, idx).trim();
+  return s;
+}
+function normalizeOpsProposalItem_(saved, base){
+  var b = base || {};
+  var brief = String((saved && saved.brief) || b.brief || '').trim() || String(b.brief || '');
+  var text = String((saved && saved.text) || b.text || '');
+  if(brief && brief.indexOf('해야 할 일') >= 0) brief = stripOpsTodoFromBrief_(brief);
+  if(text && text.indexOf('이유:') < 0 && text.indexOf('제안 문장:') < 0 && String(b.text || '').indexOf('이유:') >= 0){
+    text = String(b.text || text);
+  } else if(text && text.indexOf('이유:') < 0 && text.trim()){
+    text = '제안 문장: ' + text.trim() + (String(b.text || '').indexOf('이유:') >= 0 ? '\n이유: ' + String(b.text).split('이유:').pop().trim() : '');
+  }
+  return {
+    id: String((saved && saved.id) || b.id || 'main'),
+    title: String((saved && saved.title) || b.title || '제안 문장'),
+    brief: brief,
+    text: text,
+    pinned: !!(saved && saved.pinned),
+    done: !!(saved && saved.done)
+  };
+}
+function splitOpsG1LegacyProposalText_(raw, baseItems){
+  var text = String(raw || '');
+  if(text.indexOf('[마스터') < 0 && text.indexOf('제안 문장 세트') < 0) return null;
+  var keys = [
+    { id:'master', re: /\[마스터[^\]]*\]\s*([\s\S]*?)(?=\n\n\[|$)/ },
+    { id:'profile', re: /\[프로필용\]\s*([\s\S]*?)(?=\n\n\[|$)/ },
+    { id:'blog', re: /\[블로그용\]\s*([\s\S]*?)(?=\n\n\[|$)/ },
+    { id:'cta', re: /\[상담[^\]]*\]\s*([\s\S]*?)(?=\n\n\[|$)/ },
+    { id:'prompt', re: /\[플래너[^\]]*\]\s*([\s\S]*?)(?=\n\n\[|$)/ },
+    { id:'lexicon', re: /\[금지\/권장\]\s*([\s\S]*?)$/ }
+  ];
+  var byId = {};
+  baseItems = baseItems || [];
+  baseItems.forEach(function(b){ byId[String(b.id)] = b; });
+  var out = [];
+  keys.forEach(function(k){
+    var m = text.match(k.re);
+    var base = byId[k.id] || {};
+    var sentence = m && m[1] ? m[1].trim() : '';
+    if(!sentence) return;
+    var wrapped = sentence.indexOf('이유:') >= 0 ? sentence : opsProposalWithReason_(sentence.replace(/^제안 문장:\s*/, ''), (String(base.text || '').split('이유:')[1] || '채널 특성에 맞게 다듬은 문장입니다.').trim());
+    out.push(normalizeOpsProposalItem_({ id: k.id, title: base.title, brief: base.brief, text: wrapped }, base));
+  });
+  return out.length ? out : null;
+}
+function opsProposalWithReason_(sentence, reason){ return '제안 문장: ' + sentence + '\n이유: ' + reason; }
+function normalizeOpsProposalItems_(itemId, savedItems, baseItems){
+  baseItems = baseItems || [];
+  savedItems = Array.isArray(savedItems) ? savedItems : [];
+  if(itemId === 'ops-g-1' && savedItems.length === 1 && savedItems[0]){
+    var split = splitOpsG1LegacyProposalText_(savedItems[0].text, baseItems);
+    if(split) return split;
+  }
+  if(itemId === 'ops-g-1' && savedItems.length === 1 && savedItems[0] && savedItems[0].id === 'main'){
+    savedItems = (baseItems || []).map(function(b, i){
+      var s = savedItems[0] || {};
+      return normalizeOpsProposalItem_(i === 0 ? { id: b.id, title: b.title, text: s.text || b.text, brief: s.brief || b.brief, pinned: s.pinned, done: s.done } : null, b);
+    });
+  }
+  var byId = {};
+  savedItems.forEach(function(s){ if(s && s.id) byId[String(s.id)] = s; });
+  var merged = baseItems.map(function(b){
+    return normalizeOpsProposalItem_(byId[String(b.id)] || null, b);
+  });
+  if(!merged.length && savedItems.length){
+    merged = savedItems.map(function(s){ return normalizeOpsProposalItem_(s, null); });
+  }
+  return merged;
+}
+function ensureOpsReviewState_(item, branchId){
+  var om = getOpsManualState_();
+  if(!om.review || typeof om.review !== 'object') om.review = {};
+  var id = String(item.id || '');
+  if(!id) return null;
+  var base = buildOpsReviewDraft_(item, branchId);
+  if(!om.review[id] || typeof om.review[id] !== 'object'){
+    om.review[id] = {
+      open: false,
+      fields: { brief: base.brief || '' },
+      proposalItems: (base.proposalItems || []).map(function(p){ return normalizeOpsProposalItem_(null, p); }),
+      placementChecks: (base.placementChecks || []).map(function(c){ return { id: c.id, label: c.label, done: false }; }),
+      pinned: { brief: false }
+    };
+  } else {
+    if(!om.review[id].fields) om.review[id].fields = {};
+    if(!om.review[id].pinned) om.review[id].pinned = { brief: false };
+    if(!String(om.review[id].fields.brief || '').trim()){
+      var legacyBrief = [om.review[id].fields.purpose, om.review[id].fields.intent, om.review[id].fields.todo].filter(Boolean).join('\n');
+      om.review[id].fields.brief = legacyBrief || base.brief || '';
+    }
+    if(!Array.isArray(om.review[id].proposalItems) || !om.review[id].proposalItems.length){
+      var legacyProposal = String(om.review[id].fields.proposals || '').trim();
+      if(legacyProposal){
+        om.review[id].proposalItems = normalizeOpsProposalItems_(id, [{ id:'main', title:'제안 문장', text: legacyProposal, pinned: false, done: false }], base.proposalItems);
+      } else {
+        om.review[id].proposalItems = (base.proposalItems || []).map(function(p){ return normalizeOpsProposalItem_(null, p); });
+      }
+    } else {
+      om.review[id].proposalItems = normalizeOpsProposalItems_(id, om.review[id].proposalItems, base.proposalItems);
+    }
+    if(!Array.isArray(om.review[id].placementChecks) || !om.review[id].placementChecks.length){
+      om.review[id].placementChecks = (base.placementChecks || []).map(function(c){ return { id: c.id, label: c.label, done: false }; });
+    }
+  }
+  return om.review[id];
+}
+function syncOpsReviewItemComplete_(itemId){
+  var om = getOpsManualState_();
+  if(!om.review || !om.review[itemId]) return;
+  if(!om.checked || typeof om.checked !== 'object') om.checked = {};
+  var rv = om.review[itemId];
+  var proposalsDone = !(rv.proposalItems || []).length || (rv.proposalItems || []).every(function(p){ return !!p.done; });
+  var placementsDone = !(rv.placementChecks || []).length || (rv.placementChecks || []).every(function(c){ return !!c.done; });
+  if(proposalsDone && placementsDone) om.checked[itemId] = true;
+  else delete om.checked[itemId];
+}
+function regenerateOpsReviewText_(fieldName, current, base){
+  var cur = String(current || '').trim();
+  var b = String(base || '').trim();
+  if(!cur) return b;
+  if(fieldName === 'brief' && cur.indexOf('\n') < 0){
+    return cur + '\n의도: 위 목적에 맞게 팀과 함께 검토해 다듬습니다.';
+  }
+  if(fieldName.indexOf('proposal:') === 0 && cur.length < b.length) return cur + '\n\n[보강]\n' + b;
+  if(cur.length < Math.max(40, b.length * 0.45)){
+    return cur + '\n\n보강 제안: ' + b;
+  }
+  return cur;
+}
+const OPS_MANUAL_SECTIONS = [
+  { id: 'ops-g-brand', branch: 'global', phase: '브랜딩 기반', items: [
+    opsBranchItem_('ops-g-1', '포지셔닝 문장 확정 — 근골격계 전문가 · 병원 연계 · 운동·재활 프로그램 병행'),
+    opsBranchItem_('ops-g-2', '의료법 준수 문구·면책 — 프로필·블로그·상담 결과·플래너 프롬프트 동기화'),
+    opsBranchItem_('ops-g-3', '저자 박스 템플릿 — 이름·자격·한 줄 전문 분야 (블로그·발행본 하단)'),
+    opsBranchItem_('ops-g-4', '프로필 증상 허브 5개 — 허리·목·어깨·무릎·골반 (내용·딥링크·JSON-LD 점검)', buildSymptomHubLinksBlock_()),
+    opsBranchItem_('ops-g-5', '프로필 FAQ + JSON-LD 반영·점검'),
+    opsBranchItem_('ops-g-6', 'Bing Webmaster Tools — 사이트맵 제출 (ChatGPT 검색 대응)'),
+    opsBranchItem_('ops-g-7', 'Google Business Profile 점검 (지점별)'),
+    opsBranchItem_('ops-g-8', '월간 AI 인용 점검표 — 5엔진×핵심 키워드 수동 검색'),
+    opsBranchItem_('ops-g-9', '네이버 블로그 시리즈·카테고리·지점 안내 글 구조 정리', buildBlogHubCtaSamples_()),
+    opsBranchItem_('ops-g-10', '인스타·Threads 프로필·링크·하이라이트 정비'),
+    opsBranchItem_('ops-g-11', '강사용·프로필·플래너 URL·동기화·배포 버전 점검'),
+    opsBranchItem_('ops-g-12', 'Drive·서버 동기화·백업 주기 확인')
+  ]},
+  { id: 'ops-y-pre', branch: 'yaksu', phase: '1. 사전 준비', items: [
+    opsBranchItem_('ops-y-1', '지점명·슬로건·프로그램 라인(기능운동·P-스트레칭·작은얼굴) 확정'),
+    opsBranchItem_('ops-y-2', '의료·광고 문구 심의 — 병원 진료 권유 + 운동 프로그램 명시'),
+    opsBranchItem_('ops-y-3', '상권·경쟁·키워드 조사 (약수·중구·필라테스·재활)'),
+    opsBranchItem_('ops-y-4', '임대·인테리어·동선·치료실·운동 공간 계획'),
+    opsBranchItem_('ops-y-5', '가격·이용권·프로그램 표 초안')
+  ]},
+  { id: 'ops-y-online', branch: 'yaksu', phase: '2. 온라인 채널', items: [
+    opsBranchItem_('ops-y-6', '네이버 플레이스 등록·사진·영업시간·소개글'),
+    opsBranchItem_('ops-y-7', '네이버 블로그 지점 위치 안내 글·지도 링크'),
+    opsBranchItem_('ops-y-8', '프로필·홈페이지 약수 링크·문구 반영'),
+    opsBranchItem_('ops-y-9', '지역×증상 롱테일 키워드 3개 · 프로필 허브·블로그 연결',
+      '예: 약수 허리통증 · 약수 필라테스 허리 · 중구 재활\n글 말미 CTA에 허브 링크 1개:\n' + buildSymptomHubLinksBlock_()),
+    opsBranchItem_('ops-y-10', '리뷰 유도 SOP — 증상 키워드 포함 후기 요청')
+  ]},
+  { id: 'ops-y-open', branch: 'yaksu', phase: '3. 오픈·운영', items: [
+    opsBranchItem_('ops-y-11', '오프라인 안내판·명함·상담지·동의서'),
+    opsBranchItem_('ops-y-12', '강사·스태프 온보딩 — PSP·병원 연계 안내 스크립트'),
+    opsBranchItem_('ops-y-13', '오픈 이벤트·지역 홍보 (입주민·직장인)'),
+    opsBranchItem_('ops-y-14', '오픈 4주 후 GEO·플레이스·리뷰 점검')
+  ]},
+  { id: 'ops-j-pre', branch: 'jakjeon', phase: '1. 사전 준비', items: [
+    opsBranchItem_('ops-j-1', '지점명·슬로건·프로그램 라인(80분·50분·기능운동) 확정'),
+    opsBranchItem_('ops-j-2', '의료·광고 문구 심의 — 병원 진료 권유 + 운동 프로그램 명시'),
+    opsBranchItem_('ops-j-3', '상권·경쟁·키워드 조사 (작전·인천·재활·필라테스)'),
+    opsBranchItem_('ops-j-4', '임대·인테리어·동선 계획'),
+    opsBranchItem_('ops-j-5', '가격·이용권·프로그램 표 초안')
+  ]},
+  { id: 'ops-j-online', branch: 'jakjeon', phase: '2. 온라인 채널', items: [
+    opsBranchItem_('ops-j-6', '네이버 플레이스 등록·사진·영업시간·소개글'),
+    opsBranchItem_('ops-j-7', '네이버 블로그 작전 위치 안내 글·지도 링크'),
+    opsBranchItem_('ops-j-8', '프로필·홈페이지 작전 링크·문구 반영'),
+    opsBranchItem_('ops-j-9', '지역×증상 롱테일 키워드 3개 · 프로필 허브·블로그 연결',
+      '예: 작전 허리통증 · 인천 필라테스 · 작전 재활\n글 말미 CTA에 허브 링크 1개:\n' + buildSymptomHubLinksBlock_()),
+    opsBranchItem_('ops-j-10', '리뷰 유도 SOP — 증상 키워드 포함 후기 요청')
+  ]},
+  { id: 'ops-j-open', branch: 'jakjeon', phase: '3. 오픈·운영', items: [
+    opsBranchItem_('ops-j-11', '오프라인 안내판·명함·상담지·동의서'),
+    opsBranchItem_('ops-j-12', '강사·스태프 온보딩 — PSP·병원 연계 안내 스크립트'),
+    opsBranchItem_('ops-j-13', '오픈 이벤트·지역 홍보'),
+    opsBranchItem_('ops-j-14', '오픈 4주 후 GEO·플레이스·리뷰 점검')
+  ]},
+  { id: 'ops-n-plan', branch: 'new', phase: '1. 후보·기획', items: [
+    opsBranchItem_('ops-n-1', '가상 지점명·지역 후보 2~3곳 메모'),
+    opsBranchItem_('ops-n-2', '타깃 고객·프로그램 믹스 (병원 연계 vs 웰니스 비중)'),
+    opsBranchItem_('ops-n-3', '상권 조사·경쟁 센터·임대료 범위'),
+    opsBranchItem_('ops-n-4', '법인·계약·보험·소음·주차 등 리스크 체크'),
+    opsBranchItem_('ops-n-5', '브랜드 톤·슬로건·약수/작전과 차별점')
+  ]},
+  { id: 'ops-n-brand', branch: 'new', phase: '2. 브랜딩·채널', items: [
+    opsBranchItem_('ops-n-6', '플레이스·블로그·프로필용 지점 소개 초안'),
+    opsBranchItem_('ops-n-7', '지역×증상 SEO 키워드 5개 선정',
+      '허브 딥링크 참고:\n' + buildSymptomHubLinksBlock_()),
+    opsBranchItem_('ops-n-8', '오픈 전 콘텐츠 4편 주제 (플래너에서 작성)'),
+    opsBranchItem_('ops-n-9', '인테리어·사진 컨셉 10컷 리스트'),
+    opsBranchItem_('ops-n-10', '의료법·광고 문구 초안 검토')
+  ]},
+  { id: 'ops-n-open', branch: 'new', phase: '3. 오픈 로드맵', items: [
+    opsBranchItem_('ops-n-11', '약수·작전 체크리스트 복제 → 일정에 맞게 조정'),
+    opsBranchItem_('ops-n-12', '오픈 D-30 / D-7 / D-day 할 일 캘린더'),
+    opsBranchItem_('ops-n-13', '강사 채용·교육 일정'),
+    opsBranchItem_('ops-n-14', '오픈 후 4주 GEO·리뷰·플레이스 점검')
+  ]}
+];
 
 /** 카테고리별 프로그램 라인 (미카닥 박준규 · Re:Al 등) */
 const CAT_PROGRAM_LINE = {
@@ -130,8 +638,6 @@ const SUBGOAL_MISC_ID = 'misc';
 const SUBGOAL_MISC_LABEL = '기타 주제';
 const PENDING_SUBGOAL_SS_KEY = 'ht_pending_subgoal_plan';
 const PENDING_YEAR_SS_KEY = 'ht_pending_year_plan';
-/** 미카닥 박준규 프로필·PSP 가이드 공개 URL (프로필.html과 동기화) */
-const PROFILE_BRAND_URL = 'https://breezefeel.github.io/drpark/';
 const SUBGOAL_PLAN_GEN_ESTIMATE_SEC = 55;
 const YEAR_PLAN_GEN_ESTIMATE_SEC = 40;
 const TOPIC_FIVE_ESTIMATE_SEC = 25;
@@ -310,6 +816,7 @@ const PERSONAL_BRAND_PROFILE = `
 - 「최고의 의사」「완치 보장」「Doctor로만 신뢰」 류
 - 힐링트리·특정 병원명을 브랜드 기획·분기 주제의 주어로 사용
 - 의료인=의사 프레임으로만 포지셔닝
+- **현재 병원 근무·직접 진료·처방** 암시 (병원 진료 **권유**는 가능)
 `.trim();
 const YEAR_BRAND_WRITING_RULE = '[출력 규칙] intent·topic·goal·rationale에 클리닉·병원·기관명을 쓰지 마세요. 브랜드 주어는 오직 「미카닥 박준규」 개인 브랜드입니다. Doctor·닥터·원장님을 헤드라인·브랜드 슬로gan 주어로 쓰지 마세요.';
 
@@ -419,10 +926,10 @@ const DEFAULT_BRAND_FOUNDATION = `
 
 ■ 기준선 · 두 영역
 - 편안한 상태 = 기준선
-- 통증·불편 → 치료 영역(정상으로 되돌리기) · 통증 없음 → 웰니스 영역(더 좋은 상태로)
+- 통증·불편 → 통증·재활 영역(병원 연계·재활로 회복) · 통증 없음 → 웰니스 영역(더 좋은 상태로)
 
 ■ 프로필 맞춤 안내 3분기
-1. 통증·재활 — 증상 평가 · 치료 안내
+1. 통증·재활 — 증상 평가 · 병원 연계·프로그램 안내
 2. 움직임·자세 — 기능 · 교정 · 운동
 3. 전문가 교육 — CMT · IFC · Re:Al
 
@@ -441,7 +948,8 @@ const DEFAULT_BRAND_FOUNDATION = `
 - 예방·셀프 케어: 생활습관 코칭, 재발 방지
 
 ■ 치료·웰니스 로드맵 순서 (참고)
-침습(필요 시) → 비침습 도수(VAS·통증 질에 따라) → Passive Stretching → Assisted Active → Active(생활습관·자세) → Resistive(기능운동)
+침습(필요 시 병원) → 비침습 도수(병원) → Passive Stretching → Assisted Active → Active(생활습관·자세) → Resistive(기능운동)
+※ 미카닥 박준규는 **현재 병원 근무 없음**. 콘텐츠·상담은 **병원 진료·치료 권유** + **운동·재활 프로그램 병행** 포지셔닝. 진단·처방·치료행위 표현 금지.
 `.trim();
 
 function getCategoryThreeMonthOutcome_(catId){
@@ -759,6 +1267,7 @@ function isYearPlanCustomized_(){
 }
 function needsPlannerSetupGuide_(){
   if(state.plannerSetupDismissed) return false;
+  if(isOpsManualCategory(state.currentCat)) return false;
   if(isDailyShareCategory(state.currentCat)){
     var dailyCat = CATEGORIES[state.currentCat];
     var draftCount = dailyCat && dailyCat.drafts ? dailyCat.drafts.filter(function(d){ return d && d.id; }).length : 0;
@@ -2211,6 +2720,30 @@ function scheduleWorkshopTextareaGrow_(rootEl){
   });
 }
 window.autoGrowTextarea_ = autoGrowTextarea_;
+function opsGrowTextareas_(rootEl){
+  var root = rootEl || document.querySelector('.ops-manual-wrap');
+  if(!root) return;
+  root.querySelectorAll('textarea.ops-grow-textarea').forEach(function(ta){
+    if(!ta.__opsGrowBound){
+      ta.__opsGrowBound = true;
+      ta.addEventListener('input', function(){ autoGrowTextarea_(ta); });
+    }
+    autoGrowTextarea_(ta);
+  });
+}
+function scheduleOpsReviewTextareaGrow_(rootEl){
+  var root = rootEl || document.querySelector('.ops-manual-wrap');
+  if(!root) return;
+  opsGrowTextareas_(root);
+  requestAnimationFrame(function(){
+    opsGrowTextareas_(root);
+    requestAnimationFrame(function(){ opsGrowTextareas_(root); });
+  });
+  [50, 150, 320].forEach(function(ms){
+    setTimeout(function(){ opsGrowTextareas_(root); }, ms);
+  });
+}
+window.scheduleOpsReviewTextareaGrow_ = scheduleOpsReviewTextareaGrow_;
 function getYearPeriodPinnedStats_(periods){
   periods = periods || [];
   var pinned = periods.filter(function(per){ return per && per.pinned; }).length;
@@ -3952,7 +4485,7 @@ const DEFAULT_PSP_CLINICAL_FRAMEWORK = `
 
 ■ 기준선 · 두 영역
 - **편안한 상태 = 기준선**
-- 통증·불편 있음 → **치료 영역**(정상으로 되돌리기)
+- 통증·불편 있음 → **통증·재활 영역**(병원 연계·재활로 회복)
 - 통증 없음 → **웰니스 영역**(더 좋은 상태로 끌어올리기)
 
 ■ STEP 01 — 평가 (4가지, 시점에 맞게 유기적으로)
@@ -3967,7 +4500,7 @@ History Taking · Inspection · Movement Test · Palpation
 - VAS 3~6: 비침습 Manual Therapy — **Fascia → Muscle → Joint → Movement**.
 - VAS 6+: 침습적 옵션을 단계적으로 고려(약물·주사·시술·수술 — 임상 판단·효과 없을 때).
 - Fascia: 근막층 활주 저하·유착(Adhesion). Muscle: 과긴장·트리거·뭉침. Joint: 저가동성·Hypomobility.
-- 공통 원칙: **표층→심층**, **중심(척추)→말단**, **Static→Motion**. 사고 없이 생긴 문제도 F→M→J 순으로 찾고 치료하며 변화를 관찰.
+- 공통 원칙: **표층→심층**, **중심(척추)→말단**, **Static→Motion**. 사고 없이 생긴 문제도 F→M→J 순으로 찾고 중재하며 변화를 관찰.
 
 ■ STEP 03 — Movement · PAR 시퀀스
 **Passive Stretching(=P-ROM)** 에서 안전한 움직임을 시작한다. 시행 자체가 관절 가동범위·질을 평가하는 과정이다.
@@ -4041,6 +4574,7 @@ let state = {
   syncRationalesOnBrandSave: true,
   draftBrandOverrides: {},
   deletedDraftIds: {},
+  opsManual: null,
 };
 
 var minDraftReplenishRunningByCat = {};
@@ -4062,6 +4596,7 @@ function getCatPrompt(catId, type) {
   return DEFAULT_PROMPTS.categories[catId]?.[type] || '';
 }
 function isDailyShareCategory(catId){ return catId === 6; }
+function isOpsManualCategory(catId){ return catId === 8; }
 function isThreadCategory(catId){ return isDailyShareCategory(catId); }
 function isHeiljagyaeCategory(catId){ return catId === 7; }
 function isGeneralAudienceCategory(catId){ return catId === 0 || catId === 1 || catId === 2; }
@@ -4073,7 +4608,7 @@ function getStepToneClass_(idx){ return 'step-tone-' + (Math.max(0, parseInt(idx
 /** 기획 계층 ①1년 ②세부목표 ③주제기획 ④주제 */
 function getPlanTierClass_(tier){ return 'plan-tier-' + tier; }
 /** 블로그·인스타·이미지(2장) 워크플로 — 도수·리:얼·뷰티·교육 탭 */
-function isBlogInstaCategory(catId){ return catId !== 6 && catId !== 7; }
+function isBlogInstaCategory(catId){ return catId !== 6 && catId !== 7 && catId !== 8; }
 function getImageSlotCount(catId){
   if(isDailyShareCategory(catId)) return 0;
   return 2;
@@ -4378,17 +4913,32 @@ const DEFAULT_EXPERT_COURSE_SCOPE_RULE = `[범위·집중 — 최우선]
 
 const BLOG_CONTENT_VOICE_RULE = '미카닥 박준규 톤 — 따뜻하고 신뢰감 있는 **설명하는 전문가**. 제목·서명·헤드라인에 Doctor·닥터·원장님을 쓰지 않음. 과장·즉효 약속 금지.';
 
+const MEDICAL_COMPLIANCE_RULE = `[의료법·포지셔닝 — 필수]
+- 작성자(미카닥 박준규)는 **현재 병원에서 근무하지 않습니다**. 진단·처방·치료행위를 하거나 암시하지 마세요.
+- **치료가 필요할 수 있는 상황**은 원인·징후를 **교육적으로** 설명한 뒤, **병원 진료·검사·의사 처방 치료를 먼저 권하는** 문장을 넣으세요.
+- 제공 범위는 **운동·재활·웰니스 프로그램**(Re:Al Movement, P-스트레칭, 기능운동 등)이며, 병원 치료와 **병행**하는 흐름으로 씁니다.
+- "완치""치료한다""진단 확정""처방""수술 대신" 등 **의료행위 연상** 표현 금지. "이해를 돕기 위한 일반 정보"·"생활·운동 관리 참고" 톤.
+- 응급·적신호(마비, 대소변 장애, 발열·체중감소 동반, 사고 직후 급격한 악화 등)는 **즉시 병원** 권고.`;
+
+const GEO_CONTENT_STRUCTURE_RULE = `[GEO · AI 인용 가능 구조 — explanation 필드에 자연스럽게 녹이기]
+번호·"N단계" 표기 없이 문단으로 연결:
+① 한 줄 요약(결론 선제시) ② 자가 점검 2~4개 ③ 가능한 원인 ④ 병원 진료 신호 vs 운동·프로그램으로 관리 가능한 경우 ⑤ 안전한 셀프 확인·이완 ⑥ 주의·금기 ⑦ 근골격계 전문가 관점 ⑧ 익명 사례 톤의 변화(숫자는 예시로) ⑨ FAQ 2~3개 ⑩ 다음 행동(병원 상담 또는 프로그램 상담) — 주제와 맞으면 프로필 증상 허브 딥링크 1개 포함 가능`;
+
 const DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW = `**일반인 독자**용 블로그입니다. ${BLOG_CONTENT_VOICE_RULE}
+
+${MEDICAL_COMPLIANCE_RULE}
+
+${GEO_CONTENT_STRUCTURE_RULE}
 
 [글 흐름 — 반드시 이 순서·필드]
 1. **문제 제기** (problem): 일상 장면에서 공감되는 불편·궁금증 2~4문장. 불릿·번호 나열 금지. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스.
-2. **셀프 케어** (selfCare): **👉 로 시작**. 동작·자세·**초·회·분**을 앞쪽에. "아 시원하다" 지점에서 멈추라는 뉘앙스. 무리·재통증 주의 한 줄 가능.
-3. **원리 설명** (explanation): 동작 **뒤에** 왜 도움이 되는지 2~5문장. 비유 한 줄 + 복잡하지 않다는 마무리. 필요 시 가볍게 전문 치료가 필요한 경우 한 줄.
+2. **셀프 케어** (selfCare): **👉 로 시작**. 동작·자세·**초·회·분**을 앞쪽에. "아 시원하다" 지점에서 멈추라는 뉘앙스. 무리·재통증 주의 한 줄. 통증이 심하면 병원 먼저 한 줄.
+3. **원리 설명** (explanation): 동작 **뒤에** 왜 도움이 되는지 + GEO 구조. 비유 한 줄. 병원 치료가 필요한 경우와 **프로그램 병행**이 맞는 경우를 구분.
 
 [형식]
 - title: 호기심·질문형 한 줄 (35자 내외, 네이버 SEO 고려, 과장 금지)
 - problem / selfCare / explanation: 위 순서대로 각각 별도 필드. "N단계 —" 같은 순서 표기 금지
-- cta: 마무리 행동 유도 (미카닥 박준규·블로그/상담 자연스럽게)
+- cta: 병원 상담 또는 Re:Al·프로그램 상담 중 맥락에 맞게 (과장·즉시 예약 압박 금지). 주제와 맞는 증상 허브 URL 1개 포함 권장 — 허리 ?hub=back · 목 ?hub=neck · 어깨 ?hub=shoulder · 무릎 ?hub=knee · 골반 ?hub=pelvis (기본 ${PROFILE_BRAND_URL})
 - hashtags: 6~8개 (# 없이)`;
 
 const DEFAULT_EXPERT_COURSE_BLOG_PROMPT = `물리치료사·트레이너 등 **움직임 전문가**를 독자로 하는 SNS·블로그 글입니다.
@@ -4458,6 +5008,7 @@ const DEFAULT_PROMPTS = {
   base: `당신은 '미카닥 박준규'의 전담 콘텐츠 기획자입니다.
 브랜드 주체: 미카닥 박준규 (미국 DC·한국 PT, 20년+ 근골격계·비수술 전문가)
 ${BLOG_CONTENT_VOICE_RULE}
+${MEDICAL_COMPLIANCE_RULE}
 진료·교육: 도수치료, Re:Al Movement, 얼굴관리, CMT/IFC 전문가 교육
 인스타: @dr.park_dc.pt` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
   categories: {
@@ -4702,6 +5253,7 @@ function getPersistPayload(){
     payload.pinnedDraftIds = state.pinnedDraftIds;
   }
   if(state.plannerSetupDismissed) payload.plannerSetupDismissed = true;
+  if(state.opsManual) payload.opsManual = state.opsManual;
   return payload;
 }
 function getLocalStoragePayload(){
@@ -4916,11 +5468,25 @@ function mergePlannerPayloads_(local, remote){
       : local.syncRationalesOnBrandSave !== false;
   }
   out.draftBrandOverrides = Object.assign({}, remote.draftBrandOverrides || {}, local.draftBrandOverrides || {});
+  out.opsManual = mergeOpsManual_(local.opsManual, remote.opsManual, preferRemote);
   var mergedMs = Math.max(localMs, remoteMs, Date.now());
   out.savedAt = new Date(mergedMs).toISOString();
   out.localSavedAt = out.savedAt;
   delete out.apiKey;
   return out;
+}
+function mergeOpsManual_(local, remote, preferRemote){
+  if(!local || typeof local !== 'object') return remote && typeof remote === 'object' ? remote : null;
+  if(!remote || typeof remote !== 'object') return local;
+  var base = preferRemote ? remote : local;
+  var other = preferRemote ? local : remote;
+  return {
+    activeBranch: base.activeBranch || other.activeBranch || 'global',
+    checked: Object.assign({}, other.checked || {}, base.checked || {}),
+    notes: Object.assign({}, other.notes || {}, base.notes || {}),
+    collapsed: Object.assign({}, other.collapsed || {}, base.collapsed || {}),
+    newBranchMeta: Object.assign({}, other.newBranchMeta || {}, base.newBranchMeta || {})
+  };
 }
 function brandingFingerprint_(branding){
   if(!branding || typeof branding !== 'object') return '';
@@ -4946,7 +5512,8 @@ function plannerSyncFingerprint_(payload){
       pub: Object.keys(payload.published || {}).sort(),
       gen: Object.keys(payload.generatedOnly || {}).sort(),
       del: Object.keys(payload.deletedDraftIds || {}).sort(),
-      brand: brandingFingerprint_(payload.branding)
+      brand: brandingFingerprint_(payload.branding),
+      ops: payload.opsManual ? JSON.stringify(payload.opsManual) : ''
     });
   } catch(e){ return ''; }
 }
@@ -5166,6 +5733,7 @@ function applyPersistPayload(s){
   state.deletedDraftIds = Object.assign({}, s.deletedDraftIds || {}, prevDeleted);
   state.pinnedDraftIds = s.pinnedDraftIds && typeof s.pinnedDraftIds === 'object' ? s.pinnedDraftIds : {};
   if(s.plannerSetupDismissed) state.plannerSetupDismissed = true;
+  if(s.opsManual && typeof s.opsManual === 'object') state.opsManual = s.opsManual;
   mergeExtraDrafts(s.extraDraftsByCat);
   purgeDeletedDraftsFromCatalog_();
   applyBuiltinDraftBrandSeeds_();
@@ -6046,6 +6614,7 @@ window.onload = () => {
   updateDriveButtonState();
   bindPlannerMainClickDelegation_();
   renderTabs();
+  updateAddButtonVisibility_();
   renderMain();
   if(oauthReturned){
     handleDrivePendingActionAfterRedirect_();
@@ -6307,8 +6876,16 @@ function selectCat(i) {
   state.searchQ = '';
   state.showAdd = false;
   renderTabs();
+  updateAddButtonVisibility_();
   renderMain();
 }
+
+function updateAddButtonVisibility_(){
+  var btn = document.getElementById('add-toggle-btn');
+  if(!btn) return;
+  btn.style.display = isOpsManualCategory(state.currentCat) ? 'none' : '';
+}
+window.updateAddButtonVisibility_ = updateAddButtonVisibility_;
 
 // ── Recommendations ──
 function draftIsPublished_(draftId) {
@@ -6327,6 +6904,7 @@ function draftHasContent(d) {
 
 /** 상단 탭 배지 — 메인 화면에 보이는 미발행 주제 수 */
 function countUnpublishedTopicsForCat_(catIdx) {
+  if(isOpsManualCategory(catIdx)) return countOpsManualUnchecked_(catIdx);
   return getVisibleDraftsInMain_(catIdx).filter(function (d) {
     return !draftIsPublished_(d.id);
   }).length;
@@ -6417,10 +6995,316 @@ function getNextPublishRecommendation() {
 }
 
 // ── Main render ──
+function getOpsManualState_(){
+  if(!state.opsManual || typeof state.opsManual !== 'object'){
+    state.opsManual = { activeBranch: 'global', checked: {}, notes: {}, collapsed: {}, review: {}, newBranchMeta: { name: '', area: '', note: '' } };
+  }
+  if(!state.opsManual.checked) state.opsManual.checked = {};
+  if(!state.opsManual.notes) state.opsManual.notes = {};
+  if(!state.opsManual.collapsed) state.opsManual.collapsed = {};
+  if(!state.opsManual.review) state.opsManual.review = {};
+  if(!state.opsManual.newBranchMeta) state.opsManual.newBranchMeta = { name: '', area: '', note: '' };
+  if(!OPS_BRANCH_IDS.includes(state.opsManual.activeBranch)) state.opsManual.activeBranch = 'global';
+  return state.opsManual;
+}
+function getOpsSectionsForBranch_(branchId){
+  return OPS_MANUAL_SECTIONS.filter(function(sec){ return sec.branch === branchId; });
+}
+function countOpsManualUnchecked_(catIdx){
+  if(!isOpsManualCategory(catIdx)) return 0;
+  var om = getOpsManualState_();
+  var unchecked = 0;
+  OPS_MANUAL_SECTIONS.forEach(function(sec){
+    (sec.items || []).forEach(function(it){
+      if(!om.checked[it.id]) unchecked++;
+    });
+  });
+  return unchecked;
+}
+function countOpsManualProgress_(branchId){
+  var om = getOpsManualState_();
+  var total = 0;
+  var done = 0;
+  getOpsSectionsForBranch_(branchId).forEach(function(sec){
+    (sec.items || []).forEach(function(it){
+      total++;
+      if(om.checked[it.id]) done++;
+    });
+  });
+  return { done: done, total: total };
+}
+function renderOpsManualMainHTML_(){
+  var om = getOpsManualState_();
+  var branch = om.activeBranch;
+  var prog = countOpsManualProgress_(branch);
+  var branchTabs = OPS_BRANCH_IDS.map(function(bid){
+    var p = countOpsManualProgress_(bid);
+    var pct = p.total ? Math.round((p.done / p.total) * 100) : 0;
+    return '<button type="button" class="ops-branch-tab' + (branch === bid ? ' active' : '') + '" onclick="selectOpsBranch_(\'' + bid + '\')">' +
+      '<span class="ops-branch-tab-label">' + escapeHtml(OPS_BRANCH_LABELS[bid] || bid) + '</span>' +
+      '<span class="ops-branch-tab-prog">' + p.done + '/' + p.total + ' · ' + pct + '%</span>' +
+    '</button>';
+  }).join('');
+  var intro = '<div class="ops-manual-intro">' +
+    '<div class="ops-manual-title">브랜딩·지점 오픈 메뉴얼</div>' +
+    '<p class="ops-manual-desc">' + escapeHtml(OPS_BRANCH_HINTS[branch] || '') + '</p>' +
+    '<div class="ops-manual-progress"><span class="ops-manual-progress-label">진행</span><span class="ops-manual-progress-num">' + prog.done + ' / ' + prog.total + '</span></div>' +
+  '</div>';
+  var newMeta = '';
+  if(branch === 'new'){
+    var meta = om.newBranchMeta || {};
+    newMeta = '<div class="ops-new-meta">' +
+      '<div class="ops-new-meta-title">신규 지점 메모</div>' +
+      '<label class="ops-new-field"><span>후보명</span><input type="text" value="' + escapeHtml(meta.name || '') + '" placeholder="예: ○○ Re:Al Movement" onchange="setOpsNewMeta_(\'name\', this.value)" /></label>' +
+      '<label class="ops-new-field"><span>지역·상권</span><input type="text" value="' + escapeHtml(meta.area || '') + '" placeholder="예: 성수·역삼·계양" onchange="setOpsNewMeta_(\'area\', this.value)" /></label>' +
+      '<label class="ops-new-field"><span>메모</span><textarea rows="2" placeholder="차별점·타깃·일정" onchange="setOpsNewMeta_(\'note\', this.value)">' + escapeHtml(meta.note || '') + '</textarea></label>' +
+    '</div>';
+  }
+  var sections = getOpsSectionsForBranch_(branch).map(function(sec){
+    var collapsed = !!om.collapsed[sec.id];
+    var itemsHtml = (sec.items || []).map(function(it){
+      var checked = !!om.checked[it.id];
+      var note = om.notes[it.id] || '';
+      var review = ensureOpsReviewState_(it, branch) || { open: false, fields: {}, pinned: {} };
+      var reviewOpen = !!review.open;
+      var field = review.fields || {};
+      var proposalItems = review.proposalItems || [];
+      var checks = review.placementChecks || [];
+      var proposalHtml = proposalItems.map(function(p){
+        return '<div class="ops-review-proposal' + (p.done ? ' done' : '') + '">' +
+          '<div class="ops-review-proposal-head">' +
+            '<label class="ops-review-proposal-check">' +
+              '<input type="checkbox"' + (p.done ? ' checked' : '') + ' onchange="toggleOpsReviewProposalDone_(\'' + it.id + '\', \'' + p.id + '\', this.checked)" />' +
+              '<span class="ops-review-label">' + escapeHtml(p.title || '제안 문장') + '</span>' +
+            '</label>' +
+            '<button type="button" class="ops-review-pin' + (p.pinned ? ' active' : '') + '" onclick="toggleOpsReviewProposalPin_(\'' + it.id + '\', \'' + p.id + '\')">' + (p.pinned ? '고정됨' : '고정') + '</button>' +
+          '</div>' +
+          '<div class="ops-review-field">' +
+            '<span class="ops-review-sublabel">목적 의도 알려주기</span>' +
+            '<textarea class="ops-review-input ops-grow-textarea" rows="1" oninput="autoGrowTextarea_(this)" onchange="setOpsReviewProposalBrief_(\'' + it.id + '\', \'' + p.id + '\', this.value)">' + escapeHtml(p.brief || '') + '</textarea>' +
+          '</div>' +
+          '<div class="ops-review-field">' +
+            '<span class="ops-review-sublabel">제안 문장과 그 이유</span>' +
+            '<textarea class="ops-review-input ops-grow-textarea" rows="1" oninput="autoGrowTextarea_(this)" onchange="setOpsReviewProposalText_(\'' + it.id + '\', \'' + p.id + '\', this.value)">' + escapeHtml(p.text || '') + '</textarea>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+      var proposalProgress = proposalItems.length ? ('<span class="ops-review-group-progress">' + proposalItems.filter(function(x){ return !!x.done; }).length + '/' + proposalItems.length + ' 완료</span>') : '';
+      var checklistHtml = checks.map(function(c, idx){
+        return '<label class="ops-review-check-row">' +
+          '<input type="checkbox"' + (c.done ? ' checked' : '') + ' onchange="toggleOpsReviewPlacementCheck_(\'' + it.id + '\',' + idx + ',this.checked)" />' +
+          '<span>' + escapeHtml(c.label || '') + '</span>' +
+        '</label>';
+      }).join('');
+      var reviewHtml = '<div class="ops-review-wrap">' +
+        '<button type="button" class="ops-review-btn" onclick="toggleOpsReview_(\'' + it.id + '\')">함께 검토</button>' +
+        '<div class="ops-review-panel' + (reviewOpen ? ' open' : '') + '">' +
+          '<div class="ops-review-group"><div class="ops-review-group-title">제안 문장 <span class="ops-review-group-hint">항목별로 기획·완료</span>' + proposalProgress + '</div>' + proposalHtml + '</div>' +
+          '<div class="ops-review-group"><div class="ops-review-group-title">생성된 내용을 어디에 반영할지(체크)</div><div class="ops-review-checklist">' + checklistHtml + '</div></div>' +
+          '<div class="ops-review-actions">' +
+            '<button type="button" class="ops-review-regen" onclick="regenOpsReview_(\'' + it.id + '\', \'' + branch + '\')">재생성</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+      return '<li class="ops-check-item' + (checked ? ' done' : '') + '">' +
+        '<label class="ops-check-row">' +
+          '<input type="checkbox"' + (checked ? ' checked' : '') + ' onchange="toggleOpsCheck_(\'' + it.id + '\', this.checked)" />' +
+          '<span class="ops-check-text">' + escapeHtml(it.text) + '</span>' +
+        '</label>' +
+        (it.hint ? '<div class="ops-check-hint">' + escapeHtml(it.hint) + '</div>' : '') +
+        reviewHtml +
+        '<textarea class="ops-check-note ops-grow-textarea" rows="1" placeholder="메모·링크·담당·완료일" oninput="autoGrowTextarea_(this)" onchange="setOpsNote_(\'' + it.id + '\', this.value)">' + escapeHtml(note) + '</textarea>' +
+      '</li>';
+    }).join('');
+    return '<details class="ops-section' + (collapsed ? '' : ' open') + '" id="ops-sec-' + sec.id + '"' + (collapsed ? '' : ' open') + '>' +
+      '<summary class="ops-section-summary" onclick="toggleOpsSection_(\'' + sec.id + '\'); return false;">' +
+        '<span class="ops-section-phase">' + escapeHtml(sec.phase) + '</span>' +
+        '<span class="ops-section-count">' + (sec.items || []).filter(function(it){ return om.checked[it.id]; }).length + '/' + (sec.items || []).length + '</span>' +
+      '</summary>' +
+      '<ol class="ops-check-list">' + itemsHtml + '</ol>' +
+    '</details>';
+  }).join('');
+  return '<div class="ops-manual-wrap">' + intro + newMeta +
+    '<div class="ops-branch-tabs" role="tablist">' + branchTabs + '</div>' +
+    '<div class="ops-sections">' + sections + '</div>' +
+    '<p class="ops-manual-foot">체크·메모는 이 기기·Drive·서버 동기화에 저장됩니다. 약수·작전도 새로 시작하는 지점과 같은 항목으로 정리해 두었습니다.</p>' +
+  '</div>';
+}
+function selectOpsBranch_(branchId){
+  if(!OPS_BRANCH_IDS.includes(branchId)) return;
+  var om = getOpsManualState_();
+  om.activeBranch = branchId;
+  save({ skipDriveUpload: false });
+  renderTabs();
+  renderMain();
+}
+window.selectOpsBranch_ = selectOpsBranch_;
+function toggleOpsCheck_(itemId, checked){
+  var om = getOpsManualState_();
+  if(checked) om.checked[itemId] = true;
+  else delete om.checked[itemId];
+  save({ skipDriveUpload: false });
+  renderTabs();
+  renderMain();
+}
+window.toggleOpsCheck_ = toggleOpsCheck_;
+function setOpsNote_(itemId, note){
+  var om = getOpsManualState_();
+  note = String(note || '').trim();
+  if(note) om.notes[itemId] = note;
+  else delete om.notes[itemId];
+  save({ skipDriveUpload: true, skipGasPush: true });
+}
+window.setOpsNote_ = setOpsNote_;
+function setOpsNewMeta_(field, value){
+  var om = getOpsManualState_();
+  if(!om.newBranchMeta) om.newBranchMeta = { name: '', area: '', note: '' };
+  om.newBranchMeta[field] = String(value || '').trim();
+  save({ skipDriveUpload: true, skipGasPush: true });
+}
+window.setOpsNewMeta_ = setOpsNewMeta_;
+function toggleOpsSection_(sectionId){
+  var om = getOpsManualState_();
+  om.collapsed[sectionId] = !om.collapsed[sectionId];
+  save({ skipDriveUpload: true, skipGasPush: true });
+  var el = document.getElementById('ops-sec-' + sectionId);
+  if(el){
+    if(om.collapsed[sectionId]) el.removeAttribute('open');
+    else el.setAttribute('open', 'open');
+  }
+}
+window.toggleOpsSection_ = toggleOpsSection_;
+function renderOpsReviewFieldHTML_(itemId, key, label, value, isPinned){
+  return '<div class="ops-review-field">' +
+    '<div class="ops-review-field-head">' +
+      '<span class="ops-review-label">' + escapeHtml(label) + '</span>' +
+      '<button type="button" class="ops-review-pin' + (isPinned ? ' active' : '') + '" onclick="toggleOpsReviewPin_(\'' + itemId + '\', \'' + key + '\')">' + (isPinned ? '고정됨' : '고정') + '</button>' +
+    '</div>' +
+    '<textarea class="ops-review-input ops-grow-textarea" rows="1" oninput="autoGrowTextarea_(this)" onchange="setOpsReviewField_(\'' + itemId + '\', \'' + key + '\', this.value)">' + escapeHtml(value || '') + '</textarea>' +
+  '</div>';
+}
+function toggleOpsReview_(itemId){
+  var om = getOpsManualState_();
+  if(!om.review || !om.review[itemId]) return;
+  om.review[itemId].open = !om.review[itemId].open;
+  save({ skipDriveUpload: true, skipGasPush: true });
+  renderMain();
+}
+window.toggleOpsReview_ = toggleOpsReview_;
+function setOpsReviewField_(itemId, key, value){
+  var om = getOpsManualState_();
+  if(!om.review || !om.review[itemId]) return;
+  if(!om.review[itemId].fields) om.review[itemId].fields = {};
+  om.review[itemId].fields[key] = String(value || '').trim();
+  save({ skipDriveUpload: true, skipGasPush: true });
+}
+window.setOpsReviewField_ = setOpsReviewField_;
+function toggleOpsReviewPin_(itemId, key){
+  var om = getOpsManualState_();
+  if(!om.review || !om.review[itemId]) return;
+  if(!om.review[itemId].pinned) om.review[itemId].pinned = {};
+  om.review[itemId].pinned[key] = !om.review[itemId].pinned[key];
+  save({ skipDriveUpload: true, skipGasPush: true });
+  renderMain();
+}
+window.toggleOpsReviewPin_ = toggleOpsReviewPin_;
+function setOpsReviewProposalText_(itemId, proposalId, value){
+  var om = getOpsManualState_();
+  if(!om.review || !om.review[itemId] || !Array.isArray(om.review[itemId].proposalItems)) return;
+  om.review[itemId].proposalItems.forEach(function(p){
+    if(String(p.id) === String(proposalId)) p.text = String(value || '').trim();
+  });
+  save({ skipDriveUpload: true, skipGasPush: true });
+}
+window.setOpsReviewProposalText_ = setOpsReviewProposalText_;
+function setOpsReviewProposalBrief_(itemId, proposalId, value){
+  var om = getOpsManualState_();
+  if(!om.review || !om.review[itemId] || !Array.isArray(om.review[itemId].proposalItems)) return;
+  om.review[itemId].proposalItems.forEach(function(p){
+    if(String(p.id) === String(proposalId)) p.brief = String(value || '').trim();
+  });
+  save({ skipDriveUpload: true, skipGasPush: true });
+}
+window.setOpsReviewProposalBrief_ = setOpsReviewProposalBrief_;
+function toggleOpsReviewProposalDone_(itemId, proposalId, checked){
+  var om = getOpsManualState_();
+  if(!om.review || !om.review[itemId] || !Array.isArray(om.review[itemId].proposalItems)) return;
+  om.review[itemId].proposalItems.forEach(function(p){
+    if(String(p.id) === String(proposalId)) p.done = !!checked;
+  });
+  syncOpsReviewItemComplete_(itemId);
+  save({ skipDriveUpload: false });
+  renderTabs();
+  renderMain();
+}
+window.toggleOpsReviewProposalDone_ = toggleOpsReviewProposalDone_;
+function toggleOpsReviewProposalPin_(itemId, proposalId){
+  var om = getOpsManualState_();
+  if(!om.review || !om.review[itemId] || !Array.isArray(om.review[itemId].proposalItems)) return;
+  om.review[itemId].proposalItems.forEach(function(p){
+    if(String(p.id) === String(proposalId)) p.pinned = !p.pinned;
+  });
+  save({ skipDriveUpload: true, skipGasPush: true });
+  renderMain();
+}
+window.toggleOpsReviewProposalPin_ = toggleOpsReviewProposalPin_;
+function toggleOpsReviewPlacementCheck_(itemId, idx, checked){
+  var om = getOpsManualState_();
+  if(!om.review || !om.review[itemId] || !Array.isArray(om.review[itemId].placementChecks) || !om.review[itemId].placementChecks[idx]) return;
+  if(!om.checked || typeof om.checked !== 'object') om.checked = {};
+  om.review[itemId].placementChecks[idx].done = !!checked;
+  syncOpsReviewItemComplete_(itemId);
+  save({ skipDriveUpload: false });
+  renderTabs();
+  renderMain();
+}
+window.toggleOpsReviewPlacementCheck_ = toggleOpsReviewPlacementCheck_;
+function regenOpsReview_(itemId, branchId){
+  var om = getOpsManualState_();
+  if(!om.review || !om.review[itemId]) return;
+  var item = null;
+  OPS_MANUAL_SECTIONS.forEach(function(sec){
+    (sec.items || []).forEach(function(it){
+      if(!item && it.id === itemId) item = it;
+    });
+  });
+  if(!item) return;
+  var rv = om.review[itemId];
+  var base = buildOpsReviewDraft_(item, branchId || om.activeBranch);
+  if(!rv.fields) rv.fields = {};
+  if(!rv.pinned) rv.pinned = {};
+  if(!Array.isArray(rv.proposalItems)) rv.proposalItems = [];
+  var baseById = {};
+  (base.proposalItems || []).forEach(function(p){ baseById[String(p.id)] = p; });
+  rv.proposalItems.forEach(function(p){
+    var b = baseById[String(p.id)] || { text: p.text || '', brief: p.brief || '' };
+    if(p.pinned) return;
+    if(b.brief) p.brief = regenerateOpsReviewText_('proposal-brief:' + p.id, p.brief, b.brief);
+    p.text = regenerateOpsReviewText_('proposal:' + p.id, p.text, b.text || '');
+  });
+  if(!rv.proposalItems.length && (base.proposalItems || []).length){
+    rv.proposalItems = (base.proposalItems || []).map(function(p){ return normalizeOpsProposalItem_(null, p); });
+  }
+  if(!Array.isArray(rv.placementChecks) || !rv.placementChecks.length){
+    rv.placementChecks = (base.placementChecks || []).map(function(c){ return { id:c.id, label:c.label, done:false }; });
+  }
+  rv.open = true;
+  save({ skipDriveUpload: true, skipGasPush: true });
+  renderMain();
+}
+window.regenOpsReview_ = regenOpsReview_;
+
 function renderMain() {
   syncPendingPlansOnRender_();
   const cat = CATEGORIES[state.currentCat];
   const mc = document.getElementById('main-content');
+  updateAddButtonVisibility_();
+
+  if(isOpsManualCategory(state.currentCat)){
+    mc.innerHTML = renderOpsManualMainHTML_();
+    scheduleOpsReviewTextareaGrow_(mc);
+    return;
+  }
 
   if(state.showAdd){ mc.innerHTML = renderAddForm(); bindNewItemTopicInput_(); bindNewItemRefNoteInput_(); return; }
 
@@ -6444,7 +7328,7 @@ function renderMain() {
         (d.pillar && d.pillar.includes(q));
     });
     bodyHTML = renderMainGoalPanelHTML_() +
-      '<div class="search-mode-note">검색 중 · ' + (isDailyShareCategory(state.currentCat) ? '일상 주제 목록' : '단계별 로드맵') + '은 검색어를 지우면 다시 보여요.</div>' +
+      '<div class="search-mode-note">검색 중 · ' + (isDailyShareCategory(state.currentCat) ? '일상 주제 목록' : (isOpsManualCategory(state.currentCat) ? '메뉴얼' : '단계별 로드맵')) + '은 검색어를 지우면 다시 보여요.</div>' +
       '<div class="cards-wrap search-results">' +
       (hits.length ? hits.map(function(d){ return draftCardHTML(d, cat, false, cat.drafts.indexOf(d), false); }).join('') :
         '<div class="empty-note">검색 결과가 없어요</div>') +
@@ -10232,6 +11116,7 @@ function getReplenishSeedForCat_(catId){
 }
 
 async function runMinimumPendingDraftsForCat_(catId, reason, force){
+  if(isOpsManualCategory(catId)) return;
   if(!force && !isAutoTopicReplenishEnabled_()) return;
   if(!state.apiKey){
     if(force) openApiModal();
@@ -10262,6 +11147,7 @@ async function runMinimumPendingDraftsForCat_(catId, reason, force){
 }
 
 function scheduleMinimumPendingDraftsForCat_(catId, reason){
+  if(isOpsManualCategory(catId)) return;
   if(!isAutoTopicReplenishEnabled_()) return;
   if(minDraftReplenishTimerByCat[catId]) clearTimeout(minDraftReplenishTimerByCat[catId]);
   minDraftReplenishTimerByCat[catId] = setTimeout(function(){
@@ -10981,6 +11867,7 @@ community에는 인사말·고정 마무리 넣지 말 것. 글 흐름은 **문�
 
 반드시 images.gptVisuals는 **정확히 2개**. 각 prompt는 완성된 영문 한 덩어리. 예시 영문은 그대로 복사하지 말고 주제·각도·selfCare에 맞게 새로 쓸 것.`;
 } else if(isGeneralAudienceCategory(catId)){
+  const hubCtaHint = getSymptomHubCtaHintForTopic_(draft.topic);
   const generalImgJsonTail = `
 "images": {
 "gptVisuals": [
@@ -11012,13 +11899,15 @@ ${imagePromptGuide}
 "problem": "문제 제기 2~4문장. 불릿·번호 없이. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스",
 "selfCare": "👉 로 시작. 동작·자세·초·회·분을 앞쪽에. '시원한 지점에서 멈추기' 뉘앙스",
 "explanation": "원리 설명 2~5문장. 왜 도움이 되는지+비유+복잡하지 않다는 마무리",
-"cta": "마무리 행동 유도 (미카닥 박준규·블로그/상담 자연스럽게 언급)",
+"cta": "마무리 행동 유도 (미카닥 박준규·블로그/상담·증상 허브 URL 자연스럽게 언급)",
 "hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6"]
 },
 ${generalImgJsonTail}
 }
 
 글 흐름은 **문제 제기 → selfCare → explanation** 순. selfCare는 👉로 시작. "N단계 —" 표기 금지.
+
+[증상 허브 CTA 참고] ${hubCtaHint}
 
 반드시 images.gptVisuals는 **정확히 2개**. ②번 동작은 blog.selfCare와 일치.`;
 } else if(isExpertCourseCategory(catId)){
@@ -11070,6 +11959,7 @@ ${expertImgJsonTail}
 
 반드시 images.gptVisuals는 **정확히 2개**. ②번은 blog.outline·draft의 시연·테크닉과 일치.`;
 } else {
+  const hubCtaHintLegacy = getSymptomHubCtaHintForTopic_(draft.topic);
   prompt = `${baseInfo}
 
 ${brandBlock}
@@ -11093,11 +11983,13 @@ ${imagePromptGuide}
 "hook": "공감→문제제기→해결암시 흐름의 오프닝 2~3문장",
 "outline": ["소제목1","소제목2","소제목3","소제목4"],
 "draft": "본문 초안 700~900자. 따뜻하고 전문적인 미카닥 박준규 톤(설명하는 전문가). 실제 임상 경험 느낌. Doctor·닥터·원장님 호칭 금지. 단락 구분 포함.",
-"cta": "마무리 행동 유도 (미카닥 박준규·블로그/상담 자연스럽게 언급)",
+"cta": "마무리 행동 유도 (미카닥 박준규·블로그/상담·증상 허브 URL 자연스럽게 언급)",
 "hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6"]
 },
 ${imgJsonTail}
 }
+
+[증상 허브 CTA 참고] ${hubCtaHintLegacy}
 
 반드시 images.gptVisuals는 **정확히 2개**(① 전문 설명 보조, ② 셀프케어 동작). ②번 동작은 blog 본문의 셀프 팁과 일치. 각 prompt는 완성된 영문 한 덩어리.`;
 }

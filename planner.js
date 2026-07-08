@@ -10,7 +10,7 @@ const CATEGORIES = [
       {id:"d0-3", topic:"연부조직 치료, 어디까지 해야 효과가 날까요?",         angle:"근막·인대·건 각각의 치료 접근과 적절한 치료 횟수 가이드"},
       {id:"d0-4", topic:"목·허리·어깨 중 가장 먼저 치료해야 할 곳은?",        angle:"연쇄 보상 패턴 설명으로 치료 순서의 중요성 강조"},
     ]},
-  { id:1, icon:"", name:"리:얼 Movement",   color:"#7AF0C8", audience:"일반인",
+  { id:1, icon:"", name:"리:얼 무브먼트",   color:"#7AF0C8", audience:"일반인",
     sub:"Re-Alignment Movement Center — 패시브 스트레칭 · 기능운동 · 자세교정",
     drafts:[
       {id:"d1-0", topic:"스트레칭을 매일 해도 왜 몸이 안 풀릴까요?",           angle:"패시브 스트레칭의 올바른 방법과 잘못된 습관 교정"},
@@ -19,8 +19,8 @@ const CATEGORIES = [
       {id:"d1-3", topic:"앉아서 일하는 당신을 위한 3분 루틴",                  angle:"재택·사무직을 위한 척추-고관절 기능운동 시퀀스"},
       {id:"d1-4", topic:"걷기만 해도 자세가 교정된다, 가능한 이야기일까요?",   angle:"보행 패턴과 자세 교정의 연관성, 올바른 걷기 방법"},
     ]},
-  { id:2, icon:"", name:"얼굴 관리",       color:"#F0C87A", audience:"일반인",
-    sub:"얼굴 교정 · 작은얼굴",
+  { id:2, icon:"", name:"리:얼 페이스",    color:"#F0C87A", audience:"일반인",
+    sub:"리:얼 페이스 · 얼굴 교정 · 작은얼굴",
     drafts:[
       {id:"d2-0", topic:"셀카에서 한쪽 얼굴만 작아 보이는 진짜 이유",          angle:"안면비대칭의 원인 — 습관, 교합, 경추 연관성 설명"},
       {id:"d2-1", topic:"얼굴 살이 빠지지 않는 이유, 다이어트 문제 아닙니다",  angle:"림프 순환 + 골격 구조로 설명하는 얼굴 윤곽 개선"},
@@ -46,11 +46,11 @@ const CATEGORIES = [
       {id:"d4-3", topic:"INDIBA와 IFC를 함께 사용할 때의 프로토콜",            angle:"기기와 도수 접근의 시너지 — 순서, 타이밍, 포인트"},
       {id:"d4-4", topic:"얼굴 비대칭 케이스에서 놓치기 쉬운 평가 포인트",      angle:"교합·턱관절·경추 복합 평가 체크리스트 공유"},
     ]},
-  { id:5, icon:"", name:"리:얼 Movement 전문가 과정", color:"#7AB8F0", audience:"전문가",
-    sub:"Re-Alignment Movement Center · 전문가 교육",
+  { id:5, icon:"", name:"Re:Al 움직임 과정", color:"#7AB8F0", audience:"전문가",
+    sub:"Re:Al 움직임 과정 · 전문가 교육",
     drafts:[
       {id:"d5-0", topic:"패시브 스트레칭을 언제, 어떻게 써야 하는가?",          angle:"억제-이완 테크닉의 원리와 임상 적용 타이밍"},
-      {id:"d5-1", topic:"기능운동, 치료의 끝이 아닌 연결이다",                  angle:"도수치료 후 기능운동으로의 전환 — 리:얼 Movement 접근 철학"},
+      {id:"d5-1", topic:"기능운동, 치료의 끝이 아닌 연결이다",                  angle:"도수치료 후 기능운동으로의 전환 — 리:얼 무브먼트 접근 철학"},
       {id:"d5-2", topic:"자세 교정에서 '좋은 자세'가 없는 이유",                angle:"동적 안정성 개념과 자세 교정의 새로운 패러다임"},
       {id:"d5-3", topic:"고관절 가동성 vs 안정성, 무엇이 먼저인가?",            angle:"기능 사슬(kinetic chain) 관점의 운동 처방 우선순위"},
       {id:"d5-4", topic:"운동 처방 시 환자 순응도를 높이는 커뮤니케이션 전략",  angle:"행동변화 이론 + 동기부여 인터뷰를 운동 지도에 적용"},
@@ -87,15 +87,17 @@ const CATEGORIES = [
 const CAT_TAB_NAV_ROWS = [[0, 1, 2, 7], [3, 5, 4, 6, 8]];
 const CAT_TAB_SHORT = {
   0: '도수치료',
-  1: '리:얼 움직임',
-  2: 'Re:Al 뷰티',
+  1: '리:얼 무브먼트',
+  2: '리:얼 페이스',
   7: '힐자계',
   3: 'CMT 과정',
-  5: 'Re:Al 과정',
+  5: 'Re:Al 움직임 과정',
   4: 'IFC 과정',
   6: '일상 공유',
   8: '지점·브랜딩'
 };
+const CAT_GROUP_GENERAL = [0, 1, 2, 7, 6];
+const CAT_GROUP_EXPERT = [3, 5, 4, 8];
 /** 추가 폼 카테고리 선택 순서 */
 const ADD_FORM_CAT_ORDER = [0, 3, 1, 5, 2, 4, 7, 6];
 
@@ -774,6 +776,382 @@ const CATEGORY_THREE_MONTH_OUTCOME = {
   '6': '전문 강의·홍보 없이도 「믿을 만한 사람·공감되는 전문가」로 기억된다.',
   '7': '입주민이 부담 없이 P-스트레칭·자세·가벼운 기능을 일상에 붙인다.'
 };
+const PROGRAM_INITIAL_PLAN_DRAFTS = {
+  '0': {
+    brandProfile: '통증 부위를 단편적으로 다루지 않고, 구조·연부조직·기능을 함께 설명하는 도수치료 관점이 핵심입니다. 독자는 "왜 이 부위가 먼저인지"를 이해해야 치료 순서에 신뢰를 가질 수 있습니다. 과장된 즉효 표현보다 평가 기반 접근(History·Movement·Palpation)을 일관되게 보여 주세요.',
+    strategyGuide: '기준:\n- 주제는 통증 이름보다 "원인 구조"를 먼저 설명한다.\n- 단계는 인식(오해 해소) → 원인 이해 → 우선순위 결정 → 유지 전략 순으로 배치한다.\n- 각 단계는 독자가 바로 적용할 1가지 행동을 포함한다.\n\n의도:\n- 치료 전 불안을 낮추고, 치료 순서를 스스로 납득하게 만든다.\n- 단기 완화 기대를 "재발 줄이는 구조 이해"로 전환한다.\n- 상담 시 "왜 지금 이 접근인지"를 설명하는 기준 문장을 확보한다.',
+    steps: [
+      { id: '1', title: '1단계 · 통증 오해 정리', summary: '통증을 근육만의 문제로 보는 오해를 바로잡기', rationale: '독자가 현재 통증 해석을 바꾸지 않으면 이후 설명을 받아들이기 어렵습니다. 먼저 흔한 오해를 짚어 방어를 낮추고, 구조적 접근의 필요성을 받아들이게 합니다.' },
+      { id: '2', title: '2단계 · 원인 구조 파악', summary: '관절·연부조직·보상 패턴을 연결해서 이해시키기', rationale: '통증 위치와 원인 위치가 다를 수 있음을 이해해야 치료 방향이 명확해집니다. 독자가 자기 몸의 패턴을 설명할 수 있게 만드는 단계입니다.' },
+      { id: '3', title: '3단계 · 치료 우선순위 설계', summary: '무엇을 먼저, 무엇을 나중에 할지 기준 제시', rationale: '치료 순서를 제시하면 막연한 불안을 줄이고 실행 의지를 높일 수 있습니다. "왜 이 부위부터"에 대한 근거를 제시해 상담 전환을 돕습니다.' },
+      { id: '4', title: '4단계 · 재발 방지 루틴 연결', summary: '도수 후 생활·움직임 루틴으로 유지 전략 만들기', rationale: '치료 효과를 유지하려면 일상 행동 변화가 필요합니다. 독자가 스스로 관리 가능한 최소 루틴을 확보하도록 마무리합니다.' }
+    ]
+  },
+  '1': {
+    brandProfile: '리:얼 무브먼트는 PAR·Position을 통해 "좋은 자세를 고정"이 아니라 "움직임을 조절"하도록 돕는 프로그램입니다. 일반인이 일상 동작(앉기·걷기·업무)에서 즉시 써먹을 수 있는 표현이 중요합니다. 강한 교정보다 가벼운 감각 회복과 반복 가능한 루틴을 우선합니다.',
+    strategyGuide: '기준:\n- 단계는 감각 깨우기 → 동작 패턴 교정 → 일상 적용 → 유지 습관 순으로 구성한다.\n- 각 단계는 3~5분 내 가능한 마이크로 루틴을 포함한다.\n- "정답 자세"보다 상황별 조절 원칙을 제시한다.\n\n의도:\n- 독자가 자세 교정을 부담이 아닌 생활 기술로 인식하게 한다.\n- 통증 예방과 피로 감소를 일상 동작에서 체감하게 만든다.\n- 센터 방문 전후 모두 유지 가능한 자기조절 프레임을 만든다.',
+    steps: [
+      { id: '1', title: '1단계 · 감각 깨우기', summary: '호흡·기준선 회복으로 몸 상태를 먼저 인식하기', rationale: '몸 상태를 모르면 교정 신호를 받아들이기 어렵습니다. 가장 쉬운 감각 입력부터 시작해 "지금 내 몸"을 파악하도록 돕습니다.' },
+      { id: '2', title: '2단계 · 움직임 패턴 정리', summary: 'PAR 기반으로 잘못된 반복 동작을 수정하기', rationale: '반복 패턴을 바꾸지 않으면 통증과 피로가 재생산됩니다. 작은 동작 수정으로 즉시 체감 가능한 변화를 만들도록 구성합니다.' },
+      { id: '3', title: '3단계 · 일상 동작 연결', summary: '앉기·걷기·업무 동작에 교정 원칙 적용하기', rationale: '운동 시간보다 생활 시간이 더 길기 때문에, 실제 생활 장면에 연결해야 효과가 유지됩니다. 상황별 적용 예시로 실행 장벽을 낮춥니다.' },
+      { id: '4', title: '4단계 · 1주 유지 루틴', summary: '무리 없는 주간 루틴으로 습관화하기', rationale: '좋은 움직임은 반복으로 굳어집니다. 과도한 계획 대신 유지 가능한 최소 루틴을 제시해 장기 지속을 유도합니다.' }
+    ]
+  },
+  '2': {
+    brandProfile: '리:얼 페이스는 얼굴만 따로 보지 않고 경추·호흡·생활습관까지 함께 보는 구조 접근이 핵심입니다. "작은 얼굴" 기대는 과장 없이 현실적인 변화 범위로 안내해야 신뢰가 유지됩니다. 미용 표현보다 균형·순환·긴장 완화 관점으로 설명합니다.',
+    strategyGuide: '기준:\n- 단계는 관찰(비대칭 인식) → 원인 분해(습관·구조) → 교정 루틴 → 유지 관리 순으로 구성한다.\n- 전/후 기대치는 기간·개인차를 반드시 함께 안내한다.\n- 얼굴 문제를 경추·호흡·저작 패턴과 연결해 설명한다.\n\n의도:\n- 단기 외형 집착을 줄이고 구조 기반 관리 관점을 심는다.\n- 스스로 악화 습관을 파악·교정할 수 있게 만든다.\n- 상담 시 현실적인 목표 설정으로 이탈을 줄인다.',
+    steps: [
+      { id: '1', title: '1단계 · 비대칭 관찰', summary: '내 얼굴 패턴을 객관적으로 확인하는 법 익히기', rationale: '문제를 정확히 보지 못하면 잘못된 관리가 반복됩니다. 먼저 관찰 기준을 제공해 자기 인식을 높입니다.' },
+      { id: '2', title: '2단계 · 원인 구조 분해', summary: '습관·저작·경추 요인을 나눠서 이해하기', rationale: '원인을 분해해야 해결 순서를 정할 수 있습니다. "왜 한쪽이 더 쓰이는지"를 설명해 납득을 만듭니다.' },
+      { id: '3', title: '3단계 · 교정 루틴 적용', summary: '얼굴-목-호흡을 묶은 실천 루틴 시작하기', rationale: '이론만으로는 변화가 생기지 않습니다. 부담 없는 루틴으로 실제 체감 변화를 시작하도록 구성합니다.' },
+      { id: '4', title: '4단계 · 결과 유지 전략', summary: '재발 습관을 줄이는 생활 관리 기준 만들기', rationale: '유지 전략이 없으면 초기 변화가 금방 흐려집니다. 일상 습관 점검 포인트를 고정해 지속 가능성을 높입니다.' }
+    ]
+  },
+  '3': {
+    brandProfile: 'CMT 전문가는 치료 테크닉보다 평가 사고(촉진·히스토리·판단 순서)를 우선 학습해야 합니다. 교과서 지식을 임상 언어로 번역하는 능력이 핵심 경쟁력입니다. "잘한다"보다 "왜 그렇게 판단했는가"를 설명하는 훈련 중심으로 설계합니다.',
+    strategyGuide: '기준:\n- 단계는 평가 기준 정렬 → 촉진 정확도 강화 → 치료 선택 논리화 → 케이스 재현 순으로 구성한다.\n- 모든 단계는 "판단 근거 한 문장"을 남기게 한다.\n- 기법 소개보다 임상 의사결정 프레임을 우선한다.\n\n의도:\n- 수강생이 테크닉 의존에서 벗어나 평가 중심 사고를 체득하게 한다.\n- 임상에서 재현 가능한 치료 판단 언어를 확보하게 한다.\n- 교육 후 실제 케이스 적용률을 높인다.',
+    steps: [
+      { id: '1', title: '1단계 · 평가 프레임 정렬', summary: 'History-Inspection-Movement-Palpation 기준 통일', rationale: '평가 순서가 흔들리면 치료 결과도 흔들립니다. 공통 프레임을 먼저 맞춰 팀 전체 판단 품질을 올립니다.' },
+      { id: '2', title: '2단계 · 촉진 정확도 강화', summary: '핵심 구조를 빠르게 찾는 촉진 기준 훈련', rationale: '촉진 정확도는 치료 방향의 출발점입니다. 반복 가능한 기준점을 통해 임상 속도와 신뢰를 동시에 높입니다.' },
+      { id: '3', title: '3단계 · 치료 선택 논리화', summary: '기법 선택 이유를 환자 상태와 연결해 설명', rationale: '기법 자체보다 선택 근거가 중요합니다. 수강생이 치료 결정을 설명할 수 있어야 임상 재현성이 생깁니다.' },
+      { id: '4', title: '4단계 · 케이스 재현 적용', summary: '복합 케이스에서 평가-치료-운동 연결 완성', rationale: '실전에서는 단일 문제보다 복합 패턴이 많습니다. 케이스 재현으로 교육 내용을 임상 행동으로 전환합니다.' }
+    ]
+  },
+  '4': {
+    brandProfile: 'IFC 얼굴교육은 표면 자극이 아닌 구조·경축·기능 연결을 설명하는 전문가 과정입니다. 경추·턱관절·교합 관점을 함께 보며, 미용 기대와 구조적 필요를 조율하는 상담력이 중요합니다. 기기 사용과 도수 접근의 순서를 명확히 제시해야 합니다.',
+    strategyGuide: '기준:\n- 단계는 구조 평가 → 핵심 경축 완화 → 기기·도수 통합 프로토콜 → 케이스 피드백 순으로 구성한다.\n- 각 단계는 상담 문구(기대치 조율)를 포함한다.\n- 단순 before/after보다 기능·편안함 지표를 함께 본다.\n\n의도:\n- 수강생이 "미용 중심"에서 "구조 기반" 설명으로 전환하게 한다.\n- 상담 단계에서 과도한 기대를 안전하게 조율하게 한다.\n- 프로토콜의 재현성과 안전성을 높인다.',
+    steps: [
+      { id: '1', title: '1단계 · 구조 평가 정렬', summary: '안면·경추·턱관절 평가 순서 표준화', rationale: '평가 기준이 없으면 기법 적용이 흔들립니다. 공통 평가 루틴으로 케이스 판단의 정확도를 확보합니다.' },
+      { id: '2', title: '2단계 · 경축 핵심 완화', summary: '우선 완화할 조직과 순서를 명확히 하기', rationale: '경축 우선순위를 잘못 잡으면 결과 체감이 떨어집니다. 주요 긴장 포인트를 선별해 효율을 높입니다.' },
+      { id: '3', title: '3단계 · 통합 프로토콜 적용', summary: 'IFC + 도수 접근을 단계별로 연결하기', rationale: '기기와 도수의 순서를 명확히 해야 일관된 결과가 나옵니다. 상황별 프로토콜 선택 기준을 확립합니다.' },
+      { id: '4', title: '4단계 · 케이스 피드백 루프', summary: '결과 기록과 재계획 기준으로 완성도 높이기', rationale: '케이스 피드백이 있어야 교육이 실력으로 남습니다. 결과 기록을 바탕으로 다음 개입을 설계하도록 마무리합니다.' }
+    ]
+  },
+  '5': {
+    brandProfile: 'Re:Al 움직임 과정은 치료 이후 기능 회복을 실제 동작으로 연결하는 전문가 교육입니다. PAR·Position 철학을 임상 처방 언어로 번역하는 능력이 핵심입니다. 안전한 progression과 환자 순응도를 동시에 고려한 설계가 필요합니다.',
+    strategyGuide: '기준:\n- 단계는 상태 분류 → 기본 패턴 재학습 → 기능 과제 확장 → 지도·코칭 고도화 순으로 구성한다.\n- 각 단계는 "중단 기준/진행 기준"을 함께 제시한다.\n- 운동 처방은 통증 감소보다 기능 회복 지표를 우선한다.\n\n의도:\n- 치료실에서 운동실로 이어지는 단절을 줄인다.\n- 수강생이 환자 상태별 progression을 설명·적용하게 만든다.\n- 교육 후 실제 지도 자신감을 높인다.',
+    steps: [
+      { id: '1', title: '1단계 · 상태 분류', summary: 'PAR 관점으로 현재 기능 수준을 분류하기', rationale: '현재 수준을 정확히 구분해야 과부하를 피할 수 있습니다. 상태 분류는 안전한 처방의 출발점입니다.' },
+      { id: '2', title: '2단계 · 기본 패턴 재학습', summary: '호흡·정렬·기초 움직임 패턴 재구성', rationale: '기초 패턴이 무너지면 고급 동작에서 보상이 커집니다. 가장 작은 단위부터 안정적으로 재학습합니다.' },
+      { id: '3', title: '3단계 · 기능 과제 확장', summary: '일상/직무 동작으로 점진적 난이도 확장', rationale: '실전 기능으로 연결해야 교육 가치가 완성됩니다. 과제 확장을 통해 현장 적용력을 높입니다.' },
+      { id: '4', title: '4단계 · 코칭 언어 고도화', summary: '순응도를 높이는 설명·피드백 스크립트 구축', rationale: '좋은 처방도 전달이 약하면 지속되지 않습니다. 코칭 언어를 정교화해 수행률과 결과를 함께 높입니다.' }
+    ]
+  },
+  '6': {
+    brandProfile: '일상 공유는 전문 지식 전달보다 신뢰·온기·공감 축적이 목적입니다. 계절·컨디션·작은 루틴을 가볍게 나누되 과장·설교·홍보 톤은 줄입니다. 독자가 "이 사람은 꾸준하고 진짜다"라고 느끼는 리듬이 핵심입니다.',
+    strategyGuide: '기준:\n- 단계는 공감 장면 → 가벼운 관찰 → 작은 실천 → 관계 유지 메시지 순으로 구성한다.\n- 의학적 단정 대신 경험 기반 표현을 사용한다.\n- 각 글은 짧고 부담 없는 한 가지 메시지만 남긴다.\n\n의도:\n- 콘텐츠 피로도를 낮추면서 지속 노출 리듬을 만든다.\n- 팔로워와의 정서적 거리감을 줄여 장기 신뢰를 쌓는다.\n- 전문 콘텐츠로 이어질 수 있는 인간적 접점을 확보한다.',
+    steps: [
+      { id: '1', title: '1단계 · 공감 장면 열기', summary: '계절·날씨·피로 같은 공감 포인트로 시작', rationale: '첫 단계는 읽는 장벽을 낮추는 것이 핵심입니다. 누구나 공감 가능한 장면으로 관계의 문을 엽니다.' },
+      { id: '2', title: '2단계 · 몸 느낌 관찰', summary: '오늘 컨디션을 가볍게 언어화해 나누기', rationale: '과한 정보 없이도 신뢰는 쌓일 수 있습니다. 몸 느낌을 솔직하게 기록해 진정성을 강화합니다.' },
+      { id: '3', title: '3단계 · 작은 실천 제안', summary: '30초~3분 내 가능한 가벼운 루틴 안내', rationale: '실천이 있어야 콘텐츠가 기억됩니다. 부담 없는 행동 제안으로 참여율을 높입니다.' },
+      { id: '4', title: '4단계 · 관계 유지 마무리', summary: '다음 일상으로 이어지는 따뜻한 콜투액션', rationale: '일상 공유의 목적은 반복 접점입니다. 다음 대화를 열어두는 문장으로 관계를 이어갑니다.' }
+    ]
+  },
+  '7': {
+    brandProfile: '힐자계는 입주민이 집 근처에서 부담 없이 따라할 수 있는 생활형 케어가 핵심입니다. 전문 용어를 줄이고, 엘리베이터 앞·거실·출근 전처럼 실제 동선을 기준으로 안내해야 합니다. 즉시 가능한 짧은 루틴과 안전한 표현을 우선합니다.',
+    strategyGuide: '기준:\n- 단계는 불편 공감 → 쉬운 이완 → 자세·움직임 연결 → 생활 고정 순으로 구성한다.\n- 한 콘텐츠당 동작은 1~2개로 제한한다.\n- 통증 악화·저림 등 경고 신호 시 병원 진료 권유 문구를 포함한다.\n\n의도:\n- 입주민이 "어렵지 않다"는 경험을 반복하게 만든다.\n- 과한 운동 대신 꾸준한 생활형 루틴을 정착시킨다.\n- 지역 커뮤니티 신뢰를 높여 상담 접점을 자연스럽게 만든다.',
+    steps: [
+      { id: '1', title: '1단계 · 불편 공감 시작', summary: '입주민 일상에서 자주 겪는 불편을 정확히 짚기', rationale: '내 이야기라고 느껴야 행동이 시작됩니다. 생활 맥락의 불편을 먼저 공감해 참여를 유도합니다.' },
+      { id: '2', title: '2단계 · 1분 이완 루틴', summary: '누구나 바로 가능한 짧은 이완 동작 제시', rationale: '복잡한 설명보다 즉시 실행이 중요합니다. 1분 루틴으로 첫 성공 경험을 만들도록 구성합니다.' },
+      { id: '3', title: '3단계 · 자세·기능 연결', summary: '이완 후 자세와 가벼운 기능동작으로 확장', rationale: '이완만으로는 유지가 어렵습니다. 자세와 기능을 연결해 일상 체감 효과를 높입니다.' },
+      { id: '4', title: '4단계 · 생활 루틴 고정', summary: '집·직장 동선에 붙이는 반복 습관 만들기', rationale: '지역 프로그램은 지속성이 성패를 가릅니다. 생활 동선에 붙는 습관으로 장기 실행을 돕습니다.' }
+    ]
+  }
+};
+/** 프로그램별 1~4단계 · 단계당 주제 5개 초안 (로드맵 적용 시 빈 칸만 채움) */
+const PROGRAM_INITIAL_STEP_TOPICS = {
+  '0': {
+    '1': [
+      { topic: '통증이 근육만의 문제라면, 왜 스트레칭으로 안 풀릴까요?', angle: '통증=근육 오해 해소 + 구조 관점 입문' },
+      { topic: '"쉬면 괜찮아지겠죠?"가 위험한 말이 되는 경우', angle: '휴식과 방치의 차이, 조기 평가 필요성' },
+      { topic: '치료 받고 더 아플 때, 호전 반응일까 문제일까?', angle: '호전 반응 vs 부작용 구분 기준' },
+      { topic: '통증 위치와 원인 위치가 다를 수 있는 이유', angle: '방사통·보상 패턴을 쉽게 설명' },
+      { topic: '"딱 소리"가 나야 치료가 된 걸까요?', angle: '관절가동 오해 해소와 신뢰 기준' }
+    ],
+    '2': [
+      { topic: '허리가 뻐근한데, 왜 고관절부터 보나요?', angle: '인접 관절·연부조직 연결 설명' },
+      { topic: '목 통증인데 어깨를 치료하는 진짜 이유', angle: '연쇄 보상과 치료 순서 논리' },
+      { topic: '관절·근막·건, 어디를 먼저 봐야 하나요?', angle: '연부조직·관절 우선순위 프레임' },
+      { topic: '같은 허리 통증, 사람마다 다른 이유 3가지', angle: '구조·습관·기능 개인차 설명' },
+      { topic: '"뼈가 틀어졌다"는 말, 어디까지 사실일까요?', angle: '과장 없이 구조 변화 설명' }
+    ],
+    '3': [
+      { topic: '목·허리·어깨 중, 이번 달에 먼저 손댈 곳은?', angle: '우선순위 결정 체크리스트' },
+      { topic: '통증 줄이기와 원인 해결, 뭐가 먼저인가요?', angle: '증상 완화 vs 구조 개입 순서' },
+      { topic: '도수치료 횟수, 얼마나 해야 방향이 보이나요?', angle: '기대치·재평가 기준 제시' },
+      { topic: '병원에서 검사 정상인데도 아픈 이유', angle: '기능·구조 관점의 해석 프레임' },
+      { topic: '오늘 상담에서 확인할 질문 5가지', angle: '환자가 스스로 확인할 우선순위 질문' }
+    ],
+    '4': [
+      { topic: '치료 후 3일, 집에선 무엇을 하면 좋을까요?', angle: '재발 방지 최소 루틴' },
+      { topic: '앉아서 일할 때 통증 재발 막는 2분 루틴', angle: '직장 환경형 유지 전략' },
+      { topic: '스트레칭만 늘리면 왜 다시 뻐근해질까요?', angle: '단순 스트레칭의 한계 + 순서' },
+      { topic: '통증 없는 날에도 해야 하는 관리가 있나요?', angle: '예방형 최소 루틴 안내' },
+      { topic: '좋아졌다 싶다가 다시 아픈 사이클 끊는 법', angle: '재발 신호 인식과 조기 대응' }
+    ]
+  },
+  '1': {
+    '1': [
+      { topic: '스트레칭을 매일 해도 몸이 안 풀리는 이유', angle: '감각·기준선 회복이 먼저인 이유' },
+      { topic: '"바른 자세"를 오래 유지하면 오히려 독인 이유', angle: '정적 자세 vs 동적 조절' },
+      { topic: '호흡이 먼저인 이유, 3분만 해보면 압니다', angle: '호흡-긴장 기준선 체감' },
+      { topic: '누워서 시작하는 게 운동보다 중요한 날', angle: 'Position 1 감각 깨우기' },
+      { topic: '오늘 내 몸이 뻣뻣한지 확인하는 30초', angle: '자가 감각 체크 루틴' }
+    ],
+    '2': [
+      { topic: '운동 전 5분, 이것만 하면 부상이 준다', angle: '기능적 워밍업·PAR 입문' },
+      { topic: 'P-스트레칭, 억지로 당기면 안 되는 이유', angle: 'Passive 이완의 올바른 강도' },
+      { topic: '고관절이 안 열리면 허리가 먼저 아파요', angle: '움직임 사슬 패턴 교정' },
+      { topic: '어깨가 올라간 채 걷는 습관, 어떻게 바꾸나요?', angle: '보행·어깨 긴장 패턴 수정' },
+      { topic: '"힘을 빼라"는 말, 실제로 어떻게 하나요?', angle: '이완 큐·감각 안내' }
+    ],
+    '3': [
+      { topic: '앉아서 일하는 당신을 위한 3분 루틴', angle: '사무 장면 적용' },
+      { topic: '걷기만 해도 자세가 바뀌는 조건 3가지', angle: '보행 습관 연결' },
+      { topic: '집안일·육아 중에도 가능한 정렬 리셋', angle: '생활 동선형 적용' },
+      { topic: '스쿼트보다 먼저 해야 할 일상 동작', angle: '기능동작 우선순위' },
+      { topic: '핸드폰 볼 때 목만 들어올리는 착각', angle: '경추-흉추 연동 습관 교정' }
+    ],
+    '4': [
+      { topic: '바쁜 주를 위한 움직임 루틴 템플릿', angle: '주 3회 최소 유지 설계' },
+      { topic: '컨디션 저하일 때 강도 낮추는 기준', angle: 'progression / regression' },
+      { topic: '좋아진 감각을 놓치지 않는 체크리스트', angle: '자기점검 습관화' },
+      { topic: '운동을 쉬어도 패턴이 안 흐트러지게', angle: '유지형 마이크로 루틴' },
+      { topic: '한 달 후를 위한 이번 주 한 가지 약속', angle: '습관 고정 CTA' }
+    ]
+  },
+  '2': {
+    '1': [
+      { topic: '셀카에서 한쪽 얼굴만 작아 보이는 진짜 이유', angle: '비대칭 관찰 기준 잡기' },
+      { topic: '거울로 내 얼굴 패턴 확인하는 3가지 포인트', angle: '관찰 체크리스트' },
+      { topic: '사진 각도 탓일까, 구조 차이일까?', angle: '과도한 해석 줄이기' },
+      { topic: '아침/저녁 얼굴이 다르게 느껴지는 이유', angle: '부종·긴장·습관 관찰' },
+      { topic: '"작아 보이게"보다 먼저 볼 균형 지표', angle: '현실적 목표 설정' }
+    ],
+    '2': [
+      { topic: '얼굴 살이 안 빠지는 이유, 다이어트가 아닐 때', angle: '순환·골격·긴장 분리' },
+      { topic: '광대가 도드라져 보일 때, 턱이 원인인 경우', angle: '저작근·골격 관계' },
+      { topic: '이중턱이 생기는 구조적 이유 3가지', angle: '피부·지방·골격 분리 설명' },
+      { topic: '목 긴장이 얼굴을 바꾸게 만드는 경로', angle: '경추-안면 연결' },
+      { topic: '한쪽으로만 씹는 습관이 남기는 흔적', angle: '생활 습관 원인 분해' }
+    ],
+    '3': [
+      { topic: '얼굴 교정, 몇 번부터 변화가 느껴질까요?', angle: '기대치·기간 조율' },
+      { topic: '집에서 할 수 있는 얼굴-목 호흡 루틴', angle: '부담 없는 실천 루틴' },
+      { topic: '림프 마사지만으로는 부족한 순간', angle: '표면 vs 구조 접근' },
+      { topic: '자는 자세·베개가 얼굴 비대칭에 미치는 영향', angle: '생활 교정 포인트' },
+      { topic: '기기와 도수, 어떤 순서로 접근하나요?', angle: '통합 접근 입문' }
+    ],
+    '4': [
+      { topic: '좋아진 윤곽을 유지하는 습관 관리표', angle: '재발 습관 점검' },
+      { topic: '스트레스·수면이 얼굴을 다시 붓게 할 때', angle: '유지 전략과 컨디션' },
+      { topic: '주 1회 셀프체크 포인트', angle: '관찰 루틴 고정' },
+      { topic: '교정 후 "다시 예전처럼"이 되는 신호', angle: '조기 대응 기준' },
+      { topic: '작은 변화도 오래가는 관리 원칙', angle: '과장 없는 유지 메시지' }
+    ]
+  },
+  '3': {
+    '1': [
+      { topic: '촉진이 치료보다 먼저인 이유', angle: '평가 우선 철학' },
+      { topic: 'History에서 놓치면 치료가 흔들리는 질문', angle: '문진 프레임 정렬' },
+      { topic: 'Inspection·Movement·Palpation 순서를 지키는 법', angle: '4평가 기준 통일' },
+      { topic: '"좋아졌다"는 주관 보고를 어떻게 검증할까', angle: '객관 지표 연결' },
+      { topic: '교과서 순서와 임상 순서가 어긋날 때', angle: '임상 사고 훈련' }
+    ],
+    '2': [
+      { topic: '핵심 구조 촉진, 초보가 먼저 익힐 랜드마크', angle: '촉진 기준점 훈련' },
+      { topic: '같은 부위를 만져도 정보가 다른 이유', angle: '촉진 질 향상 포인트' },
+      { topic: '통증 유발점과 관절 이상을 빠르게 가르는 법', angle: '감별 촉진' },
+      { topic: '촉진 소견을 한 문장으로 기록하는 템플릿', angle: '임상 언어화' },
+      { topic: '손끝 감각을 올리는 매일 5분 드릴', angle: '반복 훈련 루틴' }
+    ],
+    '3': [
+      { topic: '잘 치료하는 것과 제대로 치료하는 것의 차이', angle: '선택 논리 정립' },
+      { topic: 'HVLA와 LVLA, 언제 무엇을 고르나?', angle: '기법 선택 기준' },
+      { topic: '관절가동술을 쓰는 타이밍 판단법', angle: '적응증·금기 사고' },
+      { topic: '촉진·가동 검사 결과를 치료 선택 문장으로 바꾸는 법', angle: '평가 결과의 임상 언어화' },
+      { topic: '치료 전후 비교를 설득력 있게 남기는 법', angle: '근거 기록' }
+    ],
+    '4': [
+      { topic: '복합 케이스에서 평가-치료-운동 연결하기', angle: '케이스 재현' },
+      { topic: '재발 환자에서 다시 볼 평가 포인트', angle: '피드백 루프' },
+      { topic: '실습생에게 케이스 사고과정을 시연·피드백하는 법', angle: '교육·슈퍼비전 운영' },
+      { topic: '"효과 없는 세션"을 다음 계획으로 바꾸는 법', angle: '재계획 기준' },
+      { topic: '한 달 후 내 임상 습관을 바꿀 체크리스트', angle: '적용 고정' }
+    ]
+  },
+  '4': {
+    '1': [
+      { topic: 'IFC 얼굴교정, 단순 마사지와 다른 점', angle: '구조 접근 vs 표면 접근' },
+      { topic: '얼굴 교정에서 경추를 반드시 평가하는 이유', angle: '경추-두개 연결' },
+      { topic: '턱관절·교합을 빼먹으면 생기는 공백', angle: '평가 순서 표준화' },
+      { topic: '상담 시 고객이 원하는 것과 필요한 것', angle: '기대치 조율 입문' },
+      { topic: '평가 기록 템플릿으로 케이스를 표준화하기', angle: '공통 평가 루틴' }
+    ],
+    '2': [
+      { topic: '먼저 풀어야 할 경축, 우선순위 정하는 법', angle: '핵심 긴장 선별' },
+      { topic: '안면 비대칭에서 놓치기 쉬운 평가 포인트', angle: '복합 평가 체크' },
+      { topic: '과한 자극이 결과를 떨어뜨리는 순간', angle: '강도·순서 주의' },
+      { topic: '경축 완화 전후에 확인할 기능 지표', angle: '체감·기능 지표' },
+      { topic: '"이쪽만 풀어주세요" 요청을 구조로 번역하기', angle: '상담→평가 연결' }
+    ],
+    '3': [
+      { topic: 'INDIBA와 IFC를 같이 쓸 때 프로토콜', angle: '기기+도수 시너지' },
+      { topic: '세션 안에서 순서 바꾸면 결과가 달라지는 이유', angle: '프로토콜 논리' },
+      { topic: '초기·중기·유지기 프로토콜을 나누는 기준', angle: '단계별 적용' },
+      { topic: '안전 경고를 명확히 전달하는 상담 문장', angle: '기대치·안전 조율' },
+      { topic: '시술 직후 설명해야 할 자기관리 3가지', angle: '홈케어 연결' }
+    ],
+    '4': [
+      { topic: '케이스 전후를 사진 말고 기능으로 기록하기', angle: '피드백 지표' },
+      { topic: '결과가 기대에 못 미쳤을 때 재계획 기준', angle: '재평가 루프' },
+      { topic: '고객 피드백을 다음 세션에 반영하는 법', angle: '상담 피드백' },
+      { topic: '교육 후 임상에서 바로 쓸 체크리스트', angle: '현장 적용' },
+      { topic: '한 달간 프로토콜 완성도를 올리는 리뷰법', angle: '성장 루프' }
+    ]
+  },
+  '5': {
+    '1': [
+      { topic: '패시브 스트레칭을 언제 어떻게 써야 하나', angle: '상태 분류·타이밍' },
+      { topic: '환자 기능 수준을 PAR로 빠르게 나누는 법', angle: '분류 프레임' },
+      { topic: '통증 없는 환자가 더 위험한 처방 실수', angle: '과부하 방지' },
+      { topic: '진행·중단 기준을 세션 전에 정하는 이유', angle: '안전 progression' },
+      { topic: '치료실에서 운동실로 넘기기 전 체크리스트', angle: '전환 평가' }
+    ],
+    '2': [
+      { topic: '기능운동, 치료의 끝이 아닌 연결이다', angle: '치료→운동 철학' },
+      { topic: '호흡·정렬이 무너진 채 근력운동을 하면', angle: '기초 패턴 재학습' },
+      { topic: '자세 교정에 "좋은 자세"가 없는 이유', angle: '동적 안정성' },
+      { topic: '고관절 가동성 vs 안정성, 무엇이 먼저인가', angle: '우선순위 처방' },
+      { topic: '초보 환자에게 첫 과제로 줄 동작 고르기', angle: '기초 과제 설계' }
+    ],
+    '3': [
+      { topic: '일상·직무 동작으로 난이도를 올리는 법', angle: '기능 과제 확장' },
+      { topic: '집에서 지속 가능한 홈프로그램 설계', angle: '순응도 높은 처방' },
+      { topic: '통증이 줄었을 때 강도를 올리는 타이밍', angle: 'progression 기준' },
+      { topic: 'PAR 단계별 코칭 큐로 수행률 높이는 법', angle: '동기·설명 전략' },
+      { topic: '재발 위험 동작을 일상에 안전하게 재도입하기', angle: '회귀·적용' }
+    ],
+    '4': [
+      { topic: '환자에게 "왜 이 운동인지" 한 문장으로 말하기', angle: '코칭 언어' },
+      { topic: '피드백을 교정으로 바꾸지 않고 유도하는 법', angle: '큐잉 기술' },
+      { topic: '못 하는 날을 위한 regression 스크립트', angle: '유연한 지도' },
+      { topic: '동료 지도자가 같은 처방을 재현하게 만들기', angle: '교육 전달력' },
+      { topic: '4주 코칭 루틴으로 수행률 올리는 방법', angle: '습관·피드백 고정' }
+    ]
+  },
+  '6': {
+    '1': [
+      { topic: '비 오는 날, 몸이 더 무겁게 느껴질 때', angle: '계절 공감 오프닝' },
+      { topic: '에어컨 켜기 전, 목·어깨가 먼저 뻐근한 날', angle: '초여름 일상 공감' },
+      { topic: '꽃가루 시즌, 피곤한데 밖은 좋을 때', angle: '봄 컨디션 공감' },
+      { topic: '요즘 뉴스 보면 몸도 마음도 긴장되는 날', angle: '가벼운 정서 공감' },
+      { topic: '커피 한 잔 마시며 쉬는 10분', angle: '여유·온기 오프닝' }
+    ],
+    '2': [
+      { topic: '여행 다녀온 다음 날 몸이 뻐근할 때', angle: '컨디션 관찰 나눔' },
+      { topic: '봄 산책 늘리고 나서 종아리가 뻐근한 날', angle: '움직임 후 몸 느낌' },
+      { topic: '오래 앉아 일한 날의 저녁 몸 일기', angle: '생활 컨디션 기록' },
+      { topic: '잘 잔 다음 날과 못 잔 날의 몸 차이', angle: '수면·컨디션 관찰' },
+      { topic: '피곤한데 괜히 더 움직이는 날', angle: '과활동 자기관찰' }
+    ],
+    '3': [
+      { topic: '창가에서 30초, 어깨 힘 빼고 바람 쐬기', angle: '초짧은 생활 실천' },
+      { topic: '물 한 잔 마신 뒤 오늘 컨디션 한 줄 기록', angle: '부담 없는 루틴' },
+      { topic: '엘리베이터 기다리며 발바닥 감각 느끼기', angle: '생활형 마이크로 루틴' },
+      { topic: '잠들기 전, 목·어깨에 고생했다고 말해주기', angle: '저녁 작은 실천' },
+      { topic: '오늘 할 일 하나: 척추 길게 펴고 숨 쉬기', angle: '한 가지 메시지' }
+    ],
+    '4': [
+      { topic: '내일도 무리하지 말자는 짧은 다짐', angle: '관계 유지 CTA' },
+      { topic: '같은 계절을 지나는 분들께', angle: '공감 마무리' },
+      { topic: '오늘 기록 남기고 가는 한 줄', angle: '반복 접점' },
+      { topic: '잠깐 쉬어도 괜찮다는 말', angle: '온기 메시지' },
+      { topic: '다음엔 산책 이야기로 만나요', angle: '다음 일상 예고' }
+    ]
+  },
+  '7': {
+    '1': [
+      { topic: '앉아만 있어도 목이 뻐근할 때 먼저 볼 한 가지', angle: '입주민 불편 공감' },
+      { topic: '엘리베이터 앞에서 어깨가 올라가는 순간', angle: '동선형 불편 장면' },
+      { topic: '장보기 다녀온 뒤 허리가 무거운 날', angle: '생활 맥락 공감' },
+      { topic: '아이 등원 후 목이 먼저 굳어지는 아침', angle: '바쁜 일상 공감' },
+      { topic: '"운동할 시간이 없다"가 진짜 고민일 때', angle: '진입 장벽 공감' }
+    ],
+    '2': [
+      { topic: 'P-스트레칭이 뭔가요?', angle: '쉬운 이완 개념' },
+      { topic: '엘리베이터 앞에서 할 수 있는 30초 골반 정리', angle: '초단시간 루틴' },
+      { topic: '소파에 앉기 전 1분 목·어깨 이완', angle: '집 동선 루틴' },
+      { topic: '고양이 기지개처럼 가볍게 푸는 법', angle: '강도 낮은 이완' },
+      { topic: '아픈데 억지로 늘리지 말라는 말의 의미', angle: '안전 이완 기준' }
+    ],
+    '3': [
+      { topic: '자세 교정, 하루아침에 바뀌지 않는 이유', angle: '감각부터 바꾸는 접근' },
+      { topic: '얼굴이 붓는 날, 물만 마시면 된다는 말의 빈틈', angle: '가벼운 구조·순환 연결' },
+      { topic: '단지 커뮤니티 다녀온 날 목·어깨 가볍게 푸는 법', angle: '계절+자세 연결' },
+      { topic: '단지 산책 늘린 뒤 종아리 뻐근할 때', angle: '기능 동작 확장' },
+      { topic: '서서 일하는 시간, 골반만 리셋하기', angle: '자세·기능 짧은 연결' }
+    ],
+    '4': [
+      { topic: '출퇴근길에 붙이는 주 3회 루틴', angle: '생활 습관 고정' },
+      { topic: '문손잡이 볼 때마다 어깨 내리기', angle: '동선 리마인더' },
+      { topic: '같이 사는 사람과 웃으며 해보는 30초 루틴', angle: '커뮤니티형 유지' },
+      { topic: '아파지면 멈추고, 병원 먼저인 경우', angle: '안전 경고+권유' },
+      { topic: '아파트 생활에서 꾸준함이 생기는 조건', angle: '장기 실행 팁' }
+    ]
+  }
+};
+function getInitialStepTopics_(catId, stepId){
+  var byCat = PROGRAM_INITIAL_STEP_TOPICS[String(catId)];
+  if(!byCat) return [];
+  var list = byCat[String(stepId)] || [];
+  return list.slice(0, 5).map(function(t){
+    return {
+      topic: String((t && t.topic) || '').trim(),
+      angle: String((t && t.angle) || '').trim()
+    };
+  }).filter(function(t){ return !!t.topic; });
+}
+function getInitialProgramPlanDraft_(catId){
+  var seed = PROGRAM_INITIAL_PLAN_DRAFTS[String(catId)];
+  if(!seed) return null;
+  return {
+    brandProfile: String(seed.brandProfile || '').trim(),
+    strategyGuide: normalizeProgramStrategyGuideTemplate_(String(seed.strategyGuide || '').trim()),
+    steps: (seed.steps || []).map(function(step, idx){
+      var id = String(step.id != null ? step.id : (idx + 1));
+      return {
+        id: id,
+        title: String(step.title || '').trim(),
+        summary: String(step.summary || '').trim(),
+        rationale: String(step.rationale || '').trim(),
+        pinned: false,
+        topics: getInitialStepTopics_(catId, id)
+      };
+    })
+  };
+}
+function applyInitialProgramTopicsToCat_(catId){
+  var seed = getInitialProgramPlanDraft_(catId);
+  var cat = CATEGORIES[catId];
+  var plan = getSubGoalPlan_(catId);
+  if(!seed || !cat || !plan || !plan.steps || !plan.steps.length) return 0;
+  var applied = 0;
+  seed.steps.forEach(function(step){
+    var sid = String(step.id);
+    var liveStep = (plan.steps || []).find(function(s){ return String(s.id) === sid; });
+    if(!liveStep) return;
+    var topics = step.topics || getInitialStepTopics_(catId, sid);
+    for(var slot = 1; slot <= 5; slot++){
+      var t = topics[slot - 1];
+      if(!t || !t.topic) continue;
+      var existing = getDraftForStepSlot_(catId, sid, slot, { live: true });
+      if(existing) continue;
+      if(applyTopicToStepSlot_(catId, sid, slot, t)) applied++;
+    }
+  });
+  return applied;
+}
 const DAILY_SHARE_MASTER_BRIDGE = '일상 공유는 PSP·통증 설교가 아니라, 미카닥 박준규라는 사람의 신뢰·공감·20년 임상의 온기를 보여 주는 레이어. 1년 마스터 브랜드(왜·신뢰)와 직접 연결하지 않고 「이 사람은 진짜」로 기억되게 한다.';
 /** 개인 색깔·약력·포지셔닝 — 대화·프로필·블로그(미카닥 박준규 DC PT 공지) 기준. AI·기획 시 톤·역할 참고용 */
 const PERSONAL_BRAND_PROFILE = `
@@ -1178,20 +1556,47 @@ function buildMainGoalContextBlock_(){
   if(!meta.intent && !meta.currentRationale) lines.push('(의도 미작성 — 1년 기획에서 기획 의도·분기 의도를 자세히 적어 주세요)');
   return lines.join('\n');
 }
+function normalizeProgramStrategyGuideTemplate_(raw){
+  var t = String(raw || '').trim();
+  if(!t) return '기준:\n- \n\n의도:\n- ';
+  var hasCriteria = /(^|\n)\s*기준\s*:/m.test(t);
+  var hasIntent = /(^|\n)\s*의도\s*:/m.test(t);
+  if(hasCriteria && hasIntent) return t;
+  if(hasCriteria && !hasIntent) return t + '\n\n의도:\n- ';
+  if(!hasCriteria && hasIntent) return '기준:\n- \n\n' + t;
+  var blocks = t.split(/\n\s*\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+  if(blocks.length >= 2){
+    return '기준:\n' + blocks[0] + '\n\n의도:\n' + blocks.slice(1).join('\n\n');
+  }
+  return '기준:\n' + t + '\n\n의도:\n- ';
+}
 function getProgramPlanMeta_(catId){
+  function strategyText(plan){
+    if(!plan) return '';
+    var sg = String(plan.strategyGuide || '').trim();
+    if(sg) return normalizeProgramStrategyGuideTemplate_(sg);
+    var c = String(plan.criteria || '').trim();
+    var i = String(plan.intent || '').trim();
+    if(c && i) return normalizeProgramStrategyGuideTemplate_(c + '\n\n' + i);
+    return normalizeProgramStrategyGuideTemplate_(c || i);
+  }
   var pending = state.pendingSubGoalPlan;
   if(pending && pending.catId === catId && pending.plan){
     return {
       intent: String(pending.plan.intent || '').trim(),
+      brandProfile: String(pending.plan.brandProfile || '').trim(),
+      strategyGuide: strategyText(pending.plan),
       steps: (pending.plan.steps || []).map(function(s){
         return { id: s.id, title: s.title, summary: s.summary || '', rationale: s.rationale || '', pinned: !!s.pinned };
       })
     };
   }
   var plan = getSubGoalPlan_(catId);
-  if(!plan) return { intent: '', steps: [] };
+  if(!plan) return { intent: '', brandProfile: '', strategyGuide: '', steps: [] };
   return {
     intent: String(plan.intent || '').trim(),
+    brandProfile: String(plan.brandProfile || '').trim(),
+    strategyGuide: strategyText(plan),
     steps: (plan.steps || []).map(function(s){
       return { id: s.id, title: s.title, summary: s.summary || '', rationale: s.rationale || '', pinned: !!s.pinned };
     })
@@ -1203,8 +1608,9 @@ function buildProgramPlanContextBlock_(catId, stepId){
   var outcome = getCategoryThreeMonthOutcome_(catId);
   var lines = ['[프로그램 기획 · ' + (cat ? cat.name + ' (' + cat.audience + ')' : '') + ']'];
   if(outcome) lines.push('3개월 후 독자: ' + outcome);
-  if(meta.intent) lines.push('프로그램 기획 의도(하위 목표 순서·이유): ' + meta.intent);
-  else lines.push('(프로그램 기획 의도 미작성 — 기획 워크숍에서 자세히 적어 주세요)');
+  if(meta.brandProfile) lines.push('프로그램 브랜딩 요소: ' + meta.brandProfile);
+  if(meta.strategyGuide) lines.push('하위 목표 생성 기준·기획 의도: ' + meta.strategyGuide);
+  else lines.push('(생성 기준·기획 의도 미작성 — 기획 워크숍에서 자세히 적어 주세요)');
   if(meta.steps.length){
     lines.push('', '하위 목표 단계:');
     meta.steps.forEach(function(s, i){
@@ -2501,7 +2907,9 @@ function isPendingSubGoalPlanSameAsApplied_(catId){
   if(!p || p.catId !== catId || !p.plan) return false;
   if((p.deleteIds || []).length) return false;
   var applied = getSubGoalPlan_(catId);
-  if(String(p.plan.intent || '').trim() !== String(applied.intent || '').trim()) return false;
+  if(String(p.plan.brandProfile || '').trim() !== String(applied.brandProfile || '').trim()) return false;
+  if(String((p.plan.strategyGuide || p.plan.criteria || p.plan.intent) || '').trim() !==
+     String((applied.strategyGuide || applied.criteria || applied.intent) || '').trim()) return false;
   if(!subGoalStepsMatchForCompare_(p.plan.steps, applied.steps)) return false;
   return JSON.stringify(sortPlanAssignments_(p.assignments)) === JSON.stringify(buildSubGoalAssignmentsFromDrafts_(catId));
 }
@@ -3008,15 +3416,26 @@ function renderProgramWorkshopBodyHTML_(){
       '<p class="ws-intro-ref">주제 5개는 각 하위 목표마다 따로 기획합니다.</p>' +
     '</div>';
   }
-  var intent = (p.plan && p.plan.intent) ? String(p.plan.intent).trim() : '';
+  var brandProfile = (p.plan && p.plan.brandProfile) ? String(p.plan.brandProfile).trim() : '';
+  var strategyGuide = normalizeProgramStrategyGuideTemplate_(
+    p.plan && (p.plan.strategyGuide || p.plan.criteria || p.plan.intent)
+      ? String(p.plan.strategyGuide || p.plan.criteria || p.plan.intent).trim()
+      : ''
+  );
   var programOutcome = getCategoryThreeMonthOutcome_(state.currentCat);
   var html = '<p class="ws-intro">분기별 <strong>마스터 목표</strong> → 이 프로그램 <strong>3개월 여정</strong>. 하위 목표·의도만 정하고, 주제는 단계별로 따로 기획해요.</p>' +
     (programOutcome ? '<p class="ws-intro-ref ws-program-outcome">3개월 후 독자: ' + escapeHtml(programOutcome) + '</p>' : '') +
     '<p class="ws-intro-ref">PSP·PAR·프로그램 구조: <a href="' + PROFILE_BRAND_URL + '" target="_blank" rel="noopener">미카닥 박준규 프로필 PSP 가이드</a></p>' +
     renderIntentRefBlockHTML_('분기별 목표·의도 (하위 목표 기획 시 참고)', buildMainGoalContextBlock_()) +
     '<div class="ws-intent-block">' +
-      '<label class="ws-intent-label">프로그램 기획 의도 · 하위 목표 순서를 이렇게 잡은 이유 (3~5문장)</label>' +
-      '<textarea class="ws-intent-input ws-grow-textarea" rows="4" placeholder="분기별 마스터 목표·의도에 맞춰, 이 프로그램 3개월에 독자가 어떻게 변하는지·왜 이 순서인지" oninput="updatePendingPlanIntent_(this.value);autoGrowTextarea_(this)">' + escapeHtml(intent) + '</textarea>' +
+      '<label class="ws-intent-label">프로그램 브랜딩 요소 · 특징/강점/주의점/목표 독자 (3~5문장)</label>' +
+      '<div class="ws-intent-tools"><button type="button" class="ws-item-btn" onclick="regenerateProgramBrandProfile_()">이 부분만 재생성</button></div>' +
+      '<textarea class="ws-intent-input ws-grow-textarea" rows="4" placeholder="이 프로그램의 강점·한계, 주 독자와 약속할 결과, 피해야 할 표현/접근" oninput="updatePendingPlanBrandProfile_(this.value);autoGrowTextarea_(this)">' + escapeHtml(brandProfile) + '</textarea>' +
+    '</div>' +
+    '<div class="ws-intent-block ws-criteria-block">' +
+      '<label class="ws-intent-label">하위 목표 생성 기준 + 기획 의도 (통합)</label>' +
+      '<div class="ws-intent-tools"><button type="button" class="ws-item-btn" onclick="regenerateProgramStrategyGuide_()">이 부분만 재생성</button></div>' +
+      '<textarea class="ws-intent-input ws-grow-textarea" rows="5" placeholder="예) 인식→이해→실천→유지(생성 기준), 단계별 역할, 제외 주제, CTA 톤, 왜 이 순서인지(기획 의도)" oninput="updatePendingPlanStrategyGuide_(this.value);autoGrowTextarea_(this)">' + escapeHtml(strategyGuide) + '</textarea>' +
     '</div>' +
     '<div class="ws-items ws-items-full">';
   (p.plan.steps || []).forEach(function(step, idx){
@@ -3041,10 +3460,12 @@ function renderProgramRegenBtnHTML_(){
   ensurePendingSubGoalPlanFromCurrent_(state.currentCat);
   var p = state.pendingSubGoalPlan;
   var stats = p && p.plan && p.plan.steps ? getProgramStepPinnedStats_(p.plan.steps) : { pinned: 0, unpinned: 1, total: 1 };
+  var hasSteps = !!(p && p.plan && p.plan.steps && p.plan.steps.length);
+  var hasFoundation = !!(p && p.plan && String((p.plan.brandProfile || '') + (p.plan.strategyGuide || p.plan.criteria || p.plan.intent || '')).trim());
   var allPinned = p && p.plan && p.plan.steps && p.plan.steps.length && stats.pinned >= stats.total;
   return '<button type="button" class="modal-btn ws-btn-ai' + (allPinned ? ' is-disabled' : '') + '" id="btn-program-regen"' +
     (allPinned ? ' disabled title="재생성할 단계의 고정을 해제해 주세요"' : '') +
-    ' onclick="regenerateProgramWorkshop_()">재생성</button>';
+    ' onclick="regenerateProgramWorkshop_()">' + (hasSteps ? '단계 재생성' : (hasFoundation ? '단계 생성' : '기준 먼저 제안')) + '</button>';
 }
 function renderProgramFillTopicsBtnHTML_(catId){
   var n = countStepsNeedingTopics_(catId);
@@ -3077,7 +3498,9 @@ function isPendingSubGoalPlanStructureSameAsApplied_(catId){
   if(!p || p.catId !== catId || !p.plan || !hasSubGoalPlan_(catId)) return false;
   if((p.deleteIds || []).length) return false;
   var applied = getSubGoalPlan_(catId);
-  if(String(p.plan.intent || '').trim() !== String(applied.intent || '').trim()) return false;
+  if(String(p.plan.brandProfile || '').trim() !== String(applied.brandProfile || '').trim()) return false;
+  if(String((p.plan.strategyGuide || p.plan.criteria || p.plan.intent) || '').trim() !==
+     String((applied.strategyGuide || applied.criteria || applied.intent) || '').trim()) return false;
   return subGoalStepsMatchForCompare_(p.plan.steps, applied.steps);
 }
 function ensurePendingSubGoalPlanFromCurrent_(catId){
@@ -3113,6 +3536,9 @@ function ensurePendingSubGoalPlanFromCurrent_(catId){
         return { id: String(s.id), title: s.title || '', summary: s.summary || '', rationale: s.rationale || '', pinned: !!s.pinned };
       }),
       miscLabel: plan.miscLabel || SUBGOAL_MISC_LABEL,
+      brandProfile: plan.brandProfile ? String(plan.brandProfile).trim() : '',
+      strategyGuide: plan.strategyGuide ? String(plan.strategyGuide).trim() : String(plan.criteria || plan.intent || '').trim(),
+      criteria: plan.criteria ? String(plan.criteria).trim() : '',
       intent: plan.intent ? String(plan.intent).trim() : ''
     },
     assignments: assignments,
@@ -3201,6 +3627,21 @@ window.updatePendingPlanIntent_ = function(value){
   var p = state.pendingSubGoalPlan;
   if(!p || !p.plan) return;
   p.plan.intent = String(value || '');
+  persistPendingSubGoalPlan_();
+};
+window.updatePendingPlanBrandProfile_ = function(value){
+  var p = state.pendingSubGoalPlan;
+  if(!p || !p.plan) return;
+  p.plan.brandProfile = String(value || '');
+  persistPendingSubGoalPlan_();
+};
+window.updatePendingPlanStrategyGuide_ = function(value){
+  var p = state.pendingSubGoalPlan;
+  if(!p || !p.plan) return;
+  p.plan.strategyGuide = normalizeProgramStrategyGuideTemplate_(String(value || ''));
+  /* 기존 데이터 호환: 통합 텍스트를 intent/criteria에도 반영 */
+  p.plan.criteria = p.plan.strategyGuide;
+  p.plan.intent = p.plan.strategyGuide;
   persistPendingSubGoalPlan_();
 };
 window.updatePendingYearIntent_ = function(value){
@@ -3483,7 +3924,10 @@ function applySubGoalRoadmapPlan_(payload){
       };
     }),
     miscLabel: payload.plan.miscLabel || SUBGOAL_MISC_LABEL,
-    intent: payload.plan.intent ? String(payload.plan.intent).trim() : '',
+    brandProfile: payload.plan.brandProfile ? String(payload.plan.brandProfile).trim() : '',
+    strategyGuide: payload.plan.strategyGuide ? String(payload.plan.strategyGuide).trim() : '',
+    criteria: payload.plan.strategyGuide ? String(payload.plan.strategyGuide).trim() : (payload.plan.criteria ? String(payload.plan.criteria).trim() : ''),
+    intent: payload.plan.strategyGuide ? String(payload.plan.strategyGuide).trim() : (payload.plan.intent ? String(payload.plan.intent).trim() : ''),
     updatedAt: new Date().toISOString()
   };
   var plan = state.branding.subGoalPlans[String(catId)];
@@ -3528,20 +3972,22 @@ function applySubGoalRoadmapPlan_(payload){
   (plan.steps || []).forEach(function(step){
     normalizeStepDraftSlots_(catId, String(step.id));
   });
+  var seededTopics = applyInitialProgramTopicsToCat_(catId);
+  if(seededTopics) added += seededTopics;
   reconcileSubGoalDraftSteps_(catId);
   resetSubGoalCollapseDefaults_(catId);
   return { moved: moved, added: added, deleted: deleted };
 }
 function afterSubGoalPlanCommitted_(catId){
-  var activeId = getActiveSubGoalStepId_(catId);
   setTimeout(function(){
     var plan = getSubGoalPlan_(catId);
     var firstNeed = plan && plan.steps.find(function(s){
       return stepNeedsMoreTopics_(catId, String(s.id));
     });
-    var targetId = firstNeed ? String(firstNeed.id) : activeId;
+    if(!firstNeed) return;
+    var targetId = String(firstNeed.id);
     if(targetId && state.apiKey){
-      if(confirm('하위 목표별 주제 5개를 기획할까요?')){
+      if(confirm('아직 비어 있는 단계의 주제 5개를 기획할까요?')){
         openPlanWorkshop_('topic', targetId);
       }
     }
@@ -3559,7 +4005,8 @@ function commitPendingSubGoalPlan_(){
   renderTabs();
   renderMain();
   if(typeof setAppToast === 'function'){
-    setAppToast('하위 목표를 적용했어요.\n배치 ' + result.moved + ' · 삭제 ' + result.deleted, { duration: 5000, variant: 'ok' });
+    var msg = '하위 목표를 적용했어요.\n배치 ' + result.moved + ' · 추가 ' + result.added + ' · 삭제 ' + result.deleted;
+    setAppToast(msg, { duration: 5000, variant: 'ok' });
   }
   afterSubGoalPlanCommitted_(catId);
   return true;
@@ -3577,9 +4024,115 @@ window.applyPendingSubGoalPlan_ = function(){
   var assignCount = (p.assignments || []).length;
   if(assignCount) msg += ' · 기존 주제 배치 ' + assignCount + '건';
   if(delCount) msg += ' · 삭제 ' + delCount + '건(발행 완료는 유지)';
-  msg += '\n\n주제 5개는 각 하위 목표에서 따로 기획합니다.';
+  msg += '\n\n각 단계 주제 5개 초안이 비어 있으면 기본 세트로 함께 채워집니다.';
   if(!confirm(msg)) return;
   commitPendingSubGoalPlan_();
+};
+function ensurePendingProgramPlanShell_(catId){
+  ensurePendingSubGoalPlanFromCurrent_(catId);
+  if(state.pendingSubGoalPlan && state.pendingSubGoalPlan.catId === catId) return state.pendingSubGoalPlan;
+  var seed = getInitialProgramPlanDraft_(catId);
+  var seededStrategy = seed ? seed.strategyGuide : '';
+  state.pendingSubGoalPlan = {
+    catId: catId,
+    plan: {
+      steps: seed ? seed.steps : [],
+      miscLabel: SUBGOAL_MISC_LABEL,
+      brandProfile: seed ? seed.brandProfile : '',
+      strategyGuide: seededStrategy,
+      criteria: seededStrategy,
+      intent: seededStrategy
+    },
+    assignments: [],
+    deleteIds: []
+  };
+  persistPendingSubGoalPlan_();
+  return state.pendingSubGoalPlan;
+}
+async function suggestProgramFoundationWithAI_(catId, mode){
+  mode = mode || 'both'; // both | brandProfile | strategyGuide
+  var cat = CATEGORIES[catId];
+  if(!cat) throw new Error('카테고리를 찾을 수 없어요.');
+  var p = ensurePendingProgramPlanShell_(catId);
+  var programOutcome = getCategoryThreeMonthOutcome_(catId);
+  var brandProfile = String((p.plan && p.plan.brandProfile) || '').trim();
+  var strategyGuide = String((p.plan && (p.plan.strategyGuide || p.plan.criteria || p.plan.intent)) || '').trim();
+  var sectionGuide = mode === 'brandProfile'
+    ? '- brandProfile만 작성하세요. strategyGuide는 출력하지 마세요.'
+    : mode === 'strategyGuide'
+      ? '- strategyGuide만 작성하세요. brandProfile은 출력하지 마세요.'
+      : '- brandProfile, strategyGuide 둘 다 작성하세요.';
+  var jsonGuide = mode === 'brandProfile'
+    ? '{"brandProfile":"..."}'
+    : mode === 'strategyGuide'
+      ? '{"strategyGuide":"..."}'
+      : '{"brandProfile":"...","strategyGuide":"..."}';
+  var prompt =
+buildContentStrategyPromptPrefix_({ program: getCategoryProgramLine_(catId) + ' · ' + cat.name + ' (' + cat.audience + ')' }) + '\n\n' +
+renderIntentRefBlockHTML_('분기별 목표·의도', buildMainGoalContextBlock_()).replace(/<[^>]+>/g, '').trim() + '\n\n' +
+(programOutcome ? '[프로그램 3개월 목표] ' + programOutcome + '\n\n' : '') +
+'[현재 주제]\n' + buildDraftInventoryForSubGoalAI_(catId) + '\n\n' +
+'[현재 프로그램 브랜딩 요소]\n' + (brandProfile || '(미작성)') + '\n\n' +
+'[현재 생성 기준+기획 의도]\n' + (strategyGuide || '(미작성)') + '\n\n' +
+'[요청] 프로그램 단계 생성 전에 먼저 기획 기준을 제안하세요.\n' +
+'1) 프로그램 브랜딩 요소(특징·강점·주의점·목표 독자)\n' +
+'2) 하위 목표 생성 기준 + 기획 의도(통합)\n' +
+sectionGuide + '\n' +
+'문장 길이: 각 항목 3~5문장. 구체적이고 실행 가능한 문장으로 작성하세요.\n' +
+'JSON만 출력: ' + jsonGuide;
+  var text = await callClaudePlanner_(prompt, { maxTokens: 2200 });
+  var raw = text.replace(/^```json\s*/i, '').replace(/```\s*$/g, '').trim();
+  var start = raw.indexOf('{');
+  var end = raw.lastIndexOf('}');
+  if(start < 0 || end <= start) throw new Error('JSON을 찾지 못했어요');
+  var obj = JSON.parse(raw.slice(start, end + 1));
+  if(mode !== 'strategyGuide' && obj.brandProfile != null){
+    p.plan.brandProfile = String(obj.brandProfile || '').trim();
+  }
+  if(mode !== 'brandProfile' && obj.strategyGuide != null){
+    p.plan.strategyGuide = normalizeProgramStrategyGuideTemplate_(String(obj.strategyGuide || '').trim());
+    /* 기존 데이터 호환 */
+    p.plan.criteria = p.plan.strategyGuide;
+    p.plan.intent = p.plan.strategyGuide;
+  }
+  persistPendingSubGoalPlan_();
+  return p;
+}
+window.regenerateProgramBrandProfile_ = async function(){
+  if(!state.apiKey){ openApiModal(); return; }
+  if(plannerAiBusy) return;
+  var catId = state.currentCat;
+  plannerAiBusy = true;
+  startPlanGenTimer_('program', catId);
+  try {
+    await suggestProgramFoundationWithAI_(catId, 'brandProfile');
+    refreshPlanWorkshopModal_();
+    renderMain();
+    if(typeof setAppToast === 'function') setAppToast('프로그램 브랜딩 요소를 다시 제안했어요.', { duration: 3600, variant: 'ok' });
+  } catch(e){
+    if(typeof setAppToast === 'function') setAppToast('브랜딩 요소 재생성 실패\n' + ((e && e.message) || e), { duration: 6500, variant: 'err' });
+  } finally {
+    plannerAiBusy = false;
+    stopPlanGenTimer_('program');
+  }
+};
+window.regenerateProgramStrategyGuide_ = async function(){
+  if(!state.apiKey){ openApiModal(); return; }
+  if(plannerAiBusy) return;
+  var catId = state.currentCat;
+  plannerAiBusy = true;
+  startPlanGenTimer_('program', catId);
+  try {
+    await suggestProgramFoundationWithAI_(catId, 'strategyGuide');
+    refreshPlanWorkshopModal_();
+    renderMain();
+    if(typeof setAppToast === 'function') setAppToast('생성 기준+기획 의도를 다시 제안했어요.', { duration: 3600, variant: 'ok' });
+  } catch(e){
+    if(typeof setAppToast === 'function') setAppToast('생성 기준+기획 의도 재생성 실패\n' + ((e && e.message) || e), { duration: 6500, variant: 'err' });
+  } finally {
+    plannerAiBusy = false;
+    stopPlanGenTimer_('program');
+  }
 };
 window.regenerateProgramWorkshop_ = async function(){
   if(!state.apiKey){ openApiModal(); return; }
@@ -3594,6 +4147,26 @@ window.regenerateProgramWorkshop_ = async function(){
   }
   ensurePendingSubGoalPlanFromCurrent_(catId);
   var p = state.pendingSubGoalPlan;
+  var hasFoundation = !!(p && p.plan && String((p.plan.brandProfile || '') + (p.plan.strategyGuide || p.plan.criteria || p.plan.intent || '')).trim());
+  var hasAnySteps = !!(p && p.plan && p.plan.steps && p.plan.steps.length);
+  if((!p || !p.plan || !hasFoundation) && !hasAnySteps){
+    plannerAiBusy = true;
+    startPlanGenTimer_('program', catId);
+    state.mainGoalCollapsed = true;
+    openPlanWorkshop_('program');
+    try {
+      await suggestProgramFoundationWithAI_(catId, 'both');
+      refreshPlanWorkshopModal_();
+      renderMain();
+      if(typeof setAppToast === 'function') setAppToast('먼저 프로그램 브랜딩 요소·생성 기준을 제안했어요. 확인 후 단계 생성을 눌러 주세요.', { duration: 4800, variant: 'ok' });
+    } catch(e){
+      if(typeof setAppToast === 'function') setAppToast('기준 제안 실패\n' + ((e && e.message) || e), { duration: 6500, variant: 'err' });
+    } finally {
+      plannerAiBusy = false;
+      stopPlanGenTimer_('program');
+    }
+    return;
+  }
   if(!p || !p.plan || !p.plan.steps || !p.plan.steps.length){
     plannerAiBusy = true;
     startPlanGenTimer_('program', catId);
@@ -3605,14 +4178,19 @@ window.regenerateProgramWorkshop_ = async function(){
 buildContentStrategyPromptPrefix_({ program: getCategoryProgramLine_(catId) + ' · ' + cat.name + ' (' + cat.audience + ')' }) + '\n\n' +
 (programOutcome ? '[프로그램 3개월 목표] ' + programOutcome + '\n\n' : '') +
 '[현재 주제]\n' + buildDraftInventoryForSubGoalAI_(catId) + '\n\n' +
+'[요청 순서]\n' +
+'1) 프로그램 브랜딩 요소(특징·강점·주의점·목표 독자)\n' +
+'2) 하위 목표 생성 기준 + 기획 의도(통합)\n' +
+'4) 실제 단계(3~5개)\n\n' +
 '[요청] 분기별 **마스터 목표**·의도를 이 **프로그램 3개월 여정**으로 풀어 3~5개 하위 목표(단계)로 나누세요.\n' +
 '※ 마스터 브랜드(미카닥 박준규·왜·PSP)는 유지하되, 독자·프로그램에 맞게 구체화. 글 한 편 주제가 아니라 단계별 로드맵입니다.\n' +
-'- intent: 프로그램 전체 기획 의도 3~5문장(분기별 목표 의도와 어떻게 연결되는지·독자 변화·왜 이 순서인지)\n' +
+'- brandProfile: 이 프로그램 브랜딩에 필요한 요소 3~5문장(특징·강점·주의점·목표 독자)\n' +
+'- strategyGuide: 하위 목표 생성 기준+기획 의도(통합) 3~5문장(정렬 규칙·단계별 역할·왜 이 순서인지)\n' +
 '- 각 step.rationale: 그 단계 의도 2~4문장(역할·독자가 얻을 것·앞뒤 단계 연결)\n' +
 '기존 주제가 있으면 assignments로 단계에 배치.\n' +
 '발행완료는 deleteIds 제외.\n' +
 'JSON만:\n' +
-'{"intent":"…",\n' +
+'{"brandProfile":"…","strategyGuide":"…",\n' +
 '"steps":[{"id":"1","title":"1단계 · …","summary":"한 줄","rationale":"…"}],\n' +
 '"assignments":[{"draftId":"…","stepId":"1","order":1}],\n' +
 '"deleteIds":[]}';
@@ -3636,7 +4214,10 @@ buildContentStrategyPromptPrefix_({ program: getCategoryProgramLine_(catId) + ' 
             };
           }),
           miscLabel: SUBGOAL_MISC_LABEL,
-          intent: objInit.intent ? String(objInit.intent).trim() : ''
+          brandProfile: objInit.brandProfile ? String(objInit.brandProfile).trim() : '',
+          strategyGuide: normalizeProgramStrategyGuideTemplate_(objInit.strategyGuide ? String(objInit.strategyGuide).trim() : (objInit.criteria ? String(objInit.criteria).trim() : (objInit.intent ? String(objInit.intent).trim() : ''))),
+          criteria: normalizeProgramStrategyGuideTemplate_(objInit.strategyGuide ? String(objInit.strategyGuide).trim() : (objInit.criteria ? String(objInit.criteria).trim() : (objInit.intent ? String(objInit.intent).trim() : ''))),
+          intent: normalizeProgramStrategyGuideTemplate_(objInit.strategyGuide ? String(objInit.strategyGuide).trim() : (objInit.criteria ? String(objInit.criteria).trim() : (objInit.intent ? String(objInit.intent).trim() : '')))
         },
         assignments: objInit.assignments || [],
         deleteIds: objInit.deleteIds || []
@@ -3656,7 +4237,7 @@ buildContentStrategyPromptPrefix_({ program: getCategoryProgramLine_(catId) + ' 
     return;
   }
   var stats = getProgramStepPinnedStats_(p.plan.steps);
-  if(stats.pinned >= stats.total){
+  if(stats.total > 0 && stats.pinned >= stats.total){
     if(typeof setAppToast === 'function') setAppToast('재생성할 단계의 고정을 해제해 주세요.', { duration: 4000, variant: 'err' });
     return;
   }
@@ -3692,7 +4273,8 @@ buildContentStrategyPromptPrefix_({ program: getCategoryProgramLine_(catId) + ' 
       prompt =
 buildContentStrategyPromptPrefix_(ctx) + '\n\n' +
 buildProgramPlanContextBlock_(p.catId) + '\n\n' +
-'프로그램 기획 의도(참고·유지): ' + (p.plan.intent || '') + '\n\n' +
+'프로그램 브랜딩 요소(반드시 반영): ' + (p.plan.brandProfile || '') + '\n' +
+'하위 목표 생성 기준+기획 의도(반드시 반영): ' + (p.plan.strategyGuide || p.plan.criteria || p.plan.intent || '') + '\n\n' +
 '[고정 단계 — 절대 변경하지 마세요]\n' + pinnedBlock + '\n\n' +
 '[재생성 대상 — 사용자 수정 내용 반영]\n' + unpinnedBlock + '\n\n' +
 '[요청] 고정 단계와 이어지게 ' + targetLabels + '만 새로 제안하세요.\n' +
@@ -3709,10 +4291,11 @@ buildProgramPlanContextBlock_(p.catId) + '\n\n' +
       prompt =
 buildContentStrategyPromptPrefix_(ctx) + '\n\n' +
 buildProgramPlanContextBlock_(p.catId) + '\n\n' +
-'프로그램 기획 의도(반드시 반영): ' + (p.plan.intent || '') + '\n\n' +
+'프로그램 브랜딩 요소(반드시 반영): ' + (p.plan.brandProfile || '') + '\n' +
+'하위 목표 생성 기준+기획 의도(반드시 반영): ' + (p.plan.strategyGuide || p.plan.criteria || p.plan.intent || '') + '\n\n' +
 '[현재 단계별 수정 내용 참고]\n' + stepsBlock + '\n\n' +
 '3~5개 하위 목표(단계) 전체를 새로 제안하세요. 주제 5개는 단계에서 따로 기획합니다.\n' +
-'JSON: {"intent":"…","steps":[{"id":"1","title":"1단계 · …","summary":"…","rationale":"…"}]}';
+'JSON: {"brandProfile":"…","strategyGuide":"…","steps":[{"id":"1","title":"1단계 · …","summary":"…","rationale":"…"}]}';
     }
     var text = await callClaudePlanner_(prompt, { maxTokens: isPartial ? 2200 : 4500 });
     var raw = text.replace(/^```json\s*/i, '').replace(/```\s*$/g, '').trim();
@@ -3761,6 +4344,12 @@ buildProgramPlanContextBlock_(p.catId) + '\n\n' +
           };
         });
       }
+      if(obj.brandProfile != null) p.plan.brandProfile = String(obj.brandProfile || '').trim();
+      if(obj.strategyGuide != null){
+        p.plan.strategyGuide = normalizeProgramStrategyGuideTemplate_(String(obj.strategyGuide || '').trim());
+        p.plan.criteria = p.plan.strategyGuide;
+        p.plan.intent = p.plan.strategyGuide;
+      }
       rebuildPendingProgramAssignments_(p, oldSteps);
       persistPendingSubGoalPlan_();
       refreshPlanWorkshopModal_();
@@ -3777,9 +4366,34 @@ buildProgramPlanContextBlock_(p.catId) + '\n\n' +
 window.generateSubGoalRoadmapWithAI_ = async function(){
   return regenerateProgramWorkshop_();
 };
-window.runProgramSetupWithAI_ = function(){
+window.runProgramSetupWithAI_ = async function(){
   openPlanWorkshop_('program');
-  if(!state.pendingSubGoalPlan && !state.subGoalPlanGenerating) generateSubGoalRoadmapWithAI_();
+  if(!state.apiKey){ openApiModal(); return; }
+  if(!getCurrentMainGoal_()){
+    if(typeof setAppToast === 'function') setAppToast('먼저 분기별 목표를 설정해 주세요.', { duration: 4500, variant: 'err' });
+    openPlanWorkshop_('year');
+    return;
+  }
+  if(plannerAiBusy) return;
+  var catId = state.currentCat;
+  var p = ensurePendingProgramPlanShell_(catId);
+  var hasFoundation = !!String((p.plan.brandProfile || '') + (p.plan.strategyGuide || p.plan.criteria || p.plan.intent || '')).trim();
+  if(hasFoundation) return;
+  plannerAiBusy = true;
+  startPlanGenTimer_('program', catId);
+  try {
+    await suggestProgramFoundationWithAI_(catId, 'both');
+    renderMain();
+    if(document.getElementById('plan-workshop-overlay').classList.contains('open')) refreshPlanWorkshopModal_();
+    if(typeof setAppToast === 'function'){
+      setAppToast('프로그램 브랜딩 요소·생성 기준을 먼저 제안했어요. 확인 후 단계 생성을 눌러 주세요.', { duration: 5200, variant: 'ok' });
+    }
+  } catch(e){
+    if(typeof setAppToast === 'function') setAppToast('프로그램 기준 제안 실패\n' + ((e && e.message) || e), { duration: 6500, variant: 'err' });
+  } finally {
+    plannerAiBusy = false;
+    stopPlanGenTimer_('program');
+  }
 };
 function renderMainGoalCollapsedPreviewHTML_(plan, ymeta, current, rangeLabel){
   var yearGoal = (ymeta.intent || plan.intent || '').trim() || MASTER_BRAND_NORTH_STAR;
@@ -4698,7 +5312,7 @@ function isOpsManualCategory(catId){ return catId === 8; }
 function isThreadCategory(catId){ return isDailyShareCategory(catId); }
 function isHeiljagyaeCategory(catId){ return catId === 7; }
 function isGeneralAudienceCategory(catId){ return catId === 0 || catId === 1 || catId === 2; }
-/** CMT·IFC·Re:Al Movement 전문가 과정 — 강연·영상 공유 톤 */
+/** CMT·IFC·Re:Al 움직임 과정 — 강연·영상 공유 톤 */
 function isExpertCourseCategory(catId){ return catId === 3 || catId === 4 || catId === 5; }
 /** 분기·단계 시각 구분용 톤 클래스 (0~3 분기, 0~4 단계) */
 function getQuarterToneClass_(idx){ return 'quarter-tone-' + (Math.max(0, parseInt(idx, 10) || 0) % 4); }
@@ -5117,14 +5731,14 @@ ${MEDICAL_COMPLIANCE_RULE}
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
-    1: { // 리:얼 Movement
+    1: { // 리:얼 무브먼트
       blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[Movement 맥락] P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지.`,
       insta: `캐러셀 없이 **한 포스트 캡션**에 동작·포인트·주의사항을 단계적으로 적습니다. 마지막에 저장·팔로우 유도 문장을 캡션 끝에 자연스럽게 넣으세요.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
-    2: { // 얼굴 관리
+    2: { // 리:얼 페이스
       blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[얼굴·뷰티 맥락] 20~40대 여성 독자. 과학적 근거는 가볍게, 공감과 희망. selfCare는 부담 없는 가벼운 동작·습관.`,
       insta: `캐러셀 없이 **한 포스트 캡션**으로 스토리텔링하세요. "이런 고민 있으신가요?"에 이어 문제→원인→해결→CTA를 캡션 안에서 줄바꿈으로 구분해 읽기 쉽게.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
@@ -5145,7 +5759,7 @@ ${MEDICAL_COMPLIANCE_RULE}
       notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
-    5: { // 리:얼 Movement 전문가
+    5: { // Re:Al 움직임 과정
       blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[Re:Al Movement 맥락]\n- Movement·P-A-R 등은 **참고·영상에서 다룬 내용** 안에서만 연결\n- 참고에 없는 평가·운동 처방·다른 부위로 확장 금지`,
       insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[Re:Al] 이번 강의·영상의 테크닉·포인트만.`,
       image: DEFAULT_EXPERT_COURSE_IMAGE_PROMPT,
@@ -7014,28 +7628,31 @@ function getSortedCatTabOrder() {
 }
 
 function renderTabs() {
-  function cellHTML(idx) {
-    const c = CATEGORIES[idx];
-    const label = CAT_TAB_SHORT[idx] || c.name;
-    const active = countUnpublishedTopicsForCat_(idx);
-    const pendingPlan = state.pendingSubGoalPlan && state.pendingSubGoalPlan.catId === idx;
-    return (
-      '<button type="button" class="cat-tab' +
-      (state.currentCat === idx ? ' active' : '') +
-      (pendingPlan ? ' has-pending-plan' : '') +
-      '" onclick="selectCat(' +
-      idx +
-      ')"' + (pendingPlan ? ' title="AI 하위 목표 제안 대기 중"' : '') + '><span class="cat-tab-label">' +
-      label +
-      '</span><span class="cat-tab-badge" title="화면에 보이는 진행 중 주제 수 (발행 완료 제외)">' +
-      active +
-      '</span></button>'
-    );
+  function groupSelectorHTML(groupLabel, ids){
+    var currentInGroup = ids.indexOf(state.currentCat) >= 0 ? state.currentCat : ids[0];
+    var activeCount = countUnpublishedTopicsForCat_(currentInGroup);
+    var hasPending = !!(state.pendingSubGoalPlan && ids.indexOf(state.pendingSubGoalPlan.catId) >= 0);
+    var options = ids.map(function(idx){
+      var c = CATEGORIES[idx];
+      if(!c) return '';
+      var short = CAT_TAB_SHORT[idx] || c.name;
+      var count = countUnpublishedTopicsForCat_(idx);
+      var pending = state.pendingSubGoalPlan && state.pendingSubGoalPlan.catId === idx;
+      return '<option value="' + idx + '"' + (state.currentCat === idx ? ' selected' : '') + '>' +
+        short + ' · ' + count + (pending ? ' • 대기' : '') + '</option>';
+    }).join('');
+    return '<div class="cat-group-select-wrap' + (ids.indexOf(state.currentCat) >= 0 ? ' active' : '') + '">' +
+      '<span class="cat-group-dot' + (ids.indexOf(state.currentCat) >= 0 ? ' on' : '') + (hasPending ? ' pending' : '') + '" aria-hidden="true"></span>' +
+      '<label class="cat-group-label">' + groupLabel + '</label>' +
+      '<select class="cat-group-select" onchange="selectCat(parseInt(this.value,10))" aria-label="' + groupLabel + ' 프로그램 선택">' +
+      options +
+      '</select>' +
+      '<span class="cat-group-badge" title="현재 선택 프로그램의 진행 중 주제 수">' + activeCount + '</span>' +
+    '</div>';
   }
-  var html = '';
-  CAT_TAB_NAV_ROWS.forEach(function(row){
-    row.forEach(function(idx){ html += cellHTML(idx); });
-  });
+  var html =
+    groupSelectorHTML('일반인용', CAT_GROUP_GENERAL) +
+    groupSelectorHTML('전문가용', CAT_GROUP_EXPERT);
   document.getElementById('cat-tabs-grid').innerHTML = html;
 }
 

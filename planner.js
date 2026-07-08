@@ -1028,7 +1028,9 @@ function normalizeDailySharePlan_(raw){
       note: found && found.note != null ? String(found.note).trim() : def.note
     };
   });
-  return { intent: intent, themes: themes };
+  var out = { intent: intent, themes: themes };
+  if(raw && raw.updatedAt) out.updatedAt = raw.updatedAt;
+  return out;
 }
 function getDailySharePlan_(){
   return getBranding_().dailySharePlan || normalizeDailySharePlan_(null);
@@ -1055,6 +1057,7 @@ window.updateDailyShareIntent_ = function(value){
   if(!state.branding || typeof state.branding !== 'object') state.branding = {};
   if(!state.branding.dailySharePlan) state.branding.dailySharePlan = normalizeDailySharePlan_(null);
   state.branding.dailySharePlan.intent = String(value || '').trim();
+  stampBrandingPlanUpdatedAt_(state.branding.dailySharePlan);
   save({ skipDriveUpload: true, skipGasPush: true });
 };
 window.updateDailyShareThemeNote_ = function(themeId, value){
@@ -1066,6 +1069,7 @@ window.updateDailyShareThemeNote_ = function(themeId, value){
     return Object.assign({}, t, { note: String(value || '').trim() });
   });
   state.branding.dailySharePlan.themes = themes;
+  stampBrandingPlanUpdatedAt_(state.branding.dailySharePlan);
   save({ skipDriveUpload: true, skipGasPush: true });
 };
 window.toggleDailySharePanel_ = function(forceOpen){
@@ -1805,6 +1809,9 @@ function plannerClampTextHTML_(text, opts){
   var extraClass = opts.className || '';
   var t = String(text || '').trim();
   if(!t) return '';
+  if(opts.passive){
+    return '<span class="planner-clamp-text' + (extraClass ? ' ' + extraClass : '') + '" data-clamp="' + lines + '">' + escapeHtml(t) + '</span>';
+  }
   return '<span class="planner-clamp-text' + (extraClass ? ' ' + extraClass : '') + '" data-clamp="' + lines + '" title="클릭하면 전체 보기" role="button" tabindex="0" aria-expanded="false">' + escapeHtml(t) + '</span>';
 }
 function bindPlannerMainClickDelegation_(){
@@ -1813,6 +1820,7 @@ function bindPlannerMainClickDelegation_(){
   document.addEventListener('click', function(ev){
     var clamp = ev.target.closest('.planner-clamp-text');
     if(clamp){
+      if(clamp.closest('.draft-card')) return;
       ev.preventDefault();
       ev.stopPropagation();
       clamp.classList.toggle('expanded');
@@ -1833,6 +1841,7 @@ function bindPlannerMainClickDelegation_(){
     if(ev.key !== 'Enter' && ev.key !== ' ') return;
     var clamp = ev.target.closest('.planner-clamp-text');
     if(!clamp) return;
+    if(clamp.closest('.draft-card')) return;
     ev.preventDefault();
     clamp.classList.toggle('expanded');
     clamp.setAttribute('aria-expanded', clamp.classList.contains('expanded') ? 'true' : 'false');
@@ -1852,13 +1861,7 @@ function getFirstUnpublishedDraftInStep_(drafts){
 }
 function renderSubGoalStepCardsHTML_(catId, drafts, collapsed){
   var cat = CATEGORIES[catId];
-  if(collapsed){
-    var topUnpub = getFirstUnpublishedDraftInStep_(drafts);
-    if(!topUnpub) return '';
-    return '<div class="subgoal-step-cards collapsed-preview">' +
-      draftCardHTML(topUnpub, cat, false, cat.drafts.indexOf(topUnpub), true) +
-    '</div>';
-  }
+  if(collapsed) return '';
   var html = '<div class="subgoal-step-cards">';
   if(drafts.length){
     drafts.forEach(function(d){
@@ -2775,7 +2778,7 @@ function autoGrowTextarea_(ta){
 function autoGrowTextareas_(rootEl){
   var root = rootEl || document.getElementById('plan-workshop-body');
   if(!root) return;
-  root.querySelectorAll('textarea.ws-grow-textarea, textarea.ws-item-summary, textarea.sheet-edit').forEach(function(ta){
+  root.querySelectorAll('textarea.ws-grow-textarea, textarea.ws-item-summary, textarea.sheet-edit, textarea.draft-brand-writing-brief').forEach(function(ta){
     if(!ta.__wsGrowBound){
       ta.__wsGrowBound = true;
       ta.addEventListener('input', function(){ autoGrowTextarea_(ta); });
@@ -3440,7 +3443,8 @@ function commitPendingYearPlan_(){
       };
     }),
     confirmed: true,
-    intent: p.intent || ''
+    intent: p.intent || '',
+    updatedAt: new Date().toISOString()
   };
   if(p.pillars && p.pillars.length) state.branding.pillars = p.pillars.slice();
   syncBrandingMessageFromYearPlan_();
@@ -3479,7 +3483,8 @@ function applySubGoalRoadmapPlan_(payload){
       };
     }),
     miscLabel: payload.plan.miscLabel || SUBGOAL_MISC_LABEL,
-    intent: payload.plan.intent ? String(payload.plan.intent).trim() : ''
+    intent: payload.plan.intent ? String(payload.plan.intent).trim() : '',
+    updatedAt: new Date().toISOString()
   };
   var plan = state.branding.subGoalPlans[String(catId)];
   var moved = 0, added = 0, deleted = 0;
@@ -3776,32 +3781,41 @@ window.runProgramSetupWithAI_ = function(){
   openPlanWorkshop_('program');
   if(!state.pendingSubGoalPlan && !state.subGoalPlanGenerating) generateSubGoalRoadmapWithAI_();
 };
+function renderMainGoalCollapsedPreviewHTML_(plan, ymeta, current, rangeLabel){
+  var yearGoal = (ymeta.intent || plan.intent || '').trim() || MASTER_BRAND_NORTH_STAR;
+  var quarterGoal = String(current.topic || current.goal || '').trim() || '분기 목표 미설정';
+  return '<div class="main-goal-collapsed-cards planner-layer-compact-toggle" onclick="toggleMainGoalPanel_()" role="button" tabindex="0" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleMainGoalPanel_();}">' +
+    '<div class="main-goal-preview-card year">' +
+      '<span class="main-goal-preview-label">1년 브랜드 목표</span>' +
+      '<span class="main-goal-preview-text">' + escapeHtml(yearGoal) + '</span>' +
+    '</div>' +
+    '<div class="main-goal-preview-card quarter ' + getQuarterToneClass_(0) + '">' +
+      '<span class="main-goal-preview-label">현재 분기 · ' + escapeHtml(rangeLabel) + '</span>' +
+      '<span class="main-goal-preview-text">' + escapeHtml(quarterGoal) + '</span>' +
+    '</div>' +
+  '</div>';
+}
 function renderMainGoalPanelHTML_(){
   var plan = getYearPlan_();
   var collapsed = state.mainGoalCollapsed !== false;
   var current = plan.periods[0] || {};
   var goalText = current.goal || getBranding_().message || '분기별 목표를 설정해 주세요.';
   var rangeLabel = formatPeriodRangeLabel_(current.start, current.end) || getBranding_().quarterLabel;
+  var ymeta = getYearPlanMeta_();
   var html = renderYearWorkshopStripHTML_() +
     '<div class="planner-layer main-goal-layer ' + getPlanTierClass_('year') + (collapsed ? ' collapsed' : '') + '" data-plan-tier="1">' +
-    '<div class="planner-layer-head">' +
+    '<div class="planner-layer-head planner-layer-head-toggle" onclick="toggleMainGoalPanel_()" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleMainGoalPanel_();}" role="button" tabindex="0" aria-expanded="' + (!collapsed) + '">' +
       '<div class="planner-layer-kicker">분기별 목표 · ' + escapeHtml(rangeLabel) + '</div>' +
       '<div class="planner-layer-actions">' +
-        '<button type="button" class="layer-btn subtle" onclick="toggleMainGoalPanel_()" aria-expanded="' + (!collapsed) + '">' + (collapsed ? '펼치기' : '접기') + '</button>' +
+        '<button type="button" class="layer-btn subtle" onclick="event.stopPropagation();toggleMainGoalPanel_()" aria-expanded="' + (!collapsed) + '">' + (collapsed ? '펼치기' : '접기') + '</button>' +
       '</div>' +
     '</div>';
   if(collapsed){
-    html += '<div class="planner-layer-compact">' + escapeHtml(goalText) + '</div>';
+    html += renderMainGoalCollapsedPreviewHTML_(plan, ymeta, current, rangeLabel);
   } else {
-    var ymeta = getYearPlanMeta_();
     html += '<div class="main-goal-north-star">' + escapeHtml(MASTER_BRAND_NORTH_STAR) + '</div>';
-    html += '<details class="ws-ref-block main-goal-profile-ref">' +
-      '<summary class="ws-ref-summary">미카닥 박준규 · 약력·색깔 참고</summary>' +
-      '<div class="ws-ref-body">' + escapeHtml(PERSONAL_BRAND_PROFILE) + '</div>' +
-    '</details>';
-    html += '<div class="main-goal-current">' + escapeHtml(goalText) + '</div>';
     if(ymeta.intent){
-      html += '<div class="main-goal-intent"><span class="main-goal-intent-label">기획 의도</span>' + escapeHtml(ymeta.intent) + '</div>';
+      html += '<div class="main-goal-intent"><span class="main-goal-intent-label">1년 브랜드 목표</span>' + escapeHtml(ymeta.intent) + '</div>';
     }
     if(ymeta.currentRationale){
       html += '<div class="main-goal-intent period"><span class="main-goal-intent-label">현재 분기 의도</span>' + escapeHtml(ymeta.currentRationale) + '</div>';
@@ -3811,7 +3825,7 @@ function renderMainGoalPanelHTML_(){
       var lbl = formatPeriodRangeLabel_(p.start, p.end);
       html += '<div class="year-period-row ' + getQuarterToneClass_(idx) + (idx === 0 ? ' current' : '') + '">' +
         '<span class="year-period-label">' + escapeHtml(lbl) + (idx === 0 ? ' · 지금' : '') + '</span>' +
-        '<span class="year-period-goal">' + escapeHtml(p.goal || '(목표 미설정)') + '</span>' +
+        '<span class="year-period-goal">' + escapeHtml(p.goal || p.topic || '(목표 미설정)') + '</span>' +
       '</div>';
     });
     html += '</div>';
@@ -4001,7 +4015,7 @@ function buildDraftBrandBlockHTML_(draft, catId, editable){
         '<label class="draft-brand-field"><span>시리즈</span><input type="text" id="draft-brand-series" value="' + escapeHtml(meta.series) + '" onchange="saveDraftBrandFields_()" /></label>' +
         '<label class="draft-brand-field"><span>단계</span><input type="text" id="draft-brand-step" value="' + escapeHtml(meta.step) + '" placeholder="2/5" onchange="saveDraftBrandFields_()" /></label>' +
         '<label class="draft-brand-field full"><span>글 작성 핵심</span>' +
-          '<textarea id="draft-brand-writing-brief" class="draft-brand-writing-brief" rows="8" placeholder="분기·단계 맥락, 글의 필요성, 풀어가는 순서 등 초안 작성에 필요한 핵심을 적어 주세요." onchange="saveDraftBrandFields_()" oninput="autoGrowTextarea_(this)">' + escapeHtml(brief) + '</textarea>' +
+          '<textarea id="draft-brand-writing-brief" class="draft-brand-writing-brief ws-grow-textarea" rows="1" placeholder="분기·단계 맥락, 글의 필요성, 풀어가는 순서 등 초안 작성에 필요한 핵심을 적어 주세요." onchange="saveDraftBrandFields_()" oninput="autoGrowTextarea_(this)">' + escapeHtml(brief) + '</textarea>' +
         '</label>' +
       '</div>' +
     '</div>'
@@ -5544,6 +5558,37 @@ function mergeGeneratedMaps_(a, b, preferB){
   return out;
 }
 /** 두 기기·Drive·서버 payload를 합침 — 주제(extraDrafts)는 항상 합집합, 발행·초안은 더 최신 쪽 우선 */
+/** 브랜딩 하위 기획(yearPlan/subGoalPlans/dailySharePlan)에 수정 시각 도장을 찍는다. */
+function stampBrandingPlanUpdatedAt_(plan){
+  if(plan && typeof plan === 'object') plan.updatedAt = new Date().toISOString();
+  return plan;
+}
+/** 두 기획 객체 중 자체 updatedAt이 더 최신인 것을 고른다. 없으면 전체 payload 우선순위(preferRemote)로 폴백. */
+function pickNewerBrandingPlan_(localPlan, remotePlan, preferRemote){
+  if(!localPlan) return remotePlan || null;
+  if(!remotePlan) return localPlan || null;
+  var lm = parseIsoMs_(localPlan.updatedAt);
+  var rm = parseIsoMs_(remotePlan.updatedAt);
+  if(lm && rm){
+    if(rm > lm) return remotePlan;
+    if(lm > rm) return localPlan;
+    return preferRemote ? remotePlan : localPlan;
+  }
+  if(rm && !lm) return remotePlan;
+  if(lm && !rm) return localPlan;
+  return preferRemote ? remotePlan : localPlan;
+}
+/** subGoalPlans는 카테고리별로 각자의 updatedAt 기준으로 최신본을 고른다. */
+function mergeSubGoalPlansByTs_(localPlans, remotePlans, preferRemote){
+  var out = {};
+  var keys = {};
+  Object.keys(localPlans || {}).forEach(function(k){ keys[k] = true; });
+  Object.keys(remotePlans || {}).forEach(function(k){ keys[k] = true; });
+  Object.keys(keys).forEach(function(k){
+    out[k] = pickNewerBrandingPlan_((localPlans || {})[k], (remotePlans || {})[k], preferRemote);
+  });
+  return out;
+}
 function mergePlannerPayloads_(local, remote){
   if(!remote) return local || {};
   if(!local) return Object.assign({}, remote);
@@ -5566,23 +5611,22 @@ function mergePlannerPayloads_(local, remote){
   if(local.branding || remote.branding){
     var baseBrand = preferRemote ? (remote.branding || {}) : (local.branding || {});
     out.branding = Object.assign({}, baseBrand);
+    var lb = local.branding || {};
+    var rb = remote.branding || {};
     if(preferRemote){
-      out.branding.categoryGoals = Object.assign({}, (local.branding && local.branding.categoryGoals) || {}, (remote.branding && remote.branding.categoryGoals) || {});
-      out.branding.seriesGoals = Object.assign({}, (local.branding && local.branding.seriesGoals) || {}, (remote.branding && remote.branding.seriesGoals) || {});
-      out.branding.subGoalPlans = Object.assign({}, (local.branding && local.branding.subGoalPlans) || {}, (remote.branding && remote.branding.subGoalPlans) || {});
-      if(remote.branding && remote.branding.yearPlan) out.branding.yearPlan = remote.branding.yearPlan;
-      else if(local.branding && local.branding.yearPlan) out.branding.yearPlan = local.branding.yearPlan;
-      if(remote.branding && remote.branding.dailySharePlan) out.branding.dailySharePlan = remote.branding.dailySharePlan;
-      else if(local.branding && local.branding.dailySharePlan) out.branding.dailySharePlan = local.branding.dailySharePlan;
+      out.branding.categoryGoals = Object.assign({}, lb.categoryGoals || {}, rb.categoryGoals || {});
+      out.branding.seriesGoals = Object.assign({}, lb.seriesGoals || {}, rb.seriesGoals || {});
     } else {
-      out.branding.categoryGoals = Object.assign({}, (remote.branding && remote.branding.categoryGoals) || {}, (local.branding && local.branding.categoryGoals) || {});
-      out.branding.seriesGoals = Object.assign({}, (remote.branding && remote.branding.seriesGoals) || {}, (local.branding && local.branding.seriesGoals) || {});
-      out.branding.subGoalPlans = Object.assign({}, (remote.branding && remote.branding.subGoalPlans) || {}, (local.branding && local.branding.subGoalPlans) || {});
-      if(local.branding && local.branding.yearPlan) out.branding.yearPlan = local.branding.yearPlan;
-      else if(remote.branding && remote.branding.yearPlan) out.branding.yearPlan = remote.branding.yearPlan;
-      if(local.branding && local.branding.dailySharePlan) out.branding.dailySharePlan = local.branding.dailySharePlan;
-      else if(remote.branding && remote.branding.dailySharePlan) out.branding.dailySharePlan = remote.branding.dailySharePlan;
+      out.branding.categoryGoals = Object.assign({}, rb.categoryGoals || {}, lb.categoryGoals || {});
+      out.branding.seriesGoals = Object.assign({}, rb.seriesGoals || {}, lb.seriesGoals || {});
     }
+    // 기획(yearPlan/subGoalPlans/dailySharePlan)은 각 plan의 updatedAt 기준으로 최신본을 고른다.
+    // 전체 payload 저장 시각과 무관하게, 실제로 나중에 수정된 기획이 살아남도록.
+    out.branding.subGoalPlans = mergeSubGoalPlansByTs_(lb.subGoalPlans, rb.subGoalPlans, preferRemote);
+    out.branding.yearPlan = pickNewerBrandingPlan_(lb.yearPlan, rb.yearPlan, preferRemote);
+    out.branding.dailySharePlan = pickNewerBrandingPlan_(lb.dailySharePlan, rb.dailySharePlan, preferRemote);
+    if(!out.branding.yearPlan) delete out.branding.yearPlan;
+    if(!out.branding.dailySharePlan) delete out.branding.dailySharePlan;
   }
   out.pinnedDraftIds = Object.assign({}, remote.pinnedDraftIds || {}, local.pinnedDraftIds || {});
   out.publishRecCurrentTabOnly = preferRemote ? !!remote.publishRecCurrentTabOnly : !!local.publishRecCurrentTabOnly;
@@ -7496,9 +7540,9 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
     </div>
     <div class="card-badges">${badges}</div>
     ${brandLine}
-    <div class="card-topic">${plannerClampTextHTML_(d.topic, { lines: 2 })}</div>
-    <div class="card-angle">${plannerClampTextHTML_(d.angle, { lines: 3 })}</div>
-    ${brandMeta.rationale ? '<div class="card-rationale">' + plannerClampTextHTML_(stripTopicRationaleStepPrefix_(brandMeta.rationale), { lines: 2 }) + '</div>' : ''}
+    <div class="card-topic">${plannerClampTextHTML_(d.topic, { lines: 2, passive: true })}</div>
+    <div class="card-angle">${plannerClampTextHTML_(d.angle, { lines: 3, passive: true })}</div>
+    ${brandMeta.rationale ? '<div class="card-rationale">' + plannerClampTextHTML_(stripTopicRationaleStepPrefix_(brandMeta.rationale), { lines: 2, passive: true }) + '</div>' : ''}
     <div class="card-footer">
       <div class="card-date">${isPub?'발행: '+pub.date:'미발행'}</div>
       <div class="card-created-date">생성: ${createdDateLabel}</div>
@@ -8603,9 +8647,6 @@ async function maybeRunDailyAutoDraft_(reason){
     dailyAutoRunning = false;
   }
 }
-
-
-// planner-detail-normalize.js — 브랜딩 플래너 detail
 function buildSheetTabsHTML(tab){
   const cid = state.selectedCatId;
   if(isThreadCategory(cid)){
@@ -8623,6 +8664,17 @@ function buildSheetTabsHTML(tab){
     <button type="button" class="sheet-tab${tab==='insta'?' active':''}" onclick="switchTab('insta')">인스타</button>
     <button type="button" class="sheet-tab${tab==='threads'?' active':''}" onclick="switchTab('threads')">쓰레드</button>
   </div></div>`;
+}
+function composeSheetTabLayout_(tab, titleHtml, restHtml){
+  return (titleHtml || '') + buildSheetTabsHTML(tab) + (restHtml || '');
+}
+function scrollSheetBodyToStart_(){
+  var body = document.getElementById('sheet-body');
+  if(!body) return;
+  requestAnimationFrame(function(){
+    body.scrollTop = 0;
+    scheduleWorkshopTextareaGrow_(body);
+  });
 }
 
 function normalizeImagesBlock(raw){
@@ -9010,7 +9062,9 @@ function openDetail(draftId, catId, tab, opts) {
     settleBottomSheet_(sheetEl);
     scheduleAppToastLift_();
     trapFocusIn_(sheetEl);
+    scrollSheetBodyToStart_();
   }, 10);
+  setTimeout(scrollSheetBodyToStart_, 360);
   if(!opts.skipHash){
     setOpenDetailHash_(draftId, catId, state.activeTab);
   }
@@ -9069,6 +9123,8 @@ function renderSheetEmpty(draft, cat) {
       <button onclick="genContent()" style="background:linear-gradient(135deg,#2DD4BF,#0EA5E9);color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">초안 생성하기</button>
     </div>`;
   setSheetActionsHtml_('');
+  scheduleWorkshopTextareaGrow_(document.getElementById('sheet-body'));
+  scrollSheetBodyToStart_();
 }
 
 
@@ -9090,52 +9146,52 @@ function renderSheetContent(content) {
       bodyHTML = tabsHTML + `<p class="empty-note" style="padding:12px 0;">일상 공유 초안이 없어요. 아래에서 다시 생성해 주세요.</p>
         <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:8px;">초안 다시 생성</button>`;
     } else {
-      const fullThread = getThreadPlainText(th);
       bodyHTML = tabsHTML +
-        sheetEditField_('오늘의 한 줄', 'sheet-thread-title', th.topicTitle || '', { rows: 2, title: true }) +
-        sheetEditField_('본문 (일상 나눔)', 'sheet-thread-summary', th.summary || '', { rows: 10 }) +
-        cb('전체 복사 (SNS 붙여넣기용)', `<div class="cb-box" style="white-space:pre-wrap;font-size:12px;line-height:1.65;max-height:220px;overflow-y:auto;">${escapeHtml(fullThread)}</div>`, fullThread) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">수정한 뒤 <strong>발행완료</strong>를 누르면 최종본이 저장돼요.</p>';
+        sheetFullCopyBar_() +
+        sheetEditField_('오늘의 한 줄', 'sheet-thread-title', th.topicTitle || '', { rows: 2, title: true, regen: 'thread.topicTitle', copy: true }) +
+        sheetEditField_('본문 (일상 나눔)', 'sheet-thread-summary', th.summary || '', { rows: 10, regen: 'thread.summary', copy: true }) +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 최종본이 저장돼요.</p>';
     }
   } else if(tab==='blog'){
     const blogCatId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
     const b = normalizeBlogBlock(content.blog, blogCatId) || content.blog || {};
     if(blogUsesStructuredGeneralFormat_(blogCatId, b)){
-      const fullBlog = formatGeneralBlogPostText(b);
-      bodyHTML = tabsHTML +
-        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true }) +
-        sheetEditField_('문제 제기', 'sheet-blog-problem', getGeneralBlogProblemText_(b), { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지' }) +
-        sheetEditField_('셀프 케어', 'sheet-blog-selfcare', b.selfCare || '', { rows: 8, help: '👉 로 시작 · 동작·초·회·분을 앞쪽에' }) +
-        sheetEditField_('원리 설명', 'sheet-blog-explanation', b.explanation || '', { rows: 6 }) +
-        sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3 }) +
-        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분' }) +
-        '<div class="cb"><div class="cb-label">블로그 붙여넣기 (전체) <button class="copy-btn" onclick="copyBlogFullPost_(this)">복사</button></div>' +
-          '<div class="cb-box" id="sheet-blog-full-preview" style="white-space:pre-wrap;font-size:12px;line-height:1.7;max-height:240px;overflow-y:auto;">' + escapeHtml(fullBlog) + '</div></div>' +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정한 뒤 <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요. 인스타 캡션은 그동안 백그라운드에서 만들어져요.</p>';
+      bodyHTML = composeSheetTabLayout_(tab,
+        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }),
+        sheetFullCopyBar_() +
+        sheetEditField_('문제 제기', 'sheet-blog-problem', getGeneralBlogProblemText_(b), { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지', regen: 'blog.problem', copy: true }) +
+        sheetEditField_('셀프 케어', 'sheet-blog-selfcare', b.selfCare || '', { rows: 8, help: '👉 로 시작 · 동작·초·회·분을 앞쪽에 · 단계 사이 빈 줄', regen: 'blog.selfCare', copy: true, stepPreview: true }) +
+        sheetEditField_('원리 설명', 'sheet-blog-explanation', b.explanation || '', { rows: 6, regen: 'blog.explanation', copy: true }) +
+        sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true }) +
+        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요. 인스타 캡션은 그동안 백그라운드에서 만들어져요.</p>'
+      );
     } else if(isExpertCourseCategory(blogCatId)){
       var expertCat = CATEGORIES[blogCatId];
       var expertDraft = expertCat && state.selectedId ? expertCat.drafts.find(function(d){ return d.id === state.selectedId; }) : null;
       var expertRefHtml = buildDraftReferencePreviewHTML_(expertDraft);
-      var expertFullBlog = buildBlogPasteTextForPublish_(b, blogCatId);
-      bodyHTML = tabsHTML + expertRefHtml +
-        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true }) +
-        sheetEditField_('영상·사진 맥락', 'sheet-blog-hook', b.hook, { rows: 4, help: '이번 영상·사진에서 다룬 장면·상황' }) +
-        sheetEditField_('시연·핵심 포인트', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '손 위치·동작·주의사항 — 한 줄에 하나씩' }) +
-        sheetEditField_('원리 설명', 'sheet-blog-draft', b.draft, { rows: 12, help: '본문의 중심. 왜 이렇게 하는지·짧은 메커니즘' }) +
-        sheetEditField_('마무리', 'sheet-blog-cta', b.cta, { rows: 3 }) +
-        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분 · 3~5개 권장' }) +
-        '<div class="cb"><div class="cb-label">블로그 붙여넣기 (전체) <button class="copy-btn" onclick="copyBlogFullPost_(this)">복사</button></div>' +
-          '<div class="cb-box" id="sheet-blog-full-preview" style="white-space:pre-wrap;font-size:12px;line-height:1.7;max-height:240px;overflow-y:auto;">' + escapeHtml(expertFullBlog) + '</div></div>' +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">영상·사진 내용에 맞게 다듬은 뒤 <strong>발행완료</strong>를 누르면 저장·복사돼요.</p>';
+      bodyHTML = composeSheetTabLayout_(tab,
+        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }),
+        sheetFullCopyBar_() +
+        expertRefHtml +
+        sheetEditField_('영상·사진 맥락', 'sheet-blog-hook', b.hook, { rows: 4, help: '이번 영상·사진에서 다룬 장면·상황', regen: 'blog.hook', copy: true }) +
+        sheetEditField_('시연·핵심 포인트', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '손 위치·동작·주의사항 — 한 줄에 하나씩', regen: 'blog.outline', copy: true }) +
+        sheetEditField_('원리 설명', 'sheet-blog-draft', b.draft, { rows: 12, help: '본문의 중심. 왜 이렇게 하는지·짧은 메커니즘', regen: 'blog.draft', copy: true }) +
+        sheetEditField_('마무리', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true }) +
+        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분 · 3~5개 권장', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>발행완료</strong>를 누르면 저장·복사돼요.</p>'
+      );
     } else {
-      bodyHTML = tabsHTML +
-        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true }) +
-        sheetEditField_('후킹 오프닝', 'sheet-blog-hook', b.hook, { rows: 4 }) +
-        sheetEditField_('목차 구성', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '한 줄에 소제목 하나씩' }) +
-        sheetEditField_('본문 초안', 'sheet-blog-draft', b.draft, { rows: 14 }) +
-        sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3 }) +
-        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분' }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">글을 다듬은 뒤 <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요. 인스타 캡션은 그동안 백그라운드에서 만들어져요.</p>';
+      bodyHTML = composeSheetTabLayout_(tab,
+        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }),
+        sheetFullCopyBar_() +
+        sheetEditField_('후킹 오프닝', 'sheet-blog-hook', b.hook, { rows: 4, regen: 'blog.hook', copy: true }) +
+        sheetEditField_('목차 구성', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '한 줄에 소제목 하나씩', regen: 'blog.outline', copy: true }) +
+        sheetEditField_('본문 초안', 'sheet-blog-draft', b.draft, { rows: 14, regen: 'blog.draft', copy: true }) +
+        sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true }) +
+        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요.</p>'
+      );
     }
   } else if(tab==='insta'){
     const ig = content.insta;
@@ -9146,11 +9202,13 @@ function renderSheetContent(content) {
         '<div class="sheet-insta-pending"><strong>인스타 캡션은 아직 없어요.</strong><br>블로그 탭에서 <strong>발행완료</strong>를 누르거나, 블로그 초안이 있으면 하단 <strong>재생성</strong>으로 만들 수 있어요.</div>';
     } else {
       var instaCaption = String(ig.caption || '').trim() || getInstaCaptionBodyMerged_(ig);
-      bodyHTML = tabsHTML +
-        sheetEditField_('첫 줄 후킹', 'sheet-insta-hook', ig.hook, { rows: 2, title: true }) +
-        sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10 }) +
-        sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).map(function(h){ return String(h).replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분' }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">수정한 뒤 <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동해요. 쓰레드 글은 그동안 백그라운드에서 만들어져요. <strong>재생성</strong>은 블로그 글 기준으로 인스타만 다시 만듭니다.</p>';
+      bodyHTML = composeSheetTabLayout_(tab,
+        sheetEditField_('첫 줄 후킹', 'sheet-insta-hook', ig.hook, { rows: 2, title: true, regen: 'insta.hook', copy: true }),
+        sheetFullCopyBar_() +
+        sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10, regen: 'insta.caption', copy: true }) +
+        sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).map(function(h){ return String(h).replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동해요. 쓰레드 글은 그동안 백그라운드에서 만들어져요.</p>'
+      );
     }
   } else if(tab==='threads'){
     var ths = content.threads;
@@ -9161,8 +9219,9 @@ function renderSheetContent(content) {
         '<div class="sheet-insta-pending"><strong>쓰레드 글은 아직 없어요.</strong><br>인스타 탭에서 <strong>발행완료</strong>를 누르거나, 인스타 캡션이 있으면 하단 <strong>재생성</strong>으로 만들 수 있어요.</div>';
     } else {
       bodyHTML = tabsHTML +
-        sheetEditField_('쓰레드 본문', 'sheet-threads-body', ths.text || '', { rows: 14 }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">수정한 뒤 <strong>발행완료</strong>를 누르면 저장·복사 후 Threads 앱으로 이동해요. <strong>재생성</strong>은 인스타 캡션 기준으로 쓰레드만 다시 만듭니다.</p>';
+        sheetFullCopyBar_() +
+        sheetEditField_('쓰레드 본문', 'sheet-threads-body', ths.text || '', { rows: 14, regen: 'threads.text', copy: true }) +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">본문을 수정하거나 <strong>재생성</strong>으로 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 저장·복사 후 Threads 앱으로 이동해요.</p>';
     }
   } else if(tab==='notebooklm'){
     const nl = content.notebookLM;
@@ -9204,29 +9263,24 @@ function renderSheetContent(content) {
     } else {
       const coNorm = normalizeCommunityBlock(co);
       const problemText = getCommunityProblemText_(coNorm);
-      const fullPost = formatCommunityPostText(coNorm);
-      bodyHTML = tabsHTML + `
-        ${sheetEditField_('제목', 'sheet-community-title', coNorm.title || '', { rows: 2, title: true })}
-        <div class="cb"><div class="cb-label">인사말 (고정)</div>
+      bodyHTML = composeSheetTabLayout_(tab,
+        sheetEditField_('제목', 'sheet-community-title', coNorm.title || '', { rows: 2, title: true, regen: 'community.title', copy: true }),
+        sheetFullCopyBar_() +
+        `<div class="cb"><div class="cb-label">인사말 (고정)</div>
           <div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">${escapeHtml(COMMUNITY_FIXED_GREETING)}</div></div>
-        ${sheetEditField_('문제 제기', 'sheet-community-problem', problemText, { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지, 자연스러운 문장으로' })}
-        ${sheetEditField_('셀프 케어 (해결책)', 'sheet-community-selfcare', coNorm.selfCare || '', { rows: 8, help: '👉 로 시작 · 동작·초·회·분을 앞쪽에' })}
-        ${sheetEditField_('원리 설명', 'sheet-community-explanation', coNorm.explanation || '', { rows: 6 })}
+        ${sheetEditField_('문제 제기', 'sheet-community-problem', problemText, { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지, 자연스러운 문장으로', regen: 'community.problem', copy: true })}
+        ${sheetEditField_('셀프 케어 (해결책)', 'sheet-community-selfcare', coNorm.selfCare || '', { rows: 8, help: '👉 로 시작 · 동작·초·회·분을 앞쪽에 · 단계 사이 빈 줄', regen: 'community.selfCare', copy: true, stepPreview: true })}
+        ${sheetEditField_('원리 설명', 'sheet-community-explanation', coNorm.explanation || '', { rows: 6, regen: 'community.explanation', copy: true })}
         <div class="cb"><div class="cb-label">마무리 (고정)</div>
           <div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">${escapeHtml(COMMUNITY_FIXED_CLOSING)}</div></div>
-        <div class="cb"><div class="cb-label">게시판 붙여넣기 (전체) <button class="copy-btn" onclick="copyCommunityFullPost_(this)">복사</button></div>
-          <div class="cb-box" id="sheet-community-full-preview" style="white-space:pre-wrap;font-size:12px;line-height:1.7;max-height:240px;overflow-y:auto;">${escapeHtml(fullPost)}</div></div>
-        <p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 눌러 바로 수정할 수 있어요. <strong>발행완료</strong>를 누르면 게시판 최종본이 저장돼요.</p>`;
+        <p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 눌러 바로 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 게시판 최종본이 저장돼요. 상단 <strong>전체 복사</strong>는 인사말·마무리까지 포함해 복사돼요.</p>`
+      );
     }
   } else {
     bodyHTML = tabsHTML + '<p class="empty-note">탭을 선택해 주세요.</p>';
   }
 
-  var sheetCatId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
-  var sheetCat = CATEGORIES[sheetCatId];
-  var sheetDraft = sheetCat && sheetCat.drafts.find(function(d){ return d.id === state.selectedId; });
-  var brandSheetHTML = sheetDraft ? buildDraftBrandBlockHTML_(sheetDraft, sheetCatId, true) : '';
-  document.getElementById('sheet-body').innerHTML = brandSheetHTML + bodyHTML;
+  document.getElementById('sheet-body').innerHTML = bodyHTML;
   var pubKey = getPublishKeyForTab_(tab, state.selectedCatId);
   var tabSaved = pubKey && state.published[state.selectedId]?.tabPublished?.[pubKey];
   var pubLabel = tabSaved ? '저장됨' : '발행완료';
@@ -9238,6 +9292,8 @@ function renderSheetContent(content) {
   );
   restoreTextFieldFocus_(focusSnap);
   scheduleWorkshopTextareaGrow_(document.getElementById('sheet-body'));
+  renderAllSelfCareStepPreviews_();
+  scrollSheetBodyToStart_();
 }
 
 window.getFullCopy = function(){
@@ -10331,8 +10387,233 @@ function sheetEditField_(label, id, value, opts){
   var rows = opts.rows || 4;
   var cls = 'sheet-edit' + (opts.title ? ' sheet-edit-title' : '');
   var help = opts.help ? '<div class="publish-field-help" style="margin:4px 0 6px;">' + escapeHtml(opts.help) + '</div>' : '';
-  return '<div class="cb"><div class="cb-label">' + escapeHtml(label) + '</div>' + help +
-    '<textarea class="' + cls + '" id="' + id + '" rows="' + rows + '" oninput="autoGrowTextarea_(this)">' + escapeHtml(value || '') + '</textarea></div>';
+  var wrapCls = 'cb' + (opts.title ? ' sheet-title-anchor' : '');
+  var tools = '';
+  if(opts.regen || opts.copy){
+    tools = '<span class="sheet-field-tools">';
+    if(opts.regen){
+      tools += '<button type="button" class="sheet-field-btn sheet-field-regen" onclick="regenSheetField_(\'' + opts.regen + '\', this)">재생성</button>';
+    }
+    if(opts.copy){
+      tools += '<button type="button" class="sheet-field-btn sheet-field-copy" onclick="copySheetField_(\'' + id + '\', this' + (opts.copyHashtags ? ', true' : '') + ')">복사</button>';
+    }
+    tools += '</span>';
+  }
+  var oninput = 'autoGrowTextarea_(this)' + (opts.stepPreview ? ';renderSelfCareStepsPreview_(this)' : '');
+  var previewAttr = opts.stepPreview ? ' data-selfcare-preview="1"' : '';
+  var previewHost = opts.stepPreview ? '<div class="selfcare-steps" data-steps-for="' + id + '"></div>' : '';
+  return '<div class="' + wrapCls + '"><div class="cb-label">' + escapeHtml(label) + tools + '</div>' + help +
+    '<textarea class="' + cls + '" id="' + id + '" rows="' + rows + '"' + previewAttr + ' oninput="' + oninput + '">' + escapeHtml(value || '') + '</textarea>' + previewHost + '</div>';
+}
+
+/* ── 구분 박스: 박스별 복사·재생성 + 상단 전체 복사 + 셀프 케어 단계 미리보기 ── */
+function sheetFullCopyBar_(){
+  return '<div class="sheet-fullcopy-bar">' +
+    '<button type="button" class="sheet-fullcopy-btn" onclick="copyWholeTab_(this)">전체 복사</button>' +
+    '<span class="sheet-fullcopy-hint">구분된 내용을 한 줄씩 띄워 복사해요</span></div>';
+}
+
+window.copySheetField_ = function(id, btn, isHashtags){
+  var el = document.getElementById(id);
+  if(!el) return;
+  var text = String(el.value || '');
+  if(isHashtags){
+    text = text.split(/[\s,#]+/).map(function(t){ return t.replace(/^#/, '').trim(); })
+      .filter(Boolean).map(function(t){ return '#' + t; }).join(' ');
+  }
+  text = text.trim();
+  if(!text){ setAppToast('복사할 내용이 없어요.', { duration: 2600, variant: 'err' }); return; }
+  navigator.clipboard.writeText(text);
+  var label = btn ? btn.textContent : '';
+  if(btn){
+    btn.textContent = '복사됨'; btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = label || '복사'; btn.classList.remove('copied'); }, 1500);
+  }
+};
+
+window.copyWholeTab_ = function(btn){
+  var draftId = state.selectedId;
+  var content = getDraftContent_(draftId);
+  if(!content){ setAppToast('복사할 내용이 없어요.', { duration: 3000, variant: 'err' }); return; }
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  var tab = state.activeTab;
+  var clone = JSON.parse(JSON.stringify(content));
+  applySheetEditsForTab_(clone, tab);
+  var text = '';
+  if(tab === 'blog') text = buildBlogPasteTextForPublish_(clone.blog, catId);
+  else if(tab === 'community') text = formatCommunityPostText(clone.community);
+  else if(tab === 'insta') text = getInstaFullPasteText_(clone.insta);
+  else if(tab === 'threads') text = String((clone.threads && clone.threads.text) || '').trim();
+  else if(tab === 'thread') text = getThreadPlainText(normalizeThreadBlock(clone.thread));
+  else text = getTabCopyText(tab, clone);
+  text = String(text || '').trim();
+  if(!text){ setAppToast('복사할 내용이 없어요.', { duration: 3000, variant: 'err' }); return; }
+  navigator.clipboard.writeText(text);
+  var label = btn ? btn.textContent : '';
+  if(btn){
+    btn.textContent = '복사됨'; btn.classList.add('copied');
+    setTimeout(function(){ btn.textContent = label || '전체 복사'; btn.classList.remove('copied'); }, 1600);
+  }
+};
+
+var SHEET_FIELD_META_ = {
+  'blog.title':       { block: 'blog', label: '제목', instr: '증상명과 지역/브랜드 키워드가 자연스럽게 들어간, 검색·AI 인용에 강한 제목 한 줄.' },
+  'blog.problem':     { block: 'blog', label: '문제 제기', instr: '공감 질문으로 시작해 "일상에서 바로 풀 수 있다"는 한 줄까지. 독자의 상황을 구체적으로 그려 주세요.' },
+  'blog.selfCare':    { block: 'blog', label: '셀프 케어', step: true, instr: '집에서 따라 할 수 있는 셀프 케어를 단계별로. 각 단계는 새 줄에서 "👉"로 시작하고 동작·초/회/세트를 앞쪽에 명시하세요. 단계와 단계 사이에는 빈 줄을 넣으세요.' },
+  'blog.explanation': { block: 'blog', label: '원리 설명', instr: '왜 그런지 해부학적·기능적 원리를 쉬운 말로, 단정적인 인과 문장으로 설명하세요.' },
+  'blog.cta':         { block: 'blog', label: '마무리 CTA', instr: '전문가 상담·프로필 페이지로 부드럽게 안내하는 마무리 2~3문장.' },
+  'blog.hashtags':    { block: 'blog', label: '해시태그', array: true, instr: '증상·지역·브랜드와 관련된 해시태그 5~8개.' },
+  'blog.hook':        { block: 'blog', label: '영상·사진 맥락', instr: '이번 영상·사진에서 다룬 장면·상황을 짧게 정리하세요.' },
+  'blog.outline':     { block: 'blog', label: '시연·핵심 포인트', arrayLines: true, instr: '손 위치·동작·주의사항 등 핵심 포인트를 한 줄에 하나씩.' },
+  'blog.draft':       { block: 'blog', label: '원리 설명(본문)', instr: '본문의 중심. 왜 이렇게 하는지 짧은 메커니즘을 포함해 설명하세요.' },
+  'community.title':       { block: 'community', label: '제목', instr: '입주민이 클릭하고 싶은, 증상·상황이 드러나는 제목 한 줄.' },
+  'community.problem':     { block: 'community', label: '문제 제기', instr: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지, 자연스러운 문장으로.' },
+  'community.selfCare':    { block: 'community', label: '셀프 케어', step: true, instr: '집에서 따라 할 수 있는 셀프 케어를 단계별로. 각 단계는 새 줄에서 "👉"로 시작하고 동작·초/회/세트를 앞쪽에 명시하세요. 단계 사이에는 빈 줄을 넣으세요.' },
+  'community.explanation': { block: 'community', label: '원리 설명', instr: '왜 그런지 원리를 쉬운 말로, 단정적인 인과 문장으로 설명하세요.' },
+  'insta.hook':     { block: 'insta', label: '첫 줄 후킹', instr: '스크롤을 멈추게 하는 인스타 첫 줄 후킹 한 문장.' },
+  'insta.caption':  { block: 'insta', label: '캡션', instr: '인스타 톤의 짧은 캡션 본문. 문단은 짧게, 이모지는 절제해서.' },
+  'insta.hashtags': { block: 'insta', label: '해시태그', array: true, instr: '증상·지역·브랜드와 관련된 해시태그 8~12개.' },
+  'threads.text':      { block: 'threads', label: '쓰레드 본문', instr: 'Threads 톤의 짧고 담백한 본문. 한 호흡에 읽히도록.' },
+  'thread.topicTitle': { block: 'thread', label: '오늘의 한 줄', threadNorm: true, instr: '오늘의 일상 나눔을 요약하는 따뜻한 한 줄.' },
+  'thread.summary':    { block: 'thread', label: '본문 (일상 나눔)', threadNorm: true, instr: '전문 용어 없이, 일상에서 느낀 점을 담백하게 나누는 본문.' }
+};
+
+function fieldValueToString_(meta, block){
+  if(!block) return '';
+  if(meta.array) return (block[fieldKeyOf_(meta)] || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
+  if(meta.arrayLines) return (block[fieldKeyOf_(meta)] || []).join('\n');
+  return String(block[fieldKeyOf_(meta)] || '');
+}
+function fieldKeyOf_(meta){ return meta.__field; }
+
+function buildSheetFieldReference_(meta, block){
+  var lines = [];
+  Object.keys(SHEET_FIELD_META_).forEach(function(k){
+    var m = SHEET_FIELD_META_[k];
+    if(m.block !== meta.block) return;
+    var field = k.split('.')[1];
+    if(field === meta.__field) return;
+    var v = block[field];
+    if(m.array) v = (v || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
+    else if(m.arrayLines) v = (v || []).join('\n');
+    else v = String(v || '');
+    v = String(v).trim();
+    if(v) lines.push('■ ' + m.label + ':\n' + v);
+  });
+  return lines.join('\n\n') || '(없음)';
+}
+
+window.regenSheetField_ = async function(key, btn){
+  var meta = SHEET_FIELD_META_[key];
+  if(!meta) return;
+  meta.__field = key.split('.')[1];
+  if(!state.apiKey){ openApiModal(); return; }
+  var draftId = state.selectedId;
+  if(!draftId){ setAppToast('먼저 초안 카드를 선택해 주세요.', { duration: 3000, variant: 'err' }); return; }
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  var content = getDraftContent_(draftId);
+  if(!content){ setAppToast('먼저 초안을 생성해 주세요.', { duration: 3500, variant: 'err' }); return; }
+  applySheetEditsForTab_(content, state.activeTab);
+  var block = content[meta.block] || (content[meta.block] = {});
+  var cat = CATEGORIES[catId];
+  var draft = cat && cat.drafts.find(function(d){ return d.id === draftId; });
+
+  var brand = buildBrandContextForPrompt_(catId, draft);
+  var brief = draft ? buildDraftBriefPromptLines_(draft, catId) : '';
+  var currentValue = fieldValueToString_(meta, block).trim();
+  var reference = buildSheetFieldReference_(meta, block);
+  var sourceRef = '';
+  if(meta.block === 'insta' && content.blog){
+    var blogSrc = buildBlogPasteTextForPublish_(content.blog, catId);
+    if(blogSrc) sourceRef = '[원본 블로그 글 — 이 내용을 인스타 톤으로 옮기는 것이 목적]\n' + blogSrc;
+  } else if(meta.block === 'threads' && content.insta){
+    var instaSrc = getInstaFullPasteText_(content.insta);
+    if(instaSrc) sourceRef = '[원본 인스타 캡션 — 이 내용을 쓰레드 톤으로 옮기는 것이 목적]\n' + instaSrc;
+  }
+  var outputGuide = meta.array
+    ? 'JSON만 출력하세요: {"value": ["태그1", "태그2", ...]}  (# 없이 단어만)'
+    : meta.arrayLines
+      ? 'JSON만 출력하세요: {"value": ["줄1", "줄2", ...]}'
+      : 'JSON만 출력하세요: {"value": "다시 쓴 내용"}';
+  var prompt = [
+    brand, '',
+    draft ? '주제: ' + draft.topic : '',
+    brief, '',
+    sourceRef ? sourceRef + '\n' : '',
+    '[현재 글의 다른 부분 — 참고용, 여기는 수정하지 마세요]',
+    reference, '',
+    '[다시 쓸 부분: 「' + meta.label + '」]',
+    '작성 지침: ' + meta.instr,
+    '사용자가 방금 수정한 현재 「' + meta.label + '」 내용:',
+    (currentValue || '(비어 있음)'), '',
+    '위 참고 내용·주제·글 작성 핵심과 자연스럽게 이어지도록 「' + meta.label + '」만 다시 써 주세요. 사용자가 이미 적어 둔 방향·정보·표현은 최대한 살려 다듬는 방향으로 개선하세요. 다른 부분은 절대 출력하지 마세요.',
+    outputGuide
+  ].filter(function(l){ return l != null; }).join('\n');
+
+  var origHtml = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.textContent = '생성 중…'; }
+  try {
+    var text = await callClaudePlanner_(prompt, { maxTokens: 1800 });
+    var obj = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
+    var val = obj.value;
+    if(meta.array){
+      var arr = Array.isArray(val) ? val : String(val || '').split(/[\s,#]+/);
+      block[meta.__field] = arr.map(function(t){ return String(t).replace(/^#/, '').trim(); }).filter(Boolean);
+    } else if(meta.arrayLines){
+      var arr2 = Array.isArray(val) ? val : String(val || '').split('\n');
+      block[meta.__field] = arr2.map(function(s){ return String(s).replace(/^\d+[.)]\s*/, '').trim(); }).filter(Boolean);
+    } else {
+      block[meta.__field] = String(val || '').trim();
+    }
+    content[meta.block] = block;
+    if(meta.threadNorm){ content.thread = normalizeThreadBlock(block) || block; }
+    persistDraftContent_(draftId, content);
+    renderSheetContent(content);
+    setAppToast('「' + meta.label + '」을 다시 생성했어요.', { duration: 3000, variant: 'ok' });
+  } catch(e){
+    setAppToast('재생성에 실패했어요: ' + ((e && e.message) || String(e)), { duration: 6000, variant: 'err' });
+    if(btn){ btn.disabled = false; btn.innerHTML = origHtml; }
+  }
+};
+
+function parseSelfCareSteps_(text){
+  var t = String(text || '').trim();
+  if(!t) return [];
+  var blocks = t.split(/\n\s*\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+  if(blocks.length >= 2) return blocks;
+  var markerRe = /^(👉|✅|▶|Step\s*\d+|\d+[.)]|[①②③④⑤⑥⑦⑧⑨⑩]|[-·•])/i;
+  var steps = [];
+  var cur = '';
+  t.split('\n').forEach(function(ln){
+    var isMarker = markerRe.test(ln.trim());
+    if(isMarker && cur.trim()){ steps.push(cur.trim()); cur = ln; }
+    else if(isMarker){ cur = ln; }
+    else { cur += (cur ? '\n' : '') + ln; }
+  });
+  if(cur.trim()) steps.push(cur.trim());
+  return steps.length ? steps : [t];
+}
+
+function renderSelfCareStepsPreview_(ta){
+  if(!ta) return;
+  var host = document.querySelector('[data-steps-for="' + ta.id + '"]');
+  if(!host) return;
+  var raw = String(ta.value || '').trim();
+  var steps = parseSelfCareSteps_(raw);
+  if(!raw || steps.length <= 1){ host.innerHTML = ''; return; }
+  var stripRe = /^(👉|✅|▶|Step\s*\d+[.:)]?|\d+[.)]|[①②③④⑤⑥⑦⑧⑨⑩]|[-·•])\s*/i;
+  host.innerHTML = '<div class="selfcare-steps-title">따라하기 미리보기</div>' +
+    steps.map(function(s, i){
+      var body = escapeHtml(s.replace(stripRe, '')).replace(/\n/g, '<br/>');
+      return '<div class="selfcare-step"><span class="selfcare-step-no">' + (i + 1) + '</span>' +
+        '<div class="selfcare-step-body">' + body + '</div></div>';
+    }).join('');
+}
+
+function renderAllSelfCareStepPreviews_(){
+  document.querySelectorAll('textarea[data-selfcare-preview="1"]').forEach(function(ta){
+    renderSelfCareStepsPreview_(ta);
+  });
 }
 
 function getDraftContent_(draftId){

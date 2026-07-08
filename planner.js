@@ -2153,6 +2153,77 @@ function getCategoryBrandGoal_(catId){
   var key = String(catId);
   return String((brand.categoryGoals && brand.categoryGoals[key]) || '').trim();
 }
+function buildDraftStageContextLines_(draft, catId, draftIndex){
+  var meta = getDraftBrandMeta_(draft, catId, draftIndex);
+  var lines = [];
+  var ymeta = getYearPlanMeta_();
+  if(ymeta.currentRationale) lines.push('분기 의도: ' + ymeta.currentRationale);
+  var plan = getSubGoalPlan_(catId);
+  if(plan && plan.steps && plan.steps.length){
+    var stepId = getDraftRoadmapStepId_(draft, catId, draftIndex);
+    var stepIdx = plan.steps.findIndex(function(s){ return String(s.id) === String(stepId); });
+    if(meta.series) lines.push(meta.series + (meta.step ? ' (' + meta.step + ')' : ''));
+    if(stepIdx >= 0){
+      for(var i = 0; i <= stepIdx; i++){
+        var s = plan.steps[i];
+        var bit = String(s.title || '').trim();
+        if(s.summary) bit += (bit ? ': ' : '') + String(s.summary).trim();
+        if(bit) lines.push('- ' + bit);
+      }
+    }
+  } else {
+    if(meta.series) lines.push(meta.series + (meta.step ? ' (' + meta.step + ')' : ''));
+    var sg = getSeriesGoal_(catId, meta.series);
+    if(sg) lines.push('- ' + sg);
+  }
+  return lines;
+}
+function parseWritingBriefSection_(brief, headingPattern){
+  if(!brief) return '';
+  var re = new RegExp('【' + headingPattern + '[^】]*】\\s*\\n([\\s\\S]*?)(?=\\n\\n【|$)', 'u');
+  var m = String(brief).match(re);
+  return m && m[1] ? String(m[1]).trim() : '';
+}
+function syncDraftFieldsFromWritingBrief_(draft){
+  if(!draft) return;
+  var brief = String(draft.writingBrief || '').trim();
+  if(!brief) return;
+  var pillar = parseWritingBriefSection_(brief, '브랜드\\s*기둥');
+  var rationale = parseWritingBriefSection_(brief, '왜\\s*지금');
+  var flow = parseWritingBriefSection_(brief, '풀어가는\\s*순서');
+  if(pillar) draft.pillar = pillar.split('\n')[0].trim();
+  if(rationale) draft.rationale = rationale;
+  if(flow) draft.angle = flow;
+}
+function buildDefaultWritingBrief_(draft, catId, draftIndex){
+  if(!draft) return '';
+  var meta = getDraftBrandMeta_(draft, catId, draftIndex);
+  var parts = [];
+  if(meta.pillar) parts.push('【브랜드 기둥】\n' + meta.pillar);
+  var stageLines = buildDraftStageContextLines_(draft, catId, draftIndex);
+  if(stageLines.length) parts.push('【분기 → 현재 단계】\n' + stageLines.join('\n'));
+  var rationale = stripTopicRationaleStepPrefix_(meta.rationale) || buildDraftRationaleFromRoadmap_(draft, catId, draftIndex);
+  if(rationale) parts.push('【왜 지금 이 글인가】\n' + rationale);
+  var angle = String(draft.angle || '').trim();
+  if(angle) parts.push('【풀어가는 순서】\n' + angle);
+  return parts.join('\n\n');
+}
+function getDraftWritingBrief_(draft, catId, draftIndex){
+  if(!draft) return '';
+  var saved = draft.writingBrief ? String(draft.writingBrief).trim() : '';
+  if(saved) return saved;
+  var ov = state.draftBrandOverrides && state.draftBrandOverrides[draft.id];
+  if(ov && ov.writingBrief) return String(ov.writingBrief).trim();
+  return buildDefaultWritingBrief_(draft, catId, draftIndex);
+}
+function buildDraftBriefPromptLines_(draft, catId){
+  var brief = getDraftWritingBrief_(draft, catId);
+  if(brief){
+    return '글 작성 핵심:\n' + brief + '\n\n위 「글 작성 핵심」의 분기·단계 맥락, 필요성, 풀어가는 순서를 본문 전개에 우선 반영하세요.';
+  }
+  if(draft && draft.angle) return '각도: ' + draft.angle;
+  return '';
+}
 function getDraftBrandMeta_(draft, catId, draftIndex){
   var cat = CATEGORIES[catId];
   var total = cat && cat.drafts ? cat.drafts.length : 0;
@@ -2173,6 +2244,7 @@ function applyTopicFieldsToDraft_(draft, obj, catId){
   if(obj.pillar) draft.pillar = String(obj.pillar).trim();
   else if(!draft.pillar) draft.pillar = getDefaultPillarForCat_(catId);
   if(obj.rationale) draft.rationale = stripTopicRationaleStepPrefix_(String(obj.rationale).trim());
+  if(obj.topic || obj.angle != null || obj.rationale || obj.pillar) delete draft.writingBrief;
 }
 function buildBrandContextForPrompt_(catId, draft){
   var brand = getBranding_();
@@ -2211,7 +2283,11 @@ function buildBrandContextForPrompt_(catId, draft){
     if(sg) lines.push('시리즈 목표: ' + sg);
     if(meta.pillar) lines.push('기둥: ' + meta.pillar);
     if(meta.rationale) lines.push('왜 지금(명분): ' + meta.rationale);
-    if(draft.angle) lines.push('글 풀기(각도): ' + draft.angle);
+    if(getDraftWritingBrief_(draft, catId)) {
+      lines.push('※ 글 작성 핵심은 아래 주제 블록에 별도 기재');
+    } else if(draft.angle) {
+      lines.push('글 풀기(각도): ' + draft.angle);
+    }
   }
   lines.push('', '위 메시지·시리즈와 모순되지 않게, 미카닥 박준규·Re:Al 브랜드 톤을 유지하세요.');
   return lines.join('\n');
@@ -2811,16 +2887,14 @@ function renderYearQuarterCardHTML_(per, idx){
       '<div class="ws-quarter-meta">' +
         '<div class="ws-quarter-meta-row">' +
           '<span class="ws-quarter-badge">' + (idx + 1) + '분기</span>' +
-          '<label class="ws-quarter-field-label">주제</label>' +
-          '<input type="text" class="ws-quarter-topic" value="' + escapeHtml(per.topic || '') + '" placeholder="' + (idx + 1) + '분기 · 미카닥 박준규 브랜드 주제" onchange="updatePendingYearPeriodTopic_(' + idx + ',this.value)" />' +
-        '</div>' +
-        '<div class="ws-quarter-meta-row ws-quarter-meta-sub">' +
           '<span class="ws-quarter-date">생성 ' + escapeHtml(formatYearPeriodCreatedLabel_(per.createdAt)) + '</span>' +
           '<span class="ws-quarter-range">' + escapeHtml(lbl) + (idx === 0 ? ' · 지금' : '') + '</span>' +
           '<label class="ws-quarter-months-wrap">기간 ' +
             '<select class="ws-quarter-months" onchange="updatePendingYearPeriodMonths_(' + idx + ',this.value)"' + (per.pinned ? ' disabled' : '') + '>' + monthOpts + '</select>' +
           '</label>' +
         '</div>' +
+        '<label class="ws-quarter-field-label ws-quarter-topic-label">주제</label>' +
+        '<textarea class="ws-quarter-topic ws-grow-textarea" rows="1" placeholder="' + (idx + 1) + '분기 · 미카닥 박준규 브랜드 주제" oninput="updatePendingYearPeriodTopic_(' + idx + ',this.value);autoGrowTextarea_(this)" onchange="updatePendingYearPeriodTopic_(' + idx + ',this.value)">' + escapeHtml(per.topic || '') + '</textarea>' +
       '</div>' +
       '<div class="ws-quarter-tools">' +
         '<button type="button" class="ws-item-btn pin' + pinnedCls + '" onclick="togglePinYearPeriod_(' + idx + ')" title="고정">' + (per.pinned ? '고정됨' : '고정') + '</button>' +
@@ -2904,8 +2978,9 @@ function renderProgramStepCardHTML_(step, idx){
       '<div class="ws-quarter-meta">' +
         '<div class="ws-quarter-meta-row">' +
           '<span class="ws-quarter-badge">' + (idx + 1) + '단계</span>' +
-          '<input type="text" class="ws-quarter-topic" value="' + escapeHtml(step.title || '') + '" placeholder="' + (idx + 1) + '단계 · 제목" onchange="updatePendingStepField_(' + idx + ',\'title\',this.value)" />' +
         '</div>' +
+        '<label class="ws-quarter-field-label ws-quarter-topic-label">제목</label>' +
+        '<textarea class="ws-quarter-topic ws-grow-textarea" rows="1" placeholder="' + (idx + 1) + '단계 · 제목" oninput="updatePendingStepField_(' + idx + ',\'title\',this.value);autoGrowTextarea_(this)" onchange="updatePendingStepField_(' + idx + ',\'title\',this.value)">' + escapeHtml(step.title || '') + '</textarea>' +
       '</div>' +
       '<div class="ws-quarter-tools">' +
         '<button type="button" class="ws-item-btn pin' + pinnedCls + '" onclick="togglePinPendingStep_(' + idx + ')" title="고정">' + (step.pinned ? '고정됨' : '고정') + '</button>' +
@@ -3910,13 +3985,13 @@ function renderProgramRoadmapHTML_(catId){
 }
 function buildDraftBrandBlockHTML_(draft, catId, editable){
   var meta = getDraftBrandMeta_(draft, catId);
+  var brief = getDraftWritingBrief_(draft, catId);
   if(!editable){
     var parts = [];
     if(meta.series) parts.push('<span class="draft-brand-chip series">' + escapeHtml(meta.series + (meta.step ? ' · ' + meta.step : '')) + '</span>');
-    if(meta.pillar) parts.push('<span class="draft-brand-chip pillar">' + escapeHtml(meta.pillar) + '</span>');
-    if(!parts.length && !meta.rationale) return '';
+    if(!parts.length && !brief) return '';
     return '<div class="draft-brand-block">' + parts.join('') +
-      (meta.rationale ? '<div class="draft-brand-rationale">' + escapeHtml(meta.rationale) + '</div>' : '') +
+      (brief ? '<div class="draft-brand-brief-preview">' + escapeHtml(brief) + '</div>' : '') +
       '</div>';
   }
   return (
@@ -3925,38 +4000,45 @@ function buildDraftBrandBlockHTML_(draft, catId, editable){
       '<div class="draft-brand-edit-grid">' +
         '<label class="draft-brand-field"><span>시리즈</span><input type="text" id="draft-brand-series" value="' + escapeHtml(meta.series) + '" onchange="saveDraftBrandFields_()" /></label>' +
         '<label class="draft-brand-field"><span>단계</span><input type="text" id="draft-brand-step" value="' + escapeHtml(meta.step) + '" placeholder="2/5" onchange="saveDraftBrandFields_()" /></label>' +
-        '<label class="draft-brand-field full"><span>기둥</span><input type="text" id="draft-brand-pillar" value="' + escapeHtml(meta.pillar) + '" onchange="saveDraftBrandFields_()" /></label>' +
-        '<label class="draft-brand-field full"><span>왜 지금 (명분)</span><textarea id="draft-brand-rationale" rows="2" onchange="saveDraftBrandFields_()">' + escapeHtml(meta.rationale) + '</textarea></label>' +
+        '<label class="draft-brand-field full"><span>글 작성 핵심</span>' +
+          '<textarea id="draft-brand-writing-brief" class="draft-brand-writing-brief" rows="8" placeholder="분기·단계 맥락, 글의 필요성, 풀어가는 순서 등 초안 작성에 필요한 핵심을 적어 주세요." onchange="saveDraftBrandFields_()" oninput="autoGrowTextarea_(this)">' + escapeHtml(brief) + '</textarea>' +
+        '</label>' +
       '</div>' +
     '</div>'
   );
 }
-window.saveDraftBrandFields_ = function(){
+function flushDraftBrandFieldsFromDom_(){
   var draftId = state.selectedId;
+  if(!draftId) return;
   var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
   var cat = CATEGORIES[catId];
-  if(!cat || !draftId) return;
+  if(!cat) return;
   var draft = cat.drafts.find(function(d){ return d.id === draftId; });
   if(!draft) return;
   var s = document.getElementById('draft-brand-series');
   var st = document.getElementById('draft-brand-step');
-  var p = document.getElementById('draft-brand-pillar');
-  var r = document.getElementById('draft-brand-rationale');
+  var wb = document.getElementById('draft-brand-writing-brief');
   if(s) draft.series = s.value.trim();
   if(st) draft.step = st.value.trim();
-  if(p) draft.pillar = p.value.trim();
-  if(r) draft.rationale = r.value.trim();
+  if(wb){
+    draft.writingBrief = wb.value.trim();
+    syncDraftFieldsFromWritingBrief_(draft);
+  }
   if(!isUserAddedDraftId_(draftId)){
     if(!state.draftBrandOverrides) state.draftBrandOverrides = {};
     state.draftBrandOverrides[draftId] = {
       series: draft.series || '',
       step: draft.step || '',
       pillar: draft.pillar || '',
-      rationale: draft.rationale || ''
+      rationale: draft.rationale || '',
+      writingBrief: draft.writingBrief || ''
     };
   }
+}
+window.saveDraftBrandFields_ = function(opts){
+  flushDraftBrandFieldsFromDom_();
   save({ driveImmediate: true });
-  renderMain();
+  if(!opts || !opts.skipRender) renderMain();
 };
 
 function renderTopicWorkshopCardHTML_(catId, stepId, slotIndex, draft){
@@ -3968,8 +4050,9 @@ function renderTopicWorkshopCardHTML_(catId, stepId, slotIndex, draft){
         '<div class="ws-quarter-meta">' +
           '<div class="ws-quarter-meta-row">' +
             '<span class="ws-quarter-badge">주제 ' + (i + 1) + '</span>' +
-            '<input type="text" class="ws-quarter-topic" value="' + escapeHtml(draft.topic || '') + '" placeholder="호기심을 자극하는 한 줄 주제" onchange="updateTopicDraftField_(\'' + draft.id + '\',\'topic\',this.value)" />' +
           '</div>' +
+          '<label class="ws-quarter-field-label ws-quarter-topic-label">주제</label>' +
+          '<textarea class="ws-quarter-topic ws-grow-textarea" rows="1" placeholder="호기심을 자극하는 한 줄 주제" oninput="updateTopicDraftField_(\'' + draft.id + '\',\'topic\',this.value);autoGrowTextarea_(this)" onchange="updateTopicDraftField_(\'' + draft.id + '\',\'topic\',this.value)">' + escapeHtml(draft.topic || '') + '</textarea>' +
         '</div>' +
         '<div class="ws-quarter-tools">' +
           '<button type="button" class="ws-item-btn pin' + (pinned ? ' active' : '') + '" onclick="togglePinDraft_(\'' + draft.id + '\')">' + (pinned ? '고정됨' : '고정') + '</button>' +
@@ -4535,7 +4618,8 @@ History Taking · Inspection · Movement Test · Palpation
 - 전문가 독자: 평가-치료 연결, PSP·PAR 순서 존중. 과장·즉효 약속·타 기관 비방 금지.
 - 얼굴·웰니스: 구조→기능, 호흡·자세·긴장 조절 맥락 유지.`;
 
-const DEFAULT_BLOG_TITLE_HOOK_RULE = `제목은 **독자의 호기심·궁금증**을 자극하는 후킹 요소를 넣으세요. (예: "왜 ~일까?", "사실 ○○이 원인?", "○○ 안 하면 생기는 일", 숫자·흔한 오해·반전 한 줄). 네이버 SEO(검색 키워드 자연스럽게)도 고려하되, 과장·즉효 약속·낚시는 금지.`;
+const DEFAULT_BLOG_TITLE_HOOK_RULE = `제목은 **독자의 호기심·궁금증**을 자극하는 후킹 요소를 넣으세요. (예: "왜 ~일까?", "사실 ○○이 원인?", "○○ 안 하면 생기는 일", 숫자·흔한 오해·반전 한 줄). 네이버 SEO(검색 키워드 자연스럽게)도 고려하되, 과장·즉효 약속·낚시는 금지.
+증상형 주제일 때는 **증상 키워드**와 **지역·프로그램 키워드**(예: 성수·계양·재활필라테스·도수)를 **자연스럽게** 넣을 수 있으나, 브랜드명·지역명을 억지로 반복하지 말 것.`;
 
 let state = {
   currentCat: 0,
@@ -4921,8 +5005,8 @@ const MEDICAL_COMPLIANCE_RULE = `[의료법·포지셔닝 — 필수]
 - 응급·적신호(마비, 대소변 장애, 발열·체중감소 동반, 사고 직후 급격한 악화 등)는 **즉시 병원** 권고.`;
 
 const GEO_CONTENT_STRUCTURE_RULE = `[GEO · AI 인용 가능 구조 — explanation 필드에 자연스럽게 녹이기]
-번호·"N단계" 표기 없이 문단으로 연결:
-① 한 줄 요약(결론 선제시) ② 자가 점검 2~4개 ③ 가능한 원인 ④ 병원 진료 신호 vs 운동·프로그램으로 관리 가능한 경우 ⑤ 안전한 셀프 확인·이완 ⑥ 주의·금기 ⑦ 근골격계 전문가 관점 ⑧ 익명 사례 톤의 변화(숫자는 예시로) ⑨ FAQ 2~3개 ⑩ 다음 행동(병원 상담 또는 프로그램 상담) — 주제와 맞으면 프로필 증상 허브 딥링크 1개 포함 가능`;
+**explanation 맨 앞 2~3문장은 TL;DR(핵심 결론 요약)**으로 시작할 것. AI가 먼저 발췌할 수 있게 결론을 선제시한 뒤, 아래 요소를 번호·"N단계" 표기 없이 문단으로 이어 연결:
+① (TL;DR — 위에서 이미 작성) ② 자가 점검 2~4개 ③ 가능한 원인 ④ 병원 진료 신호 vs 운동·프로그램으로 관리 가능한 경우 ⑤ 안전한 셀프 확인·이완 ⑥ 주의·금기 ⑦ 근골격계 전문가 관점 ⑧ 익명 사례 톤의 변화(숫자는 예시로) ⑨ FAQ 2~3개 ⑩ 다음 행동(병원 상담 또는 프로그램 상담) — 주제와 맞으면 프로필 증상 허브 딥링크 1개 포함 가능`;
 
 const DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW = `**일반인 독자**용 블로그입니다. ${BLOG_CONTENT_VOICE_RULE}
 
@@ -4933,7 +5017,7 @@ ${GEO_CONTENT_STRUCTURE_RULE}
 [글 흐름 — 반드시 이 순서·필드]
 1. **문제 제기** (problem): 일상 장면에서 공감되는 불편·궁금증 2~4문장. 불릿·번호 나열 금지. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스.
 2. **셀프 케어** (selfCare): **👉 로 시작**. 동작·자세·**초·회·분**을 앞쪽에. "아 시원하다" 지점에서 멈추라는 뉘앙스. 무리·재통증 주의 한 줄. 통증이 심하면 병원 먼저 한 줄.
-3. **원리 설명** (explanation): 동작 **뒤에** 왜 도움이 되는지 + GEO 구조. 비유 한 줄. 병원 치료가 필요한 경우와 **프로그램 병행**이 맞는 경우를 구분.
+3. **원리 설명** (explanation): **맨 앞 2~3문장 TL;DR(핵심 결론)** → 동작 **뒤에** 왜 도움이 되는지 + GEO 구조. 비유 한 줄. 병원 치료가 필요한 경우와 **프로그램 병행**이 맞는 경우를 구분.
 
 [형식]
 - title: 호기심·질문형 한 줄 (35자 내외, 네이버 SEO 고려, 과장 금지)
@@ -5127,6 +5211,46 @@ function restoreTextFieldFocus_(snap){
 let appToastTimer = null;
 var APP_TOAST_GAP = 10;
 var APP_TOAST_BASE_BOTTOM = 22;
+var _bodyScrollLockY = 0;
+var _bodyScrollLockCount = 0;
+
+function lockBodyScroll_() {
+  if (_bodyScrollLockCount === 0) {
+    _bodyScrollLockY = window.scrollY || document.documentElement.scrollTop || 0;
+    document.body.style.position = 'fixed';
+    document.body.style.top = '-' + _bodyScrollLockY + 'px';
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
+  }
+  _bodyScrollLockCount += 1;
+}
+
+function unlockBodyScroll_() {
+  if (_bodyScrollLockCount <= 0) return;
+  _bodyScrollLockCount -= 1;
+  if (_bodyScrollLockCount > 0) return;
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.left = '';
+  document.body.style.right = '';
+  document.body.style.width = '';
+  document.body.style.overflow = '';
+  window.scrollTo(0, _bodyScrollLockY);
+}
+
+function settleBottomSheet_(el) {
+  if (!el) return;
+  setTimeout(function () {
+    el.classList.add('sheet-settled');
+  }, 320);
+}
+
+function resetBottomSheet_(el) {
+  if (!el) return;
+  el.classList.remove('sheet-settled');
+}
 
 function getAppToastBottomChromeRects_(){
   var rects = [];
@@ -8336,12 +8460,13 @@ function setOpenDetailHash_(draftId, catId, tab){
 }
 function closeSheetUiOnly_(){
   releaseModalFocusTrap_();
+  resetBottomSheet_(document.getElementById('detail-sheet'));
   document.getElementById('detail-sheet').classList.remove('open');
   state.selectedId = null;
   state.selectedCatId = null;
   setTimeout(function(){
     document.getElementById('detail-overlay').classList.remove('open');
-    document.body.style.overflow = '';
+    unlockBodyScroll_();
     scheduleAppToastLift_();
   }, 280);
 }
@@ -8878,11 +9003,13 @@ function openDetail(draftId, catId, tab, opts) {
   if(content){ renderSheetContent(content); }
   else { renderSheetEmpty(draft, cat); }
   document.getElementById('detail-overlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
+  lockBodyScroll_();
   setTimeout(function(){
-    document.getElementById('detail-sheet').classList.add('open');
+    var sheetEl = document.getElementById('detail-sheet');
+    sheetEl.classList.add('open');
+    settleBottomSheet_(sheetEl);
     scheduleAppToastLift_();
-    trapFocusIn_(document.getElementById('detail-sheet'));
+    trapFocusIn_(sheetEl);
   }, 10);
   if(!opts.skipHash){
     setOpenDetailHash_(draftId, catId, state.activeTab);
@@ -8936,10 +9063,8 @@ function renderSheetEmpty(draft, cat) {
     : '';
   document.getElementById('sheet-body').innerHTML =
     buildDraftBrandBlockHTML_(draft, cat.id, true) +
-    `<div style="padding:10px 0 12px;font-size:13px;color:#9CA3AF;line-height:1.7;">${escapeHtml(draft.angle)}</div>
-    ${sourceNoteHtml}
-    ${ytAnalysisHtml}
-    <div style="background:#F8F7F4;border-radius:12px;padding:28px 20px;text-align:center;">
+    `${sourceNoteHtml}${ytAnalysisHtml}` +
+    `<div style="background:#F8F7F4;border-radius:12px;padding:28px 20px;text-align:center;" class="sheet-gen-cta">
       <div style="font-size:14px;color:#6B7280;line-height:1.7;margin-bottom:20px;">${genLine}</div>
       <button onclick="genContent()" style="background:linear-gradient(135deg,#2DD4BF,#0EA5E9);color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">초안 생성하기</button>
     </div>`;
@@ -11201,21 +11326,24 @@ window.openPublishModal = function(){
     refineNote.classList.add('show');
   }
   document.getElementById('publish-modal-overlay').classList.add('open');
+  lockBodyScroll_();
   setTimeout(function(){
-    document.getElementById('publish-modal').classList.add('open');
+    var pubEl = document.getElementById('publish-modal');
+    pubEl.classList.add('open');
+    settleBottomSheet_(pubEl);
     scheduleAppToastLift_();
-    trapFocusIn_(document.getElementById('publish-modal'));
+    trapFocusIn_(pubEl);
   }, 10);
-  document.body.style.overflow = 'hidden';
 };
 
 window.closePublishModal = function(e){
   if(e && e.target !== document.getElementById('publish-modal-overlay')) return;
+  resetBottomSheet_(document.getElementById('publish-modal'));
   document.getElementById('publish-modal').classList.remove('open');
   releaseModalFocusTrap_();
   setTimeout(function(){
     document.getElementById('publish-modal-overlay').classList.remove('open');
-    document.body.style.overflow = '';
+    unlockBodyScroll_();
     scheduleAppToastLift_();
     restoreDetailFocusTrapIfOpen_();
   }, 280);
@@ -11359,10 +11487,13 @@ function openPromptModal(catId) {
   state.promptTab = isThreadCategory(state.editingCatId) ? 'thread' : (isHeiljagyaeCategory(state.editingCatId) ? 'community' : 'blog');
   renderPromptModal();
   document.getElementById('prompt-modal-overlay').classList.add('open');
+  lockBodyScroll_();
   setTimeout(function(){
-    document.getElementById('prompt-modal').classList.add('open');
+    var pmEl = document.getElementById('prompt-modal');
+    pmEl.classList.add('open');
+    settleBottomSheet_(pmEl);
     scheduleAppToastLift_();
-    trapFocusIn_(document.getElementById('prompt-modal'));
+    trapFocusIn_(pmEl);
   }, 10);
 }
 
@@ -11559,10 +11690,12 @@ if(typeof setAppToast === 'function'){
 
 function closePromptModal(e) {
 if(e && e.target !== document.getElementById('prompt-modal-overlay')) return;
+resetBottomSheet_(document.getElementById('prompt-modal'));
 document.getElementById('prompt-modal').classList.remove('open');
 releaseModalFocusTrap_();
 setTimeout(function(){
   document.getElementById('prompt-modal-overlay').classList.remove('open');
+  unlockBodyScroll_();
   scheduleAppToastLift_();
   restoreDetailFocusTrapIfOpen_();
 }, 280);
@@ -11764,6 +11897,10 @@ if(!draft0){
   if(!opts.dailyAuto && !opts.batch && typeof setAppToast === 'function') setAppToast('선택된 초안을 찾을 수 없어요. 카드를 다시 눌러 주세요.', { duration: 4000, variant: 'err' });
   return false;
 }
+if(state.selectedId === jobDraftId){
+  flushDraftBrandFieldsFromDom_();
+  save({ skipDriveUpload: !!(opts.batch || opts.dailyAuto), skipGasPush: !!(opts.batch || opts.dailyAuto) });
+}
 var jobTopic = draft0.topic;
 
 if(opts.userInitiated){
@@ -11788,6 +11925,7 @@ const threadGuide = getCatPrompt(catId, 'thread');
 const imageGuide = getCatPrompt(catId, 'image');
 const baseInfo = getBasePrompt();
 const brandBlock = buildBrandContextForPrompt_(catId, draft);
+const briefPromptLines = buildDraftBriefPromptLines_(draft, catId);
 const imagePromptGuide = buildImagePromptGuide(draft.topic, draft.angle, imageGuide);
 
 const imgJsonTail = `
@@ -11810,7 +11948,7 @@ ${dailyCtxBlock ? '\n\n' + dailyCtxBlock : ''}
 카테고리: ${cat.name} (${cat.sub})
 독자: ${cat.audience}
 주제: "${draft.topic}"
-각도: ${draft.angle}
+${briefPromptLines}
 
 [일상 공유 작성 지침]
 ${threadGuide}
@@ -11843,7 +11981,7 @@ ${brandBlock}
 카테고리: ${cat.name} (${cat.sub})
 독자: ${cat.audience}
 주제: "${draft.topic}"
-각도: ${draft.angle}
+${briefPromptLines}
 
 [힐자계 아파트너 게시판 작성 지침]
 ${communityGuide}
@@ -11883,7 +12021,7 @@ ${brandBlock}
 카테고리: ${cat.name} (${cat.sub})
 독자: ${cat.audience}
 주제: "${draft.topic}"
-각도: ${draft.angle}
+${briefPromptLines}
 
 [블로그 작성 지침]
 ${blogGuide}
@@ -11895,10 +12033,10 @@ ${imagePromptGuide}
 2026년 봄/초여름 — 주제·각도에 맞을 때만 계절감을 자연스럽게. JSON만 응답:
 {
 "blog": {
-"title": "호기심·질문형 한 줄 (35자 내외, 과장 금지)",
+"title": "호기심·질문형 한 줄. 증상형이면 증상+지역·프로그램 키워드를 자연스럽게 (35자 내외, 과장 금지)",
 "problem": "문제 제기 2~4문장. 불릿·번호 없이. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스",
 "selfCare": "👉 로 시작. 동작·자세·초·회·분을 앞쪽에. '시원한 지점에서 멈추기' 뉘앙스",
-"explanation": "원리 설명 2~5문장. 왜 도움이 되는지+비유+복잡하지 않다는 마무리",
+"explanation": "맨 앞 2~3문장 TL;DR(핵심 결론) → 원리 설명+GEO 구조. 왜 도움이 되는지+비유+복잡하지 않다는 마무리",
 "cta": "마무리 행동 유도 (미카닥 박준규·블로그/상담·증상 허브 URL 자연스럽게 언급)",
 "hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6"]
 },
@@ -11929,7 +12067,7 @@ ${brandBlock}
 카테고리: ${cat.name} (${cat.sub})
 독자: ${cat.audience}
 주제: "${draft.topic}"
-각도: ${draft.angle}
+${briefPromptLines}
 
 [작성 전제 — 매우 중요]
 이 글은 교육·강의 때 **촬영한 영상** 또는 **실습·시연 사진**을 공유하며, 그 내용에 맞춰 쓰는 글입니다.
@@ -11967,7 +12105,7 @@ ${brandBlock}
 카테고리: ${cat.name} (${cat.sub})
 독자: ${cat.audience}
 주제: "${draft.topic}"
-각도: ${draft.angle}
+${briefPromptLines}
 
 [블로그 작성 지침]
 ${blogGuide}

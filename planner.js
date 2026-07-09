@@ -1533,6 +1533,122 @@ const CAT_DEFAULT_PILLAR = {
   6: '신뢰 · 과장 없는 설명',
   7: '입주민 · 가벼운 셀프 케어'
 };
+
+/** 썸네일 상단 고정 멘트 (브랜드 · 프로그램) */
+const CAT_IMAGE_THUMBNAIL_FIXED = {
+  0: { brand: '리얼무브먼트', program: '도수치료 · PSP' },
+  1: { brand: '리얼무브먼트', program: 'Re:Al Movement · PAR' },
+  2: { brand: '리얼무브먼트', program: 'Re:Al Face · 구조 교정' },
+  3: { brand: '미카닥 박준규', program: 'CMT · 임상 노트' },
+  4: { brand: '미카닥 박준규', program: 'IFC · 얼굴 구조' },
+  5: { brand: '미카닥 박준규', program: 'Re:Al Movement · 전문가' },
+  6: { brand: '미카닥 박준규', program: '일상' },
+  7: { brand: '힐자계', program: '입주민 셀프 케어' }
+};
+/** 썸네일 여백 밴드 색 (영문 프롬프트용) */
+const CAT_IMAGE_BAND_COLOR_EN = {
+  0: 'deep charcoal top and bottom bands with subtle teal accent',
+  1: 'off-white and mint green top and bottom bands',
+  2: 'warm rose and soft cream top and bottom bands',
+  3: 'deep navy and muted purple top and bottom bands',
+  4: 'burgundy rose and soft gray top and bottom bands',
+  5: 'sky blue and charcoal top and bottom bands',
+  6: 'soft warm gray top and bottom bands',
+  7: 'light warm beige bands, apartment documentary feel'
+};
+/** 썸네일 중앙 비주얼 힌트 (영문) */
+const CAT_IMAGE_THUMBNAIL_SCENE_EN = {
+  0: 'close-up neck shoulder or lower back, gentle hands-on demonstration, documentary wellness clinic, natural shadows, visible skin texture',
+  1: 'single exercise pose on yoga mat side view, movement studio, clear body alignment, athletic modest clothing',
+  2: 'face jawline and neck close-up near window, natural skin texture, lifestyle editorial not beauty ad',
+  3: 'hands-on palpation or joint mobilization demo, seminar room or clinic table, professional modest attire',
+  4: 'cervical jaw assessment hand placement, clinical studio, structural approach not spa massage',
+  5: 'P-ROM or functional movement demo on mat, education classroom, practitioner demonstrating',
+  6: 'everyday slice of life coffee window rain walking shoes, no medical diagram, phone-photo realism',
+  7: 'Korean apartment hallway or living room, relatable resident mood, not a sales ad'
+};
+
+function getCatImageThumbnailFixed_(catId){
+  var id = parseInt(catId, 10);
+  if(isNaN(id) || !CAT_IMAGE_THUMBNAIL_FIXED[id]) return CAT_IMAGE_THUMBNAIL_FIXED[1];
+  return CAT_IMAGE_THUMBNAIL_FIXED[id];
+}
+
+function buildImageOverlayHookFromContent_(content){
+  if(!content) return '';
+  if(content.blog){
+    var b = content.blog;
+    if(b.title && String(b.title).trim()) return String(b.title).trim();
+    if(b.hook && String(b.hook).trim()) return String(b.hook).trim();
+  }
+  if(content.community){
+    var c = content.community;
+    if(c.title && String(c.title).trim()) return String(c.title).trim();
+  }
+  return '';
+}
+
+function isGptVisualThumbnail_(item, idx, list){
+  if(!item) return false;
+  var isThumb = item.role === 'thumbnail' ||
+    /썸네일|thumbnail/i.test(String(item.title || '')) ||
+    (/①/.test(String(item.title || '')) && !/②|동작|본문|시연|셀프/i.test(String(item.title || '')));
+  if(!isThumb && idx === 0 && list && list.length === 2){
+    var second = list[1];
+    if(second && (/동작|본문|시연|셀프|②/i.test(String(second.title || '')) || second.role === 'body')){
+      isThumb = true;
+    }
+  }
+  return isThumb;
+}
+
+/** 블로그·게시판 제목 변경 시 썸네일 overlayHook 동기화 */
+function syncThumbnailOverlayHook_(content, catId){
+  if(!content || !content.images || !content.images.gptVisuals) return content;
+  var hook = buildImageOverlayHookFromContent_(content);
+  if(!hook) return content;
+  var list = content.images.gptVisuals;
+  list.forEach(function(item, idx){
+    if(isGptVisualThumbnail_(item, idx, list)) item.overlayHook = hook;
+  });
+  return content;
+}
+
+function enrichImageOverlays_(content, catId){
+  if(!content || !content.images || !content.images.gptVisuals) return content;
+  var fixed = getCatImageThumbnailFixed_(catId);
+  var hook = buildImageOverlayHookFromContent_(content);
+  content.images.gptVisuals.forEach(function(item, idx){
+    if(!item) return;
+    var isThumb = isGptVisualThumbnail_(item, idx, content.images.gptVisuals);
+    if(isThumb){
+      item.role = 'thumbnail';
+      if(!item.overlayFixedLine1) item.overlayFixedLine1 = fixed.brand;
+      if(!item.overlayFixedLine2) item.overlayFixedLine2 = fixed.program;
+      if(!item.overlayHook && hook) item.overlayHook = hook;
+    } else {
+      item.role = item.role || 'body';
+    }
+  });
+  return content;
+}
+
+function buildImageGptVisualsJsonExample_(catId, opts){
+  opts = opts || {};
+  var fixed = getCatImageThumbnailFixed_(catId);
+  var bodyTitle = opts.expert
+    ? '② 본문 시연·교육 동작'
+    : (parseInt(catId, 10) === 7 ? '② 본문 셀프 동작' : '② 본문 셀프케어 동작');
+  var hookHint = parseInt(catId, 10) === 7
+    ? 'community.title과 동일한 후킹 한 줄'
+    : 'blog.title과 동일한 후킹 한 줄';
+  return `"images": {
+"gptVisuals": [
+{"role":"thumbnail","title":"① 썸네일 1:1","overlayFixedLine1":"${fixed.brand}","overlayFixedLine2":"${fixed.program}","overlayHook":"${hookHint}","prompt":"영문 단일 문자열. 위 [이미지 2장] ① 썸네일 규칙대로 주제에 맞게 새로 작성."},
+{"role":"body","title":"${bodyTitle}","prompt":"영문 단일 문자열. 위 [이미지 2장] ② 본문 규칙대로 본문 동작·시연과 일치하게 새로 작성."}
+]
+}`;
+}
 const SUBGOAL_MISC_ID = 'misc';
 const SUBGOAL_MISC_LABEL = '기타 주제';
 const PENDING_SUBGOAL_SS_KEY = 'ht_pending_subgoal_plan';
@@ -3246,7 +3362,7 @@ function buildDraftInventoryForSubGoalAI_(catId){
   if(!cat) return '';
   return (cat.drafts || []).map(function(d, i){
     if(!d || !d.id) return '';
-    var pub = draftIsPublished_(d.id) ? '발행완료' : (draftHasContent(d) ? '초안있음' : '미작성');
+    var pub = draftIsPublished_(d.id) ? '발행완료' : (draftHasPartialPublish_(d.id, catId) ? '일부발행' : (draftHasContent(d) ? '초안있음' : '미작성'));
     var meta = getDraftBrandMeta_(d, catId, i);
     return '- id:' + d.id + ' | ' + pub + ' | topic:' + d.topic +
       (d.angle ? ' | angle:' + d.angle : '') +
@@ -6164,8 +6280,6 @@ let state = {
   promptTab: 'blog',
   editingCatId: 0,
   promptRefineMilestones: {}, // catId → 마지막 반영한 발행 N건 (3, 6, …)
-  publishModalDraftId: null,
-  publishModalCatId: null,
   branding: null,
   collapsedSubGoalSteps: {},
   pendingSubGoalPlan: null,
@@ -6225,10 +6339,6 @@ function getCatPrompt(catId, type) {
   const catPrompts = getPrompts().categories[catId] || {};
   const cur = catPrompts[type];
   if(cur !== undefined && cur !== null && String(cur).length > 0) return cur;
-  if(type === 'notebookLM' && !isThreadCategory(catId) && !isHeiljagyaeCategory(catId)) {
-    const legacy = catPrompts.community;
-    if(legacy !== undefined && legacy !== null && String(legacy).length > 0) return legacy;
-  }
   return DEFAULT_PROMPTS.categories[catId]?.[type] || '';
 }
 function isDailyShareCategory(catId){ return catId === 6; }
@@ -6307,10 +6417,6 @@ function closeTopmostPlannerOverlay_(){
     closeDriveModal();
     return true;
   }
-  if(document.getElementById('publish-modal-overlay').classList.contains('open')){
-    closePublishModal();
-    return true;
-  }
   if(document.getElementById('prompt-modal-overlay').classList.contains('open')){
     closePromptModal();
     return true;
@@ -6342,7 +6448,6 @@ const APARTNER_ANDROID_PKG = 'kr.co.azsmart.apartner';
 const APARTNER_IOS_STORE = 'https://apps.apple.com/kr/app/id1243505765';
 const APARTNER_PLAY_STORE = 'https://play.google.com/store/apps/details?id=' + APARTNER_ANDROID_PKG;
 const APARTNER_WEB = 'https://www.aptner.com/';
-const NOTEBOOKLM_URL = 'https://notebooklm.google.com/';
 
 /** iPhone·iPad(요청 데스크톱 UA 포함)·Android 구분 — 바로가기 앱 연동용 */
 function isIOSLikeDevice(){
@@ -6493,22 +6598,6 @@ const DEFAULT_DAILY_SHARE_PROMPT = `**일상 공유** 탭용 글입니다. Threa
 - **summary**: topicTitle에 이어지는 **연속 본문**. 관찰·느낌·여유를 말하듯. 이모지 0~1개
 - **3~7문장**, 번호·불릿 없이 한 덩어리. 전문가 시선은 **본문 1~2문장** 이내로 은은하게`;
 
-const DEFAULT_NOTEBOOKLM_PROMPT = `Google **NotebookLM**에 소스로 붙여 넣으면, 오디오 오버뷰·강의 카드·영상 대본 등으로 확장할 수 있는 **질문·답변 중심 텍스트**를 만듭니다.
-
-[역할]
-- 블로그 본문을 요약하는 것이 아니라, **한 주제를 강의·스크립트로 펼칠 때 나올 만한 질문**을 촘촘히 만들고, 각 답은 **정의 → 왜 중요한지 → 실천/주의 한 줄**이 듣는 사람에게 바로 전달되게 씁니다.
-- 답변은 **150~400자** 정도(한국어 기준). 한 문단으로 읽히게. 불필요한 소제목 번호 나열은 피하고, 말로 설명하듯 자연스럽게.
-
-[질문 구성 가이드]
-- 첫 2~3개: "이게 뭔가요?", "왜 나에게 중요한가요?", "흔한 오해는?" 같은 **입문·동기** 질문
-- 중간: 원리·메커니즘·일상과의 연결 **심화** 질문 3~4개
-- 마지막: "오늘부터 뭐부터 하면 되나요?", "언제 전문가를 보나요?" 같은 **실천·안전** 질문 1~2개
-- 카테고리(도수·운동·얼굴·교육)에 맞는 용어 깊이를 조절할 것.
-
-[금지]
-- 상업적 예약·센터 직접 홍보 문구, 과장·낚시 제목식 문장
-- "첫째 둘째 셋째" 식 **발표 자료 목차만 덩어리로** 나열 (내용은 풀어서)`;
-
 const DEFAULT_THREADS_SNS_PROMPT = `당신은 의료/건강 콘텐츠를 **Threads(쓰레드) 스타일**로 변환하는 전문가입니다.
 
 [말투]
@@ -6534,11 +6623,33 @@ const DEFAULT_THREADS_SNS_PROMPT = `당신은 의료/건강 콘텐츠를 **Threa
 - 과한 설명
 - 인스타 해시태그·불릿·번호 목록을 그대로 옮기기`;
 
-const DEFAULT_BLOG_INSTA_IMAGE_PROMPT = `이미지 생성 프롬프트는 블로그·인스타 본문과 같은 주제 흐름을 시각화합니다.
-- 정확히 2장: ① 전문 설명 보조(도식·인포그래픽·부드러운 medical illustration), ② 셀프케어 동작(본문의 동작과 정확히 일치)
-- 영문 한 덩어리 프롬프트, 80~200단어, 한 줄 요약·불릿 금지
-- Korean domestic visual language, warm beige·sage·cream palette, soft daylight, no text overlay, no logo, no watermark
-- 사람은 East Asian adult, modest everyday clothing, 자연스러운 피부와 자세`;
+const DEFAULT_BLOG_INSTA_IMAGE_PROMPT = `이미지는 **정확히 2장** — ① 1:1 썸네일(피드·인스타 커버) ② 본문 보조(동작·시연).
+
+[① 썸네일 1:1]
+- 비율 1:1. 상단 20%·하단 22%는 단색 밴드(글자 없음) — 후처리 시 한글 삽입용 여백
+- overlayFixedLine1·overlayFixedLine2·overlayHook 필드에 한글 고정·후킹 문구 기록 (이미지 안에 글자 생성 금지)
+- 중앙만 사진: editorial documentary, natural light, slight film grain, visible skin texture
+- 크리미 베이지 인포그래픽·3D 해부·AI 매끈 피부 금지
+
+[② 본문]
+- blog.selfCare와 **동일한** 셀프 동작 1장면. 매트·바닥·옆모습·자연광
+- 텍스트·로고 없음
+
+영문 prompt는 한 덩어리 90~200단어. 불릿·한 줄 요약 금지.`;
+
+const DEFAULT_EXPERT_COURSE_IMAGE_PROMPT = `전문가 과정·강연 공유용 — **2장**: ① 1:1 썸네일 ② 본문 시연.
+
+[① 썸네일] 상·하 여백 밴드 + 중앙 시연·손 클로즈업. overlay 필드에 한글 고정·후킹.
+[② 본문] blog.outline·draft·참고 메모의 테크닉·시연과 **정확히 일치**. 강의실·클리닉.
+
+크리미 medical illustration 금지. documentary·seminar editorial. 영문 prompt 한 덩어리.`;
+
+const DEFAULT_HEILJAGYAE_IMAGE_PROMPT = `힐자계 아파트너 — **2장**: ① 1:1 썸네일 ② 본문 셀프 동작.
+
+[① 썸네일] 아파트·단지 공감 컷 + 상·하 여백. overlay: 힐자계 / 입주민 셀프 케어 + community.title 후킹.
+[② 본문] community.selfCare와 **동일** 동작. 광고톤 금지, 옆집 이웃 생활감.
+
+영문 prompt 한 덩어리. 크리미 AI 일러스트 금지.`;
 
 const DEFAULT_EXPERT_COURSE_SCOPE_RULE = `[범위·집중 — 최우선]
 - 이 글은 **교육·강의 때 촬영한 영상** 또는 **실습·시연 사진**을 공유하면서, 그 장면에 맞춰 쓰는 글입니다.
@@ -6627,19 +6738,7 @@ ${DEFAULT_EXPERT_COURSE_SCOPE_RULE}
 - caption: hook 제외 **200~400자**. 수강·등록 유도 금지
 - hashtags: **4~6개** 이내, 전문 키워드 위주`;
 
-const DEFAULT_EXPERT_COURSE_IMAGE_PROMPT = `전문가 과정·강연 공유용 이미지 생성 프롬프트입니다.
-- 참고 메모·영상·본문에 나온 테크닉·동작만 시각화. 참고에 없는 부위·동작·평가로 확장 금지
-- 정확히 2장: ① 전문 설명 보조(도식·인포그래픽·부드러운 medical illustration), ② **교육·시연 동작**(본문·참고 메모의 테크닉·평가 동작과 일치)
-- 영문 한 덩어리, 80~200단어. Korean clinic or seminar room, East Asian adult professional, modest clothing
-- warm beige·sage palette, soft daylight, no text overlay, no logo`;
-
-const DEFAULT_HEILJAGYAE_IMAGE_PROMPT = `아파트너 게시글용 이미지 생성 프롬프트입니다.
-- 정확히 2장: ① 단지·동네에서 공감되는 일상 한 컷, ② 게시글 selfCare와 동일한 셀프 동작
-- 한국 아파트 복도·엘리베이터·거실·요가매트 등 입주민에게 익숙한 공간
-- Photorealistic editorial, warm beige·sage·cream palette, soft daylight, no text overlay, no logo, no watermark
-- 광고 느낌보다 옆집 이웃의 생활감·가벼운 컨디션 회복 분위기`;
-
-// ── 기본 프롬프트 (카테고리별 블로그/인스타/NotebookLM 등) ──
+// ── 기본 프롬프트 (카테고리별 블로그/인스타/쓰레드 등) ──
 const DEFAULT_PROMPTS = {
   base: `당신은 '미카닥 박준규'의 전담 콘텐츠 기획자입니다.
 브랜드 주체: 미카닥 박준규 (미국 DC·한국 PT, 20년+ 근골격계·비수술 전문가)
@@ -6652,42 +6751,36 @@ ${MEDICAL_COMPLIANCE_RULE}
       blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[도수치료 맥락] PSP·PAR 순서를 환자 언어로: 평가(증상·통증 질)→연부·관절 이해→Passive(P-ROM)→생활습관. problem에 공감·왜 아픈지 가볍게, selfCare는 집에서 할 수 있는 동작.`,
       insta: `캐러셀(여러 장 슬라이드) 없이 **한 포스트 캡션**으로 끝내세요. 첫 줄 후킹에 이어, 본문 캡션 안에 통증→원인→해결 흐름의 **핵심 포인트**를 번호(1. 2.) 또는 • 불릿으로 넣어 한 번에 읽히게 하세요.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
-      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     1: { // 리:얼 무브먼트
       blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[Movement 맥락] P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지.`,
       insta: `캐러셀 없이 **한 포스트 캡션**에 동작·포인트·주의사항을 단계적으로 적습니다. 마지막에 저장·팔로우 유도 문장을 캡션 끝에 자연스럽게 넣으세요.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
-      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     2: { // 리:얼 페이스
       blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[얼굴·뷰티 맥락] 20~40대 여성 독자. 과학적 근거는 가볍게, 공감과 희망. selfCare는 부담 없는 가벼운 동작·습관.`,
       insta: `캐러셀 없이 **한 포스트 캡션**으로 스토리텔링하세요. "이런 고민 있으신가요?"에 이어 문제→원인→해결→CTA를 캡션 안에서 줄바꿈으로 구분해 읽기 쉽게.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
-      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     3: { // CMT 전문가
       blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[CMT 맥락]\n- PSP 용어는 **참고·영상에서 다룬 범위** 안에서만. 무관한 평가·중재 전체 흐름으로 확장 금지\n- 촉진·관절가동술 등 **이번 강의 테크닉** 중심. 짧은 원리 설명은 괜찮으나 별도 케이스·부위로 넓히지 말 것`,
       insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[CMT] 이번 강의·영상의 테크닉·포인트만. PSP는 참고 범위 안에서만.`,
       image: DEFAULT_EXPERT_COURSE_IMAGE_PROMPT,
-      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     4: { // IFC 얼굴교육
       blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[IFC 맥락]\n- 구조적 접근은 **참고·영상에서 다룬 범위** 안에서만. 무관한 경추·교합·전신 이야기로 확장 금지\n- 이번 강의·시연의 테크닉·평가 포인트 중심`,
       insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[IFC] 이번 강의·영상의 테크닉·포인트만.`,
       image: DEFAULT_EXPERT_COURSE_IMAGE_PROMPT,
-      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     5: { // Re:Al 움직임 과정
       blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[Re:Al Movement 맥락]\n- Movement·P-A-R 등은 **참고·영상에서 다룬 내용** 안에서만 연결\n- 참고에 없는 평가·운동 처방·다른 부위로 확장 금지`,
       insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[Re:Al] 이번 강의·영상의 테크닉·포인트만.`,
       image: DEFAULT_EXPERT_COURSE_IMAGE_PROMPT,
-      notebookLM: DEFAULT_NOTEBOOKLM_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     6: { // 일상 공유 (thread JSON만 — 블로그/인스타/이미지 없음)
@@ -6820,14 +6913,6 @@ function getAppToastBottomChromeRects_(){
     if(pmFooter){
       var rp = pmFooter.getBoundingClientRect();
       if(rp.height > 0) rects.push(rp);
-    }
-  }
-  var pubOverlay = document.getElementById('publish-modal-overlay');
-  if(pubOverlay && pubOverlay.classList.contains('open')){
-    var pubFooter = pubOverlay.querySelector('.prompt-modal-footer');
-    if(pubFooter){
-      var ru = pubFooter.getBoundingClientRect();
-      if(ru.height > 0) rects.push(ru);
     }
   }
   return rects;
@@ -7452,6 +7537,7 @@ function applyPersistPayload(s){
   restorePendingYearPlan_();
   if(sanitizeBrandingClinicRefs_()) save({ skipDriveUpload: true, skipGasPush: true });
   if(ensureYearPlanMigrated_()) save({ skipDriveUpload: true, skipGasPush: true });
+  if(migrateLegacyPublishTabPublished_()) save({ skipDriveUpload: true, skipGasPush: true });
 }
 
 function save(opts) {
@@ -8512,6 +8598,8 @@ function saveKey() {
   state.chatgptOpenUrl = nu === '' ? '' : nu;
   var syncTokEl = document.getElementById('planner-sync-token');
   if(syncTokEl) setPlannerSyncToken_(syncTokEl.value);
+  var dailyAutoEl = document.getElementById('daily-auto-enabled');
+  if(dailyAutoEl) setDailyAutoEnabled_(!!dailyAutoEl.checked);
   save();
   document.getElementById('api-modal').classList.remove('open');
   releaseModalFocusTrap_();
@@ -8537,6 +8625,8 @@ function openApiModal() {
   if(uEl) uEl.value = state.chatgptOpenUrl || DEFAULT_CHATGPT_IMAGE_PROJECT_URL;
   var syncTokEl = document.getElementById('planner-sync-token');
   if(syncTokEl) syncTokEl.value = getPlannerSyncToken_();
+  var dailyAutoEl = document.getElementById('daily-auto-enabled');
+  if(dailyAutoEl) dailyAutoEl.checked = isDailyAutoEnabled_();
   updateGeminiServerStatusUI_();
   refreshPlannerServerCaps_();
   document.getElementById('api-modal').classList.add('open');
@@ -8606,6 +8696,8 @@ function renderTabs() {
     groupSelectorHTML('전문가용', CAT_GROUP_EXPERT, 'expert') +
     opsGroupSelectorHTML();
   document.getElementById('cat-tabs-grid').innerHTML = html;
+  var promptBtn = document.getElementById('btn-prompt-settings');
+  if(promptBtn) promptBtn.style.display = isOpsManualCategory(state.currentCat) ? 'none' : '';
 }
 
 function activateCatGroup_(groupKey, ev){
@@ -8656,8 +8748,38 @@ function updateAddButtonVisibility_(){
 window.updateAddButtonVisibility_ = updateAddButtonVisibility_;
 
 // ── Recommendations ──
+function getRequiredPublishKeysForCat_(catId){
+  if(isDailyShareCategory(catId)) return ['thread'];
+  if(isHeiljagyaeCategory(catId)) return ['community', 'image'];
+  if(isBlogInstaCategory(catId)) return ['blog', 'insta', 'threads', 'image'];
+  return [];
+}
+
+function draftHasAnyPublish_(draftId){
+  var pub = draftId && state.published[draftId];
+  if(!pub) return false;
+  if(pub.date) return true;
+  if(pub.tabPublished && Object.keys(pub.tabPublished).length) return true;
+  return false;
+}
+
+function draftIsFullyPublished_(draftId, catId){
+  if(catId == null) catId = getCatIdFromDraftId_(draftId);
+  var keys = getRequiredPublishKeysForCat_(catId);
+  if(!keys.length) return false;
+  var pub = state.published[draftId];
+  if(!pub || !pub.tabPublished) return false;
+  return keys.every(function(k){ return !!pub.tabPublished[k]; });
+}
+
+function draftHasPartialPublish_(draftId, catId){
+  if(catId == null) catId = getCatIdFromDraftId_(draftId);
+  if(draftIsFullyPublished_(draftId, catId)) return false;
+  return draftHasAnyPublish_(draftId);
+}
+
 function draftIsPublished_(draftId) {
-  return !!(draftId && state.published[draftId] && state.published[draftId].date);
+  return draftIsFullyPublished_(draftId, getCatIdFromDraftId_(draftId));
 }
 
 /** 미발행 초안(생성됐지만 아직 발행 완료 전) */
@@ -9217,6 +9339,7 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
   const pub = state.published[d.id];
   const hasDraft = draftIsPendingPublish_(d);
   const isPub = draftIsPublished_(d.id);
+  const isPartialPub = !isPub && draftHasPartialPublish_(d.id, cat.id);
   const color = cat.color;
   const brandMeta = getDraftBrandMeta_(d, cat.id, draftIndex);
   const audienceBadge = String(cat.audience || '').includes('전문가') ? '전문가' : (String(cat.audience || '').includes('일반') ? '일반인' : cat.audience);
@@ -9226,6 +9349,7 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
     isRec && d.recType==='related' ? '<span class="badge badge-rec">관련</span>' : '',
     compactInSeries && brandMeta.step ? '<span class="badge badge-step">' + escapeHtml(brandMeta.step) + '</span>' : '',
     hasDraft ? '<span class="badge badge-gen">초안있음</span>' : '',
+    isPartialPub ? '<span class="badge badge-partial">일부발행</span>' : '',
     isPub ? '<span class="badge badge-pub">발행완료</span>' : '',
   ].filter(Boolean).join('');
   const brandLine = compactInSeries
@@ -9977,7 +10101,7 @@ window.deleteDraft = function(catId, draftId){
   }
   var t0 = d.topic || '주제';
   var short = t0.length > 28 ? t0.slice(0, 28) + '…' : t0;
-  var hasExtra = draftHasContent(d) || draftIsPublished_(draftId);
+  var hasExtra = draftHasContent(d) || draftHasAnyPublish_(draftId);
   var msg = hasExtra
     ? '「' + short + '」와 작성된 초안·발행 정보를 삭제합니다.\n되돌릴 수 없어요. 계속할까요?'
     : '「' + short + '」 주제를 목록에서 삭제할까요?';
@@ -10111,9 +10235,12 @@ var dailyAutoTimer = null;
 function isDailyAutoEnabled_(){
   try {
     var v = localStorage.getItem(DAILY_AUTO_ENABLED_KEY);
-    if(v === '0') return false;
-    return true;
-  } catch(e){ return true; }
+    if(v === '1') return true;
+    return false;
+  } catch(e){ return false; }
+}
+function setDailyAutoEnabled_(on){
+  try { localStorage.setItem(DAILY_AUTO_ENABLED_KEY, on ? '1' : '0'); } catch(e){}
 }
 function isAutoTopicReplenishEnabled_(){
   try {
@@ -10382,19 +10509,48 @@ function normalizeImagesBlock(raw){
   };
 }
 
-/** 블로그 탭: 예전 5장 초안이면 ③·④에 해당하는 항목 우선 */
+/** 블로그·인스타: 썸네일 1:1 + 본문 2장. 예전 5장·인포그래픽 초안 호환 */
 function trimBlogInstaImages_(gptVisuals){
   var list = (gptVisuals || []).filter(function(x){ return x && x.prompt; });
   if(list.length <= 2) return list;
-  var pro = list.find(function(x){
-    return /전문|설명|보조|③|infographic|illustration/i.test(String(x.title || ''));
+  function isThumb(x){
+    return x.role === 'thumbnail' ||
+      (/썸네일|thumbnail|①/i.test(String(x.title || '')) &&
+        !/②|본문|동작|시연|셀프|body/i.test(String(x.title || '')));
+  }
+  function isBody(x){
+    return x.role === 'body' ||
+      /②|본문|동작|시연|셀프|body|stretch|exercise|self/i.test(String(x.title || ''));
+  }
+  var thumb = list.find(isThumb);
+  var body = list.find(function(x){ return isBody(x) && x !== thumb; });
+  if(thumb && body) return [thumb, body];
+  if(thumb){
+    var rest = list.filter(function(x){ return x !== thumb; });
+    var bodyAlt = rest.find(isBody) || rest[0];
+    if(bodyAlt) return [thumb, bodyAlt];
+  }
+  var self = list.find(isBody);
+  var scene = list.find(function(x){
+    return /썸네일|thumbnail|공감|일상|클로즈|close|cover/i.test(String(x.title || ''));
   });
-  var self = list.find(function(x){
-    return /셀프|케어|동작|④|stretch|exercise|self/i.test(String(x.title || ''));
-  });
-  if(pro && self) return [pro, self];
-  if(list.length >= 5) return [list[2], list[3]].filter(Boolean);
+  if(scene && self && scene !== self) return [scene, self];
+  if(list.length >= 5) return [list[0], list[list.length - 1]].filter(Boolean);
   return list.slice(0, 2);
+}
+
+/** 이미지 탭·저장·복사에 쓰는 정규화 목록 (2장, 썸네일+본문) */
+function getDisplayGptVisuals_(gptVisuals, catId){
+  var raw = (gptVisuals || []).filter(function(x){ return x && x.prompt; });
+  var cap = getImageSlotCount(catId) || 2;
+  return trimBlogInstaImages_(raw).slice(0, cap);
+}
+
+function normalizeContentImages_(content, catId){
+  if(!content || !content.images || !content.images.gptVisuals) return content;
+  content.images.gptVisuals = getDisplayGptVisuals_(content.images.gptVisuals, catId);
+  enrichImageOverlays_(content, catId);
+  return content;
 }
 
 function getCommunityProblemText_(c){
@@ -10526,78 +10682,44 @@ function blogHasMinimumContent_(catId, b){
   return !!String(b.draft || '').trim();
 }
 
-function normalizeNotebookLMBlock(raw){
-  if(!raw || typeof raw !== 'object') return null;
-  const qaIn = Array.isArray(raw.qa) ? raw.qa : (Array.isArray(raw.qaPairs) ? raw.qaPairs : []);
-  const qa = qaIn.map(function(x){
-    const q = x && (x.question != null ? x.question : x.q);
-    const a = x && (x.answer != null ? x.answer : x.a);
-    return { q: q != null ? String(q).trim() : '', a: a != null ? String(a).trim() : '' };
-  }).filter(function(x){ return x.q || x.a; });
-  const chapters = Array.isArray(raw.chapterTitles) ? raw.chapterTitles.map(function(x){ return String(x).trim(); }).filter(Boolean) : [];
-  const oneLine = raw.oneLineForSource != null ? String(raw.oneLineForSource).trim() : '';
-  const videoIntro = raw.videoIntroScript != null ? String(raw.videoIntroScript).trim() : '';
-  if(!qa.length && !oneLine && !chapters.length && !videoIntro) return null;
-  return {
-    oneLineForSource: oneLine,
-    qa: qa,
-    chapterTitles: chapters,
-    videoIntroScript: videoIntro
-  };
-}
-
-function formatNotebookLMExportText(nl){
-  if(!nl) return '';
-  const lines = [];
-  lines.push('━ NotebookLM 소스용 ━');
-  if(nl.oneLineForSource) lines.push('[' + nl.oneLineForSource + ']');
-  lines.push('');
-  lines.push('【질문·답변】');
-  (nl.qa || []).forEach(function(pair, i){
-    lines.push('');
-    lines.push('Q' + (i + 1) + '. ' + pair.q);
-    lines.push('A' + (i + 1) + '. ' + pair.a);
-  });
-  if(nl.chapterTitles && nl.chapterTitles.length){
-    lines.push('');
-    lines.push('【강의·모듈 제목 후보】');
-    nl.chapterTitles.forEach(function(t, i){ lines.push((i + 1) + '. ' + t); });
-  }
-  if(nl.videoIntroScript){
-    lines.push('');
-    lines.push('【영상 오프닝 스크립트】');
-    lines.push(nl.videoIntroScript);
-  }
-  lines.push('');
-  lines.push('→ NotebookLM에 붙여넣은 뒤 오디오 오버뷰·카드·영상 대본을 생성하세요.');
-  return lines.join('\n');
-}
-
-function buildImagePromptGuide(topic, angle, customGuide){
+function buildImagePromptGuide(topic, angle, customGuide, catId){
   const t = String(topic || '').trim();
   const a = String(angle || '').trim();
   const g = String(customGuide || '').trim();
+  const id = parseInt(catId, 10);
+  const fixed = getCatImageThumbnailFixed_(id);
+  const band = CAT_IMAGE_BAND_COLOR_EN[id] || CAT_IMAGE_BAND_COLOR_EN[1];
+  const scene = CAT_IMAGE_THUMBNAIL_SCENE_EN[id] || CAT_IMAGE_THUMBNAIL_SCENE_EN[1];
+  const pillar = CAT_DEFAULT_PILLAR[id] || '';
+  const isExpert = isExpertCourseCategory(id);
+  const bodyHint = isExpert
+    ? 'blog.outline·draft·참고 메모의 테크닉·시연과 **정확히 일치**'
+    : 'blog.selfCare와 **동일한** 셀프 동작·자세·초·회·분';
   return `
 [이미지 2장 — 주제 맞춤 생성 규칙]
 이번 초안 주제: "${t}"
 작성 각도: "${a}"
+${pillar ? '프로그램 톤: ' + pillar : ''}
 
-**정확히 2개** gptVisuals만. 대표·공감·마무리 정물 등은 만들지 마세요.
+**정확히 2개** gptVisuals만: ① 1:1 썸네일 ② 본문 보조. 대표·인포그래픽 단독 컷은 만들지 마세요.
 
 각 prompt는 **영문 한 덩어리** (90~200 단어). 한 줄 요약·불릿 금지.
+**이미지 안에 한글·영문 글자 생성 금지** — overlay 필드에만 기록.
 
-■ ① 전문 설명 보조
-- clean soft medical illustration 또는 minimal infographic
-- 주제에 맞는 단순 단면·화살표·ROM·근막·림프 흐름 등 (과장·고어·읽을 수 있는 라벨 금지)
-- sage green, cream white, soft palette, non-graphic educational tone
+■ ① 썸네일 1:1 (role: thumbnail)
+- 비율 1:1. 상단 20%·하단 22%는 **단색 밴드**(글자 없음) — 후처리 시 한글 삽입용 여백
+- overlayFixedLine1: "${fixed.brand}"
+- overlayFixedLine2: "${fixed.program}"
+- overlayHook: blog.title과 동일한 후킹 한 줄
+- 중앙 58% 비주얼: ${scene}
+- 밴드 색: ${band}
+- editorial documentary, natural light, slight film grain, visible skin texture
+- **금지**: 크리미 베이지 인포그래픽, sage/cream medical illustration, 3D 해부, AI 매끈 피부, readable text
 
-■ ② 셀프케어 동작
-- **블로그·인스타 본문**에 나온 셀프 스트레칭·동작과 **동일한** 자세·부위
-- Korean home wood floor or studio yoga mat, East Asian adult, modest clothing, top or side view, soft natural light
-- 동작·초·회·분이 본문에 있으면 영문 프롬프트에 구체적으로
-
-■ 공통
-Korean domestic visual language, warm beige sage cream, soft daylight, no text overlay, no logos, no watermarks.
+■ ② 본문 (${isExpert ? '교육·시연 동작' : '셀프케어 동작'}, role: body)
+- ${bodyHint}
+- Korean home floor or clinic/studio, East Asian adult, modest clothing, top or side view
+- photorealistic editorial, no text overlay, no logos
 
 ${g ? '[카테고리별 이미지 생성 지침]\n' + g : ''}
 `;
@@ -10607,19 +10729,26 @@ function buildHeiljagyaeImagePromptGuide(topic, angle, customGuide){
   const t = String(topic || '').trim();
   const a = String(angle || '').trim();
   const g = String(customGuide || '').trim();
+  const fixed = getCatImageThumbnailFixed_(7);
+  const band = CAT_IMAGE_BAND_COLOR_EN[7];
+  const scene = CAT_IMAGE_THUMBNAIL_SCENE_EN[7];
   return `
-[이미지 2장 — 아파트너 게시글용 추천 프롬프트]
+[이미지 2장 — 아파트너 게시글용]
 이번 주제: "${t}"
 작성 각도: "${a}"
 
-■ 역할 (정확히 2개만)
-① **단지·동네에서 공감되는 일상 한 컷**: 아파트 복도·창가·엘리베이터 앞 등 익숙한 공간, 한국인 입주민 연령대, 편한 복장, 주제와 연결된 가벼운 피로·스트레칭 분위기. 광고·설득 느낌 금지.
-② **게시글 selfCare와 동일한 셀프 동작 한 장면**: 동작·자세·초·회·분을 영문 프롬프트에 구체적으로. 한국 아파트 바닥 또는 요가 매트, 부드러운 자연광.
+**정확히 2개** gptVisuals: ① 1:1 썸네일 ② 본문 셀프 동작.
+각 prompt는 **영문 한 덩어리** (90~200 단어). 이미지 안 글자 생성 금지.
 
-■ 공통 (두 프롬프트 모두에 녹이기)
-Photorealistic editorial, **Korean apartment / local wellness** authenticity, warm beige sage cream palette, soft daylight, no text overlay, no logos, no watermarks. East Asian adults, modest everyday clothing, natural skin — not Western stock-photo glam.
+■ ① 썸네일 1:1 (role: thumbnail)
+- 상단 20%·하단 22% 단색 밴드(글자 없음). overlayFixedLine1: "${fixed.brand}", overlayFixedLine2: "${fixed.program}", overlayHook: community.title 후킹
+- 중앙: ${scene}
+- 밴드: ${band}
+- photorealistic editorial, 광고·설득 톤 금지
 
-각 gptVisuals.prompt는 **영문 한 덩어리** (역할당 약 80~200 단어). 한 줄 요약·불릿 금지.
+■ ② 본문 셀프 동작 (role: body)
+- community.selfCare와 **동일** 동작·자세·초·회·분
+- 한국 아파트 바닥 또는 요가 매트, 부드러운 자연광
 
 ${g ? '[카테고리별 이미지 생성 지침]\n' + g : ''}
 `;
@@ -10633,18 +10762,16 @@ function buildImageTabBody(content){
       <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:12px;">초안·이미지 다시 생성</button>`;
   }
   var rawGpt = (im.gptVisuals || []).filter(function(s){ return s && s.prompt; });
-  const gpt = isHeiljagyaeCategory(state.selectedCatId)
-    ? rawGpt.slice(0, imgCap)
-    : trimBlogInstaImages_(rawGpt).slice(0, imgCap);
+  const gpt = getDisplayGptVisuals_(rawGpt, state.selectedCatId);
 
   let html = '';
 
   if(isHeiljagyaeCategory(state.selectedCatId)){
     html += '<div class="img-section-title">ChatGPT 이미지 프롬프트 (2장 · 아파트너용)</div>';
-    html += '<p style="font-size:12px;color:#6B7280;margin:0 0 14px;line-height:1.55;">① 동네에서 공감되는 일상 컷 · ② 게시글 셀프 케어와 같은 동작 장면.</p>';
+    html += '<p style="font-size:12px;color:#6B7280;margin:0 0 14px;line-height:1.55;">① 1:1 썸네일(상·하 여백 + 고정·후킹 멘트) · ② 게시글 selfCare와 같은 동작 장면.</p>';
   } else {
     html += '<div class="img-section-title">ChatGPT 이미지 프롬프트 (2장)</div>';
-    html += '<p style="font-size:12px;color:#6B7280;margin:0 0 14px;line-height:1.55;">① 전문 설명 보조(도식·인포) · ② 셀프케어 동작(블로그·인스타 본문과 동일 동작).</p>';
+    html += '<p style="font-size:12px;color:#6B7280;margin:0 0 14px;line-height:1.55;">① 1:1 썸네일(피드 커버·상·하 여백) · ② 본문 셀프케어·시연 동작. 한글 멘트는 기록용(이미지 안에 생성하지 않음).</p>';
   }
   if(gpt.length === 0){
     html += '<p class="empty-note" style="padding:12px 0;">프롬프트가 없습니다. 재생성해 주세요.</p>';
@@ -10653,8 +10780,20 @@ function buildImageTabBody(content){
       const title = item.title || ('시안 ' + (i + 1));
       const p = item.prompt || '';
       const dp = encodeURIComponent(p);
+      const isThumb = isGptVisualThumbnail_(item, i, gpt);
       html += '<div class="img-tool-card">';
       html += '<div class="img-tool-title">' + escapeHtml(title) + '</div>';
+      if(isThumb){
+        html += '<div style="margin:0 0 10px;padding:10px 12px;background:#F9FAFB;border-radius:10px;border:1px solid #E5E7EB;">';
+        html += '<div style="font-size:11px;color:#6B7280;margin-bottom:8px;line-height:1.5;">썸네일 한글 멘트 (ChatGPT 이미지 안에 넣지 않음)</div>';
+        html += '<label style="display:block;font-size:11px;color:#374151;margin:0 0 4px;">상단 고정 1줄</label>';
+        html += '<input type="text" class="sheet-edit" id="sheet-image-overlay-l1-' + i + '" data-image-index="' + i + '" data-overlay-field="overlayFixedLine1" value="' + escapeHtml(item.overlayFixedLine1 || '') + '" style="width:100%;margin-bottom:8px;padding:8px 10px;font-size:13px;border:1px solid #E5E7EB;border-radius:8px;box-sizing:border-box;">';
+        html += '<label style="display:block;font-size:11px;color:#374151;margin:0 0 4px;">상단 고정 2줄</label>';
+        html += '<input type="text" class="sheet-edit" id="sheet-image-overlay-l2-' + i + '" data-image-index="' + i + '" data-overlay-field="overlayFixedLine2" value="' + escapeHtml(item.overlayFixedLine2 || '') + '" style="width:100%;margin-bottom:8px;padding:8px 10px;font-size:13px;border:1px solid #E5E7EB;border-radius:8px;box-sizing:border-box;">';
+        html += '<label style="display:block;font-size:11px;color:#374151;margin:0 0 4px;">하단 후킹</label>';
+        html += '<input type="text" class="sheet-edit" id="sheet-image-overlay-hook-' + i + '" data-image-index="' + i + '" data-overlay-field="overlayHook" value="' + escapeHtml(item.overlayHook || '') + '" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #E5E7EB;border-radius:8px;box-sizing:border-box;">';
+        html += '</div>';
+      }
       html += '<textarea class="sheet-edit" id="sheet-image-prompt-' + i + '" data-image-index="' + i + '" rows="7">' + escapeHtml(p) + '</textarea>';
       html += '<div class="img-tool-actions">';
       html += '<button type="button" class="img-tool-main-btn gpt" data-p="' + dp + '" onclick="copyOpenImageToolFromField(this,' + i + ')">ChatGPT 열기 · 프롬프트 복사</button>';
@@ -10750,7 +10889,13 @@ function openDetail(draftId, catId, tab, opts) {
   document.getElementById('sheet-title').textContent = draft.topic;
   const pub = state.published[draftId];
   const content = pub?.content || state.generatedOnly[draftId];
-  if(content){ renderSheetContent(content); }
+  if(content){
+    var beforeLen = (content.images && content.images.gptVisuals) ? content.images.gptVisuals.length : 0;
+    normalizeContentImages_(content, catId);
+    var afterLen = (content.images && content.images.gptVisuals) ? content.images.gptVisuals.length : 0;
+    if(beforeLen > afterLen) persistDraftContent_(draftId, content);
+    renderSheetContent(content);
+  }
   else { renderSheetEmpty(draft, cat); }
   document.getElementById('detail-overlay').classList.add('open');
   lockBodyScroll_();
@@ -10921,38 +11066,6 @@ function renderSheetContent(content) {
         sheetEditField_('쓰레드 본문', 'sheet-threads-body', ths.text || '', { rows: 14, regen: 'threads.text', copy: true }) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">본문을 수정하거나 <strong>재생성</strong>으로 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 저장·복사 후 Threads 앱으로 이동해요.</p>';
     }
-  } else if(tab==='notebooklm'){
-    const nl = content.notebookLM;
-    if(!nl){
-      bodyHTML = tabsHTML + `<p class="empty-note" style="padding:12px 0;">노트북 LM용 Q&A 초안이 없어요. 초안을 다시 생성하면 함께 만들어져요.</p>
-        <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:8px;">초안 다시 생성</button>`;
-    } else {
-      const exportText = formatNotebookLMExportText(nl);
-      const qaHtml = (nl.qa && nl.qa.length)
-        ? nl.qa.map(function(pair, i){
-            return `<div class="cb" style="margin-bottom:14px;border:1px solid #E5E7EB;border-radius:12px;padding:12px 14px;background:#FAFAF9;">
-              <div class="cb-label" style="margin-bottom:6px;">Q${i + 1}</div>
-              <div style="font-weight:700;color:#1A1A1A;margin-bottom:8px;line-height:1.5;">${escapeHtml(pair.q)}</div>
-              <div class="cb-label" style="margin-bottom:6px;">A${i + 1} <button class="copy-btn" onclick="cp(this,\`${esc(pair.a)}\`)">복사</button></div>
-              <div class="cb-box" style="white-space:pre-wrap;line-height:1.75;font-size:13px;">${escapeHtml(pair.a)}</div>
-            </div>`;
-          }).join('')
-        : '<p class="empty-note" style="padding:8px 0;">질문·답변 항목이 비어 있어요.</p>';
-      const chaptersHtml = (nl.chapterTitles && nl.chapterTitles.length)
-        ? `<div class="cb"><div class="cb-label">강의·모듈 제목 후보 <button class="copy-btn" onclick="cp(this,\`${esc(nl.chapterTitles.join('\n'))}\`)">복사</button></div>
-          <div class="cb-box" style="white-space:pre-wrap;line-height:1.65;">${nl.chapterTitles.map(function(t, i){ return escapeHtml((i + 1) + '. ' + t); }).join('<br/>')}</div></div>`
-        : '';
-      const introHtml = nl.videoIntroScript
-        ? cb('영상 오프닝 스크립트', `<div class="cb-box" style="white-space:pre-wrap;line-height:1.75;">${escapeHtml(nl.videoIntroScript)}</div>`, nl.videoIntroScript)
-        : '';
-      bodyHTML = tabsHTML + `
-        <p class="empty-note" style="padding:4px 0 12px;font-size:12px;color:#6B7280;line-height:1.65;">② 여기서 정리된 심층 Q&A를 복사 → ③ <strong>NotebookLM</strong>에 소스로 붙여 넣으면 강의 자료·오디오 오버뷰·영상용 스크립트를 만들기 좋아요.</p>
-        ${nl.oneLineForSource ? cb('소스 한 줄 제목', `<div class="cb-box cb-title">${escapeHtml(nl.oneLineForSource)}</div>`, nl.oneLineForSource) : ''}
-        <div class="cb"><div class="cb-label">질문과 답변 <button class="copy-btn" onclick="cp(this,\`${esc(exportText)}\`)">전체 복사</button></div>${qaHtml}</div>
-        ${chaptersHtml}
-        ${introHtml}
-        ${cb('NotebookLM 붙여넣기용 (전체)', `<div class="cb-box" style="white-space:pre-wrap;font-size:12px;line-height:1.7;max-height:260px;overflow-y:auto;">${escapeHtml(exportText)}</div>`, exportText)}`;
-    }
   } else if(tab==='community'){
     const co = content.community;
     if(!co){
@@ -11019,11 +11132,9 @@ window.getFullCopy = function(){
   }
   const im = content.images;
   if(im){
-    const nImg = getImageSlotCount(state.selectedCatId) || (im.gptVisuals || []).length;
-    t += '\n\n[ChatGPT 이미지 프롬프트 · ' + nImg + '장]';
-    (im.gptVisuals || []).forEach(function(x, i){
-      if(x && x.prompt){ t += '\n' + (i + 1) + '. ' + (x.title || '') + '\n' + x.prompt; }
-    });
+    var imgCatId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
+    var imgText = getImagePromptTextForData_(content, imgCatId);
+    if(imgText) t += '\n\n[ChatGPT 이미지 프롬프트 · ' + getDisplayGptVisuals_(im.gptVisuals, imgCatId).length + '장]\n' + imgText;
   }
   return t;
 };
@@ -11032,7 +11143,6 @@ function getSheetGoButtonHTML(tab){
   if(tab === 'blog') return `<button type="button" class="btn-sheet-link" onclick="openExternalNaverBlog()">블로그 가기</button>`;
   if(tab === 'insta') return `<button type="button" class="btn-sheet-link" onclick="openExternalInstagram()">인스타 가기</button>`;
   if(tab === 'community') return `<button type="button" class="btn-sheet-link" onclick="openApartnerApp()">아파트너 열기</button>`;
-  if(tab === 'notebooklm') return `<button type="button" class="btn-sheet-link" onclick="openNotebookLM()">NotebookLM 열기</button>`;
   if(tab === 'thread' || tab === 'threads') return `<button type="button" class="btn-sheet-link" onclick="openExternalThreads()">Threads 가기</button>`;
   return '';
 }
@@ -11062,24 +11172,15 @@ function getTabCopyText(tab, content){
     if(!c) return '';
     return formatCommunityPostText(c);
   }
-  if(tab === 'notebooklm'){
-    const n = content.notebookLM;
-    if(!n) return '';
-    return formatNotebookLMExportText(n);
-  }
   if(tab === 'thread'){
     const th = normalizeThreadBlock(content.thread);
     if(!th || !th.summary) return '';
     return getThreadPlainText(th);
   }
   if(tab === 'images'){
-    const im = content.images;
-    if(!im || !im.gptVisuals) return '';
-    let t = '[ChatGPT 이미지 프롬프트]\n';
-    (im.gptVisuals || []).forEach(function(x, i){
-      if(x && x.prompt) t += '\n' + (i + 1) + '. ' + (x.title || '') + '\n' + x.prompt + '\n';
-    });
-    return t.trim();
+    var imgCatId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
+    var imgCopy = getImagePromptTextForData_(content, imgCatId);
+    return imgCopy ? '[ChatGPT 이미지 프롬프트]\n' + imgCopy : '';
   }
   return '';
 }
@@ -11848,6 +11949,16 @@ function copyAndOpenThreads_(text){
   }
 }
 
+function copyAndOpenApartner_(text){
+  var open = function(){ openApartnerApp(); };
+  if(!text){ open(); return; }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(open).catch(open);
+  } else {
+    open();
+  }
+}
+
 window.openExternalInstagram = function(){
   const u = EXT_INSTAGRAM_WEB;
   const user = getInstagramUsernameFromExt_();
@@ -11901,31 +12012,6 @@ window.openExternalThreads = function(){
     return;
   }
   window.location.href = 'intent:#Intent;action=android.intent.action.VIEW;data=' + encodeURIComponent(u) + ';package=com.instagram.barcelona;S.browser_fallback_url=' + encodeURIComponent(u) + ';end';
-  setTimeout(function(){
-    if(document.hidden) return;
-    window.open(u, '_blank', 'noopener,noreferrer');
-  }, 900);
-};
-
-window.openNotebookLM = function(){
-  const u = NOTEBOOKLM_URL;
-  if(!isPhoneOrTablet()){
-    window.open(u, '_blank', 'noopener,noreferrer');
-    return;
-  }
-  if(isIOSLikeDevice()){
-    window.location.href = 'googlechromes://notebooklm.google.com/';
-    setTimeout(function(){
-      if(document.hidden) return;
-      window.location.href = u;
-    }, 450);
-    setTimeout(function(){
-      if(document.hidden) return;
-      window.open(u, '_blank', 'noopener,noreferrer');
-    }, 1100);
-    return;
-  }
-  window.location.href = 'intent://notebooklm.google.com/#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(u) + ';end';
   setTimeout(function(){
     if(document.hidden) return;
     window.open(u, '_blank', 'noopener,noreferrer');
@@ -12265,6 +12351,9 @@ window.regenSheetField_ = async function(key, btn){
     }
     content[meta.block] = block;
     if(meta.threadNorm){ content.thread = normalizeThreadBlock(block) || block; }
+    if(key === 'blog.title' || key === 'community.title'){
+      syncThumbnailOverlayHook_(content, catId);
+    }
     persistDraftContent_(draftId, content);
     renderSheetContent(content);
     setAppToast('「' + meta.label + '」을 다시 생성했어요.', { duration: 3000, variant: 'ok' });
@@ -12357,7 +12446,13 @@ function applySheetBlogEdits_(content){
   if(!content || !content.blog) return content;
   var edits = readSheetBlogEdits_();
   if(!edits) return content;
+  var prevTitle = String(content.blog.title || '').trim();
   Object.assign(content.blog, edits);
+  var nextTitle = String(content.blog.title || '').trim();
+  if(nextTitle && nextTitle !== prevTitle){
+    var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
+    syncThumbnailOverlayHook_(content, catId);
+  }
   return content;
 }
 
@@ -12396,11 +12491,21 @@ function applySheetImageEdits_(content){
   if(!content || !content.images) return content;
   var nodes = document.querySelectorAll('[data-image-index]');
   if(!nodes.length) return content;
-  var gpt = content.images.gptVisuals || [];
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
+  var gpt = getDisplayGptVisuals_(content.images.gptVisuals, catId).map(function(item){
+    return Object.assign({}, item);
+  });
   nodes.forEach(function(el){
     var idx = parseInt(el.getAttribute('data-image-index'), 10);
     if(isNaN(idx) || !gpt[idx]) return;
-    gpt[idx].prompt = String(el.value || '').trim();
+    var overlayField = el.getAttribute('data-overlay-field');
+    if(overlayField){
+      gpt[idx][overlayField] = String(el.value || '').trim();
+      return;
+    }
+    if(el.id && el.id.indexOf('sheet-image-prompt-') === 0){
+      gpt[idx].prompt = String(el.value || '').trim();
+    }
   });
   content.images.gptVisuals = gpt;
   return content;
@@ -12434,10 +12539,16 @@ function applySheetCommunityEdits_(content){
   var edits = readSheetCommunityEdits_();
   if(!edits) return content;
   if(!content.community) content.community = {};
+  var prevTitle = String(content.community.title || '').trim();
   content.community.title = edits.title;
   content.community.problem = edits.problem;
   content.community.selfCare = edits.selfCare;
   content.community.explanation = edits.explanation;
+  var nextTitle = String(content.community.title || '').trim();
+  if(nextTitle && nextTitle !== prevTitle){
+    var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
+    syncThumbnailOverlayHook_(content, catId);
+  }
   return content;
 }
 
@@ -12764,6 +12875,66 @@ window.onSheetPublishComplete = async function(){
     return;
   }
 
+  if(tab === 'thread' && isDailyShareCategory(catId)){
+    var dContent = getDraftContent_(draftId);
+    if(!dContent){
+      setAppToast('초안이 없어요. 먼저 초안을 생성해 주세요.', { duration: 4000, variant: 'err' });
+      return;
+    }
+    applySheetThreadEdits_(dContent);
+    var thBlock = normalizeThreadBlock(dContent.thread);
+    if(!thBlock || !thBlock.summary){
+      setAppToast('일상 공유 본문을 입력해 주세요.', { duration: 4000, variant: 'err' });
+      return;
+    }
+    if(pubBtn){ pubBtn.disabled = true; pubBtn.textContent = '저장 중…'; }
+    try {
+      var dailyResult = commitSheetTabPublish_(draftId, catId, 'thread');
+      var savedDaily = getDraftContent_(draftId);
+      var thSaved = normalizeThreadBlock(savedDaily && savedDaily.thread);
+      copyAndOpenThreads_(thSaved && thSaved.summary ? getThreadPlainText(thSaved) : '');
+      closeSheet();
+      renderTabs();
+      renderMain();
+      afterTabPublishSaved_(dailyResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
+      setAppToast('일상 공유 저장 · 복사 · 앱 이동\n글 입력란에 붙여넣기 하세요.', { duration: 5500, variant: 'ok' });
+    } catch(err){
+      setAppToast(((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
+    } finally {
+      if(pubBtn) pubBtn.disabled = false;
+    }
+    return;
+  }
+
+  if(tab === 'community' && isHeiljagyaeCategory(catId)){
+    var hjContent = getDraftContent_(draftId);
+    if(!hjContent || !hjContent.community){
+      setAppToast('게시판 초안이 없어요. 먼저 초안을 생성해 주세요.', { duration: 4000, variant: 'err' });
+      return;
+    }
+    applySheetCommunityEdits_(hjContent);
+    if(!hjContent.community.title && !hjContent.community.problem){
+      setAppToast('제목 또는 문제 제기를 입력해 주세요.', { duration: 4000, variant: 'err' });
+      return;
+    }
+    if(pubBtn){ pubBtn.disabled = true; pubBtn.textContent = '저장 중…'; }
+    try {
+      var commResult = commitSheetTabPublish_(draftId, catId, 'community');
+      var savedHj = getDraftContent_(draftId);
+      copyAndOpenApartner_(savedHj && savedHj.community ? formatCommunityPostText(savedHj.community) : '');
+      closeSheet();
+      renderTabs();
+      renderMain();
+      afterTabPublishSaved_(commResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
+      setAppToast('게시판 저장 · 복사 · 아파트너 이동\n글 입력란에 붙여넣기 하세요.', { duration: 5500, variant: 'ok' });
+    } catch(err){
+      setAppToast(((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
+    } finally {
+      if(pubBtn) pubBtn.disabled = false;
+    }
+    return;
+  }
+
   var content2 = getDraftContent_(draftId);
   if(!content2){
     setAppToast('초안이 없어요. 먼저 초안을 생성해 주세요.', { duration: 4000, variant: 'err' });
@@ -12804,7 +12975,7 @@ window.switchTab = function(t){
   if(isThreadCategory(state.selectedCatId) && t !== 'thread') return;
   if(isHeiljagyaeCategory(state.selectedCatId) && t !== 'community' && t !== 'images') return;
   if(isBlogInstaCategory(state.selectedCatId)){
-    if(t === 'notebooklm' || t === 'community' || t === 'thread') t = 'blog';
+    if(t === 'community' || t === 'thread') t = 'blog';
     if(t !== 'blog' && t !== 'insta' && t !== 'threads' && t !== 'images') return;
   }
   if(state.activeTab !== t){
@@ -12868,11 +13039,14 @@ function buildFinalPublishDefault_(draftId, catId){
 function getImagePromptTextForData_(content, catId){
   var im = content && content.images;
   if(!im || !im.gptVisuals) return '';
-  var list = isHeiljagyaeCategory(catId)
-    ? (im.gptVisuals || []).filter(function(x){ return x && x.prompt; })
-    : trimBlogInstaImages_(im.gptVisuals || []);
+  var list = getDisplayGptVisuals_(im.gptVisuals || [], catId);
   return list.map(function(x, i){
-    return (i + 1) + '. ' + (x.title || '이미지') + '\n' + (x.prompt || '');
+    var lines = [(i + 1) + '. ' + (x.title || '이미지')];
+    if(x.overlayFixedLine1) lines.push('상단 고정 1: ' + x.overlayFixedLine1);
+    if(x.overlayFixedLine2) lines.push('상단 고정 2: ' + x.overlayFixedLine2);
+    if(x.overlayHook) lines.push('하단 후킹: ' + x.overlayHook);
+    lines.push(x.prompt || '');
+    return lines.join('\n');
   }).filter(Boolean).join('\n\n');
 }
 
@@ -12945,90 +13119,6 @@ function formatPromptDataSamplesBlock_(samples, promptTypes){
   }).join('\n\n');
 }
 
-function getPublishFieldConfigs_(catId, content, activeTab){
-  activeTab = activeTab != null ? activeTab : state.activeTab;
-  var imageField = { key: 'image', label: '이미지 생성 프롬프트', help: 'ChatGPT 이미지 생성에 사용한 최종 프롬프트를 저장합니다.', placeholder: '이미지 생성에 사용한 프롬프트를 붙여넣기', small: true };
-
-  if(activeTab === 'images'){
-    return [imageField];
-  }
-  if(activeTab === 'blog' && isBlogInstaCategory(catId)){
-    return [{ key: 'blog', label: '블로그 최종본', help: '네이버 블로그 등에 실제로 올린 글을 저장합니다.', placeholder: '블로그에 실제로 올린 글을 붙여넣기' }];
-  }
-  if(activeTab === 'insta' && isBlogInstaCategory(catId)){
-    return [{ key: 'insta', label: '인스타 최종본', help: '인스타 캡션으로 실제로 올린 글을 저장합니다.', placeholder: '인스타에 실제로 올린 캡션을 붙여넣기' }];
-  }
-  if(activeTab === 'threads' && isBlogInstaCategory(catId)){
-    return [{ key: 'threads', label: '쓰레드 최종본', help: 'Threads에 실제로 올린 글을 저장합니다.', placeholder: 'Threads에 실제로 올린 글을 붙여넣기' }];
-  }
-  if(activeTab === 'community' && isHeiljagyaeCategory(catId)){
-    return [{ key: 'community', label: '게시판 최종본', help: '아파트너 게시판에 실제로 올린 글을 저장합니다.', placeholder: '실제로 올린 게시판 글을 붙여넣기' }];
-  }
-  if(activeTab === 'thread' && isDailyShareCategory(catId)){
-    return [{ key: 'thread', label: '일상 공유 최종본', help: 'Threads·인스타 등에 실제로 올린 생활 나눔 글을 붙여 넣으세요.', placeholder: '실제로 올린 일상 공유 글을 붙여넣기' }];
-  }
-
-  if(isDailyShareCategory(catId)){
-    return [{ key: 'thread', label: '일상 공유 최종본', help: 'Threads·인스타 등에 실제로 올린 생활 나눔 글을 붙여 넣으세요.', placeholder: '실제로 올린 일상 공유 글을 붙여넣기' }];
-  }
-  if(isHeiljagyaeCategory(catId)){
-    return [
-      { key: 'community', label: '게시판 최종본', help: '아파트너 게시판에 실제로 올린 글을 저장합니다.', placeholder: '실제로 올린 게시판 글을 붙여넣기' },
-      imageField
-    ];
-  }
-  return [
-    { key: 'blog', label: '블로그 최종본', help: '네이버 블로그 등에 실제로 올린 글을 저장합니다.', placeholder: '블로그에 실제로 올린 글을 붙여넣기' },
-    { key: 'insta', label: '인스타 최종본', help: '인스타 캡션으로 실제로 올린 글을 저장합니다.', placeholder: '인스타에 실제로 올린 캡션을 붙여넣기' },
-    { key: 'threads', label: '쓰레드 최종본', help: 'Threads에 실제로 올린 글을 저장합니다.', placeholder: 'Threads에 실제로 올린 글을 붙여넣기' },
-    imageField
-  ];
-}
-
-function getLegacyPublishKey_(catId){
-  if(isDailyShareCategory(catId)) return 'thread';
-  if(isHeiljagyaeCategory(catId)) return 'community';
-  return state.activeTab === 'insta' ? 'insta' : (state.activeTab === 'images' ? 'image' : 'blog');
-}
-
-function getSavedPublishFieldText_(pub, key, catId){
-  if(!pub) return '';
-  if(pub.finalTexts && pub.finalTexts[key]) return String(pub.finalTexts[key]);
-  if(pub.promptData && pub.promptData[key] && pub.promptData[key].finalText) return String(pub.promptData[key].finalText);
-  if(pub.finalText && key === getLegacyPublishKey_(catId)) return String(pub.finalText);
-  return '';
-}
-
-function renderPublishFinalFields_(draftId, catId, content, isEdit){
-  var pub = state.published[draftId] || {};
-  var activeTab = state.publishModalActiveTab != null ? state.publishModalActiveTab : state.activeTab;
-  var fields = getPublishFieldConfigs_(catId, content, activeTab);
-  var html = fields.map(function(f){
-    var value = isEdit ? getSavedPublishFieldText_(pub, f.key, catId) : '';
-    if(!value && f.key === 'image' && content){
-      value = getImagePromptTextForData_(content, catId);
-    }
-    return '<div class="publish-field-section">' +
-      '<label class="form-label" for="publish-final-' + f.key + '">' + escapeHtml(f.label) + '</label>' +
-      (f.help ? '<div class="publish-field-help">' + escapeHtml(f.help) + '</div>' : '') +
-      '<textarea class="publish-final-textarea' + (f.small ? ' small' : '') + '" id="publish-final-' + f.key + '" data-publish-key="' + f.key + '" placeholder="' + escapeHtml(f.placeholder || '') + '">' + escapeHtml(value) + '</textarea>' +
-    '</div>';
-  }).join('');
-  var wrap = document.getElementById('publish-fields-wrap');
-  if(wrap) wrap.innerHTML = html;
-}
-
-function collectPublishFinalTexts_(){
-  var out = {};
-  var nodes = document.querySelectorAll('[data-publish-key]');
-  nodes.forEach(function(el){
-    var key = el.getAttribute('data-publish-key');
-    var val = (el.value || '').trim();
-    if(key && val) out[key] = val;
-  });
-  return out;
-}
-
 function buildCombinedFinalText_(finalTexts){
   var labels = { blog: '블로그', insta: '인스타', threads: '쓰레드', image: '이미지 생성 프롬프트', community: '게시판', thread: '일상 공유' };
   return Object.keys(finalTexts || {}).map(function(key){
@@ -13036,11 +13126,122 @@ function buildCombinedFinalText_(finalTexts){
   }).join('\n\n---\n\n');
 }
 
+function parseCombinedFinalText_(text){
+  var out = {};
+  var raw = String(text || '').trim();
+  if(!raw) return out;
+  var labels = { '블로그': 'blog', '인스타': 'insta', '쓰레드': 'threads', '이미지 생성 프롬프트': 'image', '게시판': 'community', '일상 공유': 'thread' };
+  var blocks = raw.split(/\n\n---\n\n/);
+  var parsedAny = false;
+  blocks.forEach(function(block){
+    var m = String(block).match(/^\[([^\]]+)\]\n([\s\S]*)$/);
+    if(!m) return;
+    var key = labels[m[1].trim()];
+    var val = m[2].trim();
+    if(key && val){
+      out[key] = val;
+      parsedAny = true;
+    }
+  });
+  return parsedAny ? out : null;
+}
+
+function getLegacyPublishPrimaryKey_(catId){
+  if(isDailyShareCategory(catId)) return 'thread';
+  if(isHeiljagyaeCategory(catId)) return 'community';
+  return 'blog';
+}
+
+function inferFinalTextsFromPromptData_(promptData){
+  var out = {};
+  if(!promptData || typeof promptData !== 'object') return out;
+  ['blog', 'insta', 'threads', 'image', 'community', 'thread'].forEach(function(key){
+    var item = promptData[key];
+    if(!item) return;
+    var val = String(item.finalText || '').trim();
+    if(!val) val = String(item.generated || '').trim();
+    if(val.length >= 10) out[key] = val;
+  });
+  return out;
+}
+
+/** 구 발행 모달 데이터(pub.date·finalText만 있고 tabPublished 없음) → 탭별 발행 상태 복원 */
+function migrateLegacyPublishTabPublished_(){
+  var pubs = state.published;
+  if(!pubs || typeof pubs !== 'object') return false;
+  var changed = false;
+  Object.keys(pubs).forEach(function(draftId){
+    var pub = pubs[draftId];
+    if(!pub) return;
+    var catId = pub.catId != null ? pub.catId : getCatIdFromDraftId_(draftId);
+    var requiredKeys = getRequiredPublishKeysForCat_(catId);
+    if(!requiredKeys.length) return;
+    if(draftIsFullyPublished_(draftId, catId)) return;
+    if(!pub.date && !(pub.finalText || '').trim() && (!pub.finalTexts || !Object.keys(pub.finalTexts).length)) return;
+
+    var stamp = pub.savedAt || (pub.date ? String(pub.date) : '') || new Date().toISOString();
+    var finalTexts = Object.assign({}, pub.finalTexts || {});
+
+    if((pub.finalText || '').trim()){
+      var parsed = parseCombinedFinalText_(pub.finalText);
+      if(parsed === null){
+        var primary = getLegacyPublishPrimaryKey_(catId);
+        if(!finalTexts[primary]) finalTexts[primary] = String(pub.finalText).trim();
+      } else {
+        Object.keys(parsed).forEach(function(k){
+          if(!finalTexts[k] && parsed[k]) finalTexts[k] = parsed[k];
+        });
+      }
+    }
+
+    var fromPrompt = inferFinalTextsFromPromptData_(pub.promptData);
+    Object.keys(fromPrompt).forEach(function(k){
+      if(!finalTexts[k]) finalTexts[k] = fromPrompt[k];
+    });
+
+    if(!pub.tabPublished) pub.tabPublished = {};
+    requiredKeys.forEach(function(key){
+      if(pub.tabPublished[key]) return;
+      var val = finalTexts[key] ? String(finalTexts[key]).trim() : '';
+      if(val.length < 10) return;
+      pub.tabPublished[key] = stamp;
+      changed = true;
+    });
+
+    var prevJson = JSON.stringify(pub.finalTexts || {});
+    var nextJson = JSON.stringify(finalTexts);
+    if(prevJson !== nextJson){
+      pub.finalTexts = finalTexts;
+      pub.finalText = buildCombinedFinalText_(finalTexts);
+      changed = true;
+    } else if(Object.keys(finalTexts).length && !(pub.finalText || '').trim()){
+      pub.finalText = buildCombinedFinalText_(finalTexts);
+      changed = true;
+    }
+
+    if(!pub.promptData && Object.keys(finalTexts).length){
+      var cat = CATEGORIES[catId];
+      var draft = cat && (cat.drafts || []).find(function(d){ return d && d.id === draftId; });
+      var content = pub.content || state.generatedOnly[draftId];
+      if(content){
+        pub.promptData = buildPublishedPromptData_(draft, catId, content, finalTexts);
+        changed = true;
+      }
+    }
+
+    if(pub.catId == null && catId != null){
+      pub.catId = catId;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 function countPublishedInCat_(catId){
   var cat = CATEGORIES[catId];
   if(!cat) return 0;
   return cat.drafts.filter(function(d){
-    return d && d.id && state.published[d.id] && state.published[d.id].date;
+    return d && d.id && draftIsFullyPublished_(d.id, catId);
   }).length;
 }
 
@@ -13266,123 +13467,6 @@ window.fillPendingDraftsForCurrentCat = async function(){
   renderMain();
 };
 
-window.openPublishModal = function(){
-  var draftId = state.selectedId;
-  if(!draftId){
-    setAppToast('먼저 초안 카드를 선택해 주세요.', { duration: 3500, variant: 'err' });
-    return;
-  }
-  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
-  var cat = CATEGORIES[catId];
-  var draft = cat && cat.drafts.find(function(d){ return d.id === draftId; });
-  var content = state.published[draftId]?.content || state.generatedOnly[draftId];
-  if(!content){
-    setAppToast('초안이 없어요. 먼저 초안을 생성해 주세요.', { duration: 4000, variant: 'err' });
-    return;
-  }
-  state.publishModalDraftId = draftId;
-  state.publishModalCatId = catId;
-  state.publishModalActiveTab = state.activeTab;
-  var pub = state.published[draftId];
-  var isEdit = !!(pub && pub.date);
-  var fromImages = state.activeTab === 'images';
-  document.getElementById('publish-modal-title').textContent = fromImages
-    ? '이미지 생성 프롬프트'
-    : (isEdit ? '발행본 수정' : '발행 완료 · 최종본 저장');
-  document.getElementById('publish-modal-meta').innerHTML = fromImages
-    ? ''
-    : '<strong>' + escapeHtml(cat ? cat.name : '') + '</strong> · ' + escapeHtml(draft ? draft.topic : '') +
-      '<br><span style="color:#9CA3AF;">현재 탭(' + escapeHtml(state.activeTab === 'blog' ? '블로그' : state.activeTab === 'insta' ? '인스타' : state.activeTab === 'threads' ? '쓰레드' : state.activeTab === 'community' ? '게시판' : state.activeTab === 'thread' ? '일상 공유' : '이미지') + ')에 맞는 최종본을 저장합니다.</span>';
-  document.getElementById('publish-modal-meta').style.display = fromImages ? 'none' : '';
-  renderPublishFinalFields_(draftId, catId, content, isEdit);
-  document.getElementById('btn-publish-save').textContent = isEdit ? '저장' : '발행 저장';
-  var refineNote = document.getElementById('publish-refine-note');
-  refineNote.classList.remove('show');
-  refineNote.textContent = '';
-  var nextN = countPublishedInCat_(catId) + (isEdit ? 0 : 1);
-  if(!isEdit && nextN % PROMPT_REFINE_EVERY_PUBLISH === 0){
-    refineNote.textContent = '저장 후 「' + (cat ? cat.name : '') + '」 발행 ' + nextN + '건이 되면, 최근 발행본 ' + PROMPT_REFINE_SAMPLE_COUNT + '개를 분석해 프롬프트를 자동 개선합니다.';
-    refineNote.classList.add('show');
-  }
-  document.getElementById('publish-modal-overlay').classList.add('open');
-  lockBodyScroll_();
-  setTimeout(function(){
-    var pubEl = document.getElementById('publish-modal');
-    pubEl.classList.add('open');
-    settleBottomSheet_(pubEl);
-    scheduleAppToastLift_();
-    trapFocusIn_(pubEl);
-  }, 10);
-};
-
-window.closePublishModal = function(e){
-  if(e && e.target !== document.getElementById('publish-modal-overlay')) return;
-  resetBottomSheet_(document.getElementById('publish-modal'));
-  document.getElementById('publish-modal').classList.remove('open');
-  releaseModalFocusTrap_();
-  setTimeout(function(){
-    document.getElementById('publish-modal-overlay').classList.remove('open');
-    unlockBodyScroll_();
-    scheduleAppToastLift_();
-    restoreDetailFocusTrapIfOpen_();
-  }, 280);
-};
-
-window.confirmPublishFinal = async function(){
-  var draftId = state.publishModalDraftId;
-  var catId = state.publishModalCatId;
-  if(draftId == null || catId == null) return;
-  var finalTexts = collectPublishFinalTexts_();
-  var existingPub = state.published[draftId] || {};
-  if(existingPub.finalTexts){
-    finalTexts = Object.assign({}, existingPub.finalTexts, finalTexts);
-  }
-  var text = buildCombinedFinalText_(finalTexts);
-  if(!text){
-    setAppToast('최종본 글을 하나 이상 입력해 주세요.', { duration: 3500, variant: 'err' });
-    return;
-  }
-  var btn = document.getElementById('btn-publish-save');
-  if(btn){ btn.disabled = true; btn.textContent = '저장 중…'; }
-  var today = new Date().toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
-  var cat = CATEGORIES[catId];
-  var draft = cat && cat.drafts.find(function(d){ return d.id === draftId; });
-  if(!state.published[draftId]) state.published[draftId] = {};
-  var wasPublished = !!state.published[draftId].date;
-  state.published[draftId].date = today;
-  state.published[draftId].savedAt = new Date().toISOString();
-  state.published[draftId].finalText = text;
-  state.published[draftId].finalTexts = finalTexts;
-  state.published[draftId].catId = catId;
-  state.published[draftId].topic = draft ? draft.topic : '';
-  if(!state.published[draftId].content && state.generatedOnly[draftId]){
-    state.published[draftId].content = state.generatedOnly[draftId];
-  }
-  state.published[draftId].promptData = buildPublishedPromptData_(draft, catId, state.published[draftId].content, finalTexts);
-  delete state.generatedOnly[draftId];
-  save({ driveImmediate: true, gasImmediate: true });
-  closePublishModal();
-  closeSheet();
-  renderTabs();
-  renderMain();
-  if(btn){ btn.disabled = false; btn.textContent = '발행 저장'; }
-  setAppToast('발행본이 저장됐어요.', { duration: 4200, variant: 'ok' });
-
-  if(!wasPublished && isAutoTopicReplenishEnabled_()){
-    await ensureMinimumPendingDraftsAfterPublish_(catId, draft, text);
-  }
-
-  if(!wasPublished && shouldRefinePromptsAfterPublish_(catId)){
-    setAppToast('발행 ' + countPublishedInCat_(catId) + '건 · 프롬프트 분석 중…', { duration: 5000, variant: 'ok' });
-    try {
-      await refineCategoryPromptsFromPublished_(catId);
-    } catch(err){
-      console.warn('[프롬프트 개선]', err);
-      setAppToast('프롬프트 자동 개선에 실패했어요.\n' + ((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
-    }
-  }
-};
-
 async function refineCategoryPromptsFromPublished_(catId){
   if(!state.apiKey) return;
   var cat = CATEGORIES[catId];
@@ -13394,6 +13478,7 @@ async function refineCategoryPromptsFromPublished_(catId){
   if(!state.prompts.categories[catId]) state.prompts.categories[catId] = {};
   var curBlog = getCatPrompt(catId, 'blog');
   var curInsta = getCatPrompt(catId, 'insta');
+  var curThreads = getCatPrompt(catId, 'threads');
   var curCommunity = getCatPrompt(catId, 'community');
   var curThread = getCatPrompt(catId, 'thread');
   var curImage = getCatPrompt(catId, 'image');
@@ -13401,7 +13486,7 @@ async function refineCategoryPromptsFromPublished_(catId){
   var promptTypes = [];
   if(isDailyShareCategory(catId)) promptTypes.push('thread');
   else if(isHeiljagyaeCategory(catId)) { promptTypes.push('community'); promptTypes.push('image'); }
-  else { promptTypes.push('blog'); promptTypes.push('insta'); promptTypes.push('image'); }
+  else { promptTypes.push('blog'); promptTypes.push('insta'); promptTypes.push('threads'); promptTypes.push('image'); }
 
   var sampleBlock = formatPromptDataSamplesBlock_(samples, promptTypes);
 
@@ -13412,20 +13497,23 @@ async function refineCategoryPromptsFromPublished_(catId){
     '[현재 지침]\n' +
     (promptTypes.indexOf('blog') >= 0 ? 'blog:\n' + curBlog + '\n\n' : '') +
     (promptTypes.indexOf('insta') >= 0 ? 'insta:\n' + curInsta + '\n\n' : '') +
+    (promptTypes.indexOf('threads') >= 0 ? 'threads:\n' + curThreads + '\n\n' : '') +
     (promptTypes.indexOf('community') >= 0 ? 'community:\n' + curCommunity + '\n\n' : '') +
     (promptTypes.indexOf('thread') >= 0 ? 'thread:\n' + curThread + '\n\n' : '') +
     (promptTypes.indexOf('image') >= 0 ? 'image:\n' + curImage + '\n\n' : '') +
     '[탭별 발행 데이터]\n' + sampleBlock + '\n\n' +
     '[요청]\n' +
     '- 공통으로 드러난 **톤·문장 길이·구조·잘 된 표현·피할 패턴**을 반영\n' +
-    '- blog는 블로그 데이터, insta는 인스타 데이터, image는 이미지 프롬프트 데이터 기준으로 각각 개선\n' +
-    '- image는 구도·색감·인물·장소·금지 요소·2장 역할이 더 선명해지도록 개선\n' +
+    '- blog는 블로그 데이터, insta는 인스타 데이터, threads는 쓰레드 데이터, image는 이미지 프롬프트 데이터 기준으로 각각 개선\n' +
+    '- image는 ① 1:1 썸네일(role thumbnail·상하 여백·overlay) + ② 본문 동작 구조를 유지한 채 구도·색감·인물·장소·금지 요소를 구체화\n' +
+    '- image 지침에서 크리미 sage/cream 인포그래픽·medical illustration 복귀 금지\n' +
     '- 기존 지침을 통째로 갈아엎지 말고, 발행 데이터 스타일에 맞게 보강·구체화\n' +
     '- 변경이 거의 없으면 해당 키는 빈 문자열 ""\n\n' +
     'JSON만:\n{\n' +
     '"summary":"한국어 3~6문장. 무엇을 반영했는지",\n' +
     '"blog":"개선된 blog 지침 전문 또는 \"\"",\n' +
     '"insta":"개선된 insta 지침 전문 또는 \"\"",\n' +
+    '"threads":"개선된 threads 지침 전문 또는 \"\"",\n' +
     '"community":"개선된 community 지침 전문 또는 \"\"",\n' +
     '"thread":"개선된 thread 지침 전문 또는 \"\"",\n' +
     '"image":"개선된 image 지침 전문 또는 \"\""\n}';
@@ -13438,7 +13526,7 @@ async function refineCategoryPromptsFromPublished_(catId){
   var obj = JSON.parse(raw.slice(start, end + 1));
 
   var changed = [];
-  ['blog', 'insta', 'community', 'thread', 'image'].forEach(function(key){
+  ['blog', 'insta', 'threads', 'community', 'thread', 'image'].forEach(function(key){
     if(promptTypes.indexOf(key) < 0) return;
     var next = obj[key] != null ? String(obj[key]).trim() : '';
     if(next.length < 20) return;
@@ -13451,7 +13539,7 @@ async function refineCategoryPromptsFromPublished_(catId){
   save({ driveImmediate: true, gasImmediate: true });
 
   var summary = obj.summary ? String(obj.summary).trim() : '발행본 스타일을 반영했습니다.';
-  var keysLabel = { blog: '블로그', insta: '인스타', community: '아파트너', thread: '일상 공유', image: '이미지' };
+  var keysLabel = { blog: '블로그', insta: '인스타', threads: '쓰레드', community: '아파트너', thread: '일상 공유', image: '이미지' };
   var changedKr = changed.map(function(k){ return keysLabel[k] || k; }).join(', ');
   setAppToast(
     '「' + cat.name + '」프롬프트 개선 완료\n' + summary + (changedKr ? '\n반영: ' + changedKr : '') + '\n\n프롬프트 메뉴에서 확인할 수 있어요.',
@@ -13459,10 +13547,13 @@ async function refineCategoryPromptsFromPublished_(catId){
   );
 }
 
-function markPub(){ onSheetPublishComplete(); }
-
 function openPromptModal(catId) {
-  state.editingCatId = catId !== undefined ? catId : state.currentCat;
+  var cid = catId !== undefined ? catId : state.currentCat;
+  if(isOpsManualCategory(cid)){
+    if(typeof setAppToast === 'function') setAppToast('운영 탭에는 프롬프트 설정이 없어요.', { duration: 3200, variant: 'err' });
+    return;
+  }
+  state.editingCatId = cid;
   state.promptTab = isThreadCategory(state.editingCatId) ? 'thread' : (isHeiljagyaeCategory(state.editingCatId) ? 'community' : 'blog');
   renderPromptModal();
   document.getElementById('prompt-modal-overlay').classList.add('open');
@@ -13487,6 +13578,7 @@ function renderPromptModal() {
 
   const blogVal = getCatPrompt(state.editingCatId, 'blog');
   const instaVal = getCatPrompt(state.editingCatId, 'insta');
+  const threadsVal = getCatPrompt(state.editingCatId, 'threads');
   const communityVal = getCatPrompt(state.editingCatId, 'community');
   const threadVal = getCatPrompt(state.editingCatId, 'thread');
   const imageVal = getCatPrompt(state.editingCatId, 'image');
@@ -13514,6 +13606,7 @@ function renderPromptModal() {
         ` : `
         <button class="prompt-tab${pt==='blog'?' active':''}" onclick="switchPromptTab('blog')">블로그</button>
         <button class="prompt-tab${pt==='insta'?' active':''}" onclick="switchPromptTab('insta')">인스타</button>
+        <button class="prompt-tab${pt==='threads'?' active':''}" onclick="switchPromptTab('threads')">쓰레드</button>
         <button class="prompt-tab${pt==='image'?' active':''}" onclick="switchPromptTab('image')">이미지</button>
         <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">공통 기본</button>
         `}
@@ -13527,7 +13620,7 @@ function renderPromptModal() {
         <button class="prompt-reset-btn" onclick="resetPrompt('blog')">기본값으로</button>
       </div>
       <textarea class="prompt-textarea" id="pt-blog" placeholder="블로그 글쓰기 스타일, 톤, 구조, 주의사항 등을 자유롭게 입력하세요...">${blogVal}</textarea>
-      <div class="prompt-hint">${isGeneralAudienceCategory(state.editingCatId) ? '일반인 블로그: <strong>문제 제기 → 셀프 케어(👉) → 원리 설명</strong> 순. AI가 필드별로 나눠 작성하고, 발행 화면에서 각각 수정할 수 있어요.' : '예: "제목에 호기심을 자극하는 질문·숫자를 넣고, 네이버 SEO를 고려해…" — 이 지침이 Claude에게 전달돼 글쓰기 방향을 잡아요.'}</div>
+      <div class="prompt-hint">${isGeneralAudienceCategory(state.editingCatId) ? '일반인 블로그: <strong>문제 제기 → 셀프 케어(👉) → 원리 설명</strong> 순. AI가 필드별로 나눠 작성하고, 시트 탭에서 각각 수정할 수 있어요.' : '예: "제목에 호기심을 자극하는 질문·숫자를 넣고, 네이버 SEO를 고려해…" — 이 지침이 Claude에게 전달돼 글쓰기 방향을 잡아요.'}</div>
     </div>` : ''}
 
 ${!threadCat && !heiljCat && pt==='insta' ? `
@@ -13538,6 +13631,16 @@ ${!threadCat && !heiljCat && pt==='insta' ? `
   </div>
   <textarea class="prompt-textarea" id="pt-insta" placeholder="한 포스트 캡션 톤, 줄바꿈·불릿 스타일, 해시태그 전략 등을 입력하세요. (캐러셀 다장 구성은 사용하지 않습니다.)">${instaVal}</textarea>
   <div class="prompt-hint">예: "첫 줄에서 멈추게 만드는 짧은 질문을 써주세요. 캐러셀은 문제→원인→해결 순으로..."</div>
+</div>` : ''}
+
+${!threadCat && !heiljCat && pt==='threads' ? `
+<div class="prompt-section">
+  <div class="prompt-section-label">
+    쓰레드 작성 지침
+    <button class="prompt-reset-btn" onclick="resetPrompt('threads')">기본값으로</button>
+  </div>
+  <textarea class="prompt-textarea" id="pt-threads" placeholder="Threads 톤, 구어체, 줄바꿈 리듬, 금지 표현 등을 입력하세요.">${escapeHtml(threadsVal)}</textarea>
+  <div class="prompt-hint">인스타 발행 후 자동 생성되는 쓰레드 글에 적용됩니다. 구어체·짧은 문장·전문가 동료 톤.</div>
 </div>` : ''}
 
 ${pt==='thread' && threadCat ? `
@@ -13567,7 +13670,7 @@ ${pt==='image' && !threadCat ? `
     <button class="prompt-reset-btn" onclick="resetPrompt('image')">기본값으로</button>
   </div>
   <textarea class="prompt-textarea" id="pt-image" style="min-height:200px;" placeholder="이미지 생성용 프롬프트 톤, 구도, 색감, 금지 요소, 2장 역할 등을 입력하세요...">${escapeHtml(imageVal)}</textarea>
-  <div class="prompt-hint">이미지 탭의 ChatGPT 프롬프트 생성 규칙입니다. 발행 데이터의 이미지 프롬프트를 기준으로 ${PROMPT_REFINE_EVERY_PUBLISH}건마다 자동 개선됩니다.</div>
+  <div class="prompt-hint">① 1:1 썸네일(상·하 여백·overlay) + ② 본문 동작 구조. 발행 데이터 기준 ${PROMPT_REFINE_EVERY_PUBLISH}건마다 자동 개선됩니다.</div>
 </div>` : ''}
 
 ${pt==='base' ? `
@@ -13613,9 +13716,9 @@ function bindPromptTextareaAutosave_(){
 window.switchPromptCat = function(i) {
 flushPromptCloudSave_();
 state.editingCatId = i;
-if(isThreadCategory(i) && (state.promptTab === 'community' || state.promptTab === 'blog' || state.promptTab === 'insta' || state.promptTab === 'image' || state.promptTab === 'notebooklm')) state.promptTab = 'thread';
-if(isHeiljagyaeCategory(i) && (state.promptTab === 'thread' || state.promptTab === 'blog' || state.promptTab === 'insta' || state.promptTab === 'notebooklm')) state.promptTab = 'community';
-if(isBlogInstaCategory(i) && (state.promptTab === 'thread' || state.promptTab === 'community' || state.promptTab === 'notebooklm')) state.promptTab = 'blog';
+if(isThreadCategory(i) && (state.promptTab === 'community' || state.promptTab === 'blog' || state.promptTab === 'insta' || state.promptTab === 'image' || state.promptTab === 'threads')) state.promptTab = 'thread';
+if(isHeiljagyaeCategory(i) && (state.promptTab === 'thread' || state.promptTab === 'blog' || state.promptTab === 'insta' || state.promptTab === 'threads')) state.promptTab = 'community';
+if(isBlogInstaCategory(i) && (state.promptTab === 'thread' || state.promptTab === 'community')) state.promptTab = 'blog';
 renderPromptModal();
 };
 window.switchPromptTab = function(t) {
@@ -13629,15 +13732,15 @@ if(!state.prompts) state.prompts = JSON.parse(JSON.stringify(DEFAULT_PROMPTS));
 if(!state.prompts.categories[state.editingCatId]) state.prompts.categories[state.editingCatId] = {};
 const blogEl = document.getElementById('pt-blog');
 const instaEl = document.getElementById('pt-insta');
+const threadsEl = document.getElementById('pt-threads');
 const communityEl = document.getElementById('pt-community');
-const notebookLMEl = document.getElementById('pt-notebooklm');
 const threadEl = document.getElementById('pt-thread');
 const imageEl = document.getElementById('pt-image');
 const baseEl = document.getElementById('pt-base');
 if(blogEl) state.prompts.categories[state.editingCatId].blog = blogEl.value;
 if(instaEl) state.prompts.categories[state.editingCatId].insta = instaEl.value;
+if(threadsEl) state.prompts.categories[state.editingCatId].threads = threadsEl.value;
 if(communityEl) state.prompts.categories[state.editingCatId].community = communityEl.value;
-if(notebookLMEl) state.prompts.categories[state.editingCatId].notebookLM = notebookLMEl.value;
 if(threadEl) state.prompts.categories[state.editingCatId].thread = threadEl.value;
 if(imageEl) state.prompts.categories[state.editingCatId].image = imageEl.value;
 if(baseEl) state.prompts.base = baseEl.value;
@@ -13905,16 +14008,9 @@ const imageGuide = getCatPrompt(catId, 'image');
 const baseInfo = getBasePrompt();
 const brandBlock = buildBrandContextForPrompt_(catId, draft);
 const briefPromptLines = buildDraftBriefPromptLines_(draft, catId);
-const imagePromptGuide = buildImagePromptGuide(draft.topic, draft.angle, imageGuide);
+const imagePromptGuide = buildImagePromptGuide(draft.topic, draft.angle, imageGuide, catId);
 
-const imgJsonTail = `
-"images": {
-"gptVisuals": [
-{"title":"① 전문 설명 보조","prompt":"영문 단일 문자열. 위 [이미지 2장] 규칙·① 역할. Minimal clean infographic or soft medical illustration matching topic; sage and cream palette; no readable text labels."},
-{"title":"② 셀프케어 동작","prompt":"영문 단일 문자열. Same self-care stretch or exercise as in blog 본문. Korean home floor or studio mat, East Asian adult, modest clothing, top or side view, soft natural light — spell out exact pose."}
-]
-}
-}`;
+const imgJsonTail = buildImageGptVisualsJsonExample_(catId);
 
 let prompt;
 if(isDailyShareCategory(catId)){
@@ -13945,14 +14041,7 @@ ${threadGuide}
 thread.summary는 **하나의 문자열**만.`;
 } else if(isHeiljagyaeCategory(catId)){
   const hjImgGuide = buildHeiljagyaeImagePromptGuide(draft.topic, draft.angle, imageGuide);
-  const heiljagyaeImgJsonTail = `
-"images": {
-"gptVisuals": [
-{"title":"① 동네·단지 공감 일상 컷","prompt":"영문 단일 문자열. 위 [이미지 2장] 규칙·① 역할. Korean apartment hallway or elevator lobby slice-of-life, soft daylight, warm beige sage tones, relatable fatigue or gentle stretch mood, photorealistic editorial, no text, no logos — 주제에 맞게 새로 작성."},
-{"title":"② 게시글 selfCare와 같은 셀프 동작","prompt":"영문 단일 문자열. 아래 community.selfCare에 적힌 동작·자세·초·회·분과 정확히 일치. Korean home wood floor or yoga mat, top or side view, soft natural light, East Asian adult modest clothing, relaxing pose — 구체적으로 서술."}
-]
-}
-}`;
+  const heiljagyaeImgJsonTail = buildImageGptVisualsJsonExample_(7);
   prompt = `${baseInfo}
 
 ${brandBlock}
@@ -13982,17 +14071,10 @@ ${heiljagyaeImgJsonTail}
 
 community에는 인사말·고정 마무리 넣지 말 것. 글 흐름은 **문제 제기 → selfCare(해결책) → explanation(원리)** 순. selfCare는 👉로 시작.
 
-반드시 images.gptVisuals는 **정확히 2개**. 각 prompt는 완성된 영문 한 덩어리. 예시 영문은 그대로 복사하지 말고 주제·각도·selfCare에 맞게 새로 쓸 것.`;
+반드시 images.gptVisuals는 **정확히 2개**. 각 prompt는 완성된 영문 한 덩어리. ①번은 role thumbnail + overlay 필드. 예시 영문은 그대로 복사하지 말고 주제·각도·selfCare에 맞게 새로 쓸 것.`;
 } else if(isGeneralAudienceCategory(catId)){
   const hubCtaHint = getSymptomHubCtaHintForTopic_(draft.topic);
-  const generalImgJsonTail = `
-"images": {
-"gptVisuals": [
-{"title":"① 전문 설명 보조","prompt":"영문 단일 문자열. 위 [이미지 2장] 규칙·① 역할. Minimal clean infographic or soft medical illustration matching topic; sage and cream palette; no readable text labels."},
-{"title":"② 셀프케어 동작","prompt":"영문 단일 문자열. 아래 blog.selfCare에 적힌 동작·자세·초·회·분과 정확히 일치. Korean home floor or studio mat, top or side view, soft natural light, East Asian adult modest clothing — 구체적으로 서술."}
-]
-}
-}`;
+  const generalImgJsonTail = buildImageGptVisualsJsonExample_(catId);
   prompt = `${baseInfo}
 
 ${brandBlock}
@@ -14026,16 +14108,9 @@ ${generalImgJsonTail}
 
 [증상 허브 CTA 참고] ${hubCtaHint}
 
-반드시 images.gptVisuals는 **정확히 2개**. ②번 동작은 blog.selfCare와 일치.`;
+반드시 images.gptVisuals는 **정확히 2개**. ②번 동작은 blog.selfCare와 일치. ①번은 role thumbnail + overlay 필드 포함.`;
 } else if(isExpertCourseCategory(catId)){
-  const expertImgJsonTail = `
-"images": {
-"gptVisuals": [
-{"title":"① 전문 설명 보조","prompt":"영문 단일 문자열. 위 [이미지 2장] 규칙·① 역할. Minimal clean infographic or soft medical illustration matching topic; sage and cream palette; no readable text labels."},
-{"title":"② 교육·시연 동작","prompt":"영문 단일 문자열. 아래 blog.outline·draft·참고 메모의 시연·테크닉과 정확히 일치. Clinical or studio setting, hands-on demonstration pose, East Asian practitioner modest attire, soft natural light — 구체적으로 서술."}
-]
-}
-}`;
+  const expertImgJsonTail = buildImageGptVisualsJsonExample_(catId, { expert: true });
   const refHint = getDraftReferenceText_(draft)
     ? '**[작성자 참고]의 영상 분석·사진 메모가 글의 유일한 근거**입니다. 그 범위 안에서만 작성하세요.'
     : '참고 메모·영상 분석이 없습니다. 주제·각도 범위 안에서만 **짧게** 쓰고, 억지로 채우지 마세요.';
@@ -14074,41 +14149,9 @@ JSON만 응답:
 ${expertImgJsonTail}
 }
 
-반드시 images.gptVisuals는 **정확히 2개**. ②번은 blog.outline·draft의 시연·테크닉과 일치.`;
+반드시 images.gptVisuals는 **정확히 2개**. ②번은 blog.outline·draft의 시연·테크닉과 일치. ①번은 role thumbnail + overlay 필드 포함.`;
 } else {
-  const hubCtaHintLegacy = getSymptomHubCtaHintForTopic_(draft.topic);
-  prompt = `${baseInfo}
-
-${brandBlock}
-
-카테고리: ${cat.name} (${cat.sub})
-독자: ${cat.audience}
-주제: "${draft.topic}"
-${briefPromptLines}
-
-[블로그 작성 지침]
-${blogGuide}
-
-${imagePromptGuide}
-
-이 카테고리는 **blog**와 **images(2장)** 만 만듭니다. insta, notebookLM, community, thread 키는 JSON에 넣지 마세요. 인스타는 사용자가 블로그 확정 후 별도로 만듭니다.
-
-2026년 봄/초여름 트렌드 반영. JSON만 응답 (다른 텍스트 없이):
-{
-"blog": {
-"title": "호기심·궁금증을 자극하는 후킹 제목 (35자 이내, 질문·숫자·흔한 오해·반전 활용, 과장 금지)",
-"hook": "공감→문제제기→해결암시 흐름의 오프닝 2~3문장",
-"outline": ["소제목1","소제목2","소제목3","소제목4"],
-"draft": "본문 초안 700~900자. 따뜻하고 전문적인 미카닥 박준규 톤(설명하는 전문가). 실제 임상 경험 느낌. Doctor·닥터·원장님 호칭 금지. 단락 구분 포함.",
-"cta": "마무리 행동 유도 (미카닥 박준규·블로그/상담·증상 허브 URL 자연스럽게 언급)",
-"hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6"]
-},
-${imgJsonTail}
-}
-
-[증상 허브 CTA 참고] ${hubCtaHintLegacy}
-
-반드시 images.gptVisuals는 **정확히 2개**(① 전문 설명 보조, ② 셀프케어 동작). ②번 동작은 blog 본문의 셀프 팁과 일치. 각 prompt는 완성된 영문 한 덩어리.`;
+  throw new Error('이 카테고리는 자동 초안 생성을 지원하지 않아요.');
 }
 
 var prevYoutubeAnalysis = draft.youtubeAnalysis || '';
@@ -14161,23 +14204,17 @@ if(isThreadCategory(catId)){
   delete content.images;
 } else if(isHeiljagyaeCategory(catId)){
   content.community = normalizeCommunityBlock(content.community);
-  const im = normalizeImagesBlock(content.images);
-  if(im && im.gptVisuals && im.gptVisuals.length > 2){
-    im.gptVisuals = im.gptVisuals.slice(0, 2);
-  }
-  content.images = im;
+  content.images = normalizeImagesBlock(content.images);
+  normalizeContentImages_(content, catId);
   delete content.blog;
   delete content.insta;
   delete content.thread;
 } else {
   content.images = normalizeImagesBlock(content.images);
-  delete content.notebookLM;
   delete content.community;
   delete content.thread;
   if(content.blog) content.blog = normalizeBlogBlock(content.blog, catId);
-  if(content.images && content.images.gptVisuals){
-    content.images.gptVisuals = trimBlogInstaImages_(content.images.gptVisuals);
-  }
+  normalizeContentImages_(content, catId);
   delete content.insta;
   delete content.threads;
 }

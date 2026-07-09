@@ -157,6 +157,113 @@ const OPS_BRANCH_HINTS = {
   jakjeon: '인천 작전 — 오픈·정비하면서 항목 채우기',
   new: '다음 지점 후보 — 상권·이름·할 일을 미리 정리'
 };
+/** 리얼무브먼트 — 공통 브랜딩 확정 문구 (플레이스·채널 동기화) */
+const OPS_BRAND_COPY = {
+  master: '근골격·움직임 전문가의, 1:1 리:얼 움직임 프로그램',
+  realLine1: '리:얼(Real) — 진짜로 몸이 편해지는 움직임',
+  realLine2: 'Re Alignment(얼라이먼트) — 몸의 정렬을 다시 맞추는 움직임',
+  realDualShort: '리:얼(Real)은 진짜로 편해지는 움직임, Re Alignment(얼라이먼트)는 몸의 정렬을 다시 맞추는 움직임을 뜻합니다.',
+  cta: '내 몸에 맞는 리:얼 움직임, 1:1 상담으로 시작해 보세요.',
+  disclaimer: '※ 본 프로그램은 의료행위가 아닌 운동·웰니스 프로그램입니다.',
+  oneLiner: {
+    yaksu: '리얼무브먼트 약수점 | 진짜 움직임, 몸의 재정렬 — 1:1 리:얼 프로그램',
+    jakjeon: '리얼무브먼트 작전점 | 진짜 움직임, 몸의 재정렬 — 1:1 리:얼 프로그램'
+  },
+  storeName: { yaksu: '리얼무브먼트 약수점', jakjeon: '리얼무브먼트 작전점' },
+  location: { yaksu: '서울 중구 약수역 인근', jakjeon: '인천 계양구 작전동' },
+  phone: '010-2468-4596',
+  profileUrl: 'https://breezefeel.github.io/drpark/',
+  blogMain: 'https://blog.naver.com/allenjoy',
+  category: '체형교정',
+  categoryAlt: '필라테스',
+  hoursNote: '예약제 1:1 · 사전 예약 후 방문',
+  branch: {
+    yaksu: {
+      phone: '010-5967-4596',
+      address: '서울특별시 중구 동호로7길 32, 4층',
+      addressShort: '중구 동호로7길 32, 4층',
+      directions: '약수역 4·5번 또는 7번 출구 도보 · 내비 「리사르커피 약수」 검색',
+      parking: '지상 주차장 (리사르커피 옆 · 벤츠 차량 옆 우측 2칸 전용)',
+      blogDirections: 'https://blog.naver.com/allenjoy/224307689748',
+      keywords: ['약수 1:1 운동', '약수 체형교정', '중구 자세교정', '약수 스트레칭', '리얼무브먼트 약수', 'Re Alignment'],
+      target: '직장인·도심 거주 (중구·명동·을지로)'
+    },
+    jakjeon: {
+      phone: '010-2468-4596',
+      address: '인천광역시 계양구 봉오대로651번길 9, 힐스테이트자이계양 1층',
+      addressShort: '계양구 봉오대로651번길 9, 1층 (커뮤니티 · 도서관 옆)',
+      directions: '작전역 7번 출구 · 힐스테이트자이 계양 동문 · 커뮤니티 1층',
+      parking: '단지 주차장 (차량번호 사전 안내 시 입차 가능)',
+      blogDirections: 'https://blog.naver.com/allenjoy/224122998739',
+      keywords: ['작전 1:1 운동', '인천 체형교정', '작전 스트레칭', '계양 필라테스', '리얼무브먼트 작전', 'Re Alignment'],
+      target: '입주민·가족 단위 (인천·계양)'
+    }
+  }
+};
+function opsBranchMeta_(branchKey){
+  return (OPS_BRAND_COPY.branch && OPS_BRAND_COPY.branch[branchKey]) || OPS_BRAND_COPY.branch.yaksu;
+}
+function opsBranchPhone_(branchKey){
+  var meta = opsBranchMeta_(branchKey);
+  return meta.phone || OPS_BRAND_COPY.phone;
+}
+function opsPlaceBranchKey_(itemId){
+  return itemId === 'ops-j-6' ? 'jakjeon' : 'yaksu';
+}
+function buildOpsPlaceBasicInfo_(branchKey){
+  var meta = opsBranchMeta_(branchKey);
+  var sn = OPS_BRAND_COPY.storeName[branchKey] || '';
+  return '상호: ' + sn + '\n' +
+    '업종: ' + OPS_BRAND_COPY.category + ' (보조: ' + OPS_BRAND_COPY.categoryAlt + ')\n' +
+    '주소: ' + meta.address + '\n' +
+    '전화: ' + opsBranchPhone_(branchKey) + '\n' +
+    '영업시간: 평일 09:00–21:00 / 토요일 09:00–18:00 / 일·공휴일 휴무\n' +
+    '※ 위 시간은 초안입니다. 스케줄·실제 운영과 맞는지 확인 후 수정하세요.\n' +
+    '운영: ' + OPS_BRAND_COPY.hoursNote + '\n' +
+    '찾아오기: ' + meta.directions + '\n' +
+    '주차: ' + meta.parking;
+}
+function buildOpsPhotoShotList_(){
+  return '1. 외관·간판 (지점명·리얼무브먼트 로고 보이게)\n' +
+    '2. 입구·안내 (층수·찾아오기 단서)\n' +
+    '3. 내부 전경 (밝고 정돈된 1:1 공간)\n' +
+    '4. 상담·평가 장면 (경청·설명하는 분위기)\n' +
+    '5. 1:1 Passive Stretching 장면\n' +
+    '6. 1:1 기능운동·자세 지도 장면\n' +
+    '7. Re:Al Movement 단계별 움직임 (일상 동작 연결)\n' +
+    '8. 프로그램 설명·자료 (체계가 보이는 컷)\n' +
+    '9. 편안한 휴식·대기 공간\n' +
+    '10. 원장·전문가 신뢰 컷 (지도·설명 장면, 과한 포즈 지양)';
+}
+function buildOpsKeywords_(branchKey){
+  return opsBranchMeta_(branchKey).keywords.join(' · ');
+}
+function buildOpsPlaceLinks_(branchKey){
+  var meta = opsBranchMeta_(branchKey);
+  return '홈페이지(프로필): ' + OPS_BRAND_COPY.profileUrl + '\n' +
+    '블로그: ' + OPS_BRAND_COPY.blogMain + '\n' +
+    '오시는 길: ' + meta.blogDirections + '\n' +
+    '예약·문의: 전화 ' + opsBranchPhone_(branchKey) + ' · 네이버 톡톡(연결 시)';
+}
+function buildOpsShortIntro_(branchKey){
+  var sn = OPS_BRAND_COPY.storeName[branchKey] || OPS_BRAND_COPY.storeName.yaksu;
+  return sn + '은 근골격·움직임 전문가가 진행하는 1:1 리:얼 움직임 프로그램입니다.\n' +
+    OPS_BRAND_COPY.realDualShort + '\n' +
+    'Re:Al Movement 기반으로 앉기·서기·걷기부터, 내 몸에 맞는 단계를 1:1로 안내합니다.';
+}
+function buildOpsDetailIntro_(branchKey){
+  var sn = OPS_BRAND_COPY.storeName[branchKey] || OPS_BRAND_COPY.storeName.yaksu;
+  var meta = opsBranchMeta_(branchKey);
+  return '■ ' + sn + '\n\n' + OPS_BRAND_COPY.master + '\n\n' +
+    OPS_BRAND_COPY.realLine1 + '\n' + OPS_BRAND_COPY.realLine2 + '\n\n' +
+    '리얼무브먼트는 Re:Al Movement 기반의 기능운동·스트레칭 1:1 프로그램입니다.\n' +
+    '앉기·서기·걷기 같은 일상 동작부터, 내 몸에 맞는 움직임을 단계적으로 익힙니다.\n\n' +
+    '■ 이런 분께\n· 운동은 하지만 몸이 편해지지 않는 분\n· 자세·유연성·균형을 단계적으로 배우고 싶은 분\n· 1:1로 제대로 봐주는 움직임 프로그램을 찾는 분\n· 무엇부터 시작할지 방향을 함께 정하고 싶은 분\n\n' +
+    '■ 리얼무브먼트의 특징\n· Re:Al Movement 5단계 — 스트레칭부터 기능운동까지 체계\n· 1:1 맞춤 — 평가·상담 후 개인에게 맞는 단계 안내\n· 근골격·움직임 20년+ 경험 — 원장 직접 지도\n· Re:Al Movement · Re:Al Face 등 목적별 프로그램\n\n' +
+    '■ 프로그램\nRe:Al Movement — PAR 운동 · 자세 · 기능운동\nRe:Al Face — 작은얼굴 · 안면·체형 프로그램\n\n' +
+    '■ 위치·운영\n· ' + meta.addressShort + '\n· ' + meta.directions + '\n· 1:1 프로그램만 운영 (그룹·단체 수업 없음)\n· 상담·예약 문의 환영\n\n' +
+    OPS_BRAND_COPY.disclaimer;
+}
 function opsBranchItem_(id, text, hint){
   return { id: id, text: text, hint: hint || '' };
 }
@@ -185,7 +292,7 @@ function buildOpsGuideForItem_(item, branchId){
       '어떻게 하나요:',
       '1) 지점별 프로필(약수/작전) 각각 접속',
       '2) 카테고리·영업시간·전화·홈페이지 링크 확인',
-      '3) 소개글에 "병원 연계 + 운동·재활 병행" 톤 반영',
+      '3) 소개글에 리:얼(Real + Re Alignment) · 1:1 맞춤 톤 반영',
       '4) 최근 사진 6~10장 업데이트(외관/내부/프로그램 흐름)',
       '5) Q&A/리뷰 응답 문구 톤 통일',
       '제안: 리뷰 답변 템플릿 2종(통증·재활 / 웰니스)을 미리 정해 운영 시간을 줄이세요.',
@@ -240,11 +347,11 @@ function buildOpsGuideForItem_(item, branchId){
       '무엇을 하나요: 네이버 플레이스 기본 정보·소개글·사진을 지점 톤에 맞춰 정비합니다.',
       '어떻게 하나요:',
       '1) 지점 기본정보(상호/카테고리/전화/영업시간) 정확도 확인',
-      '2) 소개글 첫 문장에 포지셔닝 반영(병원 연계 + 운동·재활 병행)',
-      '3) 사진 6~10장 등록(외관/내부/프로그램 흐름/상담 공간)',
+      '2) Step 3~5 소개글 반영 후 Step 6 기본정보(주소·전화·영업시간) 입력',
+      '3) Step 7 사진 10컷 등록 · Step 8 링크 · Step 9 예약·톡톡 · Step 10 키워드',
       '4) 링크(프로필·블로그·예약 경로) 점검',
       '5) 수정 후 모바일/PC 노출 화면 캡처 저장',
-      '제안: 소개글은 "누구를 돕는지 + 어떤 방식인지 + 어디서 이용 가능한지" 3문장 구조로 유지하세요.',
+      '제안: 한 줄(B안) → 짧은 소개 → 상세 소개 순으로 반영하고, Re Alignment(얼라이먼트) 표기를 통일하세요.',
       '함께 기획/검토: 약수/작전 소개글을 완전히 같게 갈지, 상권 특성에 맞춰 첫 문장만 다르게 갈지 결정합니다.'
     ].join('\n');
     return { short: place, full: place, long: true };
@@ -271,14 +378,14 @@ function buildOpsGuideForItem_(item, branchId){
     how = '지역명+증상 조합 키워드를 3~5개 고른 뒤, 각 키워드를 프로필 허브/블로그 1:1로 연결합니다. 제목·소제목·CTA에 같은 키워드를 반복해 일관성을 맞춥니다.';
     suggest = '검색량보다 전환 가능성이 높은 키워드(예: 지역+통증+재활)를 우선 선택하고, 허브 링크를 CTA에 반드시 1개 넣어 주세요.';
   } else if(text.indexOf('플레이스') >= 0){
-    how = '플레이스 기본 정보(영업시간·전화·카테고리)를 먼저 고정하고, 소개글은 병원 연계+운동·재활 병행 포지셔닝 한 문장으로 통일합니다.';
-    suggest = '사진은 외관/내부/프로그램 흐름 순으로 6~10장 구성하고, 첫 3장은 브랜드 톤이 보이는 이미지로 배치하세요.';
+    how = '플레이스 기본 정보(영업시간·전화·카테고리)를 먼저 고정하고, 한 줄·짧은 소개에 리:얼(Real + Re Alignment) · 1:1 맞춤 포지셔닝을 통일합니다.';
+    suggest = '사진은 외관/내부/1:1 지도/스트레칭/상담 공간 순으로 6~10장 구성하고, 면책 문구가 빠지지 않았는지 확인하세요.';
   } else if(text.indexOf('블로그') >= 0){
     how = '주제별 카테고리를 먼저 나눈 뒤, 각 글 말미 CTA를 증상 허브 링크로 통일합니다. 글 구조는 문제 제기 → 셀프 케어 → 원리 설명 순서로 고정합니다.';
     suggest = '운영 부담을 줄이려면 주 1회 고정 발행일을 정하고, 같은 주제에서 제목만 바꾼 변형 글 2개를 미리 준비하세요.';
   } else if(text.indexOf('심의') >= 0 || text.indexOf('의료법') >= 0){
-    how = '금지 표현/권장 표현 체크리스트를 먼저 만들고, 프로필·플래너·블로그 문구를 한 번에 대조해 같은 톤으로 맞춥니다.';
-    suggest = '검토 시 "병원 우선 신호 안내 + 운동·재활 병행" 문장이 빠지지 않았는지 최종 확인 항목으로 넣어 주세요.';
+    how = '금지 표현/권장 표현 체크리스트를 먼저 만들고, 프로필·플래너·플레이스·블로그 문구를 한 번에 대조해 같은 톤으로 맞춥니다.';
+    suggest = '검토 시 "치료·진단·완치" 표현이 없고, 면책 문구가 들어갔는지 최종 확인 항목으로 넣어 주세요.';
   } else if(text.indexOf('동기화') >= 0 || text.indexOf('배포') >= 0){
     how = '수정 파일 목록을 먼저 고정하고, 업로드 → 강력 새로고침 → 핵심 화면 3개 스모크 테스트 순서로 진행합니다.';
     suggest = '배포 후 실패 화면/오류 문구를 캡처해 메모에 남기면 다음 점검 시간이 크게 줄어듭니다.';
@@ -302,10 +409,10 @@ function buildOpsReviewDraft_(item, branchId){
   var text = String(item && item.text || '').trim();
   var byId = item && item.id ? String(item.id) : '';
   var purpose = '이 항목의 목적은 "' + text + '"을 실제 운영 문장/설정으로 확정해 어디서나 동일하게 쓰는 기준을 만드는 것입니다.';
-  var intent = '병원 우선 신호는 명확히 안내하되, 기본 메시지는 운동·재활 프로그램 병행 관점이 드러나도록 정렬합니다.';
+  var intent = '리:얼(Real + Re Alignment) · 1:1 맞춤 움직임이 기본 메시지로 드러나도록 정렬합니다. 의료법 준수(면책·금지 표현)는 유지합니다.';
   var todo = '해야 할 일\n1) 기준 문장 확정\n2) 채널별 문장 확정\n3) 금지/권장 표현 확인\n4) 반영 위치 체크\n5) 반영 완료 로그 기록';
-  var proposals = '제안 문장\n- 마스터 포지셔닝 1문장: 미카닥 박준규는 근골격계 문제를 병원 연계와 운동·재활 프로그램 병행 관점에서 안내합니다.\n- 프로필용: 병원 진료가 필요한 신호는 먼저 안내하고, 적신호를 제외하면 현재 상태에 맞는 운동·재활 프로그램을 병행하도록 돕습니다.\n- 블로그용: 증상 이해를 돕는 일반 정보와 함께 병원 우선 신호를 구분하고, 일상에서 병행 가능한 운동·재활 방향을 제시합니다.\n- 상담 결과/CTA용: 병원 우선 신호를 제외하면, 평가·상담을 통해 지금 가능한 운동·재활 프로그램부터 함께 시작해 보세요.\n- 플래너 프롬프트용: 병원 우선 신호를 분리 안내하고, 기본 톤은 운동·재활 프로그램 병행 관점으로 작성한다.';
-  var placement = '반영 위치 가이드\n- 프로필: 홈/FAQ/증상 가이드/결과\n- 플래너: base prompt, 의료법·GEO 문구\n- 상담: 결과 카드/CTA/문진 후 안내\n- 블로그: 본문 말미 CTA + 허브 링크';
+  var proposals = '제안 문장\n- 마스터: ' + OPS_BRAND_COPY.master + '\n- 리:얼 이중 의미: ' + OPS_BRAND_COPY.realDualShort + '\n- CTA: ' + OPS_BRAND_COPY.cta;
+  var placement = '반영 위치 가이드\n- 프로필: 홈/FAQ/증상 가이드/결과\n- 플래너: base prompt, 의료법·GEO 문구\n- 플레이스·구글: 한 줄/짧은/상세 소개\n- 블로그: 본문 말미 CTA + 허브 링크';
 
   if(byId === 'ops-g-6'){
     purpose = 'Bing Webmaster Tools에 사이트맵을 제출해 허브/블로그 색인 기반을 확보합니다.';
@@ -317,20 +424,22 @@ function buildOpsReviewDraft_(item, branchId){
     purpose = 'Google Business Profile 지점 정보를 최신화해 지도/검색 전환을 높입니다.';
     intent = '약수·작전 지점 정보 일관성과 신뢰도를 확보합니다.';
     todo = '해야 할 일\n1) 기본 정보(시간/전화/카테고리) 점검\n2) 소개글 업데이트\n3) 사진 6~10장 정비\n4) 링크 점검\n5) 리뷰 응답 템플릿 통일';
-    proposals = '제안 문장\n- 소개글 첫 문장: 병원 우선 신호를 안내하고, 적신호를 제외하면 운동·재활 프로그램 병행을 제안합니다.';
-    placement = '반영 위치 가이드\n- Google Business Profile 소개글\n- 지점별 Q&A/리뷰 답변 템플릿';
+    proposals = '제안 문장\n- 한 줄: 지점명 | 진짜 움직임, 몸의 재정렬 — 1:1 리:얼 프로그램\n- 짧은 소개: ' + OPS_BRAND_COPY.realDualShort;
+    placement = '반영 위치 가이드\n- Google Business Profile 한 줄·소개글\n- 지점별 Q&A/리뷰 답변 템플릿\n- 네이버 플레이스와 문구 통일';
   } else if(byId === 'ops-g-9'){
     purpose = '블로그 시리즈를 운영 가능한 구조로 정리하고 허브 링크 CTA를 표준화합니다.';
     intent = '주제 누적과 상담 전환이 동시에 일어나도록 글 구조를 고정합니다.';
     todo = '해야 할 일\n1) 카테고리 3개 고정\n2) 주간 주제 1개 확정\n3) 문제→셀프케어→원리 구조 유지\n4) CTA 허브 링크 삽입\n5) 발행 후 반응 메모';
-    proposals = '제안 문장\n- CTA: 병원 우선 신호를 제외하면, 평가·상담을 통해 현재 가능한 운동·재활 프로그램 병행 방향을 안내해 드립니다.';
+    proposals = '제안 문장\n- CTA: ' + OPS_BRAND_COPY.cta;
     placement = '반영 위치 가이드\n- 블로그 본문 마지막 단락\n- 블로그 템플릿/자동 프롬프트';
   } else if(byId === 'ops-y-6' || byId === 'ops-j-6'){
-    purpose = '네이버 플레이스 정보를 지점 운영 현실에 맞게 정비합니다.';
-    intent = '검색 유입 후 방문/문의로 이어지는 신뢰 흐름을 만듭니다.';
-    todo = '해야 할 일\n1) 기본 정보 정확도 확인\n2) 소개글 문장 통일\n3) 사진 업데이트\n4) 링크/문의 경로 점검\n5) 모바일 화면 확인';
-    proposals = '제안 문장\n- 플레이스 소개글: 병원 진료가 필요한 경우를 먼저 안내하고, 그 외에는 운동·재활 프로그램 병행을 제안합니다.';
-    placement = '반영 위치 가이드\n- 네이버 플레이스 소개글\n- 프로필/블로그 지점 안내 문구';
+    var placeKey = opsPlaceBranchKey_(byId);
+    var placeLabel = placeKey === 'jakjeon' ? '작전' : '약수';
+    purpose = '네이버 플레이스 정보를 ' + placeLabel + ' 지점 운영에 맞게 정비합니다.';
+    intent = '검색 유입 후 방문/문의로 이어지는 신뢰 흐름을 만듭니다. 리:얼(Real + Re Alignment) · 1:1 맞춤 톤을 유지합니다.';
+    todo = '해야 할 일\n1) 기본 정보 정확도 확인\n2) 한 줄·짧은·상세 소개 반영\n3) 사진 업데이트\n4) 링크/문의 경로 점검\n5) 모바일 화면 확인';
+    proposals = '제안 문장\n- 한 줄: ' + OPS_BRAND_COPY.oneLiner[placeKey] + '\n- 짧은 소개: ' + buildOpsShortIntro_(placeKey).replace(/\n/g, ' ');
+    placement = '반영 위치 가이드\n- 네이버 플레이스 한 줄·짧은·상세 소개\n- 기본정보(주소·전화·영업시간·업종)\n- 사진·링크·예약·키워드\n- 프로필/블로그 지점 안내 문구';
   } else if(byId === 'ops-y-10' || byId === 'ops-j-10'){
     purpose = '리뷰 요청·응답 SOP를 만들어 증상 키워드가 자연스럽게 누적되게 합니다.';
     intent = '과장 없이 신뢰도 높은 리뷰 자산을 장기적으로 축적합니다.';
@@ -341,8 +450,14 @@ function buildOpsReviewDraft_(item, branchId){
     purpose = '브랜드 전 채널에서 동일하게 쓰는 기준 문장 세트를 완성합니다.';
     intent = '마스터 포지셔닝 1문장을 중심으로 채널별 문장을 맞추고, 이후 수정/재생성으로 문장 품질을 높입니다.';
     todo = '해야 할 일\n1) 마스터 포지셔닝 1문장 확정\n2) 채널별 적용 문구 4종 확정\n3) 금지/권장 표현 표 확정\n4) 반영 체크 로그 작성';
-    proposals = '제안 문장 세트\n[마스터 포지셔닝]\n미카닥 박준규는 근골격계 문제를 병원 연계와 운동·재활 프로그램 병행 관점에서 안내합니다.\n\n[프로필용]\n병원 진료가 필요한 신호는 먼저 안내하고, 적신호를 제외하면 현재 상태에 맞는 운동·재활 프로그램 병행 방향을 제안합니다.\n\n[블로그용]\n증상 이해를 돕는 일반 정보와 함께 병원 우선 신호를 구분하고, 일상에서 병행 가능한 운동·재활 프로그램을 안내합니다.\n\n[상담 결과/CTA용]\n병원 우선 신호를 제외하면, 평가·상담을 통해 지금 가능한 운동·재활 프로그램부터 함께 시작해 보세요.\n\n[플래너 프롬프트용]\n병원 우선 신호를 분리 안내하고, 기본 톤은 운동·재활 프로그램 병행 관점으로 작성한다.\n\n[금지/권장]\n금지: 완치, 진단 확정, 처방, 수술 대신\n권장: 병원 진료 권유 + 운동·재활 병행 안내';
-    placement = '반영 체크 로그\n- 프로필 홈/FAQ/결과\n- 증상 허브 프로그램 안내 블록\n- 플래너 base prompt/의료법·GEO 규칙\n- 상담 결과 카드/CTA';
+    proposals = '제안 문장 세트\n[마스터 포지셔닝]\n' + OPS_BRAND_COPY.master +
+      '\n\n[리:얼 이중 의미]\n' + OPS_BRAND_COPY.realLine1 + '\n' + OPS_BRAND_COPY.realLine2 +
+      '\n\n[프로필용]\n' + OPS_BRAND_COPY.storeName.yaksu + ' · Re:Al Movement 기반 1:1 리:얼 움직임 프로그램을 안내합니다.' +
+      '\n\n[블로그용]\n' + OPS_BRAND_COPY.realDualShort + ' Re:Al Movement 기반 움직임·자세 프로그램을 안내합니다.' +
+      '\n\n[상담 결과/CTA용]\n' + OPS_BRAND_COPY.cta +
+      '\n\n[플래너 프롬프트용]\n기본 톤은 리:얼(Real + Re Alignment) · 1:1 맞춤 움직임 프로그램. 치료·진단·완치 표현 금지. 면책 문구 포함.' +
+      '\n\n[금지/권장]\n금지: 치료, 진단, 완치, 처방, 재활병원, 그룹 PT\n권장: 1:1 맞춤, Re Alignment(얼라이먼트), 기능운동, 자세, 프로그램 안내';
+    placement = '반영 체크 로그\n- 프로필 홈/FAQ/결과\n- 네이버·구글 플레이스 소개글\n- 플래너 base prompt/의료법·GEO 규칙\n- 상담 결과 카드/CTA';
   }
 
   var brief = opsPurposeIntent_(purpose, intent);
@@ -351,23 +466,54 @@ function buildOpsReviewDraft_(item, branchId){
   if(byId === 'ops-g-1'){
     proposalItems = [
       { id:'master', title:'마스터 포지셔닝 1문장',
-        brief: opsPurposeIntent_('전 채널의 기준이 되는 핵심 1문장을 확정합니다.', '근골격계·병원 연계·운동·재활 병행이 한 문장에 담기게 합니다.'),
-        text: opsProposalWithReason_('미카닥 박준규는 근골격계 문제를 병원 연계와 운동·재활 프로그램 병행 관점에서 안내합니다.', '마스터 문장은 이후 채널별 문장 톤·방향의 기준이 됩니다.') },
+        brief: opsPurposeIntent_('전 채널의 기준이 되는 핵심 1문장을 확정합니다.', '근골격·움직임 전문가 · 1:1 리:얼 프로그램이 한 문장에 담기게 합니다.'),
+        text: opsProposalWithReason_(OPS_BRAND_COPY.master, '마스터 문장은 이후 채널별 문장 톤·방향의 기준이 됩니다.') },
+      { id:'real-dual', title:'리:얼 이중 의미',
+        brief: opsPurposeIntent_('Real(진짜) + Re Alignment(재정렬) 브랜드 스토리를 정의합니다.', '리얼무브먼트만의 차별점이 짧은 소개·상세에서 반복되게 합니다.'),
+        text: opsProposalWithReason_(OPS_BRAND_COPY.realLine1 + '\n' + OPS_BRAND_COPY.realLine2, '리:얼의 이중 의미가 브랜드 기억점이 됩니다.') },
       { id:'profile', title:'프로필용 문장',
-        brief: opsPurposeIntent_('프로필·FAQ·증상 허브에 쓸 고객-facing 문장을 만듭니다.', '병원 우선 신호 안내와 운동·재활 병행이 자연스럽게 이어지게 합니다.'),
-        text: opsProposalWithReason_('병원 진료가 필요한 신호는 먼저 안내하고, 적신호를 제외하면 현재 상태에 맞는 운동·재활 프로그램 병행 방향을 제안합니다.', '프로필·FAQ는 고객이 가장 먼저 읽는 구간이라 병원 안내와 병행 제안이 함께 드러나야 합니다.') },
+        brief: opsPurposeIntent_('프로필·FAQ·증상 허브에 쓸 고객-facing 문장을 만듭니다.', '1:1 리:얼 움직임 · Re:Al Movement가 자연스럽게 드러나게 합니다.'),
+        text: opsProposalWithReason_('리얼무브먼트는 Re:Al Movement 기반 1:1 리:얼 움직임 프로그램을 안내합니다. ' + OPS_BRAND_COPY.disclaimer, '프로필·FAQ는 고객이 가장 먼저 읽는 구간입니다.') },
       { id:'blog', title:'블로그용 문장',
-        brief: opsPurposeIntent_('블로그 본문·말미 CTA에 쓸 문장을 만듭니다.', '정보 제공 톤을 유지하면서 병원 우선 신호와 병행 프로그램을 구분해 안내합니다.'),
-        text: opsProposalWithReason_('증상 이해를 돕는 일반 정보와 함께 병원 우선 신호를 구분하고, 일상에서 병행 가능한 운동·재활 프로그램을 안내합니다.', '일반 정보 톤을 유지하면서 상담 연결로 자연스럽게 이어져야 합니다.') },
+        brief: opsPurposeIntent_('블로그 본문·말미 CTA에 쓸 문장을 만듭니다.', '정보 제공 톤을 유지하면서 리:얼 · 1:1 맞춤으로 연결합니다.'),
+        text: opsProposalWithReason_(OPS_BRAND_COPY.realDualShort + ' Re:Al Movement 기반 움직임·자세 프로그램을 안내합니다.', '일반 정보 톤을 유지하면서 상담 연결로 자연스럽게 이어져야 합니다.') },
       { id:'cta', title:'상담 결과/CTA 문장',
-        brief: opsPurposeIntent_('상담 결과 카드·문진 후 안내에 쓸 전환 문장을 만듭니다.', '평가·상담 후 다음 행동(프로그램 시작)으로 이어지게 합니다.'),
-        text: opsProposalWithReason_('병원 우선 신호를 제외하면, 평가·상담을 통해 지금 가능한 운동·재활 프로그램부터 함께 시작해 보세요.', '상담 직후 다음 행동을 명확히 안내해 전환률을 높입니다.') },
+        brief: opsPurposeIntent_('상담 결과 카드·문진 후·플레이스 예약에 쓸 전환 문장을 만듭니다.', '평가·상담 후 다음 행동(프로그램 시작)으로 이어지게 합니다.'),
+        text: opsProposalWithReason_(OPS_BRAND_COPY.cta, '상담·플레이스 직후 다음 행동을 명확히 안내해 전환률을 높입니다.') },
       { id:'prompt', title:'플래너 프롬프트용 기준 문장',
         brief: opsPurposeIntent_('플래너 AI 프롬프트·의료법·GEO 규칙의 기준 문장을 만듭니다.', '자동 생성 콘텐츠가 같은 톤·경계를 지키게 합니다.'),
-        text: opsProposalWithReason_('병원 우선 신호를 분리 안내하고, 기본 톤은 운동·재활 프로그램 병행 관점으로 작성한다.', 'AI 생성 콘텐츠가 같은 경계·톤을 지키도록 프롬프트에 고정합니다.') },
+        text: opsProposalWithReason_('기본 톤: 리:얼(Real + Re Alignment) · 1:1 맞춤 움직임 프로그램. 치료·진단·완치 표현 금지. ' + OPS_BRAND_COPY.disclaimer, 'AI 생성 콘텐츠가 같은 경계·톤을 지키도록 프롬프트에 고정합니다.') },
       { id:'lexicon', title:'금지/권장 표현',
         brief: opsPurposeIntent_('채널 공통으로 쓰지 않을 표현과 권장 표현을 정리합니다.', '의료법·광고 심의 리스크를 줄이면서 메시지 일관성을 유지합니다.'),
-        text: opsProposalWithReason_('금지: 완치, 진단 확정, 처방, 수술 대신\n권장: 병원 진료 권유 + 운동·재활 병행 안내', '팀 전체가 같은 표현 경계를 쓰면 의료법·광고 심의 리스크를 줄일 수 있습니다.') }
+        text: opsProposalWithReason_('금지: 치료, 진단, 완치, 처방, 재활병원, 그룹 PT\n권장: 1:1 맞춤, Re Alignment(얼라이먼트), 기능운동, 자세, 프로그램 안내', '팀 전체가 같은 표현 경계를 쓰면 의료법·광고 심의 리스크를 줄일 수 있습니다.') }
+    ];
+  } else if(byId === 'ops-y-6' || byId === 'ops-j-6'){
+    var pk = opsPlaceBranchKey_(byId);
+    proposalItems = [
+      { id:'oneliner', title:'한 줄 소개',
+        brief: opsPurposeIntent_('네이버 플레이스 검색 결과·상단에 노출되는 한 줄을 확정합니다.', '지점명 + 리:얼 이중 의미가 한눈에 들어오게 합니다.'),
+        text: opsProposalWithReason_(OPS_BRAND_COPY.oneLiner[pk], 'B안 확정 — 진짜 움직임, 몸의 재정렬 — 1:1 리:얼') },
+      { id:'short', title:'짧은 소개',
+        brief: opsPurposeIntent_('플레이스 소개 상단 2~3문장을 확정합니다.', 'Re Alignment(얼라이먼트) 표기를 포함합니다.'),
+        text: opsProposalWithReason_(buildOpsShortIntro_(pk), '짧은 소개에서 리:얼 이중 의미를 풀어줍니다.') },
+      { id:'detail', title:'상세 소개',
+        brief: opsPurposeIntent_('플레이스 본문 전체를 확정합니다.', '이런 분께 · 특징 · 프로그램 · 면책까지 포함합니다.'),
+        text: opsProposalWithReason_(buildOpsDetailIntro_(pk), '상세 소개는 검토 후 그대로 복붙해 반영합니다.') },
+      { id:'cta', title:'예약·톡톡 CTA (Step 9)',
+        brief: opsPurposeIntent_('예약·문의 버튼 근처 문구를 확정합니다.', '연락 장벽을 낮추면서 브랜드 톤을 유지합니다.'),
+        text: opsProposalWithReason_(OPS_BRAND_COPY.cta, '플레이스·카카오채널 등 문의 CTA에 공통 사용합니다.') },
+      { id:'basic', title:'기본정보 — 주소·전화·영업시간 (Step 6)',
+        brief: opsPurposeIntent_('플레이스 기본정보를 블로그·스케줄과 일치시킵니다.', '주소·전화 오타가 없어야 검색·방문 전환이 유지됩니다.'),
+        text: opsProposalWithReason_(buildOpsPlaceBasicInfo_(pk), '영업시간은 실제 스케줄과 맞는지 반드시 확인하세요.') },
+      { id:'photos', title:'대표 사진 10컷 (Step 7)',
+        brief: opsPurposeIntent_('촬영·선별할 사진 컷 리스트를 확정합니다.', '외관→내부→1:1 지도 순으로 신뢰와 프로그램이 보이게 합니다.'),
+        text: opsProposalWithReason_(buildOpsPhotoShotList_(), '의료 시술처럼 보이는 컷은 피하고, 움직임·상담 톤을 유지합니다.') },
+      { id:'links', title:'링크 연결 (Step 8)',
+        brief: opsPurposeIntent_('홈페이지·블로그·오시는 길 링크를 연결합니다.', '문의 전 신뢰 확인 경로를 만듭니다.'),
+        text: opsProposalWithReason_(buildOpsPlaceLinks_(pk), '프로필·블로그 오시는 길 글과 동일 링크를 씁니다.') },
+      { id:'keywords', title:'태그·키워드 (Step 10)',
+        brief: opsPurposeIntent_('지역×프로그램 검색 키워드를 등록합니다.', opsBranchMeta_(pk).target + ' 타깃에 맞춥니다.'),
+        text: opsProposalWithReason_(buildOpsKeywords_(pk), '플레이스 태그·소식글·블로그와 같은 키워드를 반복해 GEO를 맞춥니다.') }
     ];
   } else {
     var proposalText = proposals.replace(/^제안 문장[^\n]*\n?/, '').trim().replace(/^\-\s*/, '');
@@ -421,6 +567,7 @@ function splitOpsG1LegacyProposalText_(raw, baseItems){
   if(text.indexOf('[마스터') < 0 && text.indexOf('제안 문장 세트') < 0) return null;
   var keys = [
     { id:'master', re: /\[마스터[^\]]*\]\s*([\s\S]*?)(?=\n\n\[|$)/ },
+    { id:'real-dual', re: /\[리:얼[^\]]*\]\s*([\s\S]*?)(?=\n\n\[|$)/ },
     { id:'profile', re: /\[프로필용\]\s*([\s\S]*?)(?=\n\n\[|$)/ },
     { id:'blog', re: /\[블로그용\]\s*([\s\S]*?)(?=\n\n\[|$)/ },
     { id:'cta', re: /\[상담[^\]]*\]\s*([\s\S]*?)(?=\n\n\[|$)/ },
@@ -527,7 +674,7 @@ function regenerateOpsReviewText_(fieldName, current, base){
 }
 const OPS_MANUAL_SECTIONS = [
   { id: 'ops-g-brand', branch: 'global', phase: '브랜딩 기반', items: [
-    opsBranchItem_('ops-g-1', '포지셔닝 문장 확정 — 근골격계 전문가 · 병원 연계 · 운동·재활 프로그램 병행'),
+    opsBranchItem_('ops-g-1', '포지셔닝 문장 확정 — 근골격·움직임 전문가 · 1:1 리:얼(Re Alignment) 프로그램'),
     opsBranchItem_('ops-g-2', '의료법 준수 문구·면책 — 프로필·블로그·상담 결과·플래너 프롬프트 동기화'),
     opsBranchItem_('ops-g-3', '저자 박스 템플릿 — 이름·자격·한 줄 전문 분야 (블로그·발행본 하단)'),
     opsBranchItem_('ops-g-4', '프로필 증상 허브 5개 — 허리·목·어깨·무릎·골반 (내용·딥링크·JSON-LD 점검)', buildSymptomHubLinksBlock_()),
@@ -548,11 +695,11 @@ const OPS_MANUAL_SECTIONS = [
     opsBranchItem_('ops-y-5', '가격·이용권·프로그램 표 초안')
   ]},
   { id: 'ops-y-online', branch: 'yaksu', phase: '2. 온라인 채널', items: [
-    opsBranchItem_('ops-y-6', '네이버 플레이스 등록·사진·영업시간·소개글'),
+    opsBranchItem_('ops-y-6', '네이버 플레이스 — 한 줄·짧은·상세 소개·사진·영업시간'),
     opsBranchItem_('ops-y-7', '네이버 블로그 지점 위치 안내 글·지도 링크'),
     opsBranchItem_('ops-y-8', '프로필·홈페이지 약수 링크·문구 반영'),
     opsBranchItem_('ops-y-9', '지역×증상 롱테일 키워드 3개 · 프로필 허브·블로그 연결',
-      '예: 약수 허리통증 · 약수 필라테스 허리 · 중구 재활\n글 말미 CTA에 허브 링크 1개:\n' + buildSymptomHubLinksBlock_()),
+      '예: 약수 1:1 운동 · 약수 체형교정 · 중구 자세교정 · 리얼무브먼트 약수\n글 말미 CTA에 허브 링크 1개:\n' + buildSymptomHubLinksBlock_()),
     opsBranchItem_('ops-y-10', '리뷰 유도 SOP — 증상 키워드 포함 후기 요청')
   ]},
   { id: 'ops-y-open', branch: 'yaksu', phase: '3. 오픈·운영', items: [
@@ -569,11 +716,11 @@ const OPS_MANUAL_SECTIONS = [
     opsBranchItem_('ops-j-5', '가격·이용권·프로그램 표 초안')
   ]},
   { id: 'ops-j-online', branch: 'jakjeon', phase: '2. 온라인 채널', items: [
-    opsBranchItem_('ops-j-6', '네이버 플레이스 등록·사진·영업시간·소개글'),
+    opsBranchItem_('ops-j-6', '네이버 플레이스 — 한 줄·짧은·상세 소개·사진·영업시간'),
     opsBranchItem_('ops-j-7', '네이버 블로그 작전 위치 안내 글·지도 링크'),
     opsBranchItem_('ops-j-8', '프로필·홈페이지 작전 링크·문구 반영'),
     opsBranchItem_('ops-j-9', '지역×증상 롱테일 키워드 3개 · 프로필 허브·블로그 연결',
-      '예: 작전 허리통증 · 인천 필라테스 · 작전 재활\n글 말미 CTA에 허브 링크 1개:\n' + buildSymptomHubLinksBlock_()),
+      '예: 작전 1:1 운동 · 인천 체형교정 · 작전 스트레칭 · 리얼무브먼트 작전\n글 말미 CTA에 허브 링크 1개:\n' + buildSymptomHubLinksBlock_()),
     opsBranchItem_('ops-j-10', '리뷰 유도 SOP — 증상 키워드 포함 후기 요청')
   ]},
   { id: 'ops-j-open', branch: 'jakjeon', phase: '3. 오픈·운영', items: [

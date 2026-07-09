@@ -64,6 +64,12 @@
       <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:8px;">Apps Script <strong>스크립트 속성</strong>에 <code style="font-size:10px;background:#F3F4F6;padding:2px 4px;border-radius:4px;">PLANNER_SYNC_TOKEN</code>을 넣었다면, 여기에 <strong>같은 값</strong>을 입력하세요. (미설정 시 서버가 공개 상태일 수 있음)</div>
       <input class="modal-input" type="password" id="planner-sync-token" placeholder="PLANNER_SYNC_TOKEN" autocomplete="off" />
     </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid #E5E7EB;">
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:#374151;line-height:1.5;">
+        <input type="checkbox" id="daily-auto-enabled" style="margin-top:3px;width:16px;height:16px;accent-color:#16A34A;">
+        <span><strong>매일 8:30 자동 초안</strong> — 「다음 발행 추천」 주제를 API로 백그라운드 생성 (기본 끔)</span>
+      </label>
+    </div>
     <button type="button" class="modal-btn" id="start-btn" onclick="saveKey()" style="margin-top:14px;">시작하기 →</button>
     <button type="button" class="modal-btn-ghost" onclick="closeApiModal()">닫기</button>
   </div>
@@ -96,27 +102,6 @@
     <div class="prompt-modal-footer">
       <button class="btn-cancel-prompt" onclick="closePromptModal()">취소</button>
       <button class="btn-save-prompt" onclick="savePrompts()">저장하기</button>
-    </div>
-  </div>
-</div>
-
-<!-- 발행 완료 · 최종본 저장 -->
-
-<div class="publish-modal-overlay" id="publish-modal-overlay" onclick="closePublishModal(event)">
-  <div class="publish-modal prompt-modal" id="publish-modal" onclick="event.stopPropagation()">
-    <div class="prompt-modal-handle"></div>
-    <div class="prompt-modal-header">
-      <button class="prompt-modal-close" onclick="closePublishModal()" aria-label="닫기">×</button>
-      <div class="prompt-modal-title" id="publish-modal-title">발행 완료 · 최종본 저장</div>
-    </div>
-    <div class="publish-modal-body">
-      <div class="publish-modal-meta" id="publish-modal-meta"></div>
-      <div id="publish-fields-wrap"></div>
-      <div class="publish-refine-note" id="publish-refine-note"></div>
-    </div>
-    <div class="prompt-modal-footer">
-      <button type="button" class="btn-cancel-prompt" onclick="closePublishModal()">취소</button>
-      <button type="button" class="btn-save-prompt" id="btn-publish-save" onclick="confirmPublishFinal()" style="background:#16A34A;">발행 저장</button>
     </div>
   </div>
 </div>
@@ -179,7 +164,7 @@
       <span class="api-dot" id="api-dot"></span>
       <span id="api-status">API 키 설정</span>
     </button>
-    <button class="btn-prompt-settings" onclick="openPromptModal()">프롬프트</button>
+    <button class="btn-prompt-settings" id="btn-prompt-settings" onclick="openPromptModal()">프롬프트</button>
     <button class="btn-add" id="add-toggle-btn" onclick="toggleAdd()">추가</button>
   </div>
 </div>

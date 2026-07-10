@@ -2137,6 +2137,17 @@ flex-shrink: 0; font-size: 10px; color: #9CA3AF; background: none; border: 1px s
 border-radius: 4px; padding: 2px 7px; cursor: pointer; font-family: inherit;
 }
 .prompt-reset-btn:hover { border-color: #EF4444; color: #EF4444; }
+.prompt-cat-reset-bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
+  margin: 10px 16px 0; padding: 10px 12px; border-radius: 10px;
+  background: #FFFBEB; border: 1px solid #FDE68A;
+}
+.prompt-cat-reset-hint { font-size: 11px; color: #92400E; line-height: 1.45; flex: 1; min-width: 140px; }
+.prompt-reset-all-btn {
+  flex-shrink: 0; font-size: 11px; font-weight: 700; color: #B45309; background: #fff;
+  border: 1.5px solid #F59E0B; border-radius: 8px; padding: 7px 12px; cursor: pointer; font-family: inherit;
+}
+.prompt-reset-all-btn:hover { background: #FEF3C7; border-color: #D97706; color: #92400E; }
 .prompt-textarea {
 width: 100%; min-height: 140px; padding: 12px 14px;
 border: 1.5px solid #E5E7EB; border-radius: 10px;

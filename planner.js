@@ -1726,7 +1726,12 @@ const TOPIC_FIVE_ESTIMATE_SEC = 25;
 const TOPIC_ONE_ESTIMATE_SEC = 14;
 const TOPICS_BATCH_ESTIMATE_SEC = 55;
 const TOPIC_REGEN_ESTIMATE_SEC = 20;
+const FLOW_PROPOSAL_ESTIMATE_SEC = 42;
+const SHEET_FIELD_REGEN_ESTIMATE_SEC = 18;
+const ADD_DRAFT_TOPIC_ESTIMATE_SEC = 38;
+const ADD_DRAFT_FULL_ESTIMATE_SEC = 95;
 var plannerWaitUiTimer_ = null;
+var activeButtonCountdowns_ = [];
 
 function getCountdownSec_(startedAt, estimateSec){
   return Math.max(0, (estimateSec || 0) - Math.floor((Date.now() - (startedAt || Date.now())) / 1000));
@@ -1739,8 +1744,62 @@ function formatCountdownLong_(leftSec){
   leftSec = Math.max(0, Math.ceil(leftSec));
   return leftSec <= 0 ? '거의 다 됐어요…' : ('약 ' + leftSec + '초 남음');
 }
+function buttonCountdownText_(busyLabel, leftSec){
+  var label = busyLabel || '재생성 중';
+  if(leftSec <= 0) return label + ' · 마무리 중…';
+  return label + ' · 약 ' + formatRoughCountdown(leftSec);
+}
+function startButtonCountdown_(btn, opts){
+  if(!btn) return;
+  opts = opts || {};
+  var estSec = opts.estimateSec || 20;
+  if(!btn.getAttribute('data-planner-idle')){
+    btn.setAttribute('data-planner-idle', opts.idleText != null ? opts.idleText : btn.textContent);
+  }
+  activeButtonCountdowns_.push({
+    btn: btn,
+    endMs: Date.now() + estSec * 1000,
+    idleText: btn.getAttribute('data-planner-idle'),
+    busyLabel: opts.busyLabel || opts.label || '재생성 중'
+  });
+  btn.disabled = true;
+  tickButtonCountdowns_();
+  ensurePlannerWaitTimer_();
+}
+function startButtonsCountdownBySelector_(selector, opts){
+  if(!selector) return;
+  document.querySelectorAll(selector).forEach(function(btn){
+    startButtonCountdown_(btn, opts);
+  });
+}
+function stopButtonCountdown_(btn){
+  if(!btn) return;
+  activeButtonCountdowns_ = activeButtonCountdowns_.filter(function(w){
+    if(w.btn !== btn) return true;
+    if(document.body.contains(btn)){
+      btn.disabled = false;
+      btn.textContent = btn.getAttribute('data-planner-idle') || w.idleText || '';
+      btn.removeAttribute('data-planner-idle');
+    }
+    return false;
+  });
+  stopPlannerWaitTimerIfIdle_();
+}
+function stopButtonsCountdownBySelector_(selector){
+  if(!selector) return;
+  document.querySelectorAll(selector).forEach(function(btn){ stopButtonCountdown_(btn); });
+}
+function tickButtonCountdowns_(){
+  activeButtonCountdowns_ = activeButtonCountdowns_.filter(function(w){
+    if(!w.btn || !document.body.contains(w.btn)) return false;
+    var leftSec = (w.endMs - Date.now()) / 1000;
+    w.btn.disabled = true;
+    w.btn.textContent = buttonCountdownText_(w.busyLabel, leftSec);
+    return true;
+  });
+}
 function isAnyPlannerWaitActive_(){
-  return !!(state.yearPlanGenerating || state.subGoalPlanGenerating || state.plannerAiWait);
+  return !!(state.yearPlanGenerating || state.subGoalPlanGenerating || state.plannerAiWait || activeButtonCountdowns_.length);
 }
 function ensurePlannerWaitTimer_(){
   if(plannerWaitUiTimer_) return;
@@ -1760,6 +1819,7 @@ function startPlannerAiWait_(opts){
     startedAt: Date.now(),
     estimateSec: opts.estimateSec || 20,
     label: opts.label || '',
+    busyLabel: opts.busyLabel || '재생성 중',
     statusElId: opts.statusElId || null,
     btnSelector: opts.btnSelector || null,
     btnIdleText: opts.btnIdleText || null,
@@ -1820,7 +1880,9 @@ function tickPlannerWaitUi_(){
   }
   var w = state.plannerAiWait;
   if(w){
-    var cdShort = formatCountdownShort_(getCountdownSec_(w.startedAt, w.estimateSec));
+    var leftW = getCountdownSec_(w.startedAt, w.estimateSec);
+    var cdShort = formatCountdownShort_(leftW);
+    var cdBtn = buttonCountdownText_(w.busyLabel, leftW);
     if(w.statusElId){
       var sel = document.getElementById(w.statusElId);
       if(sel) sel.textContent = (w.label ? w.label + ' · ' : '') + cdShort;
@@ -1829,16 +1891,17 @@ function tickPlannerWaitUi_(){
       document.querySelectorAll(w.btnSelector).forEach(function(btnW){
         if(!btnW.getAttribute('data-planner-idle')) btnW.setAttribute('data-planner-idle', btnW.textContent);
         btnW.disabled = true;
-        btnW.textContent = cdShort;
+        btnW.textContent = cdBtn;
       });
     }
     if(w.regenDraftId){
       var rb2 = document.querySelector('.ws-item-btn[data-regen-draft="' + w.regenDraftId + '"]');
-      if(rb2){ rb2.disabled = true; rb2.textContent = cdShort; rb2.classList.add('generating'); }
+      if(rb2){ rb2.disabled = true; rb2.textContent = cdBtn; rb2.classList.add('generating'); }
       var mini2 = document.querySelector('.draft-card-refresh-mini[data-regen-draft="' + w.regenDraftId + '"]');
-      if(mini2){ mini2.disabled = true; mini2.textContent = cdShort; }
+      if(mini2){ mini2.disabled = true; mini2.textContent = cdBtn; }
     }
   }
+  tickButtonCountdowns_();
   stopPlannerWaitTimerIfIdle_();
 }
 
@@ -2210,6 +2273,90 @@ function getInitialProgramPlanDraft_(catId){
       };
     })
   };
+}
+function getProgramSeedBrandProfile_(catId){
+  var seed = PROGRAM_INITIAL_PLAN_DRAFTS[String(catId)];
+  return seed ? String(seed.brandProfile || '').trim() : '';
+}
+function getProgramSeedStrategyGuide_(catId){
+  var seed = PROGRAM_INITIAL_PLAN_DRAFTS[String(catId)];
+  return seed ? normalizeProgramStrategyGuideTemplate_(String(seed.strategyGuide || '').trim()) : '';
+}
+function ensureProgramIdentityPlan_(catId){
+  if(!state.branding || typeof state.branding !== 'object') state.branding = {};
+  if(!state.branding.subGoalPlans) state.branding.subGoalPlans = {};
+  var key = String(catId);
+  var plan = state.branding.subGoalPlans[key];
+  if(plan && plan.steps && plan.steps.length) return plan;
+  var seed = getInitialProgramPlanDraft_(catId);
+  if(!seed) return null;
+  state.branding.subGoalPlans[key] = {
+    steps: seed.steps.map(function(s){
+      return {
+        id: String(s.id),
+        title: s.title || '',
+        summary: s.summary || '',
+        rationale: s.rationale || '',
+        pinned: false
+      };
+    }),
+    miscLabel: SUBGOAL_MISC_LABEL,
+    brandProfile: seed.brandProfile || '',
+    strategyGuide: seed.strategyGuide || '',
+    criteria: seed.strategyGuide || '',
+    intent: seed.strategyGuide || '',
+    updatedAt: new Date().toISOString()
+  };
+  return state.branding.subGoalPlans[key];
+}
+function saveProgramBrandProfileDirect_(catId, value){
+  var plan = ensureProgramIdentityPlan_(catId);
+  if(!plan) return;
+  plan.brandProfile = String(value || '').trim();
+  plan.updatedAt = new Date().toISOString();
+  syncPendingProgramIdentityFromApplied_(catId);
+  save({ driveImmediate: true, gasImmediate: true });
+}
+function saveProgramStrategyGuideDirect_(catId, value){
+  var plan = ensureProgramIdentityPlan_(catId);
+  if(!plan) return;
+  var sg = normalizeProgramStrategyGuideTemplate_(String(value || ''));
+  plan.strategyGuide = sg;
+  plan.criteria = sg;
+  plan.intent = sg;
+  plan.updatedAt = new Date().toISOString();
+  syncPendingProgramIdentityFromApplied_(catId);
+  save({ driveImmediate: true, gasImmediate: true });
+}
+function syncPendingProgramIdentityFromApplied_(catId){
+  var p = state.pendingSubGoalPlan;
+  if(!p || p.catId !== catId || !p.plan) return;
+  var applied = state.branding && state.branding.subGoalPlans && state.branding.subGoalPlans[String(catId)];
+  if(!applied) return;
+  p.plan.brandProfile = String(applied.brandProfile || '').trim();
+  var sg = String(applied.strategyGuide || applied.criteria || applied.intent || '').trim();
+  if(sg){
+    p.plan.strategyGuide = normalizeProgramStrategyGuideTemplate_(sg);
+    p.plan.criteria = p.plan.strategyGuide;
+    p.plan.intent = p.plan.strategyGuide;
+  }
+  persistPendingSubGoalPlan_();
+}
+function commitProgramIdentityFromPending_(catId){
+  var p = state.pendingSubGoalPlan;
+  if(!p || p.catId !== catId || !p.plan) return;
+  var plan = ensureProgramIdentityPlan_(catId);
+  if(!plan) return;
+  if(p.plan.brandProfile != null) plan.brandProfile = String(p.plan.brandProfile || '').trim();
+  if(p.plan.strategyGuide != null){
+    var sg = normalizeProgramStrategyGuideTemplate_(String(p.plan.strategyGuide || ''));
+    plan.strategyGuide = sg;
+    plan.criteria = sg;
+    plan.intent = sg;
+  }
+  plan.updatedAt = new Date().toISOString();
+  syncPendingProgramIdentityFromApplied_(catId);
+  save({ driveImmediate: true, gasImmediate: true });
 }
 function applyInitialProgramTopicsToCat_(catId){
   var seed = getInitialProgramPlanDraft_(catId);
@@ -2683,14 +2830,36 @@ function getProgramPlanMeta_(catId){
     })
   };
 }
+function getProgramBrandProfile_(catId){
+  var meta = getProgramPlanMeta_(catId);
+  return meta.brandProfile || getProgramSeedBrandProfile_(catId);
+}
+function getProgramStrategyGuide_(catId){
+  var meta = getProgramPlanMeta_(catId);
+  return meta.strategyGuide || getProgramSeedStrategyGuide_(catId);
+}
+function buildProgramIdentityPromptBlock_(catId){
+  var bp = getProgramBrandProfile_(catId);
+  var sg = getProgramStrategyGuide_(catId);
+  if(!bp && !sg) return '';
+  var lines = ['[프로그램 정체성 — 채널 지침과 함께 참고]'];
+  if(bp) lines.push('브랜딩 요소: ' + bp);
+  if(sg){
+    lines.push('생성 기준·기획 의도:');
+    lines.push(sg);
+  }
+  return lines.join('\n');
+}
 function buildProgramPlanContextBlock_(catId, stepId){
   var cat = CATEGORIES[catId];
   var meta = getProgramPlanMeta_(catId);
+  var brandProfile = getProgramBrandProfile_(catId);
+  var strategyGuide = getProgramStrategyGuide_(catId);
   var outcome = getCategoryThreeMonthOutcome_(catId);
   var lines = ['[프로그램 기획 · ' + (cat ? cat.name + ' (' + cat.audience + ')' : '') + ']'];
   if(outcome) lines.push('3개월 후 독자: ' + outcome);
-  if(meta.brandProfile) lines.push('프로그램 브랜딩 요소: ' + meta.brandProfile);
-  if(meta.strategyGuide) lines.push('하위 목표 생성 기준·기획 의도: ' + meta.strategyGuide);
+  if(brandProfile) lines.push('프로그램 브랜딩 요소: ' + brandProfile);
+  if(strategyGuide) lines.push('하위 목표 생성 기준·기획 의도: ' + strategyGuide);
   else lines.push('(생성 기준·기획 의도 미작성 — 기획 워크숍에서 자세히 적어 주세요)');
   if(meta.steps.length){
     lines.push('', '하위 목표 단계:');
@@ -3625,6 +3794,7 @@ window.fillAllStepTopicsWithAI_ = async function(catId, opts){
   if(!opts.silent && document.querySelector('.btn-fill-all-topics')){
     startPlannerAiWait_({
       estimateSec: TOPICS_BATCH_ESTIMATE_SEC,
+      busyLabel: '생성 중',
       btnSelector: '.btn-fill-all-topics',
       btnIdleText: '채우기'
     });
@@ -5963,6 +6133,7 @@ window.regenerateTopicWorkshop_ = async function(stepId){
   plannerAiBusy = true;
   startPlannerAiWait_({
     estimateSec: TOPIC_FIVE_ESTIMATE_SEC,
+    busyLabel: '재생성 중',
     btnSelector: '#btn-topic-regen',
     btnIdleText: '재생성'
   });
@@ -6014,6 +6185,7 @@ window.suggestFiveTopicsForStep_ = async function(stepId, opts){
   if(!opts.silent) plannerAiBusy = true;
   if(!opts.silent && opts.btnSelector) startPlannerAiWait_({
     estimateSec: TOPIC_FIVE_ESTIMATE_SEC,
+    busyLabel: '생성 중',
     btnSelector: opts.btnSelector,
     btnIdleText: opts.btnIdleText || 'AI로 주제 5개 제안'
   });
@@ -6056,6 +6228,7 @@ window.addTopicSlotSuggestion_ = async function(stepId, slotIndex){
   plannerAiBusy = true;
   startPlannerAiWait_({
     estimateSec: TOPIC_ONE_ESTIMATE_SEC,
+    busyLabel: '생성 중',
     btnSelector: '.topic-slot-ai-btn[data-ai-slot="' + String(stepId) + '-' + slotIndex + '"]',
     btnIdleText: 'AI 추천'
   });
@@ -6525,11 +6698,77 @@ function sanitizeCatPromptKeys_(catId){
     if(allowed.indexOf(k) < 0) delete cat[k];
   });
 }
+function normalizePromptTextForCompare_(text){
+  return String(text || '').replace(/\r\n/g, '\n').trim();
+}
+function getPromptCompareValue_(catId, type){
+  var el = document.getElementById('pt-' + type);
+  if(el) return el.value;
+  if(type === 'base') return getBasePrompt();
+  return getCatPrompt(catId, type);
+}
+function isPromptAtDefault_(catId, type){
+  var def = type === 'base' ? String(DEFAULT_PROMPTS.base || '') : getDefaultCatPrompt_(catId, type);
+  if(type !== 'base' && !def) return true;
+  return normalizePromptTextForCompare_(getPromptCompareValue_(catId, type)) === normalizePromptTextForCompare_(def);
+}
+function isCatPromptsAllDefault_(catId){
+  var types = getPromptTypesForCat_(catId);
+  if(!types.length) return true;
+  return types.every(function(t){ return isPromptAtDefault_(catId, t); });
+}
+function promptResetBtnHtml_(catId, type){
+  var atDefault = isPromptAtDefault_(catId, type);
+  return '<button type="button" class="prompt-reset-btn' + (atDefault ? ' is-at-default' : ' is-modified') + '"' +
+    (atDefault ? ' disabled title="현재 내용이 기본값과 같아요"' : ' title="기본값과 다릅니다. 누르면 되돌려요"') +
+    ' onclick="resetPrompt(\'' + type + '\')">기본값으로</button>';
+}
+function promptResetAllBtnHtml_(catId){
+  var atDefault = isCatPromptsAllDefault_(catId);
+  return '<button type="button" class="prompt-reset-all-btn' + (atDefault ? ' is-at-default' : ' is-modified') + '"' +
+    (atDefault ? ' disabled title="이 프로그램 프롬프트가 모두 기본값이에요"' : ' title="수정된 채널 지침을 모두 기본값으로 되돌려요"') +
+    ' onclick="resetAllPromptsForCat()">이 프로그램 전체 기본값으로</button>';
+}
+function updatePromptResetButtons_(){
+  var catId = state.editingCatId;
+  if(catId == null || isOpsManualCategory(catId)) return;
+  var types = getPromptTypesForCat_(catId);
+  types.concat(['base']).forEach(function(type){
+    var ta = document.getElementById('pt-' + type);
+    if(!ta) return;
+    var section = ta.closest('.prompt-section');
+    if(!section) return;
+    var btn = section.querySelector('.prompt-reset-btn');
+    if(!btn) return;
+    var atDefault = isPromptAtDefault_(catId, type);
+    btn.disabled = atDefault;
+    btn.classList.toggle('is-at-default', atDefault);
+    btn.classList.toggle('is-modified', !atDefault);
+    btn.title = atDefault ? '현재 내용이 기본값과 같아요' : '기본값과 다릅니다. 누르면 되돌려요';
+  });
+  var allBtn = document.querySelector('.prompt-reset-all-btn');
+  if(allBtn && types.length){
+    var allDefault = isCatPromptsAllDefault_(catId);
+    allBtn.disabled = allDefault;
+    allBtn.classList.toggle('is-at-default', allDefault);
+    allBtn.classList.toggle('is-modified', !allDefault);
+    allBtn.title = allDefault ? '이 프로그램 프롬프트가 모두 기본값이에요' : '수정된 채널 지침을 모두 기본값으로 되돌려요';
+  }
+}
 function getCatPrompt(catId, type) {
   const catPrompts = getPrompts().categories[catId] || {};
   const cur = catPrompts[type];
   if(cur !== undefined && cur !== null && String(cur).length > 0) return cur;
   return DEFAULT_PROMPTS.categories[catId]?.[type] || '';
+}
+function getCatPromptForGeneration_(catId, type){
+  var guide = getCatPrompt(catId, type);
+  if(!guide) return guide;
+  var withIdentity = { blog: 1, insta: 1, threads: 1, community: 1, thread: 1, image: 1 };
+  if(!withIdentity[type]) return guide;
+  var block = buildProgramIdentityPromptBlock_(catId);
+  if(!block) return guide;
+  return guide + '\n\n' + block;
 }
 function isDailyShareCategory(catId){ return catId === 6; }
 function isOpsManualCategory(catId){ return catId === 8; }
@@ -6538,6 +6777,24 @@ function isHeiljagyaeCategory(catId){ return catId === 7; }
 function isGeneralAudienceCategory(catId){ return catId === 0 || catId === 1 || catId === 2; }
 /** CMT·IFC·Re:Al 움직임 과정 — 강연·영상 공유 톤 */
 function isExpertCourseCategory(catId){ return catId === 3 || catId === 4 || catId === 5; }
+function getExpertCourseTopicAudienceLine_(catId){
+  if(catId === 3) return 'CMT 수강·복습 중인 도수·물리치료 동료에게 건네는 한 줄';
+  if(catId === 4) return 'IFC 얼굴·구조 교육을 배우는 미용·도수·물리치료 동료에게 건네는 한 줄';
+  if(catId === 5) return 'Re:Al 움직임 과정 수강·복습 중인 재활·트레이닝 동료에게 건네는 한 줄';
+  return 'PT·트레이너 동료에게 건네는 한 줄';
+}
+/** 초안·주제 생성 등에 쓰는 탭별 독자 한 줄 (cat.audience보다 구체적) */
+function getProgramAudienceLine_(catId){
+  var id = parseInt(catId, 10);
+  if(id === 3) return 'CMT 임상도수 과정 수강·복습 중인 물리치료사·도수 치료사 (평가·촉진 중심)';
+  if(id === 4) return 'IFC 얼굴·구조 교육 수강·복습 중인 얼굴·구조 교육 전문가 (미용·도수·물리치료)';
+  if(id === 5) return 'Re:Al 움직임 과정 수강·복습 중인 물리치료사·트레이너 (치료→기능 연결)';
+  if(id === 0) return '통증·구조 치료에 관심 있는 일반인';
+  if(id === 1) return '일상 움직임·자세 개선에 관심 있는 일반인';
+  if(id === 2) return '얼굴·비대칭 관리에 관심 있는 일반인 (20~40대)';
+  var cat = CATEGORIES[id];
+  return cat ? (cat.audience || '') : '';
+}
 /** 분기·단계 시각 구분용 톤 클래스 (0~3 분기, 0~4 단계) */
 function getQuarterToneClass_(idx){ return 'quarter-tone-' + (Math.max(0, parseInt(idx, 10) || 0) % 4); }
 function getStepToneClass_(idx){ return 'step-tone-' + (Math.max(0, parseInt(idx, 10) || 0) % 5); }
@@ -6821,6 +7078,19 @@ const DEFAULT_THREADS_SNS_PROMPT = `당신은 의료/건강 콘텐츠를 **Threa
 - 과한 설명
 - 인스타 해시태그·불릿·번호 목록을 그대로 옮기기`;
 
+function buildExpertCourseThreadsPrompt_(opts){
+  opts = opts || {};
+  var roleReaders = opts.roleReaders || '현장 움직임 전문가 동료';
+  var programBlock = opts.programBlock ? String(opts.programBlock).trim() : '';
+  return DEFAULT_THREADS_SNS_PROMPT + '\n\n' +
+    '[전문가 과정 맥락]\n' +
+    '- 변환 대상: 인스타·블로그의 **강의·시연 공유** 글을 쓰레드 톤으로\n' +
+    '- 독자: ' + roleReaders + '에게 말걸기 (동료 혼잣말)\n' +
+    '- 시연·테크닉·원리 한 줄이 중앙. 수강·등록 유도 금지\n' +
+    '- 과도한 임상 설명·리스트 나열 금지 (쓰레드 리듬 유지)' +
+    (programBlock ? '\n' + programBlock : '');
+}
+
 const DEFAULT_BLOG_INSTA_IMAGE_PROMPT = `이미지는 **정확히 2장** — ① 1:1 썸네일(피드·인스타 커버) ② 본문 보조(동작·시연).
 
 [① 썸네일 1:1]
@@ -6886,55 +7156,106 @@ ${GEO_CONTENT_STRUCTURE_RULE}
 - cta: 병원 상담 또는 Re:Al·프로그램 상담 중 맥락에 맞게 (과장·즉시 예약 압박 금지). 주제와 맞는 증상 허브 URL 1개 포함 권장 — 허리 ?hub=back · 목 ?hub=neck · 어깨 ?hub=shoulder · 무릎 ?hub=knee · 골반 ?hub=pelvis (기본 ${PROFILE_BRAND_URL})
 - hashtags: 6~8개 (# 없이)`;
 
-const DEFAULT_EXPERT_COURSE_BLOG_PROMPT = `물리치료사·트레이너 등 **움직임 전문가**를 독자로 하는 SNS·블로그 글입니다.
+function buildExpertCourseBlogPrompt_(opts){
+  opts = opts || {};
+  var audienceIntro = opts.audienceIntro || '물리치료사·트레이너 등 **움직임 전문가**를 독자로 하는';
+  var roleReaders = opts.roleReaders || 'PT, 트레이너, 움직임에 관심 있는 현장 전문가';
+  var programBlock = opts.programBlock ? String(opts.programBlock).trim() : '';
+  return audienceIntro + ' SNS·블로그 글입니다.\n\n' +
+    '**주 사용 방식**: 교육·강의 때 진행한 **영상 링크** 또는 **실습·시연 사진**을 첨부하고, 그 내용에 맞춰 **원리 설명** 중심으로 글을 씁니다.\n\n' +
+    DEFAULT_EXPERT_COURSE_SCOPE_RULE + '\n\n' +
+    '[역할]\n' +
+    '- 독자: ' + roleReaders + '\n' +
+    '- 글의 중심은 **원리 설명**(왜 이렇게 하는지)이며, 영상·사진에서 본 시연을 복기하는 톤\n\n' +
+    '[글 흐름 — 반드시 이 순서]\n' +
+    '1. **영상·사진 맥락** (hook): 이번 영상·사진에서 다룬 장면·상황 2~3문장\n' +
+    '2. **시연·핵심 포인트** (outline): 손 위치·동작·주의사항 등 2~3개\n' +
+    '3. **원리 설명** (draft): 위 시연을 바탕으로 왜 그런지·짧은 메커니즘·현장 적용 (350~500자, **본문의 중심**)\n\n' +
+    '[톤 & 스타일]\n' +
+    '- 과장·낚시·"꼭 해야 한다" 압박 금지. **내용으로 말하는** 느낌\n' +
+    '- 전문 용어는 쓰되, **한 줄 정도 풀어서** 설명\n' +
+    '- 강의 중 실제로 하는 **말하듯** 자연스럽게\n' +
+    '- 해시태그 **최소화**(3~5개)\n\n' +
+    '[형식 — JSON 필드]\n' +
+    '- title: 현장에서 궁금해할 테크닉·질문 한 줄 (35자 내외)\n' +
+    '- hook: 영상·사진 맥락 (위 1번)\n' +
+    '- outline: 시연·핵심 포인트 배열 (위 2번)\n' +
+    '- draft: **원리 설명** 본문 (위 3번, 참고·영상·사진 범위 안만)\n' +
+    '- cta: 수강·등록 유도 금지. 가벼운 마무리\n' +
+    '- hashtags: 3~5개' +
+    (programBlock ? '\n\n' + programBlock : '');
+}
 
-**주 사용 방식**: 교육·강의 때 진행한 **영상 링크** 또는 **실습·시연 사진**을 첨부하고, 그 내용에 맞춰 **원리 설명** 중심으로 글을 씁니다.
+function buildExpertCourseInstaPrompt_(opts){
+  opts = opts || {};
+  var roleReaders = opts.roleReaders || 'PT, 트레이너, 움직임 전문가 동료';
+  var programBlock = opts.programBlock ? String(opts.programBlock).trim() : '';
+  return '전문가 과정 **강연·영상·사진 공유**용 인스타 캡션입니다. 블로그보다 짧고 밀도 있게.\n\n' +
+    DEFAULT_EXPERT_COURSE_SCOPE_RULE + '\n\n' +
+    '[역할·독자]\n' +
+    '- ' + roleReaders + '에게 말하듯\n' +
+    '- 공유한 **영상·사진에서 다룬 테크닉**과 **원리 한 줄**이 드러나게\n\n' +
+    '[구성]\n' +
+    '- 영상·사진 맥락 한 줄 → 시연·핵심 포인트 2~3개 → **원리 설명** 한두 문장\n' +
+    '- 참고 메모·영상 분석·블로그 원문 **범위 안**에서만\n\n' +
+    '[톤]\n' +
+    '- 과장 없이, 내용으로 말하기. 전문 용어는 한 줄 풀어쓰기\n' +
+    '- 강의 말투처럼 자연스럽게\n\n' +
+    '[형식]\n' +
+    '- hook: 기억에 남는 한 줄 (25자 내외)\n' +
+    '- caption: hook 제외 **200~400자**. 수강·등록 유도 금지\n' +
+    '- hashtags: **4~6개** 이내, 전문 키워드 위주' +
+    (programBlock ? '\n\n' + programBlock : '');
+}
 
-${DEFAULT_EXPERT_COURSE_SCOPE_RULE}
-
-[역할]
-- 독자: PT, 트레이너, 움직임에 관심 있는 현장 전문가
-- 글의 중심은 **원리 설명**(왜 이렇게 하는지)이며, 영상·사진에서 본 시연을 복기하는 톤
-
-[글 흐름 — 반드시 이 순서]
-1. **영상·사진 맥락** (hook): 이번 영상·사진에서 다룬 장면·상황 2~3문장
-2. **시연·핵심 포인트** (outline): 손 위치·동작·주의사항 등 2~3개
-3. **원리 설명** (draft): 위 시연을 바탕으로 왜 그런지·짧은 메커니즘·현장 적용 (350~500자, **본문의 중심**)
-
-[톤 & 스타일]
-- 과장·낚시·"꼭 해야 한다" 압박 금지. **내용으로 말하는** 느낌
-- 전문 용어는 쓰되, **한 줄 정도 풀어서** 설명
-- 강의 중 실제로 하는 **말하듯** 자연스럽게
-- 해시태그 **최소화**(3~5개)
-
-[형식 — JSON 필드]
-- title: 현장에서 궁금해할 테크닉·질문 한 줄 (35자 내외)
-- hook: 영상·사진 맥락 (위 1번)
-- outline: 시연·핵심 포인트 배열 (위 2번)
-- draft: **원리 설명** 본문 (위 3번, 참고·영상·사진 범위 안만)
-- cta: 수강·등록 유도 금지. 가벼운 마무리
-- hashtags: 3~5개`;
-
-const DEFAULT_EXPERT_COURSE_INSTA_PROMPT = `전문가 과정 **강연·영상·사진 공유**용 인스타 캡션입니다. 블로그보다 짧고 밀도 있게.
-
-${DEFAULT_EXPERT_COURSE_SCOPE_RULE}
-
-[역할·독자]
-- PT, 트레이너, 움직임 전문가 동료에게 말하듯
-- 공유한 **영상·사진에서 다룬 테크닉**과 **원리 한 줄**이 드러나게
-
-[구성]
-- 영상·사진 맥락 한 줄 → 시연·핵심 포인트 2~3개 → **원리 설명** 한두 문장
-- 참고 메모·영상 분석·블로그 원문 **범위 안**에서만
-
-[톤]
-- 과장 없이, 내용으로 말하기. 전문 용어는 한 줄 풀어쓰기
-- 강의 말투처럼 자연스럽게
-
-[형식]
-- hook: 기억에 남는 한 줄 (25자 내외)
-- caption: hook 제외 **200~400자**. 수강·등록 유도 금지
-- hashtags: **4~6개** 이내, 전문 키워드 위주`;
+const DEFAULT_CMT_EXPERT_BLOG_PROMPT = buildExpertCourseBlogPrompt_({
+  audienceIntro: '**CMT 임상도수 전문가 과정** 수강·복습 중인 물리치료사·도수 치료사를 독자로 하는',
+  roleReaders: '평가(촉진·히스토리) 중심 사고를 키우는 현장 치료사·도수 전문가',
+  programBlock: '[CMT 맥락]\n' +
+    '- 치료 테크닉보다 **평가·판단 순서**가 먼저임을 유지. "왜 그렇게 판단했는가"가 드러나게\n' +
+    '- PSP 용어는 **참고·영상에서 다룬 범위** 안에서만. 무관한 평가·중재 전체 흐름으로 확장 금지\n' +
+    '- 촉진·관절가동술 등 **이번 강의 테크닉** 중심. 짧은 원리 설명은 괜찮으나 별도 케이스·부위로 넓히지 말 것'
+});
+const DEFAULT_IFC_EXPERT_BLOG_PROMPT = buildExpertCourseBlogPrompt_({
+  audienceIntro: '**IFC 얼굴교육** 수강·복습 중인 얼굴·구조 교육 전문가(미용·도수·물리치료 등)를 독자로 하는',
+  roleReaders: '얼굴·경축·턱관절·교합을 구조적으로 보는 미용·도수·물리치료 현장 전문가',
+  programBlock: '[IFC 얼굴교육 맥락]\n' +
+    '- 표면 자극·미용 마사지가 아닌 **구조·경축·기능 연결** 관점. 경추·턱관절·교합을 함께 설명\n' +
+    '- 구조적 접근은 **참고·영상에서 다룬 범위** 안에서만. 무관한 전신·다른 부위 이야기로 확장 금지\n' +
+    '- 기기(IFC)와 도수 접근 **순서**·상담(기대치 조율) 포인트 중심. before/after 과장 금지'
+});
+const DEFAULT_REAL_MOVEMENT_EXPERT_BLOG_PROMPT = buildExpertCourseBlogPrompt_({
+  audienceIntro: '**Re:Al 움직임 전문가 과정** 수강·복습 중인 물리치료사·트레이너를 독자로 하는',
+  roleReaders: '치료 후 기능 회복·PAR·Position을 임상에 연결하는 움직임·재활 전문가',
+  programBlock: '[Re:Al Movement 맥락]\n' +
+    '- 치료실→기능운동 연결. PAR·Position·progression을 **참고·영상에서 다룬 내용** 안에서만 연결\n' +
+    '- 참고에 없는 평가·운동 처방·다른 부위로 확장 금지\n' +
+    '- 안전한 progression·환자 순응도·코칭 언어가 드러나게'
+});
+const DEFAULT_CMT_EXPERT_INSTA_PROMPT = buildExpertCourseInstaPrompt_({
+  roleReaders: 'CMT 수강·복습 중인 도수·물리치료 동료',
+  programBlock: '[CMT] 평가·판단 근거가 보이게. 이번 강의·영상의 테크닉·포인트만. PSP는 참고 범위 안에서만.'
+});
+const DEFAULT_IFC_EXPERT_INSTA_PROMPT = buildExpertCourseInstaPrompt_({
+  roleReaders: 'IFC 얼굴·구조 교육을 배우는 미용·도수·물리치료 동료',
+  programBlock: '[IFC] 얼굴·경축·구조 관점. 이번 강의·영상의 테크닉·평가 포인트만. 표면 미용 톤 금지.'
+});
+const DEFAULT_REAL_MOVEMENT_EXPERT_INSTA_PROMPT = buildExpertCourseInstaPrompt_({
+  roleReaders: 'Re:Al 움직임 과정 수강·복습 중인 재활·트레이닝 동료',
+  programBlock: '[Re:Al] 치료→기능 연결. 이번 강의·영상의 테크닉·포인트만.'
+});
+const DEFAULT_CMT_EXPERT_THREADS_PROMPT = buildExpertCourseThreadsPrompt_({
+  roleReaders: 'CMT 수강·복습 중인 도수·물리치료 동료',
+  programBlock: '[CMT] 평가·판단 근거가 보이게. 이번 강의·영상 테크닉만. PSP는 참고 범위 안에서만.'
+});
+const DEFAULT_IFC_EXPERT_THREADS_PROMPT = buildExpertCourseThreadsPrompt_({
+  roleReaders: 'IFC 얼굴·구조 교육을 배우는 미용·도수·물리치료 동료',
+  programBlock: '[IFC] 경축·턱관절·구조 연결 관점. 미용 마사지 톤 금지. before/after 과장 금지.'
+});
+const DEFAULT_REAL_MOVEMENT_EXPERT_THREADS_PROMPT = buildExpertCourseThreadsPrompt_({
+  roleReaders: 'Re:Al 움직임 과정 수강·복습 중인 재활·트레이닝 동료',
+  programBlock: '[Re:Al] 치료→기능·PAR·Position 연결. 이번 강의·영상 테크닉만.'
+});
 
 // ── 기본 프롬프트 (카테고리별 블로그/인스타/쓰레드 등) ──
 const DEFAULT_PROMPTS = {
@@ -6964,22 +7285,22 @@ ${MEDICAL_COMPLIANCE_RULE}
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     3: { // CMT 전문가
-      blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[CMT 맥락]\n- PSP 용어는 **참고·영상에서 다룬 범위** 안에서만. 무관한 평가·중재 전체 흐름으로 확장 금지\n- 촉진·관절가동술 등 **이번 강의 테크닉** 중심. 짧은 원리 설명은 괜찮으나 별도 케이스·부위로 넓히지 말 것`,
-      insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[CMT] 이번 강의·영상의 테크닉·포인트만. PSP는 참고 범위 안에서만.`,
+      blog: DEFAULT_CMT_EXPERT_BLOG_PROMPT,
+      insta: DEFAULT_CMT_EXPERT_INSTA_PROMPT,
       image: DEFAULT_EXPERT_COURSE_IMAGE_PROMPT,
-      threads: DEFAULT_THREADS_SNS_PROMPT
+      threads: DEFAULT_CMT_EXPERT_THREADS_PROMPT
     },
     4: { // IFC 얼굴교육
-      blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[IFC 맥락]\n- 구조적 접근은 **참고·영상에서 다룬 범위** 안에서만. 무관한 경추·교합·전신 이야기로 확장 금지\n- 이번 강의·시연의 테크닉·평가 포인트 중심`,
-      insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[IFC] 이번 강의·영상의 테크닉·포인트만.`,
+      blog: DEFAULT_IFC_EXPERT_BLOG_PROMPT,
+      insta: DEFAULT_IFC_EXPERT_INSTA_PROMPT,
       image: DEFAULT_EXPERT_COURSE_IMAGE_PROMPT,
-      threads: DEFAULT_THREADS_SNS_PROMPT
+      threads: DEFAULT_IFC_EXPERT_THREADS_PROMPT
     },
     5: { // Re:Al 움직임 과정
-      blog: DEFAULT_EXPERT_COURSE_BLOG_PROMPT + `\n\n[Re:Al Movement 맥락]\n- Movement·P-A-R 등은 **참고·영상에서 다룬 내용** 안에서만 연결\n- 참고에 없는 평가·운동 처방·다른 부위로 확장 금지`,
-      insta: DEFAULT_EXPERT_COURSE_INSTA_PROMPT + `\n\n[Re:Al] 이번 강의·영상의 테크닉·포인트만.`,
+      blog: DEFAULT_REAL_MOVEMENT_EXPERT_BLOG_PROMPT,
+      insta: DEFAULT_REAL_MOVEMENT_EXPERT_INSTA_PROMPT,
       image: DEFAULT_EXPERT_COURSE_IMAGE_PROMPT,
-      threads: DEFAULT_THREADS_SNS_PROMPT
+      threads: DEFAULT_REAL_MOVEMENT_EXPERT_THREADS_PROMPT
     },
     6: { // 일상 공유 (thread JSON만 — 블로그/인스타/이미지 없음)
       thread: DEFAULT_DAILY_SHARE_PROMPT
@@ -6990,6 +7311,68 @@ ${MEDICAL_COMPLIANCE_RULE}
     }
   }
 };
+
+/** v44 이전 공통 「움직임 전문가」 템플릿 — 저장본이 이 값과 정확히 같을 때만 새 기본값으로 자동 교체 */
+const LEGACY_EXPERT_COURSE_PROMPTS = {
+  3: {
+    blog: buildExpertCourseBlogPrompt_({
+      audienceIntro: '물리치료사·트레이너 등 **움직임 전문가**를 독자로 하는',
+      roleReaders: 'PT, 트레이너, 움직임에 관심 있는 현장 전문가',
+      programBlock: '[CMT 맥락]\n- PSP 용어는 **참고·영상에서 다룬 범위** 안에서만. 무관한 평가·중재 전체 흐름으로 확장 금지\n- 촉진·관절가동술 등 **이번 강의 테크닉** 중심. 짧은 원리 설명은 괜찮으나 별도 케이스·부위로 넓히지 말 것'
+    }),
+    insta: buildExpertCourseInstaPrompt_({
+      roleReaders: 'PT, 트레이너, 움직임 전문가 동료',
+      programBlock: '[CMT] 이번 강의·영상의 테크닉·포인트만. PSP는 참고 범위 안에서만.'
+    })
+  },
+  4: {
+    blog: buildExpertCourseBlogPrompt_({
+      audienceIntro: '물리치료사·트레이너 등 **움직임 전문가**를 독자로 하는',
+      roleReaders: 'PT, 트레이너, 움직임에 관심 있는 현장 전문가',
+      programBlock: '[IFC 맥락]\n- 구조적 접근은 **참고·영상에서 다룬 범위** 안에서만. 무관한 경추·교합·전신 이야기로 확장 금지\n- 이번 강의·시연의 테크닉·평가 포인트 중심'
+    }),
+    insta: buildExpertCourseInstaPrompt_({
+      roleReaders: 'PT, 트레이너, 움직임 전문가 동료',
+      programBlock: '[IFC] 이번 강의·영상의 테크닉·포인트만.'
+    })
+  },
+  5: {
+    blog: buildExpertCourseBlogPrompt_({
+      audienceIntro: '물리치료사·트레이너 등 **움직임 전문가**를 독자로 하는',
+      roleReaders: 'PT, 트레이너, 움직임에 관심 있는 현장 전문가',
+      programBlock: '[Re:Al Movement 맥락]\n- Movement·P-A-R 등은 **참고·영상에서 다룬 내용** 안에서만 연결\n- 참고에 없는 평가·운동 처방·다른 부위로 확장 금지'
+    }),
+    insta: buildExpertCourseInstaPrompt_({
+      roleReaders: 'PT, 트레이너, 움직임 전문가 동료',
+      programBlock: '[Re:Al] 이번 강의·영상의 테크닉·포인트만.'
+    })
+  }
+};
+function migrateLegacyExpertCoursePrompts_(){
+  if(!state.prompts || !state.prompts.categories) return false;
+  var changed = false;
+  [3, 4, 5].forEach(function(catId){
+    var legacy = LEGACY_EXPERT_COURSE_PROMPTS[catId];
+    var defs = DEFAULT_PROMPTS.categories[catId];
+    if(!legacy || !defs) return;
+    if(!state.prompts.categories[catId]) state.prompts.categories[catId] = {};
+    var cat = state.prompts.categories[catId];
+    ['blog', 'insta', 'threads'].forEach(function(type){
+      if(!defs[type]) return;
+      var cur = cat[type];
+      if(!cur) return;
+      var legacyText = legacy[type];
+      if(type === 'threads' && !legacyText){
+        legacyText = DEFAULT_THREADS_SNS_PROMPT;
+      }
+      if(!legacyText) return;
+      if(normalizePromptTextForCompare_(cur) !== normalizePromptTextForCompare_(legacyText)) return;
+      cat[type] = defs[type];
+      changed = true;
+    });
+  });
+  return changed;
+}
 
 
 
@@ -7756,6 +8139,7 @@ function applyPersistPayload(s){
   if(sanitizeBrandingClinicRefs_()) save({ skipDriveUpload: true, skipGasPush: true });
   if(ensureYearPlanMigrated_()) save({ skipDriveUpload: true, skipGasPush: true });
   if(migrateLegacyPublishTabPublished_()) save({ skipDriveUpload: true, skipGasPush: true });
+  if(migrateLegacyExpertCoursePrompts_()) save({ skipDriveUpload: true, skipGasPush: true });
 }
 
 function save(opts) {
@@ -9896,19 +10280,21 @@ async function generateTopicFromKeywords_(catId, keywords, imagePayload, sourceN
        '- angle: 어떤 톤으로 쓸지 한 줄 — **관찰 + 핵심 한 가지 + (선택) 짧은 감탄·철학**. 몸·날씨 맥락이 보이면 근골격계 시선 한 스푼 (강의·임상 톤 금지)\n')
     : (isExpertCourseCategory(catId)
       ? ('전문가 과정 **강연·교육 영상·실습 공유**용 주제 1개.\n' +
-         '- topic: PT·트레이너 동료에게 건네는 한 줄 (15~40자, 과장·낚시 금지)\n' +
+         '- topic: ' + getExpertCourseTopicAudienceLine_(catId) + ' (15~40자, 과장·낚시 금지)\n' +
          '- angle: **다룰 테크닉/개념 + 핵심 포인트 1~3개**가 드러나는 각도 한 줄\n' +
-         '  (예: "어깨 관절 가동술 — 강의에서 시연한 접근 각도와 손 위치 포인트")\n' +
+         '  (예: "경축 평가 순서 — 강의에서 시연한 손 위치와 주의 포인트")\n' +
          (noteBlock ? '- **참고 메모·영상 분석 범위 안**에서만 topic·angle을 잡을 것. 없는 내용·연관 질환·다른 부위로 확장 금지.\n' : ''))
       : ('입력한 키워드·아이디어·문장을 **중심 소재**로 블로그·SNS 주제 1개를 만드세요. 입력에서 벗어난 새 소재로 바꾸지 마세요.\n' +
          '- topic: 한국어 제목 한 줄 (15~36자, **호기심·궁금증을 자극하는 후킹**·질문형 권장). **입력 핵심 키워드가 드러나게**\n' +
          '- angle: 입력·메모의 관점·테크닉·메커니즘을 한 줄로 (입력에 없는 새 각도 금지)\n'));
   var fidelityBlock = buildTopicGenFidelityBlock_(keywords, sourceNote, isDaily);
+  var identityBlock = buildProgramIdentityPromptBlock_(catId);
   var prompt =
 '당신은 "브랜딩 플래너"입니다.\n' +
 buildBrandContextForPrompt_(catId, null) + '\n\n' +
+(identityBlock ? identityBlock + '\n\n' : '') +
 '카테고리: ' + cat.name + ' (' + (cat.sub || '') + ')\n' +
-'독자: ' + cat.audience + ' (카테고리 기본 독자 — 별도 선택 없음)\n' +
+'독자: ' + getProgramAudienceLine_(catId) + ' (카테고리 기본 독자 — 별도 선택 없음)\n' +
 kwLine + noteBlock + imgNote + '\n\n' + topicGuide + fidelityBlock + '\n' +
 buildTopicBrandJsonGuide_(catId) + '\n' +
 '기존 주제와 겹치지 않게:\n' + avoidTopics.map(function(t){ return ' - ' + t; }).join('\n') + '\n\n' +
@@ -9920,7 +10306,7 @@ buildTopicBrandJsonGuide_(catId) + '\n' +
   if(start < 0 || end <= start) throw new Error('AI 응답에서 주제 JSON을 찾지 못했어요');
   var obj = JSON.parse(raw.slice(start, end + 1));
   if(!obj.topic) throw new Error('topic이 비어 있어요');
-  var out = { topic: String(obj.topic).trim(), angle: String(obj.angle || cat.audience + ' 관점의 콘텐츠').trim() };
+  var out = { topic: String(obj.topic).trim(), angle: String(obj.angle || getProgramAudienceLine_(catId) + ' 관점의 콘텐츠').trim() };
   applyTopicFieldsToDraft_(out, obj, catId);
   return out;
 }
@@ -9953,7 +10339,8 @@ async function generateArticleFlowProposals_(catId, keywords, imagePayload, sour
        '  ① 한 줄 훅·장면  ② 담백한 관찰·핵심 한 가지  ③ 가벼운 마무리(공감 한 스푼)\n' +
        '강의·세미나 사진이면 전문 설명 톤이 아닌 **관찰 나눔** 각도도 1개 이상 포함.')
     : (isExpert
-      ? ('각 제안은 **전문가 동료 공유**용입니다. steps는 반드시 3단계:\n' +
+      ? ('각 제안은 **전문가 동료 공유**용입니다. (' + getExpertCourseTopicAudienceLine_(catId) + ')\n' +
+         'steps는 반드시 3단계:\n' +
          '  ① 영상·사진 맥락  ② 시연·핵심 포인트  ③ 원리 설명 방향\n' +
          '참고·영상·사진 **범위 안**에서만. 없는 내용으로 확장 금지.')
       : ('각 제안은 **일반인 블로그**용입니다. steps는 반드시 3단계:\n' +
@@ -9965,11 +10352,13 @@ async function generateArticleFlowProposals_(catId, keywords, imagePayload, sour
     }).join('\n') + '\n위와 **겹치지 않는** 새 각도 3가지를 제안하세요.';
   }
   var fidelityBlock = buildTopicGenFidelityBlock_(keywords, sourceNote, isDaily);
+  var identityBlock = buildProgramIdentityPromptBlock_(catId);
   var prompt =
 '당신은 "브랜딩 플래너"입니다.\n' +
 buildBrandContextForPrompt_(catId, null) + '\n\n' +
+(identityBlock ? identityBlock + '\n\n' : '') +
 '카테고리: ' + cat.name + ' (' + (cat.sub || '') + ')\n' +
-'독자: ' + cat.audience + '\n' +
+'독자: ' + getProgramAudienceLine_(catId) + '\n' +
 kwLine + noteBlock + imgNote + '\n\n' +
 '[과제]\n' +
 '첨부 사진·영상 분석·메모를 바탕으로, **서로 다른 각도**의 글 흐름을 **정확히 3가지** 제안하세요.\n' +
@@ -10009,6 +10398,11 @@ async function fetchFlowProposalsForNewItem_(){
     youtubeAnalysis = '';
   }
   state.newItem._cachedFlowYoutubeUrl = urlNow;
+  var flowEstSec = FLOW_PROPOSAL_ESTIMATE_SEC + (youtubeUrls.length && !youtubeAnalysis ? 18 : 0);
+  startButtonsCountdownBySelector_('.btn-flow-regen, #btn-add-draft-submit', {
+    estimateSec: flowEstSec,
+    busyLabel: '제안 중'
+  });
   try {
     if(youtubeUrls.length && isGeminiYoutubeAvailable_() && !youtubeAnalysis){
       if(typeof setAppToast === 'function') setAppToast('유튜브 영상을 분석한 뒤 글 흐름을 제안하고 있어요…', { duration: 3200, variant: 'ok' });
@@ -10026,6 +10420,7 @@ async function fetchFlowProposalsForNewItem_(){
     state.newItem.flowProposalsReady = true;
     if(typeof setAppToast === 'function') setAppToast('글 흐름 3가지를 제안했어요. 하나를 고르고 필요하면 수정한 뒤 주제를 만들어 주세요.', { duration: 4200, variant: 'ok' });
   } finally {
+    stopButtonsCountdownBySelector_('.btn-flow-regen, #btn-add-draft-submit');
     state.newItem.flowProposalsLoading = false;
     renderMain();
   }
@@ -10290,7 +10685,7 @@ function renderAddForm(){
     <div class="form-field">
       <label class="form-label">카테고리</label>
       <select class="form-select" onchange="setNewCat(this.value)">${catOpts}</select>
-      <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">독자: <strong>${cat.audience}</strong> (카테고리에 맞게 자동)</div>
+      <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">독자: <strong>${getProgramAudienceLine_(catId)}</strong> (카테고리에 맞게 자동)</div>
     </div>
     <div class="form-field">
       <label class="form-label">${kwLabel}</label>
@@ -10435,7 +10830,14 @@ window.addDraft = async function(){
   }
   var btn = document.getElementById('btn-add-draft-submit');
   var youtubeAnalysis = state.newItem.cachedYoutubeAnalysis || '';
-  if(btn){ btn.disabled = true; btn.textContent = hasMedia ? '선택한 흐름으로 주제 만드는 중…' : (isDaily && hasPhoto ? '일상 글 준비 중…' : (youtubeUrls.length && isGeminiYoutubeAvailable_() && !youtubeAnalysis ? '유튜브 분석 중…' : '주제 생성 중…')); }
+  var addEstSec = hasMedia ? ADD_DRAFT_FULL_ESTIMATE_SEC : ADD_DRAFT_TOPIC_ESTIMATE_SEC;
+  if(youtubeUrls.length && isGeminiYoutubeAvailable_() && !youtubeAnalysis && !hasMedia) addEstSec += 15;
+  if(btn){
+    startButtonCountdown_(btn, {
+      estimateSec: addEstSec,
+      busyLabel: hasMedia ? '생성 중' : '주제 생성 중'
+    });
+  }
   if(typeof setAppToast === 'function') setAppToast(
     hasMedia ? '선택한 글 흐름으로 주제 카드를 만들고 초안을 준비하고 있어요…' :
     (youtubeUrls.length && isGeminiYoutubeAvailable_() && !youtubeAnalysis ? '공개 유튜브 영상을 분석한 뒤 주제를 만들고 있어요…' :
@@ -10453,7 +10855,6 @@ window.addDraft = async function(){
         if(typeof setAppToast === 'function') setAppToast(ytToast, { duration: /할당량|quota|limit/i.test(ytMsg) ? 12000 : 7000, variant: 'err' });
       }
     }
-    if(btn) btn.textContent = hasMedia ? '주제 카드 만드는 중…' : '주제 생성 중…';
     var gen;
     if(hasMedia){
       var selected = getSelectedNewItemFlow_();
@@ -10510,7 +10911,7 @@ window.addDraft = async function(){
     save();
     var openTab = isThreadCategory(cat.id) ? 'thread' : (isHeiljagyaeCategory(cat.id) ? 'community' : 'blog');
     var genLabel = openTab === 'blog' ? '블로그 초안' : (openTab === 'thread' ? '일상 글' : '게시판·이미지 초안');
-    if(btn) btn.textContent = genLabel + ' 작성 중…';
+    if(btn) stopButtonCountdown_(btn);
     if(typeof setAppToast === 'function') {
       var toastMsg = '「' + gen.topic + '」\n' + genLabel + '을 만들고 있어요…';
       if(youtubeAnalysis) toastMsg += '\n유튜브 분석 내용이 반영됐어요.';
@@ -10522,16 +10923,7 @@ window.addDraft = async function(){
     if(typeof setAppToast === 'function') setAppToast('주제 생성 실패\n' + msg, { duration: 7000, variant: 'err' });
     else alert(msg);
   } finally {
-    if(btn){
-      var isD = isDailyShareCategory(state.newItem.catId);
-      var hp = newItemHasRefImages_();
-      var hm = newItemHasMediaSource_();
-      var fr = !!state.newItem.flowProposalsReady;
-      btn.textContent = hm
-        ? (fr ? '선택한 흐름으로 주제 만들기' : '글 흐름 제안 후 주제 만들기')
-        : (isD && hp ? '사진으로 일상 글 추가' : (isD ? '주제 추가 · 일상 글 만들기' : '키워드로 주제 만들기'));
-      btn.disabled = !!state.newItem.imageAnalyzing || !!state.newItem.flowProposalsLoading || (hm && !fr);
-    }
+    if(btn) stopButtonCountdown_(btn);
   }
 };
 
@@ -10554,7 +10946,7 @@ window.refreshTopicsForCat = async function(catId){
 ${buildBrandContextForPrompt_(catId, null)}
 
 카테고리: ${cat.name} (${cat.sub})
-독자: ${cat.audience}
+독자: ${getProgramAudienceLine_(catId)}
 
 아래 ID 목록 각각에 대해 topic·angle·series·step·pillar·rationale을 새로 만들어 주세요.
 - topic: 한국어 한 줄(15~32자, **호기심·궁금증을 자극하는 후킹**·질문형 권장)
@@ -10687,7 +11079,7 @@ window.refreshTopicsForDraft = async function(catId, draftId){
 
   var startedWait = !(state.plannerAiWait && state.plannerAiWait.regenDraftId === draftId);
   if(startedWait){
-    startPlannerAiWait_({ estimateSec: TOPIC_REGEN_ESTIMATE_SEC, regenDraftId: draftId });
+    startPlannerAiWait_({ estimateSec: TOPIC_REGEN_ESTIMATE_SEC, busyLabel: '재생성 중', regenDraftId: draftId });
   }
 
   const avoidTopics = (cat.drafts || [])
@@ -10700,7 +11092,7 @@ window.refreshTopicsForDraft = async function(catId, draftId){
 ${buildBrandContextForPrompt_(catId, d)}
 
 카테고리: ${cat.name} (${cat.sub})
-독자: ${cat.audience}
+독자: ${getProgramAudienceLine_(catId)}
 
 아래 ID 한 건에 대해 topic·angle·series·step·pillar·rationale을 새로 만들어 주세요.
 - topic: 한국어 한 줄(15~32자, **호기심·궁금증을 자극하는 후킹**·질문형 권장)
@@ -11302,7 +11694,7 @@ function buildImageTabBody(content){
   const imgCap = getImageSlotCount(state.selectedCatId) || 2;
   if(!im){
     return `<p class="empty-note" style="padding:0;">이 초안에는 이미지 추천이 없어요. 초안을 다시 생성하면 함께 만들어져요.</p>
-      <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:12px;">초안·이미지 다시 생성</button>`;
+      <button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin-top:12px;">초안·이미지 다시 생성</button>`;
   }
   var rawGpt = (im.gptVisuals || []).filter(function(s){ return s && s.prompt; });
   const gpt = getDisplayGptVisuals_(rawGpt, state.selectedCatId);
@@ -11508,7 +11900,7 @@ function renderSheetEmpty(draft, cat) {
     `${sourceNoteHtml}${ytAnalysisHtml}` +
     `<div style="background:#F8F7F4;border-radius:12px;padding:28px 20px;text-align:center;" class="sheet-gen-cta">
       <div style="font-size:14px;color:#6B7280;line-height:1.7;margin-bottom:20px;">${genLine}</div>
-      <button onclick="genContent()" style="background:linear-gradient(135deg,#2DD4BF,#0EA5E9);color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">초안 생성하기</button>
+      <button onclick="genContent(event)" style="background:linear-gradient(135deg,#2DD4BF,#0EA5E9);color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">초안 생성하기</button>
     </div>`;
   setSheetActionsHtml_('');
   scheduleWorkshopTextareaGrow_(document.getElementById('sheet-body'));
@@ -11536,7 +11928,7 @@ function renderSheetContent(content) {
     const th = normalizeThreadBlock(content.thread);
     if(!th || !th.summary){
       bodyHTML = tabsHTML + addSourceHtml + `<p class="empty-note" style="padding:12px 0;">일상 공유 초안이 없어요. 아래에서 다시 생성해 주세요.</p>
-        <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:8px;">초안 다시 생성</button>`;
+        <button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin-top:8px;">초안 다시 생성</button>`;
     } else {
       bodyHTML = tabsHTML + addSourceHtml +
         sheetFullCopyBar_() +
@@ -11618,7 +12010,7 @@ function renderSheetContent(content) {
     const co = content.community;
     if(!co){
       bodyHTML = tabsHTML + `<p class="empty-note" style="padding:12px 0;">커뮤니티 초안이 없어요. 초안을 다시 생성하면 함께 만들어져요.</p>
-        <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:8px;">초안 다시 생성</button>`;
+        <button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin-top:8px;">초안 다시 생성</button>`;
     } else {
       const coNorm = normalizeCommunityBlock(co);
       const problemText = getCommunityProblemText_(coNorm);
@@ -11645,7 +12037,7 @@ function renderSheetContent(content) {
   var pubLabel = tabSaved ? '저장됨' : '발행완료';
   var pubStyle = tabSaved ? ' style="background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0;"' : '';
   setSheetActionsHtml_(
-    '<button type="button" class="btn-regen" onclick="genContent()">재생성</button>' +
+    '<button type="button" class="btn-regen" onclick="genContent(event)">재생성</button>' +
     '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
     '<button type="button" class="btn-pub"' + pubStyle + ' onclick="onSheetPublishComplete()">' + pubLabel + '</button>'
   );
@@ -12334,7 +12726,7 @@ function tryNotifyThreadsReady_(topic, draftId, catId, ok, errMsg){
   } catch(e){}
 }
 async function generateThreadsFromInsta_(catId, insta, topic){
-  var threadsGuide = getCatPrompt(catId, 'threads') || DEFAULT_THREADS_SNS_PROMPT;
+  var threadsGuide = getCatPromptForGeneration_(catId, 'threads') || DEFAULT_THREADS_SNS_PROMPT;
   var baseInfo = getBasePrompt();
   var prompt = baseInfo + '\n\n' +
     '카테고리: ' + (CATEGORIES[catId] ? CATEGORIES[catId].name : '') + '\n' +
@@ -12883,7 +13275,9 @@ window.regenSheetField_ = async function(key, btn){
   ].filter(function(l){ return l != null; }).join('\n');
 
   var origHtml = btn ? btn.innerHTML : '';
-  if(btn){ btn.disabled = true; btn.textContent = '생성 중…'; }
+  if(btn){
+    startButtonCountdown_(btn, { estimateSec: SHEET_FIELD_REGEN_ESTIMATE_SEC, busyLabel: '재생성 중', idleText: '재생성' });
+  }
   try {
     var text = await callClaudePlanner_(prompt, { maxTokens: 1800 });
     var obj = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
@@ -12907,7 +13301,9 @@ window.regenSheetField_ = async function(key, btn){
     setAppToast('「' + meta.label + '」을 다시 생성했어요.', { duration: 3000, variant: 'ok' });
   } catch(e){
     setAppToast('재생성에 실패했어요: ' + ((e && e.message) || String(e)), { duration: 6000, variant: 'err' });
-    if(btn){ btn.disabled = false; btn.innerHTML = origHtml; }
+    if(btn) stopButtonCountdown_(btn);
+  } finally {
+    if(btn && document.body.contains(btn)) stopButtonCountdown_(btn);
   }
 };
 
@@ -13231,7 +13627,7 @@ function normalizeInstaBlock_(ig){
 }
 
 async function generateInstaFromBlog_(catId, blog, topic){
-  var instaGuide = getCatPrompt(catId, 'insta');
+  var instaGuide = getCatPromptForGeneration_(catId, 'insta');
   var baseInfo = getBasePrompt();
   var expertScope = isExpertCourseCategory(catId)
     ? '\n- 전문가 과정: 블로그에 없는 내용을 **새로 추가하지 말고**, 블로그·참고·영상·사진 범위 안에서만 압축하세요. **원리 설명** 한 줄이 드러나게.\n'
@@ -13855,7 +14251,7 @@ async function generateRelatedTopicsAfterPublish_(catId, sourceDraft, finalText,
 buildBrandContextForPrompt_(catId, sourceDraft) + '\n\n' +
 '이 카테고리에 생성된 주제 카드가 최소 ' + MIN_TOPICS_PER_CAT + '개 유지되도록, 방금 발행한 글과 연관된 새 주제를 만듭니다.\n\n' +
 '카테고리: ' + cat.name + ' (' + (cat.sub || '') + ')\n' +
-'독자: ' + cat.audience + '\n' +
+'독자: ' + getProgramAudienceLine_(catId) + '\n' +
 '방금 발행한 주제: ' + ((sourceDraft && sourceDraft.topic) || '') + '\n' +
 '방금 발행한 각도: ' + ((sourceDraft && sourceDraft.angle) || '') + '\n' +
 '작성 방향: ' + categoryGuide + '\n\n' +
@@ -14148,6 +14544,8 @@ function renderPromptModal() {
   const threadVal = getCatPrompt(state.editingCatId, 'thread');
   const imageVal = getCatPrompt(state.editingCatId, 'image');
   const baseVal = getBasePrompt();
+  const brandProfileVal = escapeHtml(getProgramBrandProfile_(state.editingCatId));
+  const strategyGuideVal = escapeHtml(getProgramStrategyGuide_(state.editingCatId));
 
   const channelTabBtns = channelTabs.map(function(t){
     return '<button class="prompt-tab' + (pt === t.id ? ' active' : '') + '" onclick="switchPromptTab(\'' + t.id + '\')">' + t.label + '</button>';
@@ -14160,10 +14558,29 @@ function renderPromptModal() {
       </div>
     </div>
 
+    <div class="prompt-identity-section">
+      <div class="prompt-section-label prompt-identity-label">
+        <span>프로그램 정체성</span>
+        <div class="prompt-identity-tools">
+          <button type="button" class="prompt-identity-btn" onclick="regenerateProgramIdentityFromPrompt_('brandProfile', event)">브랜딩 재생성</button>
+          <button type="button" class="prompt-identity-btn subtle" onclick="openProgramPlanWorkshopFromPrompt_()">기획 워크숍</button>
+        </div>
+      </div>
+      <textarea class="prompt-textarea prompt-identity-textarea" id="pt-brand-profile" rows="4" placeholder="이 프로그램의 특징·독자·강점·피할 표현…">${brandProfileVal}</textarea>
+      <details class="prompt-identity-details">
+        <summary class="prompt-identity-summary">생성 기준·기획 의도</summary>
+        <textarea class="prompt-textarea prompt-identity-textarea" id="pt-strategy-guide" rows="6" placeholder="기준: …&#10;&#10;의도: …">${strategyGuideVal}</textarea>
+        <div class="prompt-identity-tools inline">
+          <button type="button" class="prompt-identity-btn" onclick="regenerateProgramIdentityFromPrompt_('strategyGuide', event)">기준·의도 재생성</button>
+        </div>
+      </details>
+      <div class="prompt-hint">주제·초안 생성 시 <strong>채널 지침과 함께</strong> AI에 전달됩니다. 기획 워크숍과 같은 내용이에요.</div>
+    </div>
+
     ${promptTypes.length ? `
     <div class="prompt-cat-reset-bar">
       <span class="prompt-cat-reset-hint">이 프로그램: ${resetAllTypesLabel}</span>
-      <button type="button" class="prompt-reset-all-btn" onclick="resetAllPromptsForCat()">이 프로그램 전체 기본값으로</button>
+      <button type="button" class="prompt-reset-all-btn${isCatPromptsAllDefault_(state.editingCatId) ? ' is-at-default' : ' is-modified'}" onclick="resetAllPromptsForCat()"${isCatPromptsAllDefault_(state.editingCatId) ? ' disabled title="이 프로그램 프롬프트가 모두 기본값이에요"' : ' title="수정된 채널 지침을 모두 기본값으로 되돌려요"'}>이 프로그램 전체 기본값으로</button>
     </div>` : ''}
 
     <div class="prompt-tabs-scroll">
@@ -14174,7 +14591,7 @@ function renderPromptModal() {
     <div class="prompt-section">
       <div class="prompt-section-label">
         블로그 작성 지침
-        <button class="prompt-reset-btn" onclick="resetPrompt('blog')">기본값으로</button>
+        ${promptResetBtnHtml_(state.editingCatId, 'blog')}
       </div>
       <textarea class="prompt-textarea" id="pt-blog" placeholder="블로그 글쓰기 스타일, 톤, 구조, 주의사항 등을 자유롭게 입력하세요...">${blogVal}</textarea>
       <div class="prompt-hint">${isGeneralAudienceCategory(state.editingCatId) ? '일반인 블로그: <strong>문제 제기 → 셀프 케어(👉) → 원리 설명</strong> 순. AI가 필드별로 나눠 작성하고, 시트 탭에서 각각 수정할 수 있어요.' : '예: "제목에 호기심을 자극하는 질문·숫자를 넣고, 네이버 SEO를 고려해…" — 이 지침이 Claude에게 전달돼 글쓰기 방향을 잡아요.'}</div>
@@ -14184,7 +14601,7 @@ ${blogInstaCat && pt==='insta' ? `
 <div class="prompt-section">
   <div class="prompt-section-label">
     인스타 작성 지침
-    <button class="prompt-reset-btn" onclick="resetPrompt('insta')">기본값으로</button>
+    ${promptResetBtnHtml_(state.editingCatId, 'insta')}
   </div>
   <textarea class="prompt-textarea" id="pt-insta" placeholder="한 포스트 캡션 톤, 줄바꿈·불릿 스타일, 해시태그 전략 등을 입력하세요. (캐러셀 다장 구성은 사용하지 않습니다.)">${instaVal}</textarea>
   <div class="prompt-hint">예: "첫 줄에서 멈추게 만드는 짧은 질문을 써주세요. 캐러셀은 문제→원인→해결 순으로..."</div>
@@ -14194,7 +14611,7 @@ ${blogInstaCat && pt==='threads' ? `
 <div class="prompt-section">
   <div class="prompt-section-label">
     쓰레드 작성 지침
-    <button class="prompt-reset-btn" onclick="resetPrompt('threads')">기본값으로</button>
+    ${promptResetBtnHtml_(state.editingCatId, 'threads')}
   </div>
   <textarea class="prompt-textarea" id="pt-threads" placeholder="Threads 톤, 구어체, 줄바꿈 리듬, 금지 표현 등을 입력하세요.">${escapeHtml(threadsVal)}</textarea>
   <div class="prompt-hint">인스타 발행 후 자동 생성되는 쓰레드 글에 적용됩니다. 구어체·짧은 문장·전문가 동료 톤.</div>
@@ -14204,7 +14621,7 @@ ${pt==='thread' && threadCat ? `
 <div class="prompt-section">
   <div class="prompt-section-label">
     일상 공유 작성 지침
-    <button class="prompt-reset-btn" onclick="resetPrompt('thread')">기본값으로</button>
+    ${promptResetBtnHtml_(state.editingCatId, 'thread')}
   </div>
   <textarea class="prompt-textarea" id="pt-thread" style="min-height:200px;" placeholder="일기 톤, 계절·사진·교육장면은 생활 나눔으로, 금지 사항 등...">${escapeHtml(threadVal)}</textarea>
   <div class="prompt-hint">일기 톤 + 날씨·몸·감정에 가벼운 근골격계 시선(1~2문장). 전문 강의·임상 설명·독자 질문은 피하세요.</div>
@@ -14214,7 +14631,7 @@ ${pt==='community' && heiljCat ? `
 <div class="prompt-section">
   <div class="prompt-section-label">
     아파트너(힐자계) 게시판 지침
-    <button class="prompt-reset-btn" onclick="resetPrompt('community')">기본값으로</button>
+    ${promptResetBtnHtml_(state.editingCatId, 'community')}
   </div>
   <textarea class="prompt-textarea" id="pt-community" style="min-height:200px;" placeholder="아파트 게시판 톤, 고정 형식, 금지 사항 등...">${escapeHtml(communityVal)}</textarea>
   <div class="prompt-hint">옆집 이웃 톤·문제 제기→👉 해결책(동작 앞쪽)→원리 설명. 불릿 없이 자연스러운 문장. 계절은 각도에 맞을 때만. 이미지 2장.</div>
@@ -14224,7 +14641,7 @@ ${pt==='image' && (blogInstaCat || heiljCat) ? `
 <div class="prompt-section">
   <div class="prompt-section-label">
     이미지 생성 지침
-    <button class="prompt-reset-btn" onclick="resetPrompt('image')">기본값으로</button>
+    ${promptResetBtnHtml_(state.editingCatId, 'image')}
   </div>
   <textarea class="prompt-textarea" id="pt-image" style="min-height:200px;" placeholder="이미지 생성용 프롬프트 톤, 구도, 색감, 금지 요소, 2장 역할 등을 입력하세요...">${escapeHtml(imageVal)}</textarea>
   <div class="prompt-hint">① 1:1 썸네일(상·하 여백·overlay) + ② 본문 동작 구조. 발행 데이터 기준 ${PROMPT_REFINE_EVERY_PUBLISH}건마다 자동 개선됩니다.</div>
@@ -14234,14 +14651,60 @@ ${pt==='base' ? `
 <div class="prompt-section">
   <div class="prompt-section-label">
     공통 기본 설정 (모든 카테고리에 적용)
-    <button class="prompt-reset-btn" onclick="resetPrompt('base')">기본값으로</button>
+    ${promptResetBtnHtml_(state.editingCatId, 'base')}
   </div>
   <textarea class="prompt-textarea" id="pt-base" style="min-height:320px;" placeholder="미카닥 박준규 소개, PSP 임상 프로토콜, 채널 정보 등...">${baseVal}</textarea>
   <div class="prompt-hint">미카닥 박준규 프로필 PSP 건강 가이드·<a href="${PROFILE_BRAND_URL}" target="_blank" rel="noopener">drpark PSP</a>와 동기화된 임상 뼈대(PAR·Position 등)가 포함돼요. 「기본값으로」를 누르면 최신 요약이 다시 들어갑니다.</div>
 </div>` : ''}
 `;
   bindPromptTextareaAutosave_();
+  bindPromptIdentityAutosave_();
 }
+
+function bindPromptIdentityAutosave_(){
+  var bp = document.getElementById('pt-brand-profile');
+  var sg = document.getElementById('pt-strategy-guide');
+  if(bp && !bp.__htIdentityAutosave){
+    bp.__htIdentityAutosave = true;
+    bp.addEventListener('input', function(){
+      saveProgramBrandProfileDirect_(state.editingCatId, bp.value);
+    });
+  }
+  if(sg && !sg.__htIdentityAutosave){
+    sg.__htIdentityAutosave = true;
+    sg.addEventListener('input', function(){
+      saveProgramStrategyGuideDirect_(state.editingCatId, sg.value);
+    });
+  }
+}
+window.openProgramPlanWorkshopFromPrompt_ = function(){
+  flushPromptCloudSave_();
+  state.currentCat = state.editingCatId;
+  document.getElementById('prompt-modal-overlay').classList.remove('open');
+  openProgramPlanWorkshop_();
+};
+window.regenerateProgramIdentityFromPrompt_ = async function(mode, ev){
+  if(!state.apiKey){ openApiModal(); return; }
+  if(plannerAiBusy) return;
+  var catId = state.editingCatId;
+  if(catId == null || isOpsManualCategory(catId)) return;
+  var btn = ev && ev.target ? ev.target.closest('button') : null;
+  plannerAiBusy = true;
+  if(btn) startButtonCountdown_(btn, { estimateSec: 28, busyLabel: '재생성 중', idleText: btn.textContent });
+  try {
+    await suggestProgramFoundationWithAI_(catId, mode || 'brandProfile');
+    commitProgramIdentityFromPending_(catId);
+    renderPromptModal();
+    if(typeof setAppToast === 'function'){
+      setAppToast(mode === 'strategyGuide' ? '생성 기준·기획 의도를 다시 제안했어요.' : '프로그램 브랜딩 요소를 다시 제안했어요.', { duration: 3600, variant: 'ok' });
+    }
+  } catch(e){
+    if(typeof setAppToast === 'function') setAppToast('재생성 실패\n' + ((e && e.message) || e), { duration: 6500, variant: 'err' });
+  } finally {
+    plannerAiBusy = false;
+    if(btn) stopButtonCountdown_(btn);
+  }
+};
 
 function flushPromptCloudSave_(){
   if(promptCloudSaveTimer){
@@ -14266,7 +14729,10 @@ function bindPromptTextareaAutosave_(){
     var el = document.getElementById(id);
     if(!el || el.__htPromptAutosave) return;
     el.__htPromptAutosave = true;
-    el.addEventListener('input', schedulePromptCloudSave_);
+    el.addEventListener('input', function(){
+      updatePromptResetButtons_();
+      schedulePromptCloudSave_();
+    });
   });
 }
 
@@ -14307,6 +14773,10 @@ if(baseEl) state.prompts.base = baseEl.value;
 }
 
 window.resetPrompt = function(type) {
+  if(isPromptAtDefault_(state.editingCatId, type)){
+    if(typeof setAppToast === 'function') setAppToast('이미 기본값과 같아요.', { duration: 2800, variant: 'ok' });
+    return;
+  }
   if(!confirm('이 항목을 기본값으로 되돌릴까요?')) return;
   if(type === 'base'){
     if(!state.prompts) state.prompts = JSON.parse(JSON.stringify(DEFAULT_PROMPTS));
@@ -14331,6 +14801,10 @@ window.resetAllPromptsForCat = function(){
   if(isOpsManualCategory(catId)) return;
   var types = getPromptTypesForCat_(catId);
   if(!types.length) return;
+  if(isCatPromptsAllDefault_(catId)){
+    if(typeof setAppToast === 'function') setAppToast('이 프로그램 프롬프트가 모두 기본값이에요.', { duration: 2800, variant: 'ok' });
+    return;
+  }
   var cat = CATEGORIES[catId];
   var labelStr = types.map(getPromptTypeLabelKr_).join(' · ');
   if(!confirm('「' + cat.name + '」의\n' + labelStr + '\n\n위 지침을 모두 기본값으로 되돌릴까요?\n(공통 기본은 변경되지 않습니다)')) return;
@@ -14478,25 +14952,40 @@ function updateGenIndicator() {
     if(genActiveJob && genActiveJob.draftId === selId && (!genActiveJob.kind || genActiveJob.kind === 'draft')){
       var leftR = (genActiveJob.endMs - Date.now()) / 1000;
       regenBtn.disabled = true;
-      regenBtn.textContent = formatCountdownShort_(leftR);
+      regenBtn.textContent = buttonCountdownText_('재생성 중', leftR);
     } else if(genPendingCount > 0 && !genBatchRunning){
       regenBtn.disabled = true;
       if(genActiveJob && genActiveJob.draftId !== selId){
         var qAhead = Math.max(0, genPendingCount - 1);
         if(qAhead > 0){
           var qCat = state.selectedCatId != null ? state.selectedCatId : state.currentCat;
-          regenBtn.textContent = '대기 ' + formatRoughCountdown(Math.ceil(qAhead * estimateDraftMs(qCat) / 1000));
+          regenBtn.textContent = '재생성 중 · 대기 ' + formatRoughCountdown(Math.ceil(qAhead * estimateDraftMs(qCat) / 1000));
         } else {
-          regenBtn.textContent = '대기 중';
+          regenBtn.textContent = '재생성 중 · 대기 중';
         }
       } else {
-        regenBtn.textContent = '대기 중';
+        regenBtn.textContent = '재생성 중 · 대기 중';
       }
     } else {
       regenBtn.disabled = false;
       regenBtn.textContent = '재생성';
     }
   }
+  document.querySelectorAll('.btn-gen-big, .sheet-gen-cta button').forEach(function(genBtn){
+    if(!genBtn || !genBtn.getAttribute('onclick') || genBtn.getAttribute('onclick').indexOf('genContent') < 0) return;
+    if(genActiveJob && genActiveJob.draftId === selId && (!genActiveJob.kind || genActiveJob.kind === 'draft')){
+      var leftG = (genActiveJob.endMs - Date.now()) / 1000;
+      if(!genBtn.getAttribute('data-planner-idle')) genBtn.setAttribute('data-planner-idle', genBtn.textContent);
+      genBtn.disabled = true;
+      genBtn.textContent = buttonCountdownText_(genBtn.classList.contains('btn-gen-big') ? '재생성 중' : '생성 중', leftG);
+    } else if(!busy){
+      if(genBtn.getAttribute('data-planner-idle')){
+        genBtn.textContent = genBtn.getAttribute('data-planner-idle');
+        genBtn.removeAttribute('data-planner-idle');
+      }
+      genBtn.disabled = false;
+    }
+  });
   restoreTextFieldFocus_(focusSnap);
 }
 
@@ -14592,10 +15081,10 @@ genActiveJob = { topic: draft.topic || '', endMs: Date.now() + estimateDraftMs(c
 updateGenIndicator();
 try {
 
-const blogGuide = getCatPrompt(catId, 'blog');
-const communityGuide = getCatPrompt(catId, 'community');
-const threadGuide = getCatPrompt(catId, 'thread');
-const imageGuide = getCatPrompt(catId, 'image');
+const blogGuide = getCatPromptForGeneration_(catId, 'blog');
+const communityGuide = getCatPromptForGeneration_(catId, 'community');
+const threadGuide = getCatPromptForGeneration_(catId, 'thread');
+const imageGuide = getCatPromptForGeneration_(catId, 'image');
 const baseInfo = getBasePrompt();
 const brandBlock = buildBrandContextForPrompt_(catId, draft);
 const briefPromptLines = buildDraftBriefPromptLines_(draft, catId);
@@ -14612,7 +15101,7 @@ ${brandBlock}
 ${dailyCtxBlock ? '\n\n' + dailyCtxBlock : ''}
 
 카테고리: ${cat.name} (${cat.sub})
-독자: ${cat.audience}
+독자: ${getProgramAudienceLine_(catId)}
 주제: "${draft.topic}"
 ${briefPromptLines}
 
@@ -14638,7 +15127,7 @@ thread.summary는 **하나의 문자열**만.`;
 ${brandBlock}
 
 카테고리: ${cat.name} (${cat.sub})
-독자: ${cat.audience}
+독자: ${getProgramAudienceLine_(catId)}
 주제: "${draft.topic}"
 ${briefPromptLines}
 
@@ -14671,7 +15160,7 @@ community에는 인사말·고정 마무리 넣지 말 것. 글 흐름은 **문�
 ${brandBlock}
 
 카테고리: ${cat.name} (${cat.sub})
-독자: ${cat.audience}
+독자: ${getProgramAudienceLine_(catId)}
 주제: "${draft.topic}"
 ${briefPromptLines}
 
@@ -14710,7 +15199,7 @@ ${generalImgJsonTail}
 ${brandBlock}
 
 카테고리: ${cat.name} (${cat.sub})
-독자: ${cat.audience}
+독자: ${getProgramAudienceLine_(catId)}
 주제: "${draft.topic}"
 ${briefPromptLines}
 
@@ -14859,11 +15348,12 @@ try {
 }
 };
 
-window.genContent = async function(){
+window.genContent = async function(ev){
   if(!state.selectedId){
     if(typeof setAppToast === 'function') setAppToast('먼저 초안 카드를 선택해 주세요.', { duration: 3500, variant: 'err' });
     return;
   }
+  var clickBtn = ev && ev.target && ev.target.closest ? ev.target.closest('button') : null;
   var draftId = state.selectedId;
   var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
   var tab = state.activeTab;
@@ -14884,6 +15374,7 @@ window.genContent = async function(){
     }
     var cat = CATEGORIES[catId];
     var draft = cat && cat.drafts.find(function(d){ return d.id === draftId; });
+    if(clickBtn) startButtonCountdown_(clickBtn, { estimateSec: Math.ceil(INSTA_BG_ESTIMATE_MS / 1000), busyLabel: '재생성 중', idleText: clickBtn.textContent });
     enqueueInstaFromBlog_(draftId, catId, draft ? draft.topic : '', igContent.blog);
     setAppToast('블로그 글 기준으로 인스타 캡션을 다시 만들고 있어요…', { duration: 5000, variant: 'ok' });
     return;
@@ -14905,10 +15396,20 @@ window.genContent = async function(){
     }
     var catTh = CATEGORIES[catId];
     var draftTh = catTh && catTh.drafts.find(function(d){ return d.id === draftId; });
+    if(clickBtn) startButtonCountdown_(clickBtn, { estimateSec: Math.ceil(THREADS_BG_ESTIMATE_MS / 1000), busyLabel: '재생성 중', idleText: clickBtn.textContent });
     enqueueThreadsFromInsta_(draftId, catId, draftTh ? draftTh.topic : '', thIgContent.insta);
     setAppToast('인스타 캡션 기준으로 쓰레드 글을 다시 만들고 있어요…', { duration: 5000, variant: 'ok' });
     return;
   }
 
-  await window.enqueueDraftGeneration(catId, draftId, { userInitiated: true });
+  var estSec = Math.ceil(estimateDraftMs(catId) / 1000);
+  if(clickBtn && !clickBtn.classList.contains('btn-regen')){
+    var busyLabel = clickBtn.classList.contains('btn-gen-big') ? '재생성 중' : '생성 중';
+    startButtonCountdown_(clickBtn, { estimateSec: estSec, busyLabel: busyLabel, idleText: clickBtn.textContent });
+  }
+  try {
+    await window.enqueueDraftGeneration(catId, draftId, { userInitiated: true });
+  } finally {
+    if(clickBtn && !clickBtn.classList.contains('btn-regen')) stopButtonCountdown_(clickBtn);
+  }
 };

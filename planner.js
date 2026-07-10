@@ -526,6 +526,9 @@ function buildOpsFourWeekChannelCheck_(){
     '□ 허브·프로필 링크 동작';
 }
 function opsPurposeIntent_(p, i){ return '목적: ' + p + '\n의도: ' + i; }
+function opsItemPurpose_(purpose, intent){
+  return opsPurposeIntent_(String(purpose || '').trim(), String(intent || '').trim());
+}
 function buildOpsProposalItemsForId_(byId, item, branchId){
   if(byId === 'ops-g-1'){
     return [
@@ -554,6 +557,9 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
   }
   if(byId === 'ops-g-2'){
     return [
+      { id:'scope', title:'동기화 범위 요약',
+        brief: opsPurposeIntent_('어떤 문구를 맞출지 한눈에 봅니다.', '아래 제안 문장을 순서대로 확정합니다.'),
+        text: opsProposalWithReason_('공통 면책 + 허브 면책 + 블로그 말미 병원 권고 + 금지 표현표', '검토 시작 전 체크리스트로 씁니다.') },
       { id:'disclaimer-std', title:'공통 면책 문구',
         brief: opsPurposeIntent_('모든 채널 말미·하단에 넣을 표준 면책을 확정합니다.', '의료행위가 아님을 명확히 하고 적신호 시 병원 권고를 포함합니다.'),
         text: opsProposalWithReason_(buildOpsMedicalDisclaimerStandard_(), '플레이스·블로그·상담 결과에 동일하게 반복합니다.') },
@@ -575,11 +581,15 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
     ];
   }
   if(byId === 'ops-g-4'){
-    var hubItems = PROFILE_SYMPTOM_HUBS.map(function(h){
+    var hubItems = [
+      { id:'hub-links', title:'허브 URL 전체 목록',
+        brief: opsPurposeIntent_('증상별 허브 주소를 한곳에 모읍니다.', '블로그 CTA·프로필·JSON-LD가 같은 URL을 가리키게 합니다.'),
+        text: opsProposalWithReason_(buildSymptomHubLinksBlock_(), '링크 오타·구 URL을 방지합니다.') }
+    ].concat(PROFILE_SYMPTOM_HUBS.map(function(h){
       return { id:'hub-' + h.id, title: h.label + ' 허브',
         brief: opsPurposeIntent_(h.label + ' 증상 가이드 허브 문구·링크를 점검합니다.', '블로그 CTA·프로필·JSON-LD가 같은 URL을 가리키게 합니다.'),
         text: opsProposalWithReason_(h.label + ' 증상 가이드: ' + h.url + '\n키워드: ' + (h.keywords || []).slice(0, 4).join(', '), '허브 딥링크가 검색·상담 전환의 허브가 됩니다.') };
-    });
+    }));
     hubItems.push(
       { id:'faq', title:'FAQ 5문항 요약',
         brief: opsPurposeIntent_('프로필 FAQ와 JSON-LD FAQPage가 동일한지 확인합니다.', 'AI 검색·리치 결과에 노출됩니다.'),
@@ -607,6 +617,18 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
       { id:'cta-neck', title:'말미 CTA — 목·거북목 허브',
         brief: opsPurposeIntent_('목·거북목 글 말미 CTA 샘플을 확정합니다.', '동일 톤·다른 허브 URL.'),
         text: opsProposalWithReason_(buildOpsMedicalBlogFooter_() + '\n👉 목·거북목 증상 가이드: ' + PROFILE_BRAND_URL + '?hub=neck', '목·어깨 주제 글에 사용.') },
+      { id:'cta-shoulder', title:'말미 CTA — 어깨 허브',
+        brief: opsPurposeIntent_('어깨 관련 글 말미 CTA 샘플을 확정합니다.', '동일 톤·어깨 허브 URL.'),
+        text: opsProposalWithReason_(buildOpsMedicalBlogFooter_() + '\n👉 어깨 증상 가이드: ' + PROFILE_BRAND_URL + '?hub=shoulder', '어깨·회전근개 주제 글에 사용.') },
+      { id:'cta-knee', title:'말미 CTA — 무릎 허브',
+        brief: opsPurposeIntent_('무릎 관련 글 말미 CTA 샘플을 확정합니다.', '동일 톤·무릎 허브 URL.'),
+        text: opsProposalWithReason_(buildOpsMedicalBlogFooter_() + '\n👉 무릎 증상 가이드: ' + PROFILE_BRAND_URL + '?hub=knee', '무릎·관절 주제 글에 사용.') },
+      { id:'cta-pelvis', title:'말미 CTA — 골반·둔부 허브',
+        brief: opsPurposeIntent_('골반·둔부 관련 글 말미 CTA 샘플을 확정합니다.', '동일 톤·골반 허브 URL.'),
+        text: opsProposalWithReason_(buildOpsMedicalBlogFooter_() + '\n👉 골반·둔부 증상 가이드: ' + PROFILE_BRAND_URL + '?hub=pelvis', '골반·좌골 주제 글에 사용.') },
+      { id:'cta-samples-all', title:'말미 CTA 전체 샘플 (5허브)',
+        brief: opsPurposeIntent_('증상별 블로그 말미 문장을 한곳에 모읍니다.', '복사 후 지역·지점명만 수정해 씁니다.'),
+        text: opsProposalWithReason_(buildBlogHubCtaSamples_(), '허리·목·어깨·무릎·골반 글 말미에 붙입니다.') },
       { id:'directions', title:'지점 안내 글 링크',
         brief: opsPurposeIntent_('약수·작전 오시는 길 블로그 글을 카테고리에 연결합니다.', '플레이스 찾아오기와 동일 정보.'),
         text: opsProposalWithReason_('약수: ' + OPS_BRAND_COPY.branch.yaksu.blogDirections + '\n작전: ' + OPS_BRAND_COPY.branch.jakjeon.blogDirections, '지점 안내 카테고리 고정 글 2개.') }
@@ -684,7 +706,11 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
   }
   if(byId === 'ops-y-7' || byId === 'ops-j-7'){
     var pk7 = opsPlaceBranchKey_(byId);
+    var meta7 = opsBranchMeta_(pk7);
     return [
+      { id:'blog-link', title:'오시는 길 글 URL',
+        brief: opsPurposeIntent_('기존 블로그 글 주소를 고정합니다.', '수정·공유 시 바로 열 수 있게 합니다.'),
+        text: opsProposalWithReason_(meta7.blogDirections || '(블로그 오시는 글 URL)', '플레이스·프로필 링크와 동일하게 맞춥니다.') },
       { id:'directions', title:'오시는 길 글 본문',
         brief: opsPurposeIntent_('블로그 지점 안내 글을 플레이스와 맞춥니다.', '지도·주차·층수 상세.'),
         text: opsProposalWithReason_(buildOpsBlogDirectionsSnippet_(pk7), '기존 글 수정 또는 신규 발행.') },
@@ -718,6 +744,9 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
   if(byId === 'ops-y-21' || byId === 'ops-j-21'){
     var pk21 = opsPlaceBranchKey_(byId);
     return [
+      { id:'portals', title:'등록 포털 주소',
+        brief: opsPurposeIntent_('카카오맵·비즈니스 접속 주소를 고정합니다.', '담당자가 바로 열 수 있게 북마크합니다.'),
+        text: opsProposalWithReason_('매장관리: map.kakao.com · 비즈니스: business.kakao.com', '등록·수정 시 이 주소로 접속합니다.') },
       { id:'basic', title:'카카오맵 기본정보',
         brief: opsPurposeIntent_('카카오맵·카카오비즈니스에 매장 정보를 등록합니다.', '지도 검색·길찾기·전화 연결.'),
         text: opsProposalWithReason_(buildOpsKakaoMapProfile_(pk21), '네이버·구글과 주소·전화·영업시간을 통일하세요.') },
@@ -756,9 +785,36 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
       { id:'keywords', title:'롱테일 키워드 3개',
         brief: opsPurposeIntent_('지역×증상 키워드를 선정하고 허브에 연결합니다.', '전환 의도 높은 조합 우선.'),
         text: opsProposalWithReason_(buildOpsLongtailKeywords_(pk9), '블로그 제목·CTA에 동일 키워드 반복.') },
+      { id:'hub-links', title:'허브 URL 참고',
+        brief: opsPurposeIntent_('증상별 허브 주소를 확인합니다.', '키워드와 맞는 허브 1개를 골라 CTA에 연결합니다.'),
+        text: opsProposalWithReason_(buildSymptomHubLinksBlock_(), '블로그 말미·프로필 링크와 동일 URL을 씁니다.') },
       { id:'hub-cta', title:'허브 CTA 블록',
         brief: opsPurposeIntent_('선정 키워드별 허브 링크 CTA를 준비합니다.', '글 말미 1개 고정.'),
         text: opsProposalWithReason_(buildBlogHubCtaSamples_().split('\n').slice(0, 10).join('\n'), '증상 주제에 맞는 허브 1개만 선택.') }
+    ];
+  }
+  if(byId === 'ops-n-7'){
+    return [
+      { id:'keywords', title:'SEO 키워드 5개 (초안)',
+        brief: opsPurposeIntent_('신규 지점 지역×증상 키워드를 미리 선정합니다.', '오픈 후 블로그·플레이스에 바로 씁니다.'),
+        text: opsProposalWithReason_('예: (지역) 1:1 운동 · (지역) 체형교정 · (지역) 자세교정 · (지역) 스트레칭 · 리얼무브먼트 (지역)', '상권·타깃에 맞게 5개로 다듬으세요.') },
+      { id:'hub-links', title:'허브 딥링크 참고',
+        brief: opsPurposeIntent_('증상별 프로필 허브 URL을 확인합니다.', '블로그 CTA·프로필 링크에 연결합니다.'),
+        text: opsProposalWithReason_(buildSymptomHubLinksBlock_(), '허브 딥링크 참고 자료입니다.') }
+    ];
+  }
+  if(byId === 'ops-n-1'){
+    return [
+      { id:'meta', title:'신규 지점 메모 연동',
+        brief: opsPurposeIntent_('상단 신규 지점 메모와 연동합니다.', '후보명·상권 조사 결과를 한곳에 모읍니다.'),
+        text: opsProposalWithReason_('후보명·지역은 상단 「신규 지점 메모」에도 기록하세요.', '체크리스트와 메모가 서로 맞는지 확인합니다.') }
+    ];
+  }
+  if(byId === 'ops-n-11'){
+    return [
+      { id:'clone', title:'체크리스트 복제·4주 점검',
+        brief: opsPurposeIntent_('기존 지점 체크리스트를 복제합니다.', '오픈 후 4주 점검까지 이어지게 합니다.'),
+        text: opsProposalWithReason_('약수·작전 지점브랜딩 체크리스트를 복제한 뒤 일정에 맞게 조정하세요.\n오픈 4주 후 점검: 약수 ops-y-14 · 작전 ops-j-14 항목 참고', '런칭 후 누락 채널을 잡습니다.') }
     ];
   }
   if(byId === 'ops-y-10' || byId === 'ops-j-10'){
@@ -793,48 +849,51 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
   }
   return null;
 }
-function opsBranchItem_(id, text, hint){
-  return { id: id, text: text, hint: hint || '' };
+function opsBranchItem_(id, text, purpose){
+  return { id: id, text: text, purpose: purpose || '', hint: '' };
 }
 function buildOpsBranchOnlineItems_(prefix, branchKey){
   var meta = opsBranchMeta_(branchKey);
   var placeLabel = branchKey === 'jakjeon' ? '작전' : '약수';
   var items = [
-    opsBranchItem_(prefix + '-6', '네이버 스마트플레이스 — 기본·소개·키워드·사진'),
-    opsBranchItem_(prefix + '-15', '네이버 스마트플레이스 — 부가·가격·시간·예약·톡톡'),
-    opsBranchItem_(prefix + '-17', 'Google Business Profile — 기본정보·소개·사진'),
+    opsBranchItem_(prefix + '-6', '네이버 스마트플레이스 — 기본·소개·키워드·사진',
+      opsItemPurpose_('네이버 지도·검색에 보이는 기본 정보를 ' + placeLabel + ' 지점에 맞게 정비합니다.', '첫인상·신뢰·리:얼 톤이 한눈에 드러나게 합니다.')),
+    opsBranchItem_(prefix + '-15', '네이버 스마트플레이스 — 부가·가격·시간·예약·톡톡',
+      opsItemPurpose_('방문 전에 꼭 알아야 할 실무 정보를 플레이스에 채웁니다.', '예약·가격·영업시간·톡톡 경로가 한곳에 모이게 합니다.')),
+    opsBranchItem_(prefix + '-17', 'Google Business Profile — 기본정보·소개·사진',
+      opsItemPurpose_('구글 지도·검색용 지점 정보를 최신화합니다.', '네이버와 같은 신뢰·톤으로 맞춥니다.')),
     opsBranchItem_(prefix + '-21', '카카오맵·카카오비즈니스 — 매장등록·소개·사진',
-      '매장관리: map.kakao.com · 비즈니스: business.kakao.com'),
+      opsItemPurpose_('카카오 지도에서 매장을 찾고 길찾기·전화 연결을 받습니다.', '주소·전화·사진이 다른 채널과 일치하게 합니다.')),
     opsBranchItem_(prefix + '-7', '네이버 블로그 ' + placeLabel + ' 오시는 길 글·지도 링크',
-      meta.blogDirections ? ('오시는 길: ' + meta.blogDirections) : ''),
+      opsItemPurpose_('블로그 지점 안내 글을 플레이스·프로필과 맞춥니다.', '방문 전 길찾기·주차 정보를 검색에서 바로 찾게 합니다.')),
     opsBranchItem_(prefix + '-19', '숨고 — 프로필·서비스 등록·견적 응답',
-      '서비스 예: 1:1 체형교정 · 기능운동 · 스트레칭 · Re:Al Movement\n지역: ' + (meta.addressShort || placeLabel)),
+      opsItemPurpose_('숨고에서 1:1 운동·체형 프로그램 문의를 받습니다.', '플레이스와 같은 톤으로 견적 답변을 빠르게 합니다.')),
     opsBranchItem_(prefix + '-20', '당근마켓 동네생활 — 비즈프로필·홍보 글',
-      '타깃: ' + (meta.target || '') + '\n지역 인증 후 간단 소개·프로그램 안내')
+      opsItemPurpose_('근거리·입주민 고객에게 가볍게 노출합니다.', '과장 없이 상담·1:1 맞춤으로 이어지게 합니다.'))
   ];
   if(branchKey === 'yaksu'){
     items.push(opsBranchItem_(prefix + '-22', '인스타그램 · Threads · 유튜브 — 통합 브랜드 계정 (신규 생성)',
-      '약수·작전 공통 1계정 — 작전 탭에는 별도 항목 없음 · 계정 생성 후 URL을 메모에 기록\n과장·즉효 금지 · 프로필 링크 CTA'));
+      opsItemPurpose_('약수·작전 공통 SNS 계정을 개설·연결합니다.', '브랜드 톤·프로필 링크·면책을 한 계정에서 유지합니다.')));
   }
   return items;
 }
 function buildOpsBranchSearchItems_(prefix, branchKey){
-  var meta = opsBranchMeta_(branchKey);
   var placeLabel = branchKey === 'jakjeon' ? '작전' : '약수';
-  var kwSample = branchKey === 'jakjeon'
-    ? '작전 1:1 운동 · 인천 체형교정 · 작전 스트레칭 · 리얼무브먼트 작전'
-    : '약수 1:1 운동 · 약수 체형교정 · 중구 자세교정 · 리얼무브먼트 약수';
   return [
-    opsBranchItem_(prefix + '-8', '프로필·홈페이지 ' + placeLabel + ' 링크·문구 반영'),
+    opsBranchItem_(prefix + '-8', '프로필·홈페이지 ' + placeLabel + ' 링크·문구 반영',
+      opsItemPurpose_('프로필·홈페이지에 ' + placeLabel + ' 지점 정보를 반영합니다.', '주소·전화·오시는 길이 플레이스·블로그와 일치하게 합니다.')),
     opsBranchItem_(prefix + '-9', '지역×증상 롱테일 키워드 3개 · 프로필 허브·블로그 연결',
-      '예: ' + kwSample + '\n글 말미 CTA에 허브 링크 1개:\n' + buildSymptomHubLinksBlock_())
+      opsItemPurpose_('지역×증상 검색어를 정하고 허브·블로그를 연결합니다.', '전환 의도 높은 키워드로 상담 문의를 늘립니다.'))
   ];
 }
 function buildOpsBranchOpsItems_(prefix){
   return [
-    opsBranchItem_(prefix + '-10', '리뷰 유도 SOP — 증상 키워드 포함 후기 요청'),
-    opsBranchItem_(prefix + '-11', '오프라인 안내판·명함·상담지·동의서'),
-    opsBranchItem_(prefix + '-14', '오픈 4주 후 플레이스·리뷰·채널 점검')
+    opsBranchItem_(prefix + '-10', '리뷰 유도 SOP — 증상 키워드 포함 후기 요청',
+      opsItemPurpose_('후기 요청 타이밍·문구·답변을 표준화합니다.', '증상 키워드가 자연스럽게 쌓이게 합니다.')),
+    opsBranchItem_(prefix + '-11', '오프라인 안내판·명함·상담지·동의서',
+      opsItemPurpose_('오프라인 인쇄물·안내 문구를 브랜드·면책 톤에 맞춥니다.', '방문 고객이 온·오프라인에서 같은 신뢰를 느끼게 합니다.')),
+    opsBranchItem_(prefix + '-14', '오픈 4주 후 플레이스·리뷰·채널 점검',
+      opsItemPurpose_('오픈 4주 뒤 채널·리뷰·링크를 한번에 점검합니다.', '초기 누락·구버전을 잡고 운영 리듬을 고정합니다.'))
   ];
 }
 function buildOpsGuideForItem_(item, branchId){
@@ -1469,13 +1528,16 @@ function regenerateOpsReviewText_(fieldName, current, base){
 }
 const OPS_MANUAL_SECTIONS = [
   { id: 'ops-g-brand', branch: 'global', phase: '브랜딩 기반', items: [
-    opsBranchItem_('ops-g-1', '포지셔닝 문장 확정 — 근골격·움직임 전문가 · 1:1 리:얼(Re Alignment) 프로그램'),
+    opsBranchItem_('ops-g-1', '포지셔닝 문장 확정 — 근골격·움직임 전문가 · 1:1 리:얼(Re Alignment) 프로그램',
+      opsItemPurpose_('전 채널이 같은 한 문장·톤을 말하게 합니다.', '근골격·움직임 전문가 · 1:1 리:얼이 검색·상담·콘텐츠마다 흔들리지 않게 합니다.')),
     opsBranchItem_('ops-g-2', '의료법 준수 문구·면책 — 프로필·블로그·상담 결과·플래너 프롬프트 동기화',
-      '공통 면책 + 허브 면책 + 블로그 말미 병원 권고 + 금지 표현표'),
-    opsBranchItem_('ops-g-4', '프로필 증상 허브 5개 + FAQ·JSON-LD — 허리·목·어깨·무릎·골반', buildSymptomHubLinksBlock_()),
-    opsBranchItem_('ops-g-9', '네이버 블로그 시리즈·카테고리·지점 안내 글 구조 정리', buildBlogHubCtaSamples_()),
+      opsItemPurpose_('의료법·광고 심의 경계를 전 채널에 동일하게 맞춥니다.', '면책·금지 표현·병원 권고가 프로필·블로그·상담·AI 생성에 한 벌로 적용되게 합니다.')),
+    opsBranchItem_('ops-g-4', '프로필 증상 허브 5개 + FAQ·JSON-LD — 허리·목·어깨·무릎·골반',
+      opsItemPurpose_('증상별 안내 허브 5개와 FAQ·검색 노출을 점검합니다.', '허리·목·어깨·무릎·골반이 같은 URL·문장으로 연결되게 합니다.')),
+    opsBranchItem_('ops-g-9', '네이버 블로그 시리즈·카테고리·지점 안내 글 구조 정리',
+      opsItemPurpose_('블로그 카테고리·글 구조·발행 리듬을 고정합니다.', '플래너 초안과 맞는 시리즈·말미 CTA·지점 안내 글이 운영 가능한 틀로 정리되게 합니다.')),
     opsBranchItem_('ops-g-11', '강사용·프로필·플래너 URL·동기화·배포 버전 점검',
-      buildOpsDeployUrls_())
+      opsItemPurpose_('공개 URL·배포 파일·버전을 한곳에서 점검합니다.', '강사용·프로필·플래너 링크 오타·구버전 캐시를 배포 때마다 확인합니다.'))
   ]},
   { id: 'ops-y-online', branch: 'yaksu', phase: '1. 온라인 필수', items: buildOpsBranchOnlineItems_('ops-y', 'yaksu') },
   { id: 'ops-y-search', branch: 'yaksu', phase: '2. 검색·연결', items: buildOpsBranchSearchItems_('ops-y', 'yaksu') },
@@ -1485,20 +1547,25 @@ const OPS_MANUAL_SECTIONS = [
   { id: 'ops-j-open', branch: 'jakjeon', phase: '3. 운영', items: buildOpsBranchOpsItems_('ops-j') },
   { id: 'ops-n-plan', branch: 'new', phase: '1. 후보·기획', items: [
     opsBranchItem_('ops-n-1', '지역 후보·상권 조사 — 지점명·경쟁·임대료·상권 메모',
-      '후보명·지역은 상단 「신규 지점 메모」에도 기록'),
-    opsBranchItem_('ops-n-2', '타깃 고객·프로그램 믹스 (병원 연계 vs 웰니스 비중)'),
-    opsBranchItem_('ops-n-4', '법인·계약·보험·소음·주차 등 리스크 체크')
+      opsItemPurpose_('신규 지점 후보 지역·상권을 조사·기록합니다.', '지점명·경쟁·임대료·타깃을 한곳에 모아 오픈 결정에 씁니다.')),
+    opsBranchItem_('ops-n-2', '타깃 고객·프로그램 믹스 (병원 연계 vs 웰니스 비중)',
+      opsItemPurpose_('신규 지점의 핵심 고객·프로그램 비중을 정합니다.', '병원 연계 vs 웰니스 비중을 미리 맞춰 메시지·공간을 설계합니다.')),
+    opsBranchItem_('ops-n-4', '법인·계약·보험·소음·주차 등 리스크 체크',
+      opsItemPurpose_('오픈 전 법·계약·운영 리스크를 점검합니다.', '소음·주차·보험 등 현장 이슈를 미리 파악합니다.'))
   ]},
   { id: 'ops-n-brand', branch: 'new', phase: '2. 오픈 준비', items: [
-    opsBranchItem_('ops-n-6', '플레이스·블로그·프로필용 지점 소개 초안'),
+    opsBranchItem_('ops-n-6', '플레이스·블로그·프로필용 지점 소개 초안',
+      opsItemPurpose_('오픈 전 지점 소개 문구 초안을 만듭니다.', '플레이스·블로그·프로필에 같은 톤으로 쓸 수 있게 합니다.')),
     opsBranchItem_('ops-n-7', '지역×증상 SEO 키워드 5개 선정',
-      '허브 딥링크 참고:\n' + buildSymptomHubLinksBlock_()),
-    opsBranchItem_('ops-n-8', '오픈 전 콘텐츠 4편 주제 (플래너에서 작성)'),
-    opsBranchItem_('ops-n-9', '인테리어·사진 컨셉 10컷 리스트')
+      opsItemPurpose_('신규 지역×증상 SEO 키워드를 미리 선정합니다.', '오픈 후 블로그·플레이스·허브 링크에 바로 연결합니다.')),
+    opsBranchItem_('ops-n-8', '오픈 전 콘텐츠 4편 주제 (플래너에서 작성)',
+      opsItemPurpose_('오픈 전에 미리 쓸 블로그·채널 주제 4개를 정합니다.', '플래너에서 초안을 만들어 오픈 직후 발행 리듬을 잡습니다.')),
+    opsBranchItem_('ops-n-9', '인테리어·사진 컨셉 10컷 리스트',
+      opsItemPurpose_('매장·프로그램 사진 10컷 콘셉트를 정합니다.', '플레이스·SNS·블로그에 쓸 사진 방향을 미리 맞춥니다.'))
   ]},
   { id: 'ops-n-open', branch: 'new', phase: '3. 런칭', items: [
     opsBranchItem_('ops-n-11', '약수·작전 체크리스트 복제 → 일정에 맞게 조정',
-      '오픈 4주 후 점검은 약수·작전 ops-y-14 항목 참고')
+      opsItemPurpose_('기존 지점 체크리스트를 복제해 신규 일정에 맞춥니다.', '누락 없이 오픈·4주 점검까지 이어지게 합니다.'))
   ]},
 ];
 
@@ -1851,8 +1918,8 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
     ]
   },
   '6': {
-    brandProfile: '일상 공유는 전문 지식 전달보다 신뢰·온기·공감 축적이 목적입니다. 계절·컨디션·작은 루틴을 가볍게 나누되 과장·설교·홍보 톤은 줄입니다. 독자가 "이 사람은 꾸준하고 진짜다"라고 느끼는 리듬이 핵심입니다.',
-    strategyGuide: '기준:\n- 단계는 공감 장면 → 가벼운 관찰 → 작은 실천 → 관계 유지 메시지 순으로 구성한다.\n- 의학적 단정 대신 경험 기반 표현을 사용한다.\n- 각 글은 짧고 부담 없는 한 가지 메시지만 남긴다.\n\n의도:\n- 콘텐츠 피로도를 낮추면서 지속 노출 리듬을 만든다.\n- 팔로워와의 정서적 거리감을 줄여 장기 신뢰를 쌓는다.\n- 전문 콘텐츠로 이어질 수 있는 인간적 접점을 확보한다.',
+    brandProfile: '일상 공유는 전문 지식 전달보다 신뢰 축적이 목적입니다. 핵심을 담백하게 말하되 장면·관찰로 공감 한 스푼. 과장·설교·홍보·과한 감성 톤은 줄입니다. 독자가 "이 사람은 꾸준하고 진짜다"라고 느끼는 리듬이 핵심입니다.',
+    strategyGuide: '기준:\n- 단계는 장면 관찰 → 핵심 한 가지 → (선택) 짧은 감탄·철학 → 담백한 마무리 순으로 구성한다.\n- 의학적 단정 대신 경험·관찰 기반 표현을 사용한다.\n- 각 글은 짧고 부담 없는 한 가지 메시지만 남긴다.\n\n의도:\n- 콘텐츠 피로도를 낮추면서 지속 노출 리듬을 만든다.\n- 담백함 속 살짝의 공감으로 거리감을 줄인다.\n- 전문 콘텐츠로 이어질 수 있는 인간적 접점을 확보한다.',
     steps: [
       { id: '1', title: '1단계 · 공감 장면 열기', summary: '계절·날씨·피로 같은 공감 포인트로 시작', rationale: '첫 단계는 읽는 장벽을 낮추는 것이 핵심입니다. 누구나 공감 가능한 장면으로 관계의 문을 엽니다.' },
       { id: '2', title: '2단계 · 몸 느낌 관찰', summary: '오늘 컨디션을 가볍게 언어화해 나누기', rationale: '과한 정보 없이도 신뢰는 쌓일 수 있습니다. 몸 느낌을 솔직하게 기록해 진정성을 강화합니다.' },
@@ -2165,7 +2232,8 @@ function applyInitialProgramTopicsToCat_(catId){
   });
   return applied;
 }
-const DAILY_SHARE_MASTER_BRIDGE = '일상 공유는 PSP·통증 설교가 아니라, 미카닥 박준규라는 사람의 신뢰·공감·20년 임상의 온기를 보여 주는 레이어. 1년 마스터 브랜드(왜·신뢰)와 직접 연결하지 않고 「이 사람은 진짜」로 기억되게 한다.';
+const DAILY_SHARE_MASTER_BRIDGE = '일상 공유는 PSP·통증 설교가 아니라, 미카닥 박준규라는 사람의 신뢰를 보여 주는 레이어. 핵심을 담백하게 말하되 공감 한 스푼 — 「이 사람은 진짜」로 기억되게 한다.';
+const DAILY_SHARE_TONE_ANCHOR = '담백·관찰 위주. 핵심 메시지 하나를 분명히 말하되, 장면·몸감각·짧은 감탄·한 줄 철학으로 살짝 공감을 더한다. 눈물·위로·설교·과한 감성·시적 수사 금지. 「읽는 사람이 아, 나도 그런 날 있지」 한 번 정도면 충분.';
 /** 개인 색깔·약력·포지셔닝 — 대화·프로필·블로그(미카닥 박준규 DC PT 공지) 기준. AI·기획 시 톤·역할 참고용 */
 const PERSONAL_BRAND_PROFILE = `
 [미카닥 박준규 — 누구인지 · 어떻게 불러야 하는지]
@@ -2201,7 +2269,7 @@ const PERSONAL_BRAND_PROFILE = `
 - 움직임·자세: PAR·Position — 일상 동작으로 연결
 - 얼굴·웰니스: 구조(경축·골격)·비수술 · 기대치 현실화
 - 전문가: 촉진·평가 우선, 교과서와 임상의 간격 메우기
-- 일상 공유: 강의·홍보 없이 **믿을 만한 사람** — 공감·온기
+- 일상 공유: 강의·홍보 없이 **믿을 만한 사람** — 담백한 관찰 + 공감 한 스푼
 
 [쓰지 말 것 · 톤]
 - 「최고의 의사」「완치 보장」「Doctor로만 신뢰」 류
@@ -2233,10 +2301,10 @@ const DEFAULT_BRANDING = {
 };
 
 const DEFAULT_DAILY_SHARE_THEMES = [
-  { id: 'season', label: '계절·날씨', note: '장마·더위·꽃가루… 몸 느낌 가볍게' },
-  { id: 'body', label: '몸 컨디션', note: '피곤·뻐근함·가벼운 움직임' },
-  { id: 'travel', label: '여행·이동', note: '다녀온 날·이동 후 컨디션' },
-  { id: 'rest', label: '쉬는 날·감사', note: '커피·여유·소소한 기쁨' }
+  { id: 'season', label: '계절·날씨', note: '장면 관찰 — 습도·더위가 몸에 어떻게 느껴지는지 담백하게' },
+  { id: 'body', label: '몸 컨디션', note: '피곤·뻐근함 — 판단 없이 관찰, 가벼운 움직임 한 줄' },
+  { id: 'travel', label: '여행·이동', note: '다녀온 날의 핵심 한 가지 + 짧은 감탄' },
+  { id: 'rest', label: '쉬는 날·여유', note: '커피·창밖·10분 쉼 — 과장 없는 한 줄 철학까지' }
 ];
 
 const CLINIC_NAME_REPLACEMENTS = [
@@ -2436,7 +2504,7 @@ function hasDailyShareThemesCustomized_(){
 }
 function buildDailyShareContextBlock_(){
   var plan = getDailySharePlan_();
-  var lines = ['[일상 공유 · 이번 달 테마]', DAILY_SHARE_MASTER_BRIDGE];
+  var lines = ['[일상 공유 · 이번 달 테마]', DAILY_SHARE_MASTER_BRIDGE, '톤: ' + DAILY_SHARE_TONE_ANCHOR];
   if(plan.intent) lines.push('나눔 방향: ' + plan.intent);
   plan.themes.forEach(function(t){
     if(t.note) lines.push('- ' + t.label + ': ' + t.note);
@@ -2825,7 +2893,13 @@ function getDraftsForSubGoalStep_(catId, stepId, opts){
     var ib = cat.drafts.indexOf(b);
     var pa = getDraftStepParts_(a, catId, ia);
     var pb = getDraftStepParts_(b, catId, ib);
-    return pa.step - pb.step;
+    if(pa.step !== pb.step) return pa.step - pb.step;
+    if(String(stepId) === SUBGOAL_MISC_ID){
+      var ta = userAddedDraftTimestamp_(a.id);
+      var tb = userAddedDraftTimestamp_(b.id);
+      if(ta !== tb) return tb - ta;
+    }
+    return ia - ib;
   });
 }
 function getDraftForStepSlot_(catId, stepId, slotNum, opts){
@@ -3058,6 +3132,11 @@ function getVisibleDraftsInMain_(catId){
   if(isDailyShareCategory(catId)){
     return (cat.drafts || []).filter(function(d){
       return d && d.id && !(state.deletedDraftIds && state.deletedDraftIds[d.id]);
+    }).sort(function(a, b){
+      var ta = userAddedDraftTimestamp_(a.id) || (a.createdAt ? Date.parse(a.createdAt) : 0);
+      var tb = userAddedDraftTimestamp_(b.id) || (b.createdAt ? Date.parse(b.createdAt) : 0);
+      if(ta !== tb) return tb - ta;
+      return (cat.drafts.indexOf(b) - cat.drafts.indexOf(a));
     });
   }
   var plan = getSubGoalPlan_(catId);
@@ -3113,12 +3192,6 @@ function getSubGoalMiscLabel_(plan){
 function getDraftRoadmapStepId_(draft, catId, draftIndex){
   var plan = getSubGoalPlan_(catId);
   if(!plan || !draft) return null;
-  var meta = getDraftBrandMeta_(draft, catId, draftIndex);
-  var miscLabel = getSubGoalMiscLabel_(plan);
-  if(meta.series === miscLabel) return SUBGOAL_MISC_ID;
-  for(var j = 0; j < plan.steps.length; j++){
-    if(plan.steps[j].title === meta.series) return String(plan.steps[j].id);
-  }
   var ov = state.draftBrandOverrides && state.draftBrandOverrides[draft.id];
   var stored = (ov && ov.roadmapStepId) || draft.roadmapStepId;
   if(stored){
@@ -3127,6 +3200,13 @@ function getDraftRoadmapStepId_(draft, catId, draftIndex){
     for(var i = 0; i < plan.steps.length; i++){
       if(String(plan.steps[i].id) === stored) return stored;
     }
+  }
+  if(isUserAddedDraftId_(draft.id)) return SUBGOAL_MISC_ID;
+  var meta = getDraftBrandMeta_(draft, catId, draftIndex);
+  var miscLabel = getSubGoalMiscLabel_(plan);
+  if(meta.series === miscLabel) return SUBGOAL_MISC_ID;
+  for(var j = 0; j < plan.steps.length; j++){
+    if(plan.steps[j].title === meta.series) return String(plan.steps[j].id);
   }
   return SUBGOAL_MISC_ID;
 }
@@ -3150,8 +3230,48 @@ function applyDraftRoadmapAssignment_(draft, catId, stepId, stepTitle, order, to
     state.draftBrandOverrides[draft.id].roadmapStepId = draft.roadmapStepId;
   }
 }
+function assignUserAddedDraftToMisc_(draft, catId){
+  if(!draft || !isUserAddedDraftId_(draft.id)) return false;
+  var plan = getSubGoalPlan_(catId);
+  if(!plan) return false;
+  var miscLabel = getSubGoalMiscLabel_(plan);
+  var existing = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true })
+    .filter(function(d){ return d && d.id !== draft.id; });
+  var total = existing.length + 1;
+  existing.forEach(function(d, i){
+    applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, i + 2, total);
+  });
+  applyDraftRoadmapAssignment_(draft, catId, SUBGOAL_MISC_ID, miscLabel, 1, total);
+  return true;
+}
+function normalizeMiscUserAddedOrder_(catId){
+  var plan = getSubGoalPlan_(catId);
+  if(!plan) return;
+  var miscLabel = getSubGoalMiscLabel_(plan);
+  var list = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true });
+  if(!list.length) return;
+  var userAdded = list.filter(function(d){ return isUserAddedDraftId_(d.id); });
+  var others = list.filter(function(d){ return !isUserAddedDraftId_(d.id); });
+  userAdded.sort(function(a, b){ return userAddedDraftTimestamp_(b.id) - userAddedDraftTimestamp_(a.id); });
+  var ordered = userAdded.concat(others);
+  var total = ordered.length;
+  ordered.forEach(function(d, i){
+    applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, i + 1, total);
+  });
+}
+function ensureUserAddedDraftsInMisc_(catId){
+  var cat = CATEGORIES[catId];
+  if(!cat || !getSubGoalPlan_(catId)) return;
+  var toMigrate = (cat.drafts || []).filter(function(d){
+    return d && isUserAddedDraftId_(d.id) && String(d.roadmapStepId || '') !== SUBGOAL_MISC_ID;
+  });
+  toMigrate.sort(function(a, b){ return userAddedDraftTimestamp_(a.id) - userAddedDraftTimestamp_(b.id); });
+  toMigrate.forEach(function(d){ assignUserAddedDraftToMisc_(d, catId); });
+  normalizeMiscUserAddedOrder_(catId);
+}
 function isUnassignedDraftForSubGoal_(draft){
   if(!draft || !draft.id) return false;
+  if(isUserAddedDraftId_(draft.id)) return false;
   var ov = state.draftBrandOverrides && state.draftBrandOverrides[draft.id];
   if(ov && ov.roadmapStepId) return false;
   if(draft.roadmapStepId) return false;
@@ -3639,7 +3759,21 @@ function getDraftWritingBrief_(draft, catId, draftIndex){
   return buildDefaultWritingBrief_(draft, catId, draftIndex);
 }
 function buildDraftBriefPromptLines_(draft, catId){
+  var flowLines = [];
+  if(draft && draft.articleFlow){
+    var af = draft.articleFlow;
+    var steps = Array.isArray(af.steps) ? af.steps : [];
+    flowLines.push('[선택한 글 흐름 — 추가 단계에서 확정]');
+    if(af.title) flowLines.push('제목 방향: ' + af.title);
+    if(af.angle) flowLines.push('각도: ' + af.angle);
+    if(steps.length) flowLines.push('전개 순서:\n' + steps.map(function(s, i){ return (i + 1) + '. ' + s; }).join('\n'));
+    flowLines.push('위 흐름·순서를 벗어나지 말고 작성하세요.');
+  }
   var brief = getDraftWritingBrief_(draft, catId);
+  if(flowLines.length && brief){
+    return flowLines.join('\n') + '\n\n글 작성 핵심:\n' + brief + '\n\n위 「선택한 글 흐름」과 「글 작성 핵심」을 본문 전개에 우선 반영하세요.';
+  }
+  if(flowLines.length) return flowLines.join('\n');
   if(brief){
     return '글 작성 핵심:\n' + brief + '\n\n위 「글 작성 핵심」의 분기·단계 맥락, 필요성, 풀어가는 순서를 본문 전개에 우선 반영하세요.';
   }
@@ -5514,11 +5648,11 @@ function renderDailySharePanelHTML_(catId){
     var compact = plan.intent || plan.themes.map(function(t){ return t.label; }).join(' · ');
     html += '<div class="planner-layer-compact">' + escapeHtml(compact || '사진·오늘 느낌으로 가볍게 올려요') + '</div>';
   } else {
-    html += '<p class="daily-share-intro">강의·홍보 없이 <strong>생활 일기·공감</strong> 톤. 사진만 올려도 주제를 만들 수 있어요.</p>';
+    html += '<p class="daily-share-intro">강의·홍보 없이 <strong>담백한 관찰 + 공감 한 스푼</strong>. 핵심 한 가지를 분명히, 과한 감성은 피해요.</p>';
     html += '<p class="daily-share-bridge">' + escapeHtml(DAILY_SHARE_MASTER_BRIDGE) + '</p>';
     html += '<div class="ws-intent-block daily-intent-block">' +
       '<label class="ws-intent-label">이번 달 일상 나눔 방향 (선택)</label>' +
-      '<textarea class="ws-intent-input ws-grow-textarea daily-intent-input" rows="2" placeholder="예: 봄 산책·컨디션, 여유·공감 톤 — PSP 설교 없이 「믿을 만한 사람」으로" oninput="updateDailyShareIntent_(this.value);autoGrowTextarea_(this)">' + escapeHtml(plan.intent || '') + '</textarea>' +
+      '<textarea class="ws-intent-input ws-grow-textarea daily-intent-input" rows="2" placeholder="예: 담백·관찰 위주. 핵심 한 가지 분명히, 장면·몸감각으로 살짝 공감. 감탄·짧은 철학 1문장까지" oninput="updateDailyShareIntent_(this.value);autoGrowTextarea_(this)">' + escapeHtml(plan.intent || '') + '</textarea>' +
     '</div>';
     html += '<div class="daily-theme-grid">';
     plan.themes.forEach(function(t, idx){
@@ -6269,7 +6403,7 @@ let state = {
   generatedOnly: {},
   localSavedAt: '',
   showAdd: false,
-  newItem: { date:'', topic:'', catId:0, refImages:[], refImage:null, refNote:'', imageAnalyzing:false },
+  newItem: { date:'', topic:'', catId:0, refImages:[], refImage:null, refNote:'', imageAnalyzing:false, flowProposals:[], selectedFlowIdx:0, flowProposalsLoading:false, flowProposalsReady:false, cachedYoutubeAnalysis:'', _cachedFlowYoutubeUrl:'' },
   apiKey: '',
   geminiYoutubeEnabled: false,
   plannerAuthRequired: false,
@@ -6334,6 +6468,62 @@ const MIN_DRAFT_REPLENISH_COOLDOWN_MS = 90 * 1000;
 
 function getPrompts() {
   return state.prompts || JSON.parse(JSON.stringify(DEFAULT_PROMPTS));
+}
+/** 프롬프트 설정 모달에 표시할 프로그램 (지점·브랜딩 제외) */
+function getPromptModalCatIds_(){
+  return CATEGORIES.map(function(c, i){ return i; }).filter(function(i){ return !isOpsManualCategory(i); });
+}
+/** 카테고리별 AI 생성에 쓰는 프롬프트 키 */
+function getPromptTypesForCat_(catId){
+  if(isOpsManualCategory(catId)) return [];
+  if(isDailyShareCategory(catId)) return ['thread'];
+  if(isHeiljagyaeCategory(catId)) return ['community', 'image'];
+  if(isBlogInstaCategory(catId)) return ['blog', 'insta', 'threads', 'image'];
+  return [];
+}
+/** 프롬프트 모달 채널 탭 정의 */
+function getPromptChannelTabDefsForCat_(catId){
+  if(isDailyShareCategory(catId)){
+    return [
+      { id: 'thread', label: '일상 공유' },
+      { id: 'base', label: '공통 기본' }
+    ];
+  }
+  if(isHeiljagyaeCategory(catId)){
+    return [
+      { id: 'community', label: '아파트너 게시판' },
+      { id: 'image', label: '이미지' },
+      { id: 'base', label: '공통 기본' }
+    ];
+  }
+  if(isBlogInstaCategory(catId)){
+    return [
+      { id: 'blog', label: '블로그' },
+      { id: 'insta', label: '인스타' },
+      { id: 'threads', label: '쓰레드' },
+      { id: 'image', label: '이미지' },
+      { id: 'base', label: '공통 기본' }
+    ];
+  }
+  return [{ id: 'base', label: '공통 기본' }];
+}
+function getDefaultCatPrompt_(catId, type){
+  var def = DEFAULT_PROMPTS.categories[catId];
+  if(!def || def[type] == null || def[type] === undefined) return '';
+  return String(def[type]);
+}
+function getPromptTypeLabelKr_(type){
+  var labels = { blog: '블로그', insta: '인스타', threads: '쓰레드', image: '이미지', community: '아파트너 게시판', thread: '일상 공유' };
+  return labels[type] || type;
+}
+/** 저장본에 해당 프로그램에 없는 채널 키가 남아 있으면 제거 */
+function sanitizeCatPromptKeys_(catId){
+  if(!state.prompts || !state.prompts.categories[catId]) return;
+  var allowed = getPromptTypesForCat_(catId);
+  var cat = state.prompts.categories[catId];
+  Object.keys(cat).forEach(function(k){
+    if(allowed.indexOf(k) < 0) delete cat[k];
+  });
 }
 function getCatPrompt(catId, type) {
   const catPrompts = getPrompts().categories[catId] || {};
@@ -6576,27 +6766,35 @@ const DEFAULT_HEILJAGYAE_COMMUNITY_PROMPT = `힐스테이트 자이 계양 **아
 엘리베이터 앞, 30초면 충분합니다. 🙂
 (마무리 — 앱 고정)`;
 
-const DEFAULT_DAILY_SHARE_PROMPT = `**일상 공유** 탭용 글입니다. Threads·인스타 등에 올리는 **생활 일기·오늘의 한마디** 톤으로 써 주세요.
+const DEFAULT_DAILY_SHARE_PROMPT = `**일상 공유** 탭용 글입니다. Threads·인스타 등에 올리는 **담백한 생활 나눔** 톤으로 써 주세요.
+
+[톤 앵커 — 최우선]
+${DAILY_SHARE_TONE_ANCHOR}
+
+[글의 뼈대]
+- **핵심 메시지 하나**를 분명히 (전문가답게 말하고 싶은 포인트는 유지)
+- 그 앞뒤로 **장면·관찰**을 깔고, **몸감각·날씨**를 담백하게 묘사
+- **짧은 감탄·한 줄 철학**은 1문장 이내로만 — 공감을 살짝 보태는 용도
+- 감성 일기·위로·눈물·시적 수사·「우리 모두~」 류 **과한 터치 금지**
 
 [주제 축]
-- 일상·쉬는 시간, **계절·날씨**, 몸 컨디션·가벼운 건강, **여행·이동**, 최근 이슈에 대한 **느낌**(논쟁·설교 금지), 감사·여유
+- 일상·쉬는 시간, 계절·날씨, 몸 컨디션, 여행·이동, 최근 느낌(논쟁·설교 금지)
 
-[근골격계 전문가의 시선 — 가볍게]
-- 글의 뼈대는 **일기·생활 나눔**. DC·PT·근골격계 전문가가 **옆에서 한 줄 덧붙이듯**만 녹입니다.
-- 날씨·습도·기온·활동량·피로·뻐근함·무거움·기분·철학·감정 이야기할 때, 주제와 맞으면 **짧은 이유·연결 한두 문장** (예: "비 오는 날 몸이 납덩이처럼 무거울 때" → 습도가 높으면 더 무겁게 느껴질 수 있다 / 이럴수록 가벼운 움직임이 기분도 살아나는 경우가 많다).
-- **한 줄 공감 → 가벼운 몸·움직임 이유 → 여유로운 마무리** 흐름이 자연스럽게. 강의·진단·치료 권유·"꼭 하세요"·용어·PSP 나열 금지.
+[근골격계 전문가 시선 — 가볍게]
+- 본문 **1~2문장**만, 옆에서 한 줄 덧붙이듯 (강의·진단·치료 권유·"꼭 하세요"·용어·PSP 나열 금지)
+- 날씨·피로·뻐근함과 맞을 때만 짧은 이유·연결
 
 [사진이 있을 때]
-- 교육·세미나·클리닉 사진이어도 **전문 강의·치료 설명 톤 금지** — "오늘 다녀왔는데", "피곤하지만 좋았다" 같은 **일기·생활 나눔**만 (몸·날씨 맥락이 보이면 위 시선을 살짝)
+- 교육·세미나 사진이어도 강의 톤 금지 — "오늘 다녀왔는데", "피곤하지만" 같은 **관찰 나눔**만
 
 [절대 피할 것]
-- **억지 공감 유도**, **독자에게 던지는 질문**("~하신 적 있나요?", "~하지 않으세요?", "~할 때 있죠?" 등)
-- 소제목·번호·강의록·임상 설명·홍보·"결론부터" 멘트
+- 억지 공감 유도, 독자에게 던지는 질문("~하신 적 있나요?" 등)
+- 소제목·번호·강의록·홍보·"결론부터" 멘트
 
 [이렇게 써 주세요]
-- **topicTitle**: 오늘의 한 줄 **평서·감탄·장면 묘사** (질문형·설문형 금지)
-- **summary**: topicTitle에 이어지는 **연속 본문**. 관찰·느낌·여유를 말하듯. 이모지 0~1개
-- **3~7문장**, 번호·불릿 없이 한 덩어리. 전문가 시선은 **본문 1~2문장** 이내로 은은하게`;
+- **topicTitle**: 오늘의 한 줄 — **평서·짧은 감탄·장면** (질문형 금지)
+- **summary**: topicTitle에 이어지는 연속 본문. **관찰 → 핵심 한 가지 → (선택) 짧은 감탄/철학 1문장** 흐름. 이모지 0~1개
+- **3~7문장**, 번호·불릿 없이 한 덩어리`;
 
 const DEFAULT_THREADS_SNS_PROMPT = `당신은 의료/건강 콘텐츠를 **Threads(쓰레드) 스타일**로 변환하는 전문가입니다.
 
@@ -6831,18 +7029,23 @@ function captureTextFieldFocus_(){
 
 function restoreTextFieldFocus_(snap){
   if(!snap || !snap.id) return;
+  var el = document.getElementById(snap.id);
+  if(!el || !isEditableTextField_(el) || !document.contains(el)) return;
+  if(document.activeElement === el) return;
+
   function attempt(){
-    var el = document.getElementById(snap.id);
-    if(!el || !isEditableTextField_(el) || !document.contains(el)) return;
+    var target = document.getElementById(snap.id);
+    if(!target || !isEditableTextField_(target) || !document.contains(target)) return;
+    if(document.activeElement === target) return;
     try {
-      if(document.activeElement !== el) el.focus({ preventScroll: true });
-      if(snap.start != null && typeof el.setSelectionRange === 'function'){
-        var len = (el.value || '').length;
+      target.focus({ preventScroll: true });
+      if(snap.start != null && typeof target.setSelectionRange === 'function'){
+        var len = (target.value || '').length;
         var s = Math.min(snap.start, len);
         var e = Math.min(snap.end != null ? snap.end : s, len);
-        el.setSelectionRange(s, e);
+        target.setSelectionRange(s, e);
       }
-      if(snap.scrollTop != null) el.scrollTop = snap.scrollTop;
+      if(snap.scrollTop != null) target.scrollTop = snap.scrollTop;
     } catch(e){}
   }
   FOCUS_RESTORE_DELAYS_.forEach(function(ms){
@@ -6854,6 +7057,7 @@ function restoreTextFieldFocus_(snap){
   });
 }
 let appToastTimer = null;
+var appToastLiftTimer = null;
 var APP_TOAST_GAP = 10;
 var APP_TOAST_BASE_BOTTOM = 22;
 var _bodyScrollLockY = 0;
@@ -6918,17 +7122,19 @@ function getAppToastBottomChromeRects_(){
   return rects;
 }
 
+function isEditableTextFieldFocused_(){
+  return isEditableTextField_(document.activeElement);
+}
+
 function updateAppToastLift_(){
   var el = document.getElementById('app-toast');
   if(!el) return;
-  var focusSnap = captureTextFieldFocus_();
-  if(!el.classList.contains('show')){
-    el.style.bottom = '';
-    restoreTextFieldFocus_(focusSnap);
+  if(isEditableTextFieldFocused_()){
+    if(!el.classList.contains('show')) el.style.bottom = '';
     return;
   }
-  if(focusSnap){
-    restoreTextFieldFocus_(focusSnap);
+  if(!el.classList.contains('show')){
+    el.style.bottom = '';
     return;
   }
   var vh = window.innerHeight || document.documentElement.clientHeight || 0;
@@ -6943,19 +7149,17 @@ function updateAppToastLift_(){
 }
 
 function scheduleAppToastLift_(){
-  var focusSnap = captureTextFieldFocus_();
-  updateAppToastLift_();
-  requestAnimationFrame(function(){
+  if(isEditableTextFieldFocused_()) return;
+  if(appToastLiftTimer) clearTimeout(appToastLiftTimer);
+  appToastLiftTimer = setTimeout(function(){
+    appToastLiftTimer = null;
+    if(isEditableTextFieldFocused_()) return;
     updateAppToastLift_();
     requestAnimationFrame(function(){
+      if(isEditableTextFieldFocused_()) return;
       updateAppToastLift_();
-      restoreTextFieldFocus_(focusSnap);
     });
-  });
-  setTimeout(function(){
-    updateAppToastLift_();
-    restoreTextFieldFocus_(focusSnap);
-  }, 320);
+  }, 48);
 }
 
 function setAppToast(message, options) {
@@ -6965,19 +7169,26 @@ function setAppToast(message, options) {
   var el = document.getElementById('app-toast');
   if (!el) return;
   var focusSnap = captureTextFieldFocus_();
+  var wasTyping = !!focusSnap;
   clearTimeout(appToastTimer);
   el.classList.remove('app-toast--ok', 'app-toast--err');
   if (variant === 'ok') el.classList.add('app-toast--ok');
   else if (variant === 'err') el.classList.add('app-toast--err');
   el.textContent = message;
   el.classList.add('show');
-  restoreTextFieldFocus_(focusSnap);
-  scheduleAppToastLift_();
+  if(!wasTyping) scheduleAppToastLift_();
+  else if(focusSnap){
+    var lost = document.activeElement !== document.getElementById(focusSnap.id);
+    if(lost) restoreTextFieldFocus_(focusSnap);
+  }
   if (duration > 0) appToastTimer = setTimeout(function(){
     var hideFocusSnap = captureTextFieldFocus_();
+    var hideWasTyping = !!hideFocusSnap;
     el.classList.remove('show');
-    if(!hideFocusSnap) el.style.bottom = '';
-    restoreTextFieldFocus_(hideFocusSnap);
+    if(!hideWasTyping) el.style.bottom = '';
+    if(hideFocusSnap && document.activeElement !== document.getElementById(hideFocusSnap.id)){
+      restoreTextFieldFocus_(hideFocusSnap);
+    }
   }, duration);
 }
 
@@ -7462,6 +7673,10 @@ function handleServerPlannerAuto_(payload){
 function isUserAddedDraftId_(id){
   return /^d\d+-c\d+$/.test(String(id || ''));
 }
+function userAddedDraftTimestamp_(id){
+  var m = String(id || '').match(/-c(\d+)$/);
+  return m ? parseInt(m[1], 10) : 0;
+}
 function purgeDeletedDraftsFromCatalog_(){
   var deleted = state.deletedDraftIds || {};
   if(!deleted || !Object.keys(deleted).length) return;
@@ -7505,6 +7720,8 @@ function mergeExtraDrafts(byCat){
         youtubeAnalysis: d.youtubeAnalysis || '',
         youtubeUrls: d.youtubeUrls || []
       });
+      var merged = cat.drafts[cat.drafts.length - 1];
+      if(merged) assignUserAddedDraftToMisc_(merged, i);
     });
   });
   purgeDeletedDraftsFromCatalog_();
@@ -7531,6 +7748,7 @@ function applyPersistPayload(s){
     ensureCatGroupLast_();
   }
   mergeExtraDrafts(s.extraDraftsByCat);
+  CATEGORIES.forEach(function(cat, i){ ensureUserAddedDraftsInMisc_(i); });
   purgeDeletedDraftsFromCatalog_();
   applyBuiltinDraftBrandSeeds_();
   restorePendingSubGoalPlan_();
@@ -8445,7 +8663,10 @@ window.onload = () => {
   scheduleDailyAutoDraft_();
   setInterval(function(){ maybeRunDailyAutoDraft_('interval'); }, 2 * 60 * 1000);
   setTimeout(function(){ maybeRunDailyAutoDraft_('load'); }, 4000);
-  var onToastViewportChange_ = function(){ scheduleAppToastLift_(); };
+  var onToastViewportChange_ = function(){
+    if(isEditableTextFieldFocused_()) return;
+    scheduleAppToastLift_();
+  };
   window.addEventListener('resize', onToastViewportChange_);
   window.addEventListener('orientationchange', onToastViewportChange_);
   if(window.visualViewport){
@@ -9005,7 +9226,10 @@ function renderOpsManualMainHTML_(){
           '<input type="checkbox"' + (checked ? ' checked' : '') + ' onchange="toggleOpsCheck_(\'' + it.id + '\', this.checked)" />' +
           '<span class="ops-check-text">' + escapeHtml(it.text) + '</span>' +
         '</label>' +
-        (it.hint ? '<div class="ops-check-hint">' + escapeHtml(it.hint) + '</div>' : '') +
+        (function(){
+          var purposeLine = String(it.purpose || it.hint || '').trim();
+          return purposeLine ? '<div class="ops-check-purpose">' + escapeHtml(purposeLine) + '</div>' : '';
+        })() +
         reviewHtml +
       '</li>';
     }).join('');
@@ -9294,7 +9518,7 @@ function renderMain() {
     return;
   }
 
-  if(state.showAdd){ mc.innerHTML = renderAddForm(); bindNewItemTopicInput_(); bindNewItemRefNoteInput_(); return; }
+  if(state.showAdd){ mc.innerHTML = renderAddForm(); bindNewItemTopicInput_(); bindNewItemRefNoteInput_(); bindNewItemFlowInputs_(); return; }
 
   const visibleDrafts = getVisibleDraftsInMain_(state.currentCat);
   const total = visibleDrafts.length;
@@ -9424,6 +9648,58 @@ function buildClaudeMessageContent_(textPrompt, imagePayload){
 function newItemHasRefImages_(){
   return !!(state.newItem.refImages && state.newItem.refImages.length && state.newItem.refImages[0].data);
 }
+
+function createEmptyNewItem_(catId){
+  return {
+    date: '', topic: '', catId: typeof catId === 'number' ? catId : 0,
+    refImages: [], refImage: null, refNote: '', imageAnalyzing: false,
+    flowProposals: [], selectedFlowIdx: 0, flowProposalsLoading: false,
+    flowProposalsReady: false, cachedYoutubeAnalysis: '', _cachedFlowYoutubeUrl: ''
+  };
+}
+
+function resetNewItemFlowProposals_(){
+  if(!state.newItem) return;
+  state.newItem.flowProposals = [];
+  state.newItem.selectedFlowIdx = 0;
+  state.newItem.flowProposalsReady = false;
+  state.newItem.flowProposalsLoading = false;
+  state.newItem.cachedYoutubeAnalysis = '';
+  state.newItem._cachedFlowYoutubeUrl = '';
+}
+
+function newItemHasMediaSource_(){
+  if(newItemHasRefImages_()) return true;
+  var source = buildDraftSourceNote_(state.newItem.topic, state.newItem.refNote);
+  return extractYoutubeUrlsFromText_(source).length > 0;
+}
+
+function parseFlowStepsText_(text){
+  return String(text || '').split('\n').map(function(line){
+    return line.replace(/^\s*\d+[\.\)、]\s*/, '').trim();
+  }).filter(Boolean);
+}
+
+function flowStepsToText_(steps){
+  return (steps || []).map(function(s, i){ return (i + 1) + '. ' + s; }).join('\n');
+}
+
+function normalizeFlowProposal_(raw, idx){
+  var steps = Array.isArray(raw && raw.steps) ? raw.steps : [];
+  if(!steps.length && raw && raw.flow) steps = parseFlowStepsText_(raw.flow);
+  return {
+    id: idx,
+    title: String((raw && (raw.title || raw.topic)) || '').trim(),
+    angle: String((raw && raw.angle) || '').trim(),
+    steps: steps.map(function(s){ return String(s).trim(); }).filter(Boolean)
+  };
+}
+
+function getSelectedNewItemFlow_(){
+  var flows = state.newItem.flowProposals || [];
+  var idx = typeof state.newItem.selectedFlowIdx === 'number' ? state.newItem.selectedFlowIdx : 0;
+  return flows[idx] || null;
+}
 function getDraftRefImages_(draft){
   if(!draft) return [];
   if(Array.isArray(draft.refImages) && draft.refImages.length) return draft.refImages.filter(function(img){ return img && img.data; });
@@ -9513,7 +9789,7 @@ function buildTopicGenFidelityBlock_(keywords, sourceNote, isDaily){
     var preview = kw.length > 480 ? kw.slice(0, 480) + '…' : kw;
     lines.splice(2, 0, '사용자 입력 원문: 「' + preview + '」');
   }
-  if(isDaily) lines.push('- 사진·메모의 장면·느낌을 topic·angle에 직접 반영');
+  if(isDaily) lines.push('- 사진·메모의 장면·핵심을 topic·angle에 반영. 담백·관찰 위주, 과한 감성 금지');
   else if(hasNote) lines.push('- 참고 메모의 테크닉·관점·용어를 topic·angle에 반영');
   return '\n' + lines.join('\n');
 }
@@ -9584,7 +9860,7 @@ async function analyzeRefImagesForMemo_(images, catId){
   var isExpert = isExpertCourseCategory(catId);
   var countNote = list.length > 1 ? ('첨부 사진 ' + list.length + '장을 순서대로 보고 ') : '첨부 사진을 보고 ';
   var prompt = isDaily
-    ? (countNote + '장면·분위기·느낌·등장 요소를 한국어 참고 메모로 정리하세요. 3~8문장, 불릿 없이. 과장·진단 단정 금지. 메모 본문만 출력.')
+    ? (countNote + '장면·분위기·몸감각·핵심 포인트를 한국어 참고 메모로 정리하세요. 담백·관찰 위주 3~8문장, 불릿 없이. 과장·진단 단정·감성 수사 금지. 메모 본문만 출력.')
     : (isExpert
       ? (countNote + '강의·실습 캡처 내용을 한국어 참고영상 메모로 정리하세요. 테크닉·손 위치·핵심 포인트 3~10문장. 메모 본문만 출력.')
       : (countNote + '참고 영상/사진 캡처를 한국어 참고영상 메모로 정리하세요. 자세·부위·동작·상황·핵심 포인트 3~10문장. 메모 본문만 출력.'));
@@ -9600,7 +9876,7 @@ async function generateTopicFromKeywords_(catId, keywords, imagePayload, sourceN
   var imgNote = '';
   if(images.length){
     imgNote = isDaily
-      ? '\n[첨부 사진' + (images.length > 1 ? ' ' + images.length + '장' : '') + '] 장면·분위기·오늘의 느낌을 topic·angle에 반영. 몸·날씨 맥락이 보이면 가벼운 근골격계 시선 한 스푼. 교육·세미나 사진이면 일기·생활 나눔 각도로.'
+      ? '\n[첨부 사진' + (images.length > 1 ? ' ' + images.length + '장' : '') + '] 장면·관찰·오늘의 핵심 한 가지를 topic·angle에 반영. 몸·날씨 맥락이 보이면 가벼운 근골격계 시선 한 스푼. 교육·세미나 사진이면 강의 톤 말고 담백한 관찰 나눔 각도로.'
       : '\n[첨부 참고 사진' + (images.length > 1 ? ' ' + images.length + '장' : '') + '] 사진에 보이는 자세·부위·상황을 topic·angle에 반영하세요.';
   }
   var noteBlock = '';
@@ -9615,9 +9891,9 @@ async function generateTopicFromKeywords_(catId, keywords, imagePayload, sourceN
     ? ('입력 (키워드·아이디어·문장): ' + keywords)
     : (isDaily && images.length ? '입력 (키워드·아이디어·문장): (없음 — 사진·메모만 참고)' : (sourceNote ? '입력 (키워드·아이디어·문장): (없음 — 참고 메모만)' : '입력 (키워드·아이디어·문장): '));
   var topicGuide = isDaily
-    ? ('일상 공유용 주제 1개. **입력·사진·메모의 장면·느낌**을 중심으로 (다른 일상 소재로 바꾸지 마세요).\n' +
-       '- topic: 일기 제목 한 줄 (15~32자, 질문·감탄·오늘의 장면). 입력 키워드·장면 반영\n' +
-       '- angle: 어떤 느낌으로 쓸지 한 줄. 날씨·피로·움직임 등 **근골격계 전문가 시선 한 스푼** 가능 (강의·임상 톤 금지)\n')
+    ? ('일상 공유용 주제 1개. **입력·사진·메모의 장면·핵심**을 중심으로 (다른 일상 소재로 바꾸지 마세요).\n' +
+       '- topic: 담백한 제목 한 줄 (15~32자, 질문 금지·짧은 감탄·장면). 입력 키워드·장면 반영\n' +
+       '- angle: 어떤 톤으로 쓸지 한 줄 — **관찰 + 핵심 한 가지 + (선택) 짧은 감탄·철학**. 몸·날씨 맥락이 보이면 근골격계 시선 한 스푼 (강의·임상 톤 금지)\n')
     : (isExpertCourseCategory(catId)
       ? ('전문가 과정 **강연·교육 영상·실습 공유**용 주제 1개.\n' +
          '- topic: PT·트레이너 동료에게 건네는 한 줄 (15~40자, 과장·낚시 금지)\n' +
@@ -9648,6 +9924,150 @@ buildTopicBrandJsonGuide_(catId) + '\n' +
   applyTopicFieldsToDraft_(out, obj, catId);
   return out;
 }
+
+async function generateArticleFlowProposals_(catId, keywords, imagePayload, sourceNote, youtubeAnalysis, prevFlows){
+  var cat = CATEGORIES[catId];
+  if(!cat) throw new Error('카테고리를 찾을 수 없어요');
+  var isDaily = isDailyShareCategory(catId);
+  var isExpert = isExpertCourseCategory(catId);
+  var images = normalizeRefImages_(imagePayload);
+  var imgNote = '';
+  if(images.length){
+    imgNote = isDaily
+      ? '\n[첨부 사진' + (images.length > 1 ? ' ' + images.length + '장' : '') + '] 장면·관찰·핵심을 각 제안에 반영. 교육·세미나 사진이면 강의 톤 말고 담백한 관찰 나눔 각도도 포함.'
+      : '\n[첨부 참고 사진' + (images.length > 1 ? ' ' + images.length + '장' : '') + '] 사진에 보이는 자세·부위·상황을 각 제안에 반영하세요.';
+  }
+  var noteBlock = '';
+  if(sourceNote && String(sourceNote).trim()){
+    noteBlock = '\n[참고 메모 — 영상·테크닉·링크 등]\n' + String(sourceNote).trim();
+    if(!youtubeAnalysis) noteBlock += '\n(AI는 영상 파일을 직접 볼 수 없습니다. 메모·링크 설명을 바탕으로 제안하세요.)';
+  }
+  if(youtubeAnalysis && String(youtubeAnalysis).trim()){
+    noteBlock += '\n\n[YouTube 영상 분석 — Gemini]\n' + String(youtubeAnalysis).trim();
+  }
+  var kwLine = keywords
+    ? ('입력 (키워드·아이디어·문장): ' + keywords)
+    : (images.length ? '입력 (키워드·아이디어·문장): (없음 — 사진·메모만 참고)' : (sourceNote ? '입력: (없음 — 참고 메모만)' : '입력: '));
+  var flowStructureGuide = isDaily
+    ? ('각 제안은 **일상 공유(쓰레드)** 용입니다. steps는 반드시 3단계:\n' +
+       '  ① 한 줄 훅·장면  ② 담백한 관찰·핵심 한 가지  ③ 가벼운 마무리(공감 한 스푼)\n' +
+       '강의·세미나 사진이면 전문 설명 톤이 아닌 **관찰 나눔** 각도도 1개 이상 포함.')
+    : (isExpert
+      ? ('각 제안은 **전문가 동료 공유**용입니다. steps는 반드시 3단계:\n' +
+         '  ① 영상·사진 맥락  ② 시연·핵심 포인트  ③ 원리 설명 방향\n' +
+         '참고·영상·사진 **범위 안**에서만. 없는 내용으로 확장 금지.')
+      : ('각 제안은 **일반인 블로그**용입니다. steps는 반드시 3단계:\n' +
+         '  ① 문제 제기(공감 장면)  ② 셀프 케어 동작  ③ 원리 설명 방향'));
+  var prevBlock = '';
+  if(prevFlows && prevFlows.length){
+    prevBlock = '\n\n[이전 제안 — 다른 각도로 다시]\n' + prevFlows.map(function(f, i){
+      return (i + 1) + ') ' + f.title + ' / ' + f.angle;
+    }).join('\n') + '\n위와 **겹치지 않는** 새 각도 3가지를 제안하세요.';
+  }
+  var fidelityBlock = buildTopicGenFidelityBlock_(keywords, sourceNote, isDaily);
+  var prompt =
+'당신은 "브랜딩 플래너"입니다.\n' +
+buildBrandContextForPrompt_(catId, null) + '\n\n' +
+'카테고리: ' + cat.name + ' (' + (cat.sub || '') + ')\n' +
+'독자: ' + cat.audience + '\n' +
+kwLine + noteBlock + imgNote + '\n\n' +
+'[과제]\n' +
+'첨부 사진·영상 분석·메모를 바탕으로, **서로 다른 각도**의 글 흐름을 **정확히 3가지** 제안하세요.\n' +
+'단순 요약이 아니라 「이렇게 쓰면 좋겠다」는 **기획안** 수준으로.\n' +
+flowStructureGuide + fidelityBlock + prevBlock + '\n\n' +
+'[각 flow 필드]\n' +
+'- title: 글 제목 방향 한 줄 (15~36자, 과장·낚시 금지)\n' +
+'- angle: 이 흐름의 핵심 각도 한 줄\n' +
+'- steps: 위 3단계 전개를 **문장**으로 (배열 3개)\n\n' +
+'JSON만 출력:\n{"flows":[{"title":"...","angle":"...","steps":["...","...","..."]},{"title":"...","angle":"...","steps":["...","...","..."]},{"title":"...","angle":"...","steps":["...","...","..."]}]}';
+  var text = await callClaudePlanner_(prompt, { image: images.length ? images : null, maxTokens: 2200 });
+  var raw = text.replace(/^```json\s*/i, '').replace(/```\s*$/g, '').trim();
+  var start = raw.indexOf('{');
+  var end = raw.lastIndexOf('}');
+  if(start < 0 || end <= start) throw new Error('AI 응답에서 글 흐름 JSON을 찾지 못했어요');
+  var obj = JSON.parse(raw.slice(start, end + 1));
+  var flows = Array.isArray(obj.flows) ? obj.flows : [];
+  if(flows.length < 3) throw new Error('글 흐름 제안이 3개가 아니에요. 다시 시도해 주세요.');
+  return flows.slice(0, 3).map(function(f, i){ return normalizeFlowProposal_(f, i); });
+}
+
+async function fetchFlowProposalsForNewItem_(){
+  if(!state.apiKey) return;
+  if(state.newItem.imageAnalyzing) return;
+  if(!newItemHasMediaSource_()) return;
+  var keywords = (state.newItem.topic || '').trim();
+  var refNote = (state.newItem.refNote || '').trim();
+  var sourceNote = buildDraftSourceNote_(keywords, refNote);
+  var prevFlows = (state.newItem.flowProposals || []).slice();
+  state.newItem.flowProposalsLoading = true;
+  renderMain();
+  var youtubeAnalysis = state.newItem.cachedYoutubeAnalysis || '';
+  var youtubeUrls = extractYoutubeUrlsFromText_(sourceNote);
+  var urlNow = youtubeUrls[0] || '';
+  if(state.newItem._cachedFlowYoutubeUrl && urlNow && state.newItem._cachedFlowYoutubeUrl !== urlNow){
+    state.newItem.cachedYoutubeAnalysis = '';
+    youtubeAnalysis = '';
+  }
+  state.newItem._cachedFlowYoutubeUrl = urlNow;
+  try {
+    if(youtubeUrls.length && isGeminiYoutubeAvailable_() && !youtubeAnalysis){
+      if(typeof setAppToast === 'function') setAppToast('유튜브 영상을 분석한 뒤 글 흐름을 제안하고 있어요…', { duration: 3200, variant: 'ok' });
+      try {
+        youtubeAnalysis = await analyzeYoutubeWithGemini_(youtubeUrls[0], state.newItem.catId);
+        state.newItem.cachedYoutubeAnalysis = youtubeAnalysis;
+      } catch(ytErr){
+        var ytMsg = (ytErr && ytErr.message) ? ytErr.message : String(ytErr);
+        if(typeof setAppToast === 'function') setAppToast('유튜브 분석 실패 — 메모·사진만으로 흐름을 제안할게요.\n' + ytMsg, { duration: 7000, variant: 'err' });
+      }
+    }
+    var flows = await generateArticleFlowProposals_(state.newItem.catId, keywords, state.newItem.refImages, sourceNote, youtubeAnalysis, prevFlows);
+    state.newItem.flowProposals = flows;
+    state.newItem.selectedFlowIdx = 0;
+    state.newItem.flowProposalsReady = true;
+    if(typeof setAppToast === 'function') setAppToast('글 흐름 3가지를 제안했어요. 하나를 고르고 필요하면 수정한 뒤 주제를 만들어 주세요.', { duration: 4200, variant: 'ok' });
+  } finally {
+    state.newItem.flowProposalsLoading = false;
+    renderMain();
+  }
+}
+
+window.regenerateFlowProposals = async function(){
+  if(state.newItem.imageAnalyzing){
+    if(typeof setAppToast === 'function') setAppToast('사진 분석이 끝날 때까지 잠시만 기다려 주세요.', { duration: 3200, variant: 'err' });
+    return;
+  }
+  if(!newItemHasMediaSource_()){
+    if(typeof setAppToast === 'function') setAppToast('사진 또는 유튜브 URL을 먼저 추가해 주세요.', { duration: 3500, variant: 'err' });
+    return;
+  }
+  if(!state.apiKey){ openApiModal(); return; }
+  try {
+    await fetchFlowProposalsForNewItem_();
+  } catch(e){
+    var msg = (e && e.message) ? e.message : String(e);
+    if(typeof setAppToast === 'function') setAppToast('글 흐름 제안 실패\n' + msg, { duration: 7000, variant: 'err' });
+    else alert(msg);
+  }
+};
+
+window.selectNewItemFlow = function(idx){
+  state.newItem.selectedFlowIdx = parseInt(idx, 10) || 0;
+  renderMain();
+};
+
+window.updateNewItemFlowField = function(idx, field, value){
+  var flows = state.newItem.flowProposals || [];
+  var i = parseInt(idx, 10) || 0;
+  if(!flows[i]) return;
+  if(field === 'title' || field === 'angle') flows[i][field] = value;
+};
+
+window.updateNewItemFlowSteps = function(idx, value){
+  var flows = state.newItem.flowProposals || [];
+  var i = parseInt(idx, 10) || 0;
+  if(!flows[i]) return;
+  flows[i].steps = parseFlowStepsText_(value);
+};
 
 const REF_IMAGE_MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
 const REF_IMAGE_MAX_DIM = 2048;
@@ -9725,6 +10145,7 @@ window.onNewItemImage = async function(input){
     state.newItem.refImages = [];
     state.newItem.refImage = null;
     state.newItem.imageAnalyzing = false;
+    resetNewItemFlowProposals_();
     renderMain();
     return;
   }
@@ -9735,6 +10156,7 @@ window.onNewItemImage = async function(input){
     return;
   }
   state.newItem.imageAnalyzing = true;
+  resetNewItemFlowProposals_();
   try {
     var images = [];
     for(var i = 0; i < files.length; i++){
@@ -9760,8 +10182,51 @@ window.onNewItemImage = async function(input){
   } finally {
     state.newItem.imageAnalyzing = false;
     renderMain();
+    if(state.apiKey && newItemHasMediaSource_()){
+      fetchFlowProposalsForNewItem_().catch(function(e){
+        var msg = (e && e.message) ? e.message : String(e);
+        if(typeof setAppToast === 'function') setAppToast('글 흐름 제안 실패\n' + msg, { duration: 7000, variant: 'err' });
+      });
+    }
   }
 };
+
+function renderAddFormFlowSectionHTML_(){
+  if(!newItemHasMediaSource_()) return '';
+  var flows = state.newItem.flowProposals || [];
+  var selIdx = typeof state.newItem.selectedFlowIdx === 'number' ? state.newItem.selectedFlowIdx : 0;
+  var loading = !!state.newItem.flowProposalsLoading;
+  var ready = !!state.newItem.flowProposalsReady && flows.length > 0;
+  var isDaily = isDailyShareCategory(state.newItem.catId);
+  var isExpert = isExpertCourseCategory(state.newItem.catId);
+  var stepHint = isDaily
+    ? '① 한 줄 훅 ② 관찰·핵심 ③ 마무리'
+    : (isExpert ? '① 영상·사진 맥락 ② 시연 포인트 ③ 원리 설명' : '① 문제 제기 ② 셀프 케어 ③ 원리 설명');
+  var header = '<div class="add-flow-header"><div class="form-label" style="margin-bottom:0;">글 흐름 제안 (3가지)</div>' +
+    '<span style="font-size:11px;color:#9CA3AF;">' + stepHint + '</span></div>';
+  if(loading){
+    return '<div class="add-flow-section">' + header +
+      '<div class="add-flow-loading">사진·영상·메모를 보고 글 흐름 3가지를 제안하고 있어요…</div></div>';
+  }
+  if(!ready){
+    return '<div class="add-flow-section">' + header +
+      '<p class="add-flow-empty">사진·유튜브 URL을 넣으면 AI가 <strong>서로 다른 글 흐름 3가지</strong>를 제안해요. 아래 버튼으로 받을 수 있어요.</p></div>';
+  }
+  var cards = flows.map(function(flow, i){
+    var selected = i === selIdx;
+    return '<label class="add-flow-card' + (selected ? ' selected' : '') + '">' +
+      '<div class="add-flow-card-head">' +
+      '<input type="radio" name="new-item-flow-pick" class="add-flow-radio" value="' + i + '"' + (selected ? ' checked' : '') + ' onchange="selectNewItemFlow(' + i + ')" />' +
+      '<div class="add-flow-fields">' +
+      '<input type="text" class="form-input add-flow-title-input" id="new-item-flow-title-' + i + '" value="' + escapeHtml(flow.title || '') + '" placeholder="제목 방향" oninput="updateNewItemFlowField(' + i + ',\'title\',this.value)" onclick="event.stopPropagation();" />' +
+      '<input type="text" class="form-input add-flow-angle-input" id="new-item-flow-angle-' + i + '" value="' + escapeHtml(flow.angle || '') + '" placeholder="핵심 각도" oninput="updateNewItemFlowField(' + i + ',\'angle\',this.value)" onclick="event.stopPropagation();" />' +
+      '<textarea class="form-input add-flow-steps-input" id="new-item-flow-steps-' + i + '" rows="4" placeholder="글 전개 3단계" oninput="updateNewItemFlowSteps(' + i + ',this.value)" onclick="event.stopPropagation();">' + escapeHtml(flowStepsToText_(flow.steps)) + '</textarea>' +
+      '</div></div></label>';
+  }).join('');
+  return '<div class="add-flow-section">' + header +
+    '<p class="add-flow-guide">하나를 고르고 제목·각도·전개 순서를 수정할 수 있어요. 「흐름 다시 제안」은 사진·메모·영상 분석을 바탕으로 새 각도 3가지를 냅니다.</p>' +
+    cards + '</div>';
+}
 
 function renderAddForm(){
   const cat = CATEGORIES[state.newItem.catId] || CATEGORIES[0];
@@ -9777,7 +10242,7 @@ function renderAddForm(){
   const imgHint = analyzing
     ? '<span style="font-size:11px;color:#D97706;">사진 ' + imgNames.length + '장 분석 중… 참고 메모에 자동으로 채워집니다.</span>'
     : (hasPhoto
-      ? '<span style="font-size:11px;color:#0F766E;">참고 사진 ' + imgNames.length + '장: ' + escapeHtml(imgNames.join(', ')) + (isDaily ? ' — 일기 톤으로 글을 씁니다' : '') + '</span>'
+      ? '<span style="font-size:11px;color:#0F766E;">참고 사진 ' + imgNames.length + '장: ' + escapeHtml(imgNames.join(', ')) + (isDaily ? ' — 담백·관찰 톤으로 글을 씁니다' : '') + '</span>'
       : (isDaily
         ? '<span style="font-size:11px;color:#9CA3AF;">여러 장 선택 가능. 올리면 AI가 참고 메모를 채워 드려요.</span>'
         : '<span style="font-size:11px;color:#9CA3AF;">여러 장 선택 가능 · 최대 12MB(자동 압축). 올리면 AI가 참고영상 메모를 채워요.</span>'));
@@ -9785,7 +10250,7 @@ function renderAddForm(){
     ? '「일상 공유」에 올릴 <strong>생활 일기·느낌</strong> 주제를 만듭니다. 사진만 올려도 되고, 키워드와 함께 써도 돼요.'
     : (isExpert
       ? '교육·강의 때 촬영한 <strong>영상 링크</strong> 또는 <strong>실습·시연 사진</strong>을 올리고, 그 내용에 맞춰 동료에게 공유할 주제를 만듭니다. 글은 영상·사진·메모 범위 안에서만 쓰여요.'
-      : '추가한 주제는 <strong>선택한 카테고리 탭</strong>의 「전체 초안」 목록 맨 아래에 카드로 생깁니다.');
+      : '추가한 주제는 <strong>선택한 카테고리 탭</strong>의 <strong>「기타 주제」</strong> 그룹에 카드로 생깁니다. (하위 목표가 없는 탭은 전체 목록 맨 아래)');
   const kwLabel = isDaily ? '키워드 · 아이디어 (선택)' : (isExpert ? '테크닉 · 개념' : '키워드 · 아이디어');
   const kwPlaceholder = isDaily
     ? '키워드, 짧은 문장, 떠오른 장면을 자유롭게 적어 주세요 (비우고 사진만 가능)'
@@ -9808,7 +10273,17 @@ function renderAddForm(){
     : (isExpert
       ? '공개 <strong>유튜브 URL</strong>이 있으면 서버(Gemini)가 영상을 분석해요. GAS 스크립트 속성 <code style="font-size:10px;">GEMINI_API_KEY</code> 필요. 비공개 영상은 자막·메모를 붙여 주세요.'
       : '공개 유튜브 URL → 서버(Gemini) 분석. 그 외는 <strong>링크·메모</strong>가 초안까지 전달돼요.');
-  const btnLabel = isDaily && hasPhoto ? '사진으로 일상 글 추가' : (isDaily ? '주제 추가 · 일상 글 만들기' : '키워드로 주제 만들기');
+  const hasMedia = newItemHasMediaSource_();
+  const flowsReady = !!state.newItem.flowProposalsReady && (state.newItem.flowProposals || []).length > 0;
+  const flowLoading = !!state.newItem.flowProposalsLoading;
+  const btnLabel = hasMedia
+    ? (analyzing ? '사진 분석 중…' : (flowLoading ? '글 흐름 제안 중…' : (flowsReady ? '선택한 흐름으로 주제 만들기' : '글 흐름 제안 후 주제 만들기')))
+    : (isDaily && hasPhoto ? '사진으로 일상 글 추가' : (isDaily ? '주제 추가 · 일상 글 만들기' : '키워드로 주제 만들기'));
+  const submitDisabled = analyzing || flowLoading || (hasMedia && !flowsReady);
+  const flowSectionHtml = renderAddFormFlowSectionHTML_();
+  const regenBtnHtml = hasMedia
+    ? '<button type="button" class="btn-flow-regen" onclick="regenerateFlowProposals()" ' + (analyzing || flowLoading ? 'disabled' : '') + '>' + (flowsReady ? '흐름 다시 제안' : '글 흐름 3가지 제안 받기') + '</button>'
+    : '';
   return `<div class="add-form">
     <div class="form-title">새 주제 추가</div>
     <p style="font-size:12px;color:#6B7280;line-height:1.55;margin-bottom:12px;">${addIntro}</p>
@@ -9832,7 +10307,9 @@ function renderAddForm(){
       <input class="form-input" type="file" accept="image/*" multiple onchange="onNewItemImage(this)" style="padding:8px;" />
       <div style="margin-top:4px;">${imgHint}</div>
     </div>
-    <button type="button" class="btn-submit" id="btn-add-draft-submit" onclick="addDraft()" ${analyzing ? 'disabled' : ''}>${analyzing ? '사진 분석 중…' : btnLabel}</button>
+    ${flowSectionHtml}
+    ${regenBtnHtml}
+    <button type="button" class="btn-submit" id="btn-add-draft-submit" onclick="addDraft()" ${submitDisabled ? 'disabled' : ''}>${btnLabel}</button>
   </div>`;
 }
 function scrollTextareaCaretIntoView_(ta){
@@ -9895,11 +10372,36 @@ function bindNewItemRefNoteInput_(){
     });
   });
 }
-function setNewCat(v){ state.newItem.catId=parseInt(v,10); renderMain(); }
+function bindNewItemFlowInputs_(){
+  var flows = state.newItem.flowProposals || [];
+  flows.forEach(function(flow, i){
+    ['title', 'angle', 'steps'].forEach(function(kind){
+      var el = document.getElementById('new-item-flow-' + kind + '-' + i);
+      if(!el || el._caretScrollBound) return;
+      el._caretScrollBound = true;
+      if(el.tagName !== 'TEXTAREA') return;
+      var sync = function(){ scrollTextareaCaretIntoView_(el); };
+      ['click','keyup','keydown','select','input','focus','touchend'].forEach(function(ev){
+        el.addEventListener(ev, function(){
+          requestAnimationFrame(function(){ requestAnimationFrame(sync); });
+        });
+      });
+    });
+  });
+}
+function setNewCat(v){
+  state.newItem.catId = parseInt(v, 10);
+  resetNewItemFlowProposals_();
+  renderMain();
+}
 
 window.addDraft = async function(){
   if(state.newItem.imageAnalyzing){
     if(typeof setAppToast === 'function') setAppToast('사진 분석이 끝날 때까지 잠시만 기다려 주세요.', { duration: 3200, variant: 'err' });
+    return;
+  }
+  if(state.newItem.flowProposalsLoading){
+    if(typeof setAppToast === 'function') setAppToast('글 흐름 제안이 끝날 때까지 잠시만 기다려 주세요.', { duration: 3200, variant: 'err' });
     return;
   }
   var keywords = (state.newItem.topic || '').trim();
@@ -9907,10 +10409,22 @@ window.addDraft = async function(){
   var sourceNote = buildDraftSourceNote_(keywords, refNote);
   var isDaily = isDailyShareCategory(state.newItem.catId);
   var hasPhoto = newItemHasRefImages_();
+  var hasMedia = newItemHasMediaSource_();
   if(!sourceNote && !(isDaily && hasPhoto)){
     if(typeof setAppToast === 'function') setAppToast(isDaily ? '키워드·메모를 입력하거나 사진을 올려 주세요.' : '키워드 또는 참고 메모를 입력해 주세요.', { duration: 3500, variant: 'err' });
     else alert(isDaily ? '키워드·메모 또는 사진이 필요합니다' : '키워드 또는 참고 메모를 입력해주세요');
     return;
+  }
+  if(hasMedia){
+    var selFlow = getSelectedNewItemFlow_();
+    if(!state.newItem.flowProposalsReady || !selFlow){
+      if(typeof setAppToast === 'function') setAppToast('「글 흐름 3가지 제안 받기」로 흐름을 받고 하나를 선택해 주세요.', { duration: 4000, variant: 'err' });
+      return;
+    }
+    if(!String(selFlow.title || '').trim()){
+      if(typeof setAppToast === 'function') setAppToast('선택한 흐름의 제목을 입력해 주세요.', { duration: 3500, variant: 'err' });
+      return;
+    }
   }
   if(!state.apiKey){ openApiModal(); return; }
   var youtubeUrls = extractYoutubeUrlsFromText_(sourceNote);
@@ -9920,15 +10434,16 @@ window.addDraft = async function(){
     }
   }
   var btn = document.getElementById('btn-add-draft-submit');
-  var youtubeAnalysis = '';
-  if(btn){ btn.disabled = true; btn.textContent = isDaily && hasPhoto ? '일상 글 준비 중…' : (youtubeUrls.length && isGeminiYoutubeAvailable_() ? '유튜브 분석 중…' : '주제 생성 중…'); }
+  var youtubeAnalysis = state.newItem.cachedYoutubeAnalysis || '';
+  if(btn){ btn.disabled = true; btn.textContent = hasMedia ? '선택한 흐름으로 주제 만드는 중…' : (isDaily && hasPhoto ? '일상 글 준비 중…' : (youtubeUrls.length && isGeminiYoutubeAvailable_() && !youtubeAnalysis ? '유튜브 분석 중…' : '주제 생성 중…')); }
   if(typeof setAppToast === 'function') setAppToast(
-    youtubeUrls.length && isGeminiYoutubeAvailable_() ? '공개 유튜브 영상을 분석한 뒤 주제를 만들고 있어요…' :
-    (isDaily && hasPhoto ? '사진을 보고 주제·일상 글을 만들고 있어요…' : '주제 제목·각도를 만들고 있어요…'),
+    hasMedia ? '선택한 글 흐름으로 주제 카드를 만들고 초안을 준비하고 있어요…' :
+    (youtubeUrls.length && isGeminiYoutubeAvailable_() && !youtubeAnalysis ? '공개 유튜브 영상을 분석한 뒤 주제를 만들고 있어요…' :
+    (isDaily && hasPhoto ? '사진을 보고 주제·일상 글을 만들고 있어요…' : '주제 제목·각도를 만들고 있어요…')),
     { duration: 3200, variant: 'ok' }
   );
   try {
-    if(youtubeUrls.length && isGeminiYoutubeAvailable_()){
+    if(!hasMedia && youtubeUrls.length && isGeminiYoutubeAvailable_() && !youtubeAnalysis){
       try {
         youtubeAnalysis = await analyzeYoutubeWithGemini_(youtubeUrls[0], state.newItem.catId);
       } catch(ytErr){
@@ -9938,14 +10453,38 @@ window.addDraft = async function(){
         if(typeof setAppToast === 'function') setAppToast(ytToast, { duration: /할당량|quota|limit/i.test(ytMsg) ? 12000 : 7000, variant: 'err' });
       }
     }
-    if(btn) btn.textContent = '주제 생성 중…';
-    var gen = await generateTopicFromKeywords_(state.newItem.catId, keywords, state.newItem.refImages, sourceNote, youtubeAnalysis);
+    if(btn) btn.textContent = hasMedia ? '주제 카드 만드는 중…' : '주제 생성 중…';
+    var gen;
+    if(hasMedia){
+      var selected = getSelectedNewItemFlow_();
+      gen = {
+        topic: String(selected.title || '').trim(),
+        angle: String(selected.angle || '').trim() || (CATEGORIES[state.newItem.catId].audience + ' 관점'),
+        series: getDefaultSeriesForCat_(state.newItem.catId),
+        pillar: getDefaultPillarForCat_(state.newItem.catId),
+        rationale: (selected.steps || []).join(' → ')
+      };
+    } else {
+      gen = await generateTopicFromKeywords_(state.newItem.catId, keywords, state.newItem.refImages, sourceNote, youtubeAnalysis);
+    }
     var cat = CATEGORIES[state.newItem.catId];
     var id = 'd' + state.newItem.catId + '-c' + Date.now();
     var draft = { id: id, topic: gen.topic, angle: gen.angle, createdAt: new Date().toISOString() };
     applyTopicFieldsToDraft_(draft, gen, state.newItem.catId);
+    if(hasMedia){
+      var picked = getSelectedNewItemFlow_();
+      draft.articleFlow = {
+        title: String(picked.title || '').trim(),
+        angle: String(picked.angle || '').trim(),
+        steps: (picked.steps || []).slice()
+      };
+    }
+    assignUserAddedDraftToMisc_(draft, state.newItem.catId);
     if(sourceNote) draft.sourceNote = sourceNote;
-    if(youtubeAnalysis){
+    if(hasMedia && youtubeAnalysis){
+      draft.youtubeAnalysis = youtubeAnalysis;
+      if(youtubeUrls.length) draft.youtubeUrls = [youtubeUrls[0]];
+    } else if(youtubeAnalysis){
       draft.youtubeAnalysis = youtubeAnalysis;
       draft.youtubeUrls = [youtubeUrls[0]];
     }
@@ -9962,7 +10501,7 @@ window.addDraft = async function(){
     }
     cat.drafts.push(draft);
     var savedCatId = state.newItem.catId;
-    state.newItem = { date:'', topic:'', catId: savedCatId, refImages: [], refImage: null, refNote: '', imageAnalyzing: false };
+    state.newItem = createEmptyNewItem_(savedCatId);
     state.showAdd = false;
     document.getElementById('add-toggle-btn').textContent = '추가';
     state.currentCat = cat.id;
@@ -9986,8 +10525,12 @@ window.addDraft = async function(){
     if(btn){
       var isD = isDailyShareCategory(state.newItem.catId);
       var hp = newItemHasRefImages_();
-      btn.textContent = isD && hp ? '사진으로 일상 글 추가' : (isD ? '주제 추가 · 일상 글 만들기' : '키워드로 주제 만들기');
-      btn.disabled = false;
+      var hm = newItemHasMediaSource_();
+      var fr = !!state.newItem.flowProposalsReady;
+      btn.textContent = hm
+        ? (fr ? '선택한 흐름으로 주제 만들기' : '글 흐름 제안 후 주제 만들기')
+        : (isD && hp ? '사진으로 일상 글 추가' : (isD ? '주제 추가 · 일상 글 만들기' : '키워드로 주제 만들기'));
+      btn.disabled = !!state.newItem.imageAnalyzing || !!state.newItem.flowProposalsLoading || (hm && !fr);
     }
   }
 };
@@ -10913,13 +11456,20 @@ function openDetail(draftId, catId, tab, opts) {
   }
 }
 
-function buildDraftReferencePreviewHTML_(draft){
+function buildDraftReferencePreviewHTML_(draft, opts){
+  opts = opts || {};
   if(!draft) return '';
+  var catId = opts.catId != null ? opts.catId : getCatIdFromDraftId_(draft.id);
+  var userAdded = isUserAddedDraftId_(draft.id);
+  var isDaily = isDailyShareCategory(catId);
+  var sourceLabel = userAdded
+    ? '추가에서 작성한 내용'
+    : (isDaily ? '참고 메모' : '참고 메모 (영상·테크닉)');
   var parts = [];
   if(draft.sourceNote){
-    parts.push('<div style="margin-bottom:12px;padding:12px 14px;background:#F0FDFA;border:1px solid #CCFBF1;border-radius:10px;">' +
-      '<div style="font-size:10px;font-weight:700;color:#0F766E;letter-spacing:.6px;margin-bottom:6px;">참고 메모 (영상·테크닉)</div>' +
-      '<div style="font-size:12px;color:#374151;line-height:1.65;white-space:pre-wrap;max-height:100px;overflow-y:auto;">' + escapeHtml(draft.sourceNote) + '</div></div>');
+    parts.push('<div class="sheet-add-source-preview" style="margin-bottom:12px;padding:12px 14px;background:#F0FDFA;border:1px solid #CCFBF1;border-radius:10px;">' +
+      '<div style="font-size:10px;font-weight:700;color:#0F766E;letter-spacing:.6px;margin-bottom:6px;">' + escapeHtml(sourceLabel) + '</div>' +
+      '<div style="font-size:12px;color:#374151;line-height:1.65;white-space:pre-wrap;max-height:140px;overflow-y:auto;">' + escapeHtml(draft.sourceNote) + '</div></div>');
   }
   if(draft.youtubeAnalysis){
     parts.push('<div style="margin-bottom:12px;padding:12px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;">' +
@@ -10938,7 +11488,7 @@ function buildDraftReferencePreviewHTML_(draft){
 
 function renderSheetEmpty(draft, cat) {
   const genLine = isDailyShareCategory(cat.id)
-    ? 'AI가 <strong>일상 일기·생활 나눔</strong> 톤으로<br><strong>한 줄 + 3~7문장</strong>을 써요. 몸·날씨·감정 이야기엔 <strong>가벼운 전문가 시선</strong>이 더해질 수 있어요'
+    ? 'AI가 <strong>담백한 관찰 + 공감 한 스푼</strong> 톤으로<br><strong>한 줄 + 3~7문장</strong>을 써요. 핵심 한 가지를 분명히, 과한 감성은 피해요'
     : isHeiljagyaeCategory(cat.id)
     ? 'AI가 <strong>아파트너 게시판 글</strong>과 <strong>추천 이미지 프롬프트 2개</strong>만<br>만들어드려요'
     : isGeneralAudienceCategory(cat.id)
@@ -10946,12 +11496,7 @@ function renderSheetEmpty(draft, cat) {
     : isExpertCourseCategory(cat.id)
     ? '교육·강의 <strong>영상 링크</strong> 또는 <strong>실습 사진</strong>을 먼저 올리면, AI가 그에 맞춰<br><strong>영상·사진 맥락 → 시연 포인트 → 원리 설명</strong> 글과 이미지 프롬프트 <strong>2장</strong>을 만들어요'
     : 'AI가 <strong>블로그</strong>와 이미지 프롬프트 <strong>2장</strong>을 만들어드려요.<br>인스타는 블로그 <strong>발행완료</strong> 후, 쓰레드는 인스타 <strong>발행완료</strong> 후 생성돼요';
-  const sourceNoteHtml = draft.sourceNote
-    ? `<div style="margin-bottom:16px;padding:12px 14px;background:#F0FDFA;border:1px solid #CCFBF1;border-radius:10px;">
-        <div style="font-size:10px;font-weight:700;color:#0F766E;letter-spacing:.6px;margin-bottom:6px;">참고 메모 (영상·테크닉)</div>
-        <div style="font-size:12px;color:#374151;line-height:1.65;white-space:pre-wrap;max-height:120px;overflow-y:auto;">${escapeHtml(draft.sourceNote)}</div>
-      </div>`
-    : '';
+  const sourceNoteHtml = buildDraftReferencePreviewHTML_(draft, { catId: cat.id });
   const ytAnalysisHtml = draft.youtubeAnalysis
     ? `<div style="margin-bottom:16px;padding:12px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;">
         <div style="font-size:10px;font-weight:700;color:#1D4ED8;letter-spacing:.6px;margin-bottom:6px;">YouTube 분석 (Gemini)</div>
@@ -10979,17 +11524,21 @@ function renderSheetContent(content) {
     applySheetEditsForTab_(content, tab);
   }
   const tabsHTML = buildSheetTabsHTML(tab);
+  var sheetCatId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
+  var sheetCat = CATEGORIES[sheetCatId];
+  var sheetDraft = sheetCat && state.selectedId ? sheetCat.drafts.find(function(d){ return d.id === state.selectedId; }) : null;
+  var addSourceHtml = buildDraftReferencePreviewHTML_(sheetDraft, { catId: sheetCatId });
 
   let bodyHTML = '';
   if(tab==='images'){
-    bodyHTML = tabsHTML + buildImageTabBody(content);
+    bodyHTML = tabsHTML + addSourceHtml + buildImageTabBody(content);
   } else if(tab==='thread'){
     const th = normalizeThreadBlock(content.thread);
     if(!th || !th.summary){
-      bodyHTML = tabsHTML + `<p class="empty-note" style="padding:12px 0;">일상 공유 초안이 없어요. 아래에서 다시 생성해 주세요.</p>
+      bodyHTML = tabsHTML + addSourceHtml + `<p class="empty-note" style="padding:12px 0;">일상 공유 초안이 없어요. 아래에서 다시 생성해 주세요.</p>
         <button type="button" class="btn-gen-big" onclick="genContent()" style="width:100%;margin-top:8px;">초안 다시 생성</button>`;
     } else {
-      bodyHTML = tabsHTML +
+      bodyHTML = tabsHTML + addSourceHtml +
         sheetFullCopyBar_() +
         sheetEditField_('오늘의 한 줄', 'sheet-thread-title', th.topicTitle || '', { rows: 2, title: true, regen: 'thread.topicTitle', copy: true }) +
         sheetEditField_('본문 (일상 나눔)', 'sheet-thread-summary', th.summary || '', { rows: 10, regen: 'thread.summary', copy: true }) +
@@ -11001,7 +11550,7 @@ function renderSheetContent(content) {
     if(blogUsesStructuredGeneralFormat_(blogCatId, b)){
       bodyHTML = composeSheetTabLayout_(tab,
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }),
-        sheetFullCopyBar_() +
+        addSourceHtml + sheetFullCopyBar_() +
         sheetEditField_('문제 제기', 'sheet-blog-problem', getGeneralBlogProblemText_(b), { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지', regen: 'blog.problem', copy: true }) +
         sheetEditField_('셀프 케어', 'sheet-blog-selfcare', b.selfCare || '', { rows: 8, help: '👉 로 시작 · 동작·초·회·분을 앞쪽에 · 단계 사이 빈 줄', regen: 'blog.selfCare', copy: true, stepPreview: true }) +
         sheetEditField_('원리 설명', 'sheet-blog-explanation', b.explanation || '', { rows: 6, regen: 'blog.explanation', copy: true }) +
@@ -11010,9 +11559,8 @@ function renderSheetContent(content) {
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요. 인스타 캡션은 그동안 백그라운드에서 만들어져요.</p>'
       );
     } else if(isExpertCourseCategory(blogCatId)){
-      var expertCat = CATEGORIES[blogCatId];
-      var expertDraft = expertCat && state.selectedId ? expertCat.drafts.find(function(d){ return d.id === state.selectedId; }) : null;
-      var expertRefHtml = buildDraftReferencePreviewHTML_(expertDraft);
+      var expertDraft = sheetDraft;
+      var expertRefHtml = addSourceHtml;
       bodyHTML = composeSheetTabLayout_(tab,
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }),
         sheetFullCopyBar_() +
@@ -11027,7 +11575,7 @@ function renderSheetContent(content) {
     } else {
       bodyHTML = composeSheetTabLayout_(tab,
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }),
-        sheetFullCopyBar_() +
+        addSourceHtml + sheetFullCopyBar_() +
         sheetEditField_('후킹 오프닝', 'sheet-blog-hook', b.hook, { rows: 4, regen: 'blog.hook', copy: true }) +
         sheetEditField_('목차 구성', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '한 줄에 소제목 하나씩', regen: 'blog.outline', copy: true }) +
         sheetEditField_('본문 초안', 'sheet-blog-draft', b.draft, { rows: 14, regen: 'blog.draft', copy: true }) +
@@ -11047,7 +11595,7 @@ function renderSheetContent(content) {
       var instaCaption = String(ig.caption || '').trim() || getInstaCaptionBodyMerged_(ig);
       bodyHTML = composeSheetTabLayout_(tab,
         sheetEditField_('첫 줄 후킹', 'sheet-insta-hook', ig.hook, { rows: 2, title: true, regen: 'insta.hook', copy: true }),
-        sheetFullCopyBar_() +
+        addSourceHtml + sheetFullCopyBar_() +
         sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10, regen: 'insta.caption', copy: true }) +
         sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).map(function(h){ return String(h).replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동해요. 쓰레드 글은 그동안 백그라운드에서 만들어져요.</p>'
@@ -11061,7 +11609,7 @@ function renderSheetContent(content) {
       bodyHTML = tabsHTML +
         '<div class="sheet-insta-pending"><strong>쓰레드 글은 아직 없어요.</strong><br>인스타 탭에서 <strong>발행완료</strong>를 누르거나, 인스타 캡션이 있으면 하단 <strong>재생성</strong>으로 만들 수 있어요.</div>';
     } else {
-      bodyHTML = tabsHTML +
+      bodyHTML = tabsHTML + addSourceHtml +
         sheetFullCopyBar_() +
         sheetEditField_('쓰레드 본문', 'sheet-threads-body', ths.text || '', { rows: 14, regen: 'threads.text', copy: true }) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">본문을 수정하거나 <strong>재생성</strong>으로 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 저장·복사 후 Threads 앱으로 이동해요.</p>';
@@ -11076,7 +11624,7 @@ function renderSheetContent(content) {
       const problemText = getCommunityProblemText_(coNorm);
       bodyHTML = composeSheetTabLayout_(tab,
         sheetEditField_('제목', 'sheet-community-title', coNorm.title || '', { rows: 2, title: true, regen: 'community.title', copy: true }),
-        sheetFullCopyBar_() +
+        addSourceHtml + sheetFullCopyBar_() +
         `<div class="cb"><div class="cb-label">인사말 (고정)</div>
           <div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">${escapeHtml(COMMUNITY_FIXED_GREETING)}</div></div>
         ${sheetEditField_('문제 제기', 'sheet-community-problem', problemText, { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지, 자연스러운 문장으로', regen: 'community.problem', copy: true })}
@@ -12258,8 +12806,8 @@ var SHEET_FIELD_META_ = {
   'insta.caption':  { block: 'insta', label: '캡션', instr: '인스타 톤의 짧은 캡션 본문. 문단은 짧게, 이모지는 절제해서.' },
   'insta.hashtags': { block: 'insta', label: '해시태그', array: true, instr: '증상·지역·브랜드와 관련된 해시태그 8~12개.' },
   'threads.text':      { block: 'threads', label: '쓰레드 본문', instr: 'Threads 톤의 짧고 담백한 본문. 한 호흡에 읽히도록.' },
-  'thread.topicTitle': { block: 'thread', label: '오늘의 한 줄', threadNorm: true, instr: '오늘의 일상 나눔을 요약하는 따뜻한 한 줄.' },
-  'thread.summary':    { block: 'thread', label: '본문 (일상 나눔)', threadNorm: true, instr: '전문 용어 없이, 일상에서 느낀 점을 담백하게 나누는 본문.' }
+  'thread.topicTitle': { block: 'thread', label: '오늘의 한 줄', threadNorm: true, instr: '담백한 관찰·장면 한 줄. 짧은 감탄 가능. 따뜻한 위로·과한 감성 금지.' },
+  'thread.summary':    { block: 'thread', label: '본문 (일상 나눔)', threadNorm: true, instr: '관찰 → 핵심 한 가지 → (선택) 짧은 감탄·철학 1문장. 담백·구어체. 과한 감성·설교 금지.' }
 };
 
 function fieldValueToString_(meta, block){
@@ -13550,7 +14098,7 @@ async function refineCategoryPromptsFromPublished_(catId){
 function openPromptModal(catId) {
   var cid = catId !== undefined ? catId : state.currentCat;
   if(isOpsManualCategory(cid)){
-    if(typeof setAppToast === 'function') setAppToast('운영 탭에는 프롬프트 설정이 없어요.', { duration: 3200, variant: 'err' });
+    if(typeof setAppToast === 'function') setAppToast('지점·브랜딩 탭은 콘텐츠 프롬프트가 없어요. 다른 프로그램 탭에서 열어 주세요.', { duration: 3800, variant: 'err' });
     return;
   }
   state.editingCatId = cid;
@@ -13569,12 +14117,29 @@ function openPromptModal(catId) {
 
 function renderPromptModal() {
   const cat = CATEGORIES[state.editingCatId];
-  document.getElementById('prompt-modal-title').textContent = cat.name + ' 프롬프트';
+  if(!cat || isOpsManualCategory(state.editingCatId)){
+    state.editingCatId = getPromptModalCatIds_()[0] || 0;
+  }
+  const editCat = CATEGORIES[state.editingCatId];
+  document.getElementById('prompt-modal-title').textContent = editCat.name + ' 프롬프트';
 
-  const catTabs = CATEGORIES.map((c,i)=>`
-    <button class="cat-tab${state.editingCatId===i?' active':''}" onclick="switchPromptCat(${i})" style="color:${state.editingCatId===i?c.color:'#6B6B6B'};border-bottom-color:${state.editingCatId===i?c.color:'transparent'};font-size:11px;padding:8px 10px;">
-      ${c.name}
-    </button>`).join('');
+  const modalCatIds = getPromptModalCatIds_();
+  const catTabs = modalCatIds.map(function(i){
+    var c = CATEGORIES[i];
+    return '<button class="cat-tab' + (state.editingCatId === i ? ' active' : '') + '" onclick="switchPromptCat(' + i + ')" style="color:' + (state.editingCatId === i ? c.color : '#6B6B6B') + ';border-bottom-color:' + (state.editingCatId === i ? c.color : 'transparent') + ';font-size:11px;padding:8px 10px;">' +
+      c.name +
+    '</button>';
+  }).join('');
+
+  const channelTabs = getPromptChannelTabDefsForCat_(state.editingCatId);
+  var validTabIds = channelTabs.map(function(t){ return t.id; });
+  if(validTabIds.indexOf(state.promptTab) < 0) state.promptTab = channelTabs[0].id;
+  const pt = state.promptTab;
+  const threadCat = isDailyShareCategory(state.editingCatId);
+  const heiljCat = isHeiljagyaeCategory(state.editingCatId);
+  const blogInstaCat = isBlogInstaCategory(state.editingCatId);
+  const promptTypes = getPromptTypesForCat_(state.editingCatId);
+  const resetAllTypesLabel = promptTypes.map(getPromptTypeLabelKr_).join(' · ');
 
   const blogVal = getCatPrompt(state.editingCatId, 'blog');
   const instaVal = getCatPrompt(state.editingCatId, 'insta');
@@ -13583,9 +14148,10 @@ function renderPromptModal() {
   const threadVal = getCatPrompt(state.editingCatId, 'thread');
   const imageVal = getCatPrompt(state.editingCatId, 'image');
   const baseVal = getBasePrompt();
-  const pt = state.promptTab;
-  const threadCat = isThreadCategory(state.editingCatId);
-  const heiljCat = isHeiljagyaeCategory(state.editingCatId);
+
+  const channelTabBtns = channelTabs.map(function(t){
+    return '<button class="prompt-tab' + (pt === t.id ? ' active' : '') + '" onclick="switchPromptTab(\'' + t.id + '\')">' + t.label + '</button>';
+  }).join('');
 
   document.getElementById('prompt-modal-body').innerHTML = `
     <div class="prompt-modal-cat-scroll">
@@ -13594,26 +14160,17 @@ function renderPromptModal() {
       </div>
     </div>
 
+    ${promptTypes.length ? `
+    <div class="prompt-cat-reset-bar">
+      <span class="prompt-cat-reset-hint">이 프로그램: ${resetAllTypesLabel}</span>
+      <button type="button" class="prompt-reset-all-btn" onclick="resetAllPromptsForCat()">이 프로그램 전체 기본값으로</button>
+    </div>` : ''}
+
     <div class="prompt-tabs-scroll">
-      <div class="prompt-tabs">
-        ${threadCat ? `
-        <button class="prompt-tab${pt==='thread'?' active':''}" onclick="switchPromptTab('thread')">일상 공유</button>
-        <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">공통 기본</button>
-        ` : heiljCat ? `
-        <button class="prompt-tab${pt==='community'?' active':''}" onclick="switchPromptTab('community')">아파트너 게시판</button>
-        <button class="prompt-tab${pt==='image'?' active':''}" onclick="switchPromptTab('image')">이미지</button>
-        <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">공통 기본</button>
-        ` : `
-        <button class="prompt-tab${pt==='blog'?' active':''}" onclick="switchPromptTab('blog')">블로그</button>
-        <button class="prompt-tab${pt==='insta'?' active':''}" onclick="switchPromptTab('insta')">인스타</button>
-        <button class="prompt-tab${pt==='threads'?' active':''}" onclick="switchPromptTab('threads')">쓰레드</button>
-        <button class="prompt-tab${pt==='image'?' active':''}" onclick="switchPromptTab('image')">이미지</button>
-        <button class="prompt-tab${pt==='base'?' active':''}" onclick="switchPromptTab('base')">공통 기본</button>
-        `}
-      </div>
+      <div class="prompt-tabs">${channelTabBtns}</div>
     </div>
 
-    ${!threadCat && !heiljCat && pt==='blog' ? `
+    ${blogInstaCat && pt==='blog' ? `
     <div class="prompt-section">
       <div class="prompt-section-label">
         블로그 작성 지침
@@ -13623,7 +14180,7 @@ function renderPromptModal() {
       <div class="prompt-hint">${isGeneralAudienceCategory(state.editingCatId) ? '일반인 블로그: <strong>문제 제기 → 셀프 케어(👉) → 원리 설명</strong> 순. AI가 필드별로 나눠 작성하고, 시트 탭에서 각각 수정할 수 있어요.' : '예: "제목에 호기심을 자극하는 질문·숫자를 넣고, 네이버 SEO를 고려해…" — 이 지침이 Claude에게 전달돼 글쓰기 방향을 잡아요.'}</div>
     </div>` : ''}
 
-${!threadCat && !heiljCat && pt==='insta' ? `
+${blogInstaCat && pt==='insta' ? `
 <div class="prompt-section">
   <div class="prompt-section-label">
     인스타 작성 지침
@@ -13633,7 +14190,7 @@ ${!threadCat && !heiljCat && pt==='insta' ? `
   <div class="prompt-hint">예: "첫 줄에서 멈추게 만드는 짧은 질문을 써주세요. 캐러셀은 문제→원인→해결 순으로..."</div>
 </div>` : ''}
 
-${!threadCat && !heiljCat && pt==='threads' ? `
+${blogInstaCat && pt==='threads' ? `
 <div class="prompt-section">
   <div class="prompt-section-label">
     쓰레드 작성 지침
@@ -13663,7 +14220,7 @@ ${pt==='community' && heiljCat ? `
   <div class="prompt-hint">옆집 이웃 톤·문제 제기→👉 해결책(동작 앞쪽)→원리 설명. 불릿 없이 자연스러운 문장. 계절은 각도에 맞을 때만. 이미지 2장.</div>
 </div>` : ''}
 
-${pt==='image' && !threadCat ? `
+${pt==='image' && (blogInstaCat || heiljCat) ? `
 <div class="prompt-section">
   <div class="prompt-section-label">
     이미지 생성 지침
@@ -13705,7 +14262,7 @@ function schedulePromptCloudSave_(){
 }
 
 function bindPromptTextareaAutosave_(){
-  ['pt-blog', 'pt-insta', 'pt-community', 'pt-thread', 'pt-image', 'pt-base'].forEach(function(id){
+  ['pt-blog', 'pt-insta', 'pt-threads', 'pt-community', 'pt-thread', 'pt-image', 'pt-base'].forEach(function(id){
     var el = document.getElementById(id);
     if(!el || el.__htPromptAutosave) return;
     el.__htPromptAutosave = true;
@@ -13714,12 +14271,15 @@ function bindPromptTextareaAutosave_(){
 }
 
 window.switchPromptCat = function(i) {
-flushPromptCloudSave_();
-state.editingCatId = i;
-if(isThreadCategory(i) && (state.promptTab === 'community' || state.promptTab === 'blog' || state.promptTab === 'insta' || state.promptTab === 'image' || state.promptTab === 'threads')) state.promptTab = 'thread';
-if(isHeiljagyaeCategory(i) && (state.promptTab === 'thread' || state.promptTab === 'blog' || state.promptTab === 'insta' || state.promptTab === 'threads')) state.promptTab = 'community';
-if(isBlogInstaCategory(i) && (state.promptTab === 'thread' || state.promptTab === 'community')) state.promptTab = 'blog';
-renderPromptModal();
+  if(isOpsManualCategory(i)) return;
+  flushPromptCloudSave_();
+  sanitizeCatPromptKeys_(state.editingCatId);
+  state.editingCatId = i;
+  var tabs = getPromptChannelTabDefsForCat_(i);
+  if(tabs.length && tabs.map(function(t){ return t.id; }).indexOf(state.promptTab) < 0){
+    state.promptTab = tabs[0].id;
+  }
+  renderPromptModal();
 };
 window.switchPromptTab = function(t) {
 flushPromptCloudSave_();
@@ -13747,15 +14307,46 @@ if(baseEl) state.prompts.base = baseEl.value;
 }
 
 window.resetPrompt = function(type) {
-if(!confirm('이 항목을 기본값으로 되돌릴까요?')) return;
-if(!state.prompts) state.prompts = JSON.parse(JSON.stringify(DEFAULT_PROMPTS));
-if(type==='base') { state.prompts.base = DEFAULT_PROMPTS.base; }
-else {
-if(!state.prompts.categories[state.editingCatId]) state.prompts.categories[state.editingCatId]={};
-state.prompts.categories[state.editingCatId][type] = DEFAULT_PROMPTS.categories[state.editingCatId][type];
-}
-renderPromptModal();
-flushPromptCloudSave_();
+  if(!confirm('이 항목을 기본값으로 되돌릴까요?')) return;
+  if(type === 'base'){
+    if(!state.prompts) state.prompts = JSON.parse(JSON.stringify(DEFAULT_PROMPTS));
+    state.prompts.base = DEFAULT_PROMPTS.base;
+  } else {
+    var def = getDefaultCatPrompt_(state.editingCatId, type);
+    if(!def){
+      if(typeof setAppToast === 'function') setAppToast('이 프로그램에는 「' + getPromptTypeLabelKr_(type) + '」 기본값이 없어요.', { duration: 3500, variant: 'err' });
+      return;
+    }
+    if(!state.prompts) state.prompts = JSON.parse(JSON.stringify(DEFAULT_PROMPTS));
+    if(!state.prompts.categories[state.editingCatId]) state.prompts.categories[state.editingCatId] = {};
+    state.prompts.categories[state.editingCatId][type] = def;
+    sanitizeCatPromptKeys_(state.editingCatId);
+  }
+  renderPromptModal();
+  flushPromptCloudSave_();
+};
+
+window.resetAllPromptsForCat = function(){
+  var catId = state.editingCatId;
+  if(isOpsManualCategory(catId)) return;
+  var types = getPromptTypesForCat_(catId);
+  if(!types.length) return;
+  var cat = CATEGORIES[catId];
+  var labelStr = types.map(getPromptTypeLabelKr_).join(' · ');
+  if(!confirm('「' + cat.name + '」의\n' + labelStr + '\n\n위 지침을 모두 기본값으로 되돌릴까요?\n(공통 기본은 변경되지 않습니다)')) return;
+  if(!state.prompts) state.prompts = JSON.parse(JSON.stringify(DEFAULT_PROMPTS));
+  if(!state.prompts.categories[catId]) state.prompts.categories[catId] = {};
+  types.forEach(function(t){
+    var def = getDefaultCatPrompt_(catId, t);
+    if(def) state.prompts.categories[catId][t] = def;
+    else delete state.prompts.categories[catId][t];
+  });
+  sanitizeCatPromptKeys_(catId);
+  renderPromptModal();
+  flushPromptCloudSave_();
+  if(typeof setAppToast === 'function'){
+    setAppToast('「' + cat.name + '」프롬프트 ' + types.length + '개를 기본값으로 되돌렸어요.', { duration: 3800, variant: 'ok' });
+  }
 };
 
 function savePrompts() {
@@ -14028,13 +14619,13 @@ ${briefPromptLines}
 [일상 공유 작성 지침]
 ${threadGuide}
 
-이 카테고리는 **일상 일기·생활 나눔 한 덩어리**만 만듭니다. 감정·철학·날씨·몸 이야기에는 **근골격계 전문가 시선을 1~2문장** 은은하게. 강의·임상·홍보 톤 금지. 응답 JSON에는 **thread 키 하나만** 넣으세요.
+이 카테고리는 **담백한 생활 나눔 한 덩어리**만 만듭니다. 핵심 메시지 하나 + 장면·관찰, 짧은 감탄·철학 1문장으로 공감 한 스푼. 몸·날씨 이야기엔 **근골격계 전문가 시선 1~2문장**만. 강의·임상·홍보·과한 감성 톤 금지. 응답 JSON에는 **thread 키 하나만** 넣으세요.
 
 2026년 5~6월 — 주제·각도·사진에 맞을 때만 계절·날씨를 자연스럽게. JSON만 출력:
 {
   "thread": {
-    "topicTitle": "오늘의 한 줄 (평서·감탄·장면 — 질문형·독자에게 묻는 말 금지)",
-    "summary": "topicTitle에 이어지는 연속 본문. 3~7문장. 관찰·느낌·일기 톤. 주제에 맞을 때만 습도·피로·가벼운 움직임·몸 감각을 한두 문장 가볍게 연결(전문 강의 톤 금지). 억지 공감·질문 없음. 구어체. 번호·불릿 금지."
+    "topicTitle": "오늘의 한 줄 (평서·짧은 감탄·장면 — 질문형·독자에게 묻는 말 금지)",
+    "summary": "topicTitle에 이어지는 연속 본문. 3~7문장. 관찰 → 핵심 한 가지 → (선택) 짧은 감탄·철학 1문장. 담백·구어체. 몸·날씨 맥락이 맞을 때만 가벼운 전문가 시선 1~2문장(강의 톤 금지). 억지 공감·질문·과한 감성 없음. 번호·불릿 금지."
   }
 }
 

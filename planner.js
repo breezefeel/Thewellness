@@ -1434,12 +1434,36 @@ function formatOpsProposalPreviewInnerHTML_(text){
 }
 function syncOpsProposalPreview_(textarea){
   if(!textarea) return;
-  var key = textarea.getAttribute('data-ops-text');
-  if(!key) return;
-  var preview = document.querySelector('.ops-proposal-preview[data-ops-text="' + key + '"]');
+  var field = textarea.closest('.ops-proposal-field');
+  if(!field) return;
+  var preview = field.querySelector('.ops-proposal-preview');
   if(preview) preview.innerHTML = formatOpsProposalPreviewInnerHTML_(textarea.value);
 }
+function focusOpsProposalTextarea_(previewEl){
+  if(!previewEl) return;
+  var field = previewEl.closest('.ops-proposal-field');
+  if(!field) return;
+  field.classList.add('is-editing');
+  var ta = field.querySelector('textarea[data-ops-text]');
+  if(!ta) return;
+  if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(ta);
+  ta.focus();
+  var len = ta.value.length;
+  try { ta.setSelectionRange(len, len); } catch(e) {}
+}
+function blurOpsProposalTextarea_(textarea){
+  if(!textarea) return;
+  setTimeout(function(){
+    var field = textarea.closest('.ops-proposal-field');
+    if(!field) return;
+    if(field.contains(document.activeElement)) return;
+    field.classList.remove('is-editing');
+    syncOpsProposalPreview_(textarea);
+  }, 120);
+}
 window.syncOpsProposalPreview_ = syncOpsProposalPreview_;
+window.focusOpsProposalTextarea_ = focusOpsProposalTextarea_;
+window.blurOpsProposalTextarea_ = blurOpsProposalTextarea_;
 function normalizeOpsProposalItems_(itemId, savedItems, baseItems){
   baseItems = baseItems || [];
   savedItems = Array.isArray(savedItems) ? savedItems : [];
@@ -9578,10 +9602,10 @@ function renderOpsManualMainHTML_(){
             '<span class="ops-review-sublabel">목적 의도 알려주기</span>' +
             '<textarea class="ops-review-input ops-grow-textarea" rows="1" data-ops-brief="' + it.id + '-' + p.id + '" oninput="autoGrowTextarea_(this)" onchange="setOpsReviewProposalBrief_(\'' + it.id + '\', \'' + p.id + '\', this.value)">' + escapeHtml(p.brief || '') + '</textarea>' +
           '</div>' +
-          '<div class="ops-review-field">' +
-            '<span class="ops-review-sublabel"><strong>제안 문장</strong>과 그 이유</span>' +
-            '<div class="ops-proposal-preview" data-ops-text="' + it.id + '-' + p.id + '">' + formatOpsProposalPreviewInnerHTML_(p.text || '') + '</div>' +
-            '<textarea class="ops-review-input ops-grow-textarea" rows="1" data-ops-text="' + it.id + '-' + p.id + '" oninput="autoGrowTextarea_(this);syncOpsProposalPreview_(this)" onchange="setOpsReviewProposalText_(\'' + it.id + '\', \'' + p.id + '\', this.value)">' + escapeHtml(p.text || '') + '</textarea>' +
+          '<div class="ops-review-field ops-proposal-field">' +
+            '<span class="ops-review-sublabel"><strong>제안 문장</strong>과 그 이유 <span class="ops-proposal-edit-hint">· 탭하여 수정</span></span>' +
+            '<div class="ops-proposal-preview" tabindex="0" role="button" aria-label="제안 문장 수정" onclick="focusOpsProposalTextarea_(this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();focusOpsProposalTextarea_(this);}">' + formatOpsProposalPreviewInnerHTML_(p.text || '') + '</div>' +
+            '<textarea class="ops-review-input ops-grow-textarea ops-proposal-textarea" rows="1" data-ops-text="' + it.id + '-' + p.id + '" oninput="autoGrowTextarea_(this);syncOpsProposalPreview_(this)" onblur="blurOpsProposalTextarea_(this)" onchange="setOpsReviewProposalText_(\'' + it.id + '\', \'' + p.id + '\', this.value)">' + escapeHtml(p.text || '') + '</textarea>' +
           '</div>' +
         '</div>';
       }).join('');

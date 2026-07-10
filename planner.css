@@ -2124,6 +2124,29 @@ margin: -16px -20px 14px;
 min-width: 0;
 scrollbar-width: thin;
 }
+.prompt-identity-section {
+  margin: 0 0 16px; padding: 12px 14px; border-radius: 12px;
+  background: #F8FAFC; border: 1px solid #E2E8F0;
+}
+.prompt-identity-label { margin-bottom: 8px; }
+.prompt-identity-tools {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+.prompt-identity-tools.inline { margin-top: 8px; }
+.prompt-identity-btn {
+  font-size: 10px; font-weight: 700; color: #475569; background: #fff;
+  border: 1px solid #CBD5E1; border-radius: 6px; padding: 4px 8px;
+  cursor: pointer; font-family: inherit;
+}
+.prompt-identity-btn:hover { border-color: #94A3B8; color: #1E293B; }
+.prompt-identity-btn.subtle { font-weight: 600; color: #64748B; background: transparent; }
+.prompt-identity-textarea { min-height: 88px; font-size: 12px; line-height: 1.55; }
+.prompt-identity-details { margin-top: 10px; }
+.prompt-identity-summary {
+  font-size: 11px; font-weight: 700; color: #64748B; cursor: pointer;
+  list-style: none; margin-bottom: 8px;
+}
+.prompt-identity-summary::-webkit-details-marker { display: none; }
 .prompt-modal-cat-scroll .cat-tabs-wrap {
 overflow-x: visible;
 }
@@ -2137,6 +2160,16 @@ flex-shrink: 0; font-size: 10px; color: #9CA3AF; background: none; border: 1px s
 border-radius: 4px; padding: 2px 7px; cursor: pointer; font-family: inherit;
 }
 .prompt-reset-btn:hover { border-color: #EF4444; color: #EF4444; }
+.prompt-reset-btn.is-at-default,
+.prompt-reset-btn:disabled {
+  opacity: 0.45; cursor: not-allowed; color: #C0C0C0; border-color: #E8E8E8; background: #FAFAFA;
+}
+.prompt-reset-btn.is-at-default:hover,
+.prompt-reset-btn:disabled:hover { border-color: #E8E8E8; color: #C0C0C0; }
+.prompt-reset-btn.is-modified:not(:disabled) {
+  color: #B45309; border-color: #FCD34D; background: #FFFBEB;
+}
+.prompt-reset-btn.is-modified:not(:disabled):hover { border-color: #F59E0B; color: #92400E; }
 .prompt-cat-reset-bar {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
   margin: 10px 16px 0; padding: 10px 12px; border-radius: 10px;
@@ -2148,6 +2181,16 @@ border-radius: 4px; padding: 2px 7px; cursor: pointer; font-family: inherit;
   border: 1.5px solid #F59E0B; border-radius: 8px; padding: 7px 12px; cursor: pointer; font-family: inherit;
 }
 .prompt-reset-all-btn:hover { background: #FEF3C7; border-color: #D97706; color: #92400E; }
+.prompt-reset-all-btn.is-at-default,
+.prompt-reset-all-btn:disabled {
+  opacity: 0.45; cursor: not-allowed; color: #C0C0C0; border-color: #E8E8E8; background: #FAFAFA;
+}
+.prompt-reset-all-btn.is-at-default:hover,
+.prompt-reset-all-btn:disabled:hover { background: #FAFAFA; border-color: #E8E8E8; color: #C0C0C0; }
+.prompt-reset-all-btn.is-modified:not(:disabled) {
+  color: #B45309; border-color: #F59E0B; background: #FFFBEB;
+}
+.prompt-reset-all-btn.is-modified:not(:disabled):hover { background: #FEF3C7; border-color: #D97706; color: #92400E; }
 .prompt-textarea {
 width: 100%; min-height: 140px; padding: 12px 14px;
 border: 1.5px solid #E5E7EB; border-radius: 10px;

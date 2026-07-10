@@ -2485,6 +2485,20 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   overflow-y: hidden;
   box-sizing: border-box;
 }
+.ops-proposal-edit-hint {
+  font-size: 10px;
+  font-weight: 500;
+  color: #94a3b8;
+}
+.ops-proposal-field .ops-proposal-textarea {
+  display: none;
+}
+.ops-proposal-field.is-editing .ops-proposal-textarea {
+  display: block;
+}
+.ops-proposal-field.is-editing .ops-proposal-preview {
+  display: none;
+}
 .ops-proposal-preview {
   padding: 8px 10px;
   border: 1px solid #e2e8f0;
@@ -2493,6 +2507,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-size: 12px;
   line-height: 1.55;
   color: #334155;
+  cursor: text;
 }
 .ops-proposal-sentence {
   display: block;

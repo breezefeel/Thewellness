@@ -10624,7 +10624,8 @@ function renderAddFormFlowSectionHTML_(){
 }
 
 function renderAddForm(){
-  const cat = CATEGORIES[state.newItem.catId] || CATEGORIES[0];
+  const catId = state.newItem.catId;
+  const cat = CATEGORIES[catId] || CATEGORIES[0];
   const isDaily = isDailyShareCategory(state.newItem.catId);
   const isExpert = isExpertCourseCategory(state.newItem.catId);
   const hasPhoto = newItemHasRefImages_();

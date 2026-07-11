@@ -3251,6 +3251,7 @@ function applyTopicToStepSlot_(catId, stepId, slotNum, topicData){
     existing.topic = String(topicData.topic).trim();
     if(topicData.angle != null) existing.angle = String(topicData.angle).trim();
     if(topicData.rationale) existing.rationale = stripTopicRationaleStepPrefix_(String(topicData.rationale).trim());
+    existing.updatedAt = new Date().toISOString();
     applyDraftRoadmapAssignment_(existing, catId, stepId, title, slot, 5);
     ensurePendingAssignmentForDraft_(catId, stepId, slot, existing.id);
     return true;
@@ -3261,7 +3262,8 @@ function applyTopicToStepSlot_(catId, stepId, slotNum, topicData){
     topic: String(topicData.topic).trim(),
     angle: String(topicData.angle || '').trim(),
     rationale: stripTopicRationaleStepPrefix_(String(topicData.rationale || '').trim()),
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
   applyDraftRoadmapAssignment_(draft, catId, stepId, title, slot, 5);
   cat.drafts.push(draft);
@@ -5994,14 +5996,15 @@ function flushDraftBrandFieldsFromDom_(){
     syncDraftFieldsFromWritingBrief_(draft);
   }
   if(!isUserAddedDraftId_(draftId)){
-    if(!state.draftBrandOverrides) state.draftBrandOverrides = {};
-    state.draftBrandOverrides[draftId] = {
+    stampDraftBrandOverride_(draftId, {
       series: draft.series || '',
       step: draft.step || '',
       pillar: draft.pillar || '',
       rationale: draft.rationale || '',
-      writingBrief: draft.writingBrief || ''
-    };
+      writingBrief: draft.writingBrief || '',
+      topic: draft.topic || '',
+      angle: draft.angle || ''
+    });
   }
 }
 window.saveDraftBrandFields_ = function(opts){
@@ -6116,7 +6119,12 @@ window.updateTopicDraftField_ = function(draftId, field, value){
   var d = (cat.drafts || []).find(function(x){ return x && x.id === draftId; });
   if(!d) return;
   d[field] = field === 'rationale' ? stripTopicRationaleStepPrefix_(String(value || '').trim()) : String(value || '').trim();
-  save({ driveImmediate: true });
+  d.updatedAt = new Date().toISOString();
+  if(!isUserAddedDraftId_(draftId)){
+    var patch = { topic: d.topic || '', angle: d.angle || '', rationale: d.rationale || '' };
+    stampDraftBrandOverride_(draftId, patch);
+  }
+  save({ driveImmediate: true, gasImmediate: true });
 };
 window.refreshTopicWorkshop_ = function(){
   if(state.planWorkshopMode === 'topic'){
@@ -6390,6 +6398,8 @@ function applyBuiltinDraftBrandSeeds_(){
       if(Object.prototype.hasOwnProperty.call(ov, 'rationale')) d.rationale = String(ov.rationale || '').trim();
       else if(!d.rationale && rationales[i]) d.rationale = rationales[i];
       if(ov.roadmapStepId != null && String(ov.roadmapStepId).trim()) d.roadmapStepId = String(ov.roadmapStepId).trim();
+      if(Object.prototype.hasOwnProperty.call(ov, 'topic') && String(ov.topic || '').trim()) d.topic = String(ov.topic).trim();
+      if(Object.prototype.hasOwnProperty.call(ov, 'angle') && String(ov.angle || '').trim()) d.angle = String(ov.angle).trim();
     });
   });
 }
@@ -6630,6 +6640,7 @@ let state = {
   deletedDraftIds: {},
   opsManual: null,
   catGroupLast: { general: 0, expert: 3 },
+  syncRevision: 0,
 };
 
 function getCatGroupKeyForCat_(catId){
@@ -6884,6 +6895,10 @@ function restoreDetailFocusTrapIfOpen_(){
   }
 }
 function closeTopmostPlannerOverlay_(){
+  if(document.getElementById('sync-status-overlay').classList.contains('open')){
+    closeSyncStatusModal_();
+    return true;
+  }
   if(document.getElementById('drive-modal-overlay').classList.contains('open')){
     closeDriveModal();
     return true;
@@ -7606,6 +7621,48 @@ function getPlannerGasUrl_(){
   } catch(e){}
   return PLANNER_GAS_URL;
 }
+function ensurePayloadSyncRevision_(payload){
+  if(!payload || typeof payload !== 'object') return payload;
+  var rev = parseInt(payload.syncRevision, 10);
+  if(!isNaN(rev) && rev > 0) return payload;
+  var ms = getPayloadSavedMs_(payload);
+  payload.syncRevision = ms > 0 ? Math.floor(ms / 1000) : 0;
+  return payload;
+}
+function getPayloadRevision_(payload){
+  if(!payload) return 0;
+  ensurePayloadSyncRevision_(payload);
+  var rev = parseInt(payload.syncRevision, 10);
+  if(!isNaN(rev) && rev > 0) return rev;
+  var ms = getPayloadSavedMs_(payload);
+  return ms > 0 ? Math.floor(ms / 1000) : 0;
+}
+/** true = remote 쪽을 기본으로 (revision·시각 모두 고려) */
+function preferRemotePayload_(local, remote){
+  if(!remote) return false;
+  if(!local) return true;
+  var lr = getPayloadRevision_(local);
+  var rr = getPayloadRevision_(remote);
+  if(rr > lr) return true;
+  if(lr > rr) return false;
+  return getPayloadSavedMs_(remote) >= getPayloadSavedMs_(local);
+}
+function invalidateStalePendingPlans_(){
+  state.pendingSubGoalPlan = null;
+  state.pendingYearPlan = null;
+  try {
+    sessionStorage.removeItem(PENDING_SUBGOAL_SS_KEY);
+    sessionStorage.removeItem(PENDING_YEAR_SS_KEY);
+  } catch(e){}
+}
+function stampDraftBrandOverride_(draftId, patch){
+  if(!draftId) return;
+  if(!state.draftBrandOverrides) state.draftBrandOverrides = {};
+  var prev = state.draftBrandOverrides[draftId] || {};
+  state.draftBrandOverrides[draftId] = Object.assign({}, prev, patch || {}, {
+    updatedAt: new Date().toISOString()
+  });
+}
 function getPersistPayload(){
   var dailyLast = '';
   try { dailyLast = localStorage.getItem('ht_daily_auto_last') || ''; } catch(e0){}
@@ -7613,6 +7670,7 @@ function getPersistPayload(){
     published: state.published,
     generatedOnly: state.generatedOnly,
     localSavedAt: state.localSavedAt,
+    syncRevision: state.syncRevision || 0,
     chatgptOpenUrl: state.chatgptOpenUrl,
     prompts: state.prompts,
     promptRefineMilestones: state.promptRefineMilestones || {},
@@ -7688,7 +7746,9 @@ async function plannerPullRemoteIntoStateCore_(){
   if(!remote) return false;
   var merged = mergePlannerPayloads_(body, remote);
   if(plannerSyncFingerprint_(body) === plannerSyncFingerprint_(merged)) return false;
-  applyPersistPayload(merged);
+  var remoteWins = preferRemotePayload_(body, remote);
+  if(remoteWins) invalidateStalePendingPlans_();
+  applyPersistPayload(merged, { skipRestorePending: remoteWins });
   return true;
 }
 async function plannerPullRemoteIntoState_(){
@@ -7718,9 +7778,12 @@ async function plannerGasPushNow_(){
     if(data.result === 'conflict' && data.payload){
       var promptsBefore = promptsFingerprint_(state.prompts);
       var localDeleted = Object.assign({}, state.deletedDraftIds || {});
-      var merged = mergePlannerPayloads_(getPersistPayload(), data.payload);
+      var localBefore = getPersistPayload();
+      var merged = mergePlannerPayloads_(localBefore, data.payload);
       merged.deletedDraftIds = Object.assign({}, merged.deletedDraftIds || {}, localDeleted);
-      applyPersistPayload(merged);
+      var remoteWins = preferRemotePayload_(localBefore, data.payload);
+      if(remoteWins) invalidateStalePendingPlans_();
+      applyPersistPayload(merged, { skipRestorePending: remoteWins });
       save({ skipDriveUpload: true, skipGasPush: true });
       if(data.payload.plannerLastAuto && typeof handleServerPlannerAuto_ === 'function'){
         handleServerPlannerAuto_(data.payload);
@@ -7737,6 +7800,14 @@ async function plannerGasPushNow_(){
       if(isPlannerAuthError_(data)) notifyPlannerAuthError_(data);
       throw new Error(data.message || '서버 백업 실패');
     }
+    if(data.result === 'success' && data.payload){
+      var canon = mergePlannerPayloads_(getPersistPayload(), data.payload);
+      applyPersistPayload(canon, { skipRestorePending: true });
+      save({ skipDriveUpload: true, skipGasPush: true });
+      markGasSyncOk_(state.syncRevision, data.savedAt || canon.savedAt);
+    } else if(data.result === 'success'){
+      markGasSyncOk_(state.syncRevision, data.savedAt);
+    }
   } catch(err) {
     console.warn('[GAS push]', err);
     if(typeof setAppToast === 'function'){
@@ -7749,6 +7820,30 @@ function getPayloadSavedMs_(payload){
   if(!payload) return 0;
   return parseIsoMs_(payload.savedAt || payload.localSavedAt);
 }
+function draftExtraTimestamp_(draft){
+  if(!draft) return 0;
+  return parseIsoMs_(draft.updatedAt) || userAddedDraftTimestamp_(draft.id) || 0;
+}
+function mergeDraftBrandOverrides_(local, remote, preferRemote){
+  var out = {};
+  var keys = {};
+  Object.keys(local || {}).forEach(function(k){ keys[k] = true; });
+  Object.keys(remote || {}).forEach(function(k){ keys[k] = true; });
+  Object.keys(keys).forEach(function(id){
+    var l = (local || {})[id] || {};
+    var r = (remote || {})[id] || {};
+    if(!Object.keys(l).length){ out[id] = Object.assign({}, r); return; }
+    if(!Object.keys(r).length){ out[id] = Object.assign({}, l); return; }
+    var lAt = parseIsoMs_(l.updatedAt);
+    var rAt = parseIsoMs_(r.updatedAt);
+    if(lAt && rAt && lAt !== rAt){
+      out[id] = Object.assign({}, lAt > rAt ? l : r);
+      return;
+    }
+    out[id] = Object.assign({}, preferRemote ? l : r, preferRemote ? r : l);
+  });
+  return out;
+}
 
 function filterDeletedFromExtraDraftsByCat_(byCat, deleted){
   if(!byCat || typeof byCat !== 'object') return byCat || {};
@@ -7758,11 +7853,20 @@ function filterDeletedFromExtraDraftsByCat_(byCat, deleted){
   });
   return out;
 }
-function mergeExtraDraftsByCat_(a, b, deletedIds){
+function mergeExtraDraftsByCat_(a, b, deletedIds, preferRemote){
   var deleted = deletedIds || {};
   a = filterDeletedFromExtraDraftsByCat_(a, deleted);
   b = filterDeletedFromExtraDraftsByCat_(b, deleted);
   var out = {};
+  function mergeDraftPair(existing, incoming){
+    if(!existing) return Object.assign({}, incoming);
+    if(!incoming) return Object.assign({}, existing);
+    var eAt = draftExtraTimestamp_(existing);
+    var iAt = draftExtraTimestamp_(incoming);
+    if(iAt > eAt) return Object.assign({}, existing, incoming);
+    if(eAt > iAt) return Object.assign({}, incoming, existing);
+    return Object.assign({}, existing, incoming);
+  }
   function addFrom(src){
     Object.keys(src || {}).forEach(function(k){
       if(!out[k]) out[k] = [];
@@ -7770,12 +7874,14 @@ function mergeExtraDraftsByCat_(a, b, deletedIds){
         if(!d || !d.id || deleted[d.id]) return;
         var ix = out[k].findIndex(function(x){ return x.id === d.id; });
         if(ix === -1) out[k].push(Object.assign({}, d));
-        else out[k][ix] = Object.assign({}, out[k][ix], d);
+        else out[k][ix] = mergeDraftPair(out[k][ix], d);
       });
     });
   }
-  addFrom(a);
-  addFrom(b);
+  var first = preferRemote ? a : b;
+  var second = preferRemote ? b : a;
+  addFrom(first);
+  addFrom(second);
   return out;
 }
 function mergePublishedMaps_(a, b, preferB){
@@ -7832,15 +7938,17 @@ function mergeSubGoalPlansByTs_(localPlans, remotePlans, preferRemote){
   return out;
 }
 function mergePlannerPayloads_(local, remote){
-  if(!remote) return local || {};
-  if(!local) return Object.assign({}, remote);
+  if(!remote) return ensurePayloadSyncRevision_(Object.assign({}, local || {}));
+  if(!local) return ensurePayloadSyncRevision_(Object.assign({}, remote));
+  ensurePayloadSyncRevision_(local);
+  ensurePayloadSyncRevision_(remote);
+  var preferRemote = preferRemotePayload_(local, remote);
   var localMs = getPayloadSavedMs_(local);
   var remoteMs = getPayloadSavedMs_(remote);
-  var preferRemote = remoteMs >= localMs;
   var out = Object.assign({}, preferRemote ? remote : local, {
     published: mergePublishedMaps_(local.published, remote.published, preferRemote),
     generatedOnly: mergeGeneratedMaps_(local.generatedOnly, remote.generatedOnly, preferRemote),
-    extraDraftsByCat: mergeExtraDraftsByCat_(local.extraDraftsByCat, remote.extraDraftsByCat, Object.assign({}, remote.deletedDraftIds || {}, local.deletedDraftIds || {})),
+    extraDraftsByCat: mergeExtraDraftsByCat_(local.extraDraftsByCat, remote.extraDraftsByCat, Object.assign({}, remote.deletedDraftIds || {}, local.deletedDraftIds || {}), preferRemote),
     deletedDraftIds: Object.assign({}, remote.deletedDraftIds || {}, local.deletedDraftIds || {}),
     promptRefineMilestones: Object.assign({}, local.promptRefineMilestones || {}, remote.promptRefineMilestones || {}),
   });
@@ -7877,11 +7985,12 @@ function mergePlannerPayloads_(local, remote){
       ? remote.syncRationalesOnBrandSave !== false
       : local.syncRationalesOnBrandSave !== false;
   }
-  out.draftBrandOverrides = Object.assign({}, remote.draftBrandOverrides || {}, local.draftBrandOverrides || {});
+  out.draftBrandOverrides = mergeDraftBrandOverrides_(local.draftBrandOverrides, remote.draftBrandOverrides, preferRemote);
   out.opsManual = mergeOpsManual_(local.opsManual, remote.opsManual, preferRemote);
   var mergedMs = Math.max(localMs, remoteMs, Date.now());
   out.savedAt = new Date(mergedMs).toISOString();
   out.localSavedAt = out.savedAt;
+  out.syncRevision = Math.max(getPayloadRevision_(local), getPayloadRevision_(remote));
   delete out.apiKey;
   return out;
 }
@@ -7912,18 +8021,23 @@ function brandingFingerprint_(branding){
 function plannerSyncFingerprint_(payload){
   if(!payload) return '';
   try {
-    var ids = [];
+    var extraBits = [];
     var byCat = payload.extraDraftsByCat || {};
     Object.keys(byCat).sort().forEach(function(k){
-      (byCat[k] || []).forEach(function(d){ if(d && d.id) ids.push(d.id); });
+      (byCat[k] || []).forEach(function(d){
+        if(!d || !d.id) return;
+        extraBits.push(d.id + ':' + String(d.topic || '') + '|' + String(d.angle || '') + '|' + String(d.rationale || ''));
+      });
     });
     return JSON.stringify({
-      extra: ids.sort(),
+      extra: extraBits.sort(),
+      overrides: payload.draftBrandOverrides || {},
       pub: Object.keys(payload.published || {}).sort(),
       gen: Object.keys(payload.generatedOnly || {}).sort(),
       del: Object.keys(payload.deletedDraftIds || {}).sort(),
       brand: brandingFingerprint_(payload.branding),
-      ops: payload.opsManual ? JSON.stringify(payload.opsManual) : ''
+      ops: payload.opsManual ? JSON.stringify(payload.opsManual) : '',
+      rev: getPayloadRevision_(payload)
     });
   } catch(e){ return ''; }
 }
@@ -7959,11 +8073,248 @@ function startPlannerIdleSync_() {
 
 /** Drive(appData) · GAS 서버 백업을 이 기기와 합침 (주제·초안·발행본 누락 방지) */
 var _plannerSyncMutexTail = Promise.resolve();
+let _plannerSyncUiBusy = false;
+let _syncStatusUiTimer = null;
+let _syncStatusModalRemote = null;
 function withPlannerSyncMutex_(fn){
-  var run = _plannerSyncMutexTail.then(fn, fn);
+  _plannerSyncUiBusy = true;
+  updateSyncStatusUI_();
+  var run = _plannerSyncMutexTail.then(function(){
+    return fn();
+  }, function(){
+    return fn();
+  }).finally(function(){
+    _plannerSyncUiBusy = false;
+    updateSyncStatusUI_();
+  });
   _plannerSyncMutexTail = run.catch(function(){});
   return run;
 }
+function readStoredSyncRev_(key){
+  try { return parseInt(localStorage.getItem(key) || '0', 10) || 0; } catch(e){ return 0; }
+}
+function markGasSyncOk_(rev, iso){
+  try {
+    localStorage.setItem(GAS_LAST_SYNC_KEY, iso || new Date().toISOString());
+    localStorage.setItem(GAS_LAST_SYNC_REV_KEY, String(rev != null ? rev : (state.syncRevision || 0)));
+  } catch(e){}
+  updateSyncStatusUI_();
+}
+function markSyncReason_(reason){
+  try { if(reason) localStorage.setItem(SYNC_LAST_REASON_KEY, String(reason)); } catch(e){}
+}
+function isPlannerSyncBusy_(){
+  return !!(_plannerSyncUiBusy || plannerGasPushTimer || driveUploadTimer);
+}
+function isServerSyncConfigured_(){
+  return !!(getPlannerGasUrl_() && location.protocol !== 'file:');
+}
+function getSyncStatusInfo_(remoteMeta){
+  remoteMeta = remoteMeta || _syncStatusModalRemote || null;
+  var localRev = parseInt(state.syncRevision, 10) || 0;
+  var localAt = state.localSavedAt || '';
+  var serverRev = readStoredSyncRev_(GAS_LAST_SYNC_REV_KEY);
+  var serverAt = '';
+  try { serverAt = localStorage.getItem(GAS_LAST_SYNC_KEY) || ''; } catch(e0){}
+  var driveRev = readStoredSyncRev_(DRIVE_LAST_SYNC_REV_KEY);
+  var driveAt = '';
+  try { driveAt = localStorage.getItem(DRIVE_LAST_SYNC_KEY) || ''; } catch(e1){}
+  var remoteRev = remoteMeta && remoteMeta.rev != null ? remoteMeta.rev : null;
+  var remoteAt = remoteMeta && remoteMeta.savedAt ? remoteMeta.savedAt : '';
+  var busy = isPlannerSyncBusy_();
+  var serverOn = isServerSyncConfigured_();
+  var driveOn = hasDriveValidToken_();
+  var serverPending = serverOn && localRev > serverRev;
+  var drivePending = driveOn && localRev > driveRev;
+  var remoteNewer = remoteRev != null && remoteRev > localRev;
+  var overall = 'ok';
+  if(busy) overall = 'syncing';
+  else if(!serverOn && location.protocol === 'file:') overall = 'warn';
+  else if(serverPending || drivePending) overall = 'pending';
+  else if(remoteNewer) overall = 'pending';
+  else if(serverOn && !serverRev && localRev > 0) overall = 'pending';
+  var summary = '';
+  if(busy) summary = '동기화를 진행 중이에요. 잠시만 기다려 주세요.';
+  else if(remoteNewer) summary = '서버에 이 기기보다 최신 데이터(rev ' + remoteRev + ')가 있어요. 「지금 동기화」를 눌러 받아오세요.';
+  else if(serverPending || drivePending) summary = '이 기기에 저장된 변경이 아직 서버·Drive에 반영되지 않았어요. 곧 자동으로 올라가거나 「지금 동기화」를 눌러 주세요.';
+  else if(!serverOn) summary = '서버 URL이 없거나 file:// 로 열려 있어요. https로 열면 기기 간 동기화가 됩니다.';
+  else summary = '이 기기·서버·Drive가 같은 revision 기준으로 맞춰져 있어요.';
+  var lastReason = '';
+  try { lastReason = localStorage.getItem(SYNC_LAST_REASON_KEY) || ''; } catch(e2){}
+  return {
+    localRev: localRev,
+    localAt: localAt,
+    serverRev: serverRev,
+    serverAt: serverAt,
+    driveRev: driveRev,
+    driveAt: driveAt,
+    remoteRev: remoteRev,
+    remoteAt: remoteAt,
+    busy: busy,
+    serverOn: serverOn,
+    driveOn: driveOn,
+    serverPending: serverPending,
+    drivePending: drivePending,
+    remoteNewer: remoteNewer,
+    overall: overall,
+    summary: summary,
+    lastReason: lastReason
+  };
+}
+function scheduleSyncStatusUiRefresh_(){
+  if(_syncStatusUiTimer) clearTimeout(_syncStatusUiTimer);
+  _syncStatusUiTimer = setTimeout(function(){
+    _syncStatusUiTimer = null;
+    updateSyncStatusUI_();
+  }, 120);
+}
+function updateSyncStatusUI_(){
+  var btn = document.getElementById('btn-sync-status');
+  var dot = document.getElementById('sync-dot');
+  var label = document.getElementById('sync-status-label');
+  var sub = document.getElementById('sync-btn-sub');
+  if(!btn) return;
+  var info = getSyncStatusInfo_();
+  btn.classList.remove('ok', 'pending', 'syncing', 'warn');
+  if(dot) dot.className = 'sync-dot ' + info.overall;
+  btn.classList.add(info.overall);
+  if(label) label.textContent = '동기화';
+  if(sub){
+    if(info.busy) sub.textContent = '진행 중…';
+    else if(info.overall === 'pending') sub.textContent = '업로드 대기 · rev ' + info.localRev;
+    else if(info.overall === 'ok') sub.textContent = 'rev ' + info.localRev + ' · 최신';
+    else if(info.overall === 'warn') sub.textContent = '서버 미연결';
+    else sub.textContent = 'rev ' + info.localRev;
+  }
+  btn.title = info.summary;
+  var body = document.getElementById('sync-status-body');
+  if(body && document.getElementById('sync-status-overlay') && document.getElementById('sync-status-overlay').classList.contains('open')){
+    body.innerHTML = renderSyncStatusBodyHTML_(info);
+  }
+}
+function renderSyncStatusBodyHTML_(info){
+  function row(title, badgeClass, badgeText, metaHtml){
+    return '<div class="sync-status-row">' +
+      '<div class="sync-status-row-head">' +
+        '<span class="sync-status-row-title">' + escapeHtml(title) + '</span>' +
+        '<span class="sync-status-badge ' + badgeClass + '">' + escapeHtml(badgeText) + '</span>' +
+      '</div>' +
+      '<div class="sync-status-row-meta">' + metaHtml + '</div>' +
+    '</div>';
+  }
+  var localFmt = formatDriveTimeShort(info.localAt) || '(아직 없음)';
+  var html = '<div class="sync-status-summary ' + (info.overall === 'ok' ? '' : info.overall) + '">' + escapeHtml(info.summary) + '</div>';
+  html += row(
+    '이 기기',
+    info.busy ? 'syncing' : 'ok',
+    info.busy ? '저장/동기화 중' : '기준',
+    'revision <strong>' + info.localRev + '</strong> · 마지막 저장 <strong>' + escapeHtml(localFmt) + '</strong>'
+  );
+  if(info.serverOn){
+    var sBadge = info.serverPending ? 'pending' : (info.remoteNewer ? 'pending' : (info.serverRev ? 'ok' : 'off'));
+    var sText = info.serverPending ? '업로드 대기' : (info.remoteNewer ? '서버가 더 최신' : (info.serverRev ? '일치' : '미확인'));
+    var sMeta = '마지막 확인 revision <strong>' + info.serverRev + '</strong>';
+    if(info.serverAt) sMeta += ' · <strong>' + escapeHtml(formatDriveTimeShort(info.serverAt)) + '</strong>';
+    if(info.remoteRev != null){
+      sMeta += '<br>서버 현재 revision <strong>' + info.remoteRev + '</strong>';
+      if(info.remoteAt) sMeta += ' · <strong>' + escapeHtml(formatDriveTimeShort(info.remoteAt)) + '</strong>';
+    }
+    html += row('서버 (GAS)', sBadge, sText, sMeta);
+  } else {
+    html += row('서버 (GAS)', 'off', '미설정', 'https 배포 URL이 필요해요. 설정에서 GAS URL·토큰을 확인하세요.');
+  }
+  if(hasDriveConnection_()){
+    var dBadge = info.driveOn ? (info.drivePending ? 'pending' : (info.driveRev ? 'ok' : 'off')) : 'warn';
+    var dText = !info.driveOn ? '로그인 필요' : (info.drivePending ? '업로드 대기' : (info.driveRev ? '일치' : '미업로드'));
+    var dMeta = info.driveRev ? ('마지막 revision <strong>' + info.driveRev + '</strong>') : '아직 Drive에 올린 기록이 없어요.';
+    if(info.driveAt) dMeta += ' · <strong>' + escapeHtml(formatDriveTimeShort(info.driveAt)) + '</strong>';
+    html += row('Google Drive', dBadge, dText, dMeta);
+  } else {
+    html += row('Google Drive', 'off', '미연동', 'Drive 버튼에서 로그인하면 백업·복구에 쓸 수 있어요.');
+  }
+  if(info.lastReason){
+    html += '<div class="sync-status-row-meta" style="padding:0 2px;">최근 자동 동기화: <strong>' + escapeHtml(info.lastReason) + '</strong></div>';
+  }
+  html += '<div class="sync-status-row-meta" style="padding:0 2px;color:#9CA3AF;">revision은 저장할 때마다 1씩 올라가요. 숫자가 클수록 최신본입니다.</div>';
+  return html;
+}
+async function fetchServerSyncMeta_(){
+  var url = getPlannerGasUrl_();
+  if(!url || location.protocol === 'file:') return null;
+  try {
+    var r = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: plannerGasRequestBody_({ action: 'plannerSyncPull' })
+    });
+    var data = await r.json();
+    applyPlannerServerCaps_(data);
+    if(data.result === 'success' && data.payload){
+      return {
+        rev: getPayloadRevision_(data.payload),
+        savedAt: data.savedAt || data.payload.savedAt || data.payload.localSavedAt || ''
+      };
+    }
+  } catch(e){
+    console.warn('[동기화 상태]', e);
+  }
+  return null;
+}
+window.openSyncStatusModal_ = async function(){
+  var overlay = document.getElementById('sync-status-overlay');
+  var body = document.getElementById('sync-status-body');
+  var err = document.getElementById('sync-status-err');
+  if(!overlay || !body) return;
+  if(err) err.textContent = '';
+  _syncStatusModalRemote = null;
+  overlay.classList.add('open');
+  body.innerHTML = renderSyncStatusBodyHTML_(getSyncStatusInfo_());
+  body.innerHTML += '<div class="sync-status-row-meta" style="padding:4px 2px;">서버 상태 확인 중…</div>';
+  try {
+    _syncStatusModalRemote = await fetchServerSyncMeta_();
+    body.innerHTML = renderSyncStatusBodyHTML_(getSyncStatusInfo_());
+  } catch(e2){
+    if(err) err.textContent = '서버 상태를 가져오지 못했어요.';
+    body.innerHTML = renderSyncStatusBodyHTML_(getSyncStatusInfo_());
+  }
+};
+window.closeSyncStatusModal_ = function(ev){
+  if(ev && ev.target && ev.currentTarget && ev.target !== ev.currentTarget) return;
+  var overlay = document.getElementById('sync-status-overlay');
+  if(overlay) overlay.classList.remove('open');
+  _syncStatusModalRemote = null;
+};
+window.runManualFullSync_ = async function(){
+  var btn = document.getElementById('btn-sync-now');
+  var err = document.getElementById('sync-status-err');
+  if(btn) btn.disabled = true;
+  if(err) err.textContent = '';
+  updateSyncStatusUI_();
+  try {
+    markSyncReason_('수동');
+    var changed = await syncAllSourcesIfNewer_('manual');
+    if(isServerSyncConfigured_()){
+      await plannerGasPushNow_();
+    }
+    if(hasDriveValidToken_()){
+      await driveUploadNow();
+    }
+    _syncStatusModalRemote = await fetchServerSyncMeta_();
+    var body = document.getElementById('sync-status-body');
+    if(body) body.innerHTML = renderSyncStatusBodyHTML_(getSyncStatusInfo_());
+    if(typeof setAppToast === 'function'){
+      setAppToast(changed ? '최신 데이터를 받아 반영했어요.' : '이미 최신 상태예요.', { duration: 4200, variant: 'ok' });
+    }
+  } catch(e3){
+    var msg = (e3 && e3.message) ? e3.message : String(e3);
+    if(err) err.textContent = msg;
+    if(typeof setAppToast === 'function') setAppToast('동기화에 실패했어요.\n' + msg, { duration: 6500, variant: 'err' });
+  } finally {
+    if(btn) btn.disabled = false;
+    updateSyncStatusUI_();
+  }
+};
 async function syncAllSourcesIfNewer_(reason){
   return withPlannerSyncMutex_(function(){ return syncAllSourcesIfNewerCore_(reason); });
 }
@@ -8031,11 +8382,12 @@ async function syncAllSourcesIfNewerCore_(reason){
   var merged = mergePlannerPayloads_(localPayload, remote);
   var fpBefore = plannerSyncFingerprint_(localPayload);
   var fpAfter = plannerSyncFingerprint_(merged);
-  var remoteNewer = remoteMs > localMs + 1500;
+  var remoteNewer = preferRemotePayload_(localPayload, remote);
   if(fpBefore === fpAfter && !remoteNewer) return false;
 
   var promptsBefore = promptsFingerprint_(state.prompts);
-  applyPersistPayload(merged);
+  if(remoteNewer) invalidateStalePendingPlans_();
+  applyPersistPayload(merged, { skipRestorePending: remoteNewer });
   try {
     if(merged.dailyAutoLast) localStorage.setItem('ht_daily_auto_last', merged.dailyAutoLast);
   } catch(e2){}
@@ -8044,6 +8396,8 @@ async function syncAllSourcesIfNewerCore_(reason){
   renderTabs();
   renderMain();
   updateDriveButtonState();
+  markSyncReason_(reason || 'auto');
+  updateSyncStatusUI_();
 
   var promptsChanged = promptsBefore !== promptsFingerprint_(state.prompts);
   var topicsAdded = fpBefore !== fpAfter;
@@ -8104,7 +8458,8 @@ function collectExtraDrafts(){
         roadmapStepId: d.roadmapStepId || '',
         sourceNote: d.sourceNote || '',
         youtubeAnalysis: d.youtubeAnalysis || '',
-        youtubeUrls: d.youtubeUrls || []
+        youtubeUrls: d.youtubeUrls || [],
+        updatedAt: d.updatedAt || (userAddedDraftTimestamp_(d.id) ? new Date(userAddedDraftTimestamp_(d.id)).toISOString() : '')
       };
     });
   });
@@ -8125,7 +8480,8 @@ function mergeExtraDrafts(byCat){
         roadmapStepId: d.roadmapStepId || '',
         sourceNote: d.sourceNote || '',
         youtubeAnalysis: d.youtubeAnalysis || '',
-        youtubeUrls: d.youtubeUrls || []
+        youtubeUrls: d.youtubeUrls || [],
+        updatedAt: d.updatedAt || ''
       });
       var merged = cat.drafts[cat.drafts.length - 1];
       if(merged) assignUserAddedDraftToMisc_(merged, i);
@@ -8133,12 +8489,13 @@ function mergeExtraDrafts(byCat){
   });
   purgeDeletedDraftsFromCatalog_();
 }
-function applyPersistPayload(s){
+function applyPersistPayload(s, opts){
   if(!s) return;
   var prevDeleted = state.deletedDraftIds || {};
   state.published = s.published || {};
   state.generatedOnly = s.generatedOnly || {};
   state.localSavedAt = s.localSavedAt || '';
+  state.syncRevision = parseInt(s.syncRevision, 10) || state.syncRevision || 0;
   state.chatgptOpenUrl = s.chatgptOpenUrl || '';
   state.prompts = s.prompts !== undefined ? s.prompts : null;
   state.promptRefineMilestones = s.promptRefineMilestones || {};
@@ -8158,8 +8515,10 @@ function applyPersistPayload(s){
   CATEGORIES.forEach(function(cat, i){ ensureUserAddedDraftsInMisc_(i); });
   purgeDeletedDraftsFromCatalog_();
   applyBuiltinDraftBrandSeeds_();
-  restorePendingSubGoalPlan_();
-  restorePendingYearPlan_();
+  if(!(opts && opts.skipRestorePending)){
+    restorePendingSubGoalPlan_();
+    restorePendingYearPlan_();
+  }
   if(sanitizeBrandingClinicRefs_()) save({ skipDriveUpload: true, skipGasPush: true });
   if(ensureYearPlanMigrated_()) save({ skipDriveUpload: true, skipGasPush: true });
   if(migrateLegacyPublishTabPublished_()) save({ skipDriveUpload: true, skipGasPush: true });
@@ -8169,6 +8528,7 @@ function applyPersistPayload(s){
 function save(opts) {
   var o = opts || {};
   state.localSavedAt = new Date().toISOString();
+  state.syncRevision = (parseInt(state.syncRevision, 10) || 0) + 1;
   var payload = JSON.stringify(getLocalStoragePayload());
   var ok = false;
   try {
@@ -8199,6 +8559,7 @@ function save(opts) {
     }
     if(!o.skipDriveUpload) scheduleDriveUpload(!!o.driveImmediate);
     if(!o.skipGasPush) schedulePlannerGasPush_(!!o.gasImmediate);
+    scheduleSyncStatusUiRefresh_();
   }
 }
 
@@ -8206,6 +8567,10 @@ function save(opts) {
 const DRIVE_SYNC_FILENAME = 'planner-sync-v1.json';
 const DRIVE_CONNECTED_KEY = 'ht_drive_connected';
 const DRIVE_LAST_SYNC_KEY = 'ht_drive_last_sync_ok';
+const DRIVE_LAST_SYNC_REV_KEY = 'ht_drive_last_sync_rev';
+const GAS_LAST_SYNC_KEY = 'ht_gas_last_sync_ok';
+const GAS_LAST_SYNC_REV_KEY = 'ht_gas_last_sync_rev';
+const SYNC_LAST_REASON_KEY = 'ht_sync_last_reason';
 /** Google OAuth 웹 클라이언트 ID — 비밀이 아니므로 내장. 다른 ID로 덮어쓰려면 Drive 모달에서 입력( ht_gdrive_cid 저장 ) */
 const GOOGLE_OAUTH_WEB_CLIENT_ID = '442956975507-a6qqamnjlhuqflflfdknq20slb16jrmc.apps.googleusercontent.com';
 let driveTokenWaiters = [];
@@ -8905,8 +9270,12 @@ window.onDriveButtonClick = async function(){
   }
 };
 function markDriveSyncOk_(){
-  try { localStorage.setItem(DRIVE_LAST_SYNC_KEY, new Date().toISOString()); } catch(e){}
+  try {
+    localStorage.setItem(DRIVE_LAST_SYNC_KEY, new Date().toISOString());
+    localStorage.setItem(DRIVE_LAST_SYNC_REV_KEY, String(state.syncRevision || 0));
+  } catch(e){}
   updateDriveButtonState();
+  updateSyncStatusUI_();
 }
 function maybeRequestNotificationAfterDrive(){
   try{
@@ -9013,8 +9382,10 @@ window.driveDisconnect = function(){
 try {
   const s = JSON.parse(localStorage.getItem(SK));
   if(s){
+    ensurePayloadSyncRevision_(s);
     applyPersistPayload(s);
     if(s.apiKey) state.apiKey = s.apiKey;
+    if(s.syncRevision) state.syncRevision = parseInt(s.syncRevision, 10) || state.syncRevision || 0;
   }
   else applyBuiltinDraftBrandSeeds_();
 } catch(e){
@@ -9035,6 +9406,7 @@ window.onload = () => {
   else { trapFocusIn_(document.querySelector('#api-modal .modal-box')); }
   refreshPlannerServerCaps_();
   updateDriveButtonState();
+  updateSyncStatusUI_();
   bindPlannerMainClickDelegation_();
   renderTabs();
   updateAddButtonVisibility_();

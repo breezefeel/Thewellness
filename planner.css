@@ -64,11 +64,13 @@ flex-wrap: nowrap; gap: 10px;
   .planner-head-right .api-badge,
   .planner-head-right .btn-prompt-settings,
   .planner-head-right .btn-drive-sync,
+  .planner-head-right .btn-sync-status,
   .planner-head-right .btn-add {
     font-size: 10px;
     padding: 5px 7px;
   }
   .btn-drive-sync { min-width: 0; padding: 4px 7px; }
+  .btn-sync-status { min-width: 0; padding: 4px 7px; }
   .drive-btn-main { font-size: 10px; gap: 4px; }
   .drive-btn-sub { font-size: 8px; max-width: 72px; }
   .btn-add { padding: 5px 10px; }
@@ -2280,6 +2282,55 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .btn-drive-sync.linked.warn .drive-btn-sub { color: #FBBF24; }
 .btn-drive-sync:hover { border-color: #4285F4; color: #93C5FD; }
 .btn-drive-sync.linked { border-color: #4285F4; color: #93C5FD; }
+.btn-sync-status {
+background: none; color: #9CA3AF; border: 1px solid #3A3A3A;
+border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer;
+font-family: inherit; transition: all .15s;
+display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+line-height: 1.15; min-width: 4.5rem; text-align: right;
+}
+.sync-btn-main { font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+.sync-dot { width: 6px; height: 6px; border-radius: 50%; background: #6B7280; flex: 0 0 auto; }
+.sync-dot.ok { background: #2DD4BF; }
+.sync-dot.pending { background: #FBBF24; }
+.sync-dot.syncing { background: #60A5FA; animation: syncDotPulse 1s ease-in-out infinite; }
+.sync-dot.warn { background: #EF4444; }
+@keyframes syncDotPulse { 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
+.sync-btn-sub {
+font-size: 9px; color: #6B7280; max-width: 140px; margin-top: 2px;
+white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.btn-sync-status.ok { border-color: #0F766E; color: #5EEAD4; }
+.btn-sync-status.ok .sync-btn-sub { color: #5EEAD4; }
+.btn-sync-status.pending { border-color: #D97706; color: #FCD34D; }
+.btn-sync-status.pending .sync-btn-sub { color: #FCD34D; }
+.btn-sync-status.syncing { border-color: #2563EB; color: #93C5FD; }
+.btn-sync-status.warn { border-color: #DC2626; color: #FCA5A5; }
+.btn-sync-status:hover { border-color: #0F766E; color: #5EEAD4; }
+#sync-status-overlay { z-index: 315; }
+.sync-status-body { display: flex; flex-direction: column; gap: 10px; }
+.sync-status-row {
+  border: 1px solid #E5E7EB; border-radius: 10px; padding: 10px 12px; background: #FAFAF9;
+}
+.sync-status-row-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.sync-status-row-title { font-size: 12px; font-weight: 800; color: #374151; }
+.sync-status-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; white-space: nowrap;
+}
+.sync-status-badge.ok { background: #D1FAE5; color: #065F46; }
+.sync-status-badge.pending { background: #FEF3C7; color: #92400E; }
+.sync-status-badge.syncing { background: #DBEAFE; color: #1E40AF; }
+.sync-status-badge.off { background: #F3F4F6; color: #6B7280; }
+.sync-status-badge.warn { background: #FEE2E2; color: #991B1B; }
+.sync-status-row-meta { font-size: 11px; color: #6B7280; line-height: 1.5; }
+.sync-status-row-meta strong { color: #374151; font-weight: 700; }
+.sync-status-summary {
+  font-size: 12px; line-height: 1.55; color: #374151;
+  padding: 10px 12px; border-radius: 10px; background: #F0FDF4; border: 1px solid #BBF7D0;
+}
+.sync-status-summary.pending { background: #FFFBEB; border-color: #FDE68A; }
+.sync-status-summary.warn { background: #FEF2F2; border-color: #FECACA; }
+.sync-status-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
 #drive-modal-overlay { z-index: 310; }
 #drive-oauth-busy {
   display: none; position: fixed; inset: 0; z-index: 500;

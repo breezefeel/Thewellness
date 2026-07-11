@@ -1531,11 +1531,17 @@ function syncOpsReviewItemComplete_(itemId){
   var om = getOpsManualState_();
   if(!om.review || !om.review[itemId]) return;
   if(!om.checked || typeof om.checked !== 'object') om.checked = {};
+  if(!om.checkedAt) om.checkedAt = {};
   var rv = om.review[itemId];
   var proposalsDone = !(rv.proposalItems || []).length || (rv.proposalItems || []).every(function(p){ return !!p.done; });
   var placementsDone = !(rv.placementChecks || []).length || (rv.placementChecks || []).every(function(c){ return !!c.done; });
-  if(proposalsDone && placementsDone) om.checked[itemId] = true;
-  else delete om.checked[itemId];
+  if(proposalsDone && placementsDone){
+    om.checked[itemId] = true;
+    om.checkedAt[itemId] = new Date().toISOString();
+  } else {
+    om.checked[itemId] = false;
+    om.checkedAt[itemId] = new Date().toISOString();
+  }
 }
 function regenerateOpsReviewText_(fieldName, current, base){
   var cur = String(current || '').trim();
@@ -7994,17 +8000,81 @@ function mergePlannerPayloads_(local, remote){
   delete out.apiKey;
   return out;
 }
+function mergeOpsManualFieldMaps_(localVal, localAt, remoteVal, remoteAt, preferRemote){
+  localVal = localVal || {};
+  remoteVal = remoteVal || {};
+  localAt = localAt || {};
+  remoteAt = remoteAt || {};
+  var outVal = {};
+  var outAt = {};
+  var keys = {};
+  Object.keys(localVal).forEach(function(k){ keys[k] = true; });
+  Object.keys(remoteVal).forEach(function(k){ keys[k] = true; });
+  Object.keys(localAt).forEach(function(k){ keys[k] = true; });
+  Object.keys(remoteAt).forEach(function(k){ keys[k] = true; });
+  Object.keys(keys).forEach(function(k){
+    var hasL = Object.prototype.hasOwnProperty.call(localVal, k);
+    var hasR = Object.prototype.hasOwnProperty.call(remoteVal, k);
+    var lt = parseIsoMs_(localAt[k]);
+    var rt = parseIsoMs_(remoteAt[k]);
+    if(lt && rt){
+      if(lt > rt){
+        if(hasL) outVal[k] = localVal[k];
+        else outVal[k] = false;
+        outAt[k] = localAt[k];
+      } else if(rt > lt){
+        if(hasR) outVal[k] = remoteVal[k];
+        else outVal[k] = false;
+        outAt[k] = remoteAt[k];
+      } else {
+        var pickRemote = preferRemote;
+        if(hasL && hasR) outVal[k] = pickRemote ? remoteVal[k] : localVal[k];
+        else if(hasL) outVal[k] = localVal[k];
+        else if(hasR) outVal[k] = remoteVal[k];
+        outAt[k] = pickRemote ? (remoteAt[k] || localAt[k]) : (localAt[k] || remoteAt[k]);
+      }
+      return;
+    }
+    if(lt && !rt){
+      outVal[k] = hasL ? localVal[k] : false;
+      outAt[k] = localAt[k];
+      return;
+    }
+    if(!lt && rt){
+      outVal[k] = hasR ? remoteVal[k] : false;
+      outAt[k] = remoteAt[k];
+      return;
+    }
+    if(hasL && hasR) outVal[k] = preferRemote ? remoteVal[k] : localVal[k];
+    else if(hasL) outVal[k] = localVal[k];
+    else if(hasR) outVal[k] = remoteVal[k];
+  });
+  Object.keys(outVal).forEach(function(k){
+    if(outVal[k] == null) delete outVal[k];
+  });
+  return { val: outVal, at: outAt };
+}
 function mergeOpsManual_(local, remote, preferRemote){
   if(!local || typeof local !== 'object') return remote && typeof remote === 'object' ? remote : null;
   if(!remote || typeof remote !== 'object') return local;
   var base = preferRemote ? remote : local;
   var other = preferRemote ? local : remote;
+  var checkedMerged = mergeOpsManualFieldMaps_(
+    local.checked, local.checkedAt, remote.checked, remote.checkedAt, preferRemote
+  );
+  var notesMerged = mergeOpsManualFieldMaps_(
+    local.notes, local.notesAt, remote.notes, remote.notesAt, preferRemote
+  );
   return {
     activeBranch: base.activeBranch || other.activeBranch || 'global',
-    checked: Object.assign({}, other.checked || {}, base.checked || {}),
-    notes: Object.assign({}, other.notes || {}, base.notes || {}),
+    checked: checkedMerged.val,
+    checkedAt: checkedMerged.at,
+    notes: notesMerged.val,
+    notesAt: notesMerged.at,
     collapsed: Object.assign({}, other.collapsed || {}, base.collapsed || {}),
-    newBranchMeta: Object.assign({}, other.newBranchMeta || {}, base.newBranchMeta || {})
+    review: Object.assign({}, other.review || {}, base.review || {}),
+    newBranchMeta: Object.assign({}, other.newBranchMeta || {}, base.newBranchMeta || {}),
+    updatedAt: (parseIsoMs_(base.updatedAt) >= parseIsoMs_(other.updatedAt) ? base.updatedAt : other.updatedAt) || new Date().toISOString()
   };
 }
 function brandingFingerprint_(branding){
@@ -9888,15 +9958,30 @@ function getNextPublishRecommendation() {
 // ── Main render ──
 function getOpsManualState_(){
   if(!state.opsManual || typeof state.opsManual !== 'object'){
-    state.opsManual = { activeBranch: 'global', checked: {}, notes: {}, collapsed: {}, review: {}, newBranchMeta: { name: '', area: '', note: '' } };
+    state.opsManual = { activeBranch: 'global', checked: {}, checkedAt: {}, notes: {}, notesAt: {}, collapsed: {}, review: {}, newBranchMeta: { name: '', area: '', note: '' } };
   }
   if(!state.opsManual.checked) state.opsManual.checked = {};
+  if(!state.opsManual.checkedAt) state.opsManual.checkedAt = {};
   if(!state.opsManual.notes) state.opsManual.notes = {};
+  if(!state.opsManual.notesAt) state.opsManual.notesAt = {};
   if(!state.opsManual.collapsed) state.opsManual.collapsed = {};
   if(!state.opsManual.review) state.opsManual.review = {};
   if(!state.opsManual.newBranchMeta) state.opsManual.newBranchMeta = { name: '', area: '', note: '' };
   if(!OPS_BRANCH_IDS.includes(state.opsManual.activeBranch)) state.opsManual.activeBranch = 'global';
   return state.opsManual;
+}
+function isOpsItemChecked_(om, itemId){
+  return !!(om && om.checked && om.checked[itemId] === true);
+}
+function stampOpsCheckedAt_(om, itemId){
+  if(!om.checkedAt) om.checkedAt = {};
+  om.checkedAt[itemId] = new Date().toISOString();
+  om.updatedAt = om.checkedAt[itemId];
+}
+function stampOpsNoteAt_(om, itemId){
+  if(!om.notesAt) om.notesAt = {};
+  om.notesAt[itemId] = new Date().toISOString();
+  om.updatedAt = om.notesAt[itemId];
 }
 function getOpsSectionsForBranch_(branchId){
   return OPS_MANUAL_SECTIONS.filter(function(sec){ return sec.branch === branchId; });
@@ -9923,7 +10008,7 @@ function countOpsManualProgress_(branchId){
   getOpsSectionsForBranch_(branchId).forEach(function(sec){
     (sec.items || []).forEach(function(it){
       total++;
-      if(om.checked[it.id]) done++;
+      if(isOpsItemChecked_(om, it.id)) done++;
     });
   });
   return { done: done, total: total };
@@ -9951,7 +10036,7 @@ function renderOpsManualMainHTML_(){
   var sections = getOpsSectionsForBranch_(branch).map(function(sec){
     var collapsed = !!om.collapsed[sec.id];
     var itemsHtml = (sec.items || []).map(function(it){
-      var checked = !!om.checked[it.id];
+      var checked = isOpsItemChecked_(om, it.id);
       var note = om.notes[it.id] || '';
       var review = ensureOpsReviewState_(it, branch) || { open: false, fields: {}, pinned: {} };
       var reviewOpen = !!review.open;
@@ -10016,7 +10101,7 @@ function renderOpsManualMainHTML_(){
     return '<details class="ops-section' + (collapsed ? '' : ' open') + '" id="ops-sec-' + sec.id + '"' + (collapsed ? '' : ' open') + '>' +
       '<summary class="ops-section-summary" onclick="toggleOpsSection_(\'' + sec.id + '\'); return false;">' +
         '<span class="ops-section-phase">' + escapeHtml(sec.phase) + '</span>' +
-        '<span class="ops-section-count">' + (sec.items || []).filter(function(it){ return om.checked[it.id]; }).length + '/' + (sec.items || []).length + '</span>' +
+        '<span class="ops-section-count">' + (sec.items || []).filter(function(it){ return isOpsItemChecked_(om, it.id); }).length + '/' + (sec.items || []).length + '</span>' +
       '</summary>' +
       '<ol class="ops-check-list">' + itemsHtml + '</ol>' +
     '</details>';
@@ -10033,8 +10118,9 @@ window.selectOpsBranch_ = selectOpsBranch_;
 function toggleOpsCheck_(itemId, checked){
   var om = getOpsManualState_();
   if(checked) om.checked[itemId] = true;
-  else delete om.checked[itemId];
-  save({ skipDriveUpload: false });
+  else om.checked[itemId] = false;
+  stampOpsCheckedAt_(om, itemId);
+  save({ skipDriveUpload: false, gasImmediate: true, driveImmediate: true });
   renderTabs();
   renderMain();
 }
@@ -10044,6 +10130,7 @@ function setOpsNote_(itemId, note){
   note = String(note || '').trim();
   if(note) om.notes[itemId] = note;
   else delete om.notes[itemId];
+  stampOpsNoteAt_(om, itemId);
   save({ skipDriveUpload: true, skipGasPush: true });
 }
 window.setOpsNote_ = setOpsNote_;

@@ -7098,30 +7098,43 @@ ${DAILY_SHARE_TONE_ANCHOR}
 - **summary**: topicTitle에 이어지는 연속 본문. **관찰 → 핵심 한 가지 → (선택) 짧은 감탄/철학 1문장** 흐름. 이모지 0~1개
 - **3~7문장**, 번호·불릿 없이 한 덩어리`;
 
-const DEFAULT_THREADS_SNS_PROMPT = `당신은 의료/건강 콘텐츠를 **Threads(쓰레드) 스타일**로 변환하는 전문가입니다.
+const THREADS_BODY_COMMENT_RULES = `[Threads 2단 구조 — 필수]
+■ **body(본문)**: 게시글 1포스트 — 궁금증·후킹만. 해설·답·근거는 넣지 마세요.
+■ **comment(댓글)**: 본인 댓글(재게시용) — 본문의 물음·반전에 대한 해설·근거·과정·철학.
+
+[본문 body]
+- **1~3문장**, 줄바꿈 최소. **한 줄 핵심**이 반이어야 함.
+- **교과서 vs 전문가**: "○○ 배웠지만, 현장에선 △△" 흐름.
+- **쉬운 비유** 1개. **의견이 갈리는** 주제 OK (의료법·과장 금지).
+- 통념 뒤집기·반전·궁금증 유발. **답·해설·리스트·근거는 본문에 쓰지 마세요.**
+
+[댓글 comment]
+- 본문에서 던진 **궁금증·반전에 대한 답**.
+- **과정·철학·왜** — 블로그 원리 설명 축을 압축.
+- **근거**: 현장 경험·짧은 메커니즘. (해당 시) 병원 진료 먼저 권고.
+- 본문과 **같은 문장 반복 금지**. 해시태그·"~하세요" 나열 금지.
+
+[공통 금지]
+- 치료·완치·진단·처방·수술 대신·Doctor/닥터/원장님
+- 인스타 해시태그·불릿·번호 목록 그대로 복사
+- 본문에 긴 해설·리스트·해답 미리 공개`;
+
+const DEFAULT_THREADS_SNS_PROMPT = `당신은 **블로그 글**을 Threads **2단 포스트**(본문 훅 + 댓글 해설)로 만드는 전문가입니다.
+
+[인스타와 다른 각도 — 중요]
+- **인스타** = "오늘 현장에서 ○○ 했더니 △△" (결과·시연·변화)
+- **쓰레드** = **통념 뒤집기 훅(본문)** + **과정·철학·근거(댓글)**
+- 블로그를 다시 요약하지 말고, 위 각도로 **새로** 쓰세요.
 
 [말투]
 - 격식체(~습니다) → 구어체(~임, ~거임, ~됨)
-- 설명하는 말투 → 혼잣말처럼 툭 던지는 말투
-- 전문가가 동료한테 말하는 느낌
+- 혼잣말처럼 툭 던지는 말투. 전문가가 동료·팔로워에게 말하는 느낌
 
-[구조]
-- 첫 줄: 반전 or 의문 → 짧게 끊기
-- 중간: 핵심 근거 1~3줄 (→ 로 흐름 연결 가능)
-- 마지막: 임상 경험 기반 한 줄 결론
+` + THREADS_BODY_COMMENT_RULES + `
 
 [형식]
-- 문장은 최대 1~2줄
-- 줄바꿈으로 리듬 만들기
-- 이모지 최대 1~2개, 자연스러운 위치에
-- 해시태그 없음
-- 불릿(•), 볼드, 헤더 없음
-
-[금지]
-- "~하세요" 같은 지시형
-- 리스트 나열
-- 과한 설명
-- 인스타 해시태그·불릿·번호 목록을 그대로 옮기기`;
+- 이모지: 본문 0~1개, 댓글 0~1개
+- 해시태그 없음. 불릿(•), 볼드, 헤더 없음`;
 
 function buildExpertCourseThreadsPrompt_(opts){
   opts = opts || {};
@@ -7129,10 +7142,11 @@ function buildExpertCourseThreadsPrompt_(opts){
   var programBlock = opts.programBlock ? String(opts.programBlock).trim() : '';
   return DEFAULT_THREADS_SNS_PROMPT + '\n\n' +
     '[전문가 과정 맥락]\n' +
-    '- 변환 대상: 인스타·블로그의 **강의·시연 공유** 글을 쓰레드 톤으로\n' +
-    '- 독자: ' + roleReaders + '에게 말걸기 (동료 혼잣말)\n' +
-    '- 시연·테크닉·원리 한 줄이 중앙. 수강·등록 유도 금지\n' +
-    '- 과도한 임상 설명·리스트 나열 금지 (쓰레드 리듬 유지)' +
+    '- 변환 대상: **블로그(강의·시연 글)** → Threads 본문+댓글\n' +
+    '- 독자: ' + roleReaders + '\n' +
+    '- 본문: 현장에서 흔히 틀리는 테크닉·전제 하나를 **한 줄**로 뒤집기\n' +
+    '- 댓글: 영상·글에 있는 테크닉 원리·손 느낌·주의를 풀어 설명. 수강·등록 유도 금지\n' +
+    '- 블로그·참고·영상 범위 밖 내용 추가 금지' +
     (programBlock ? '\n' + programBlock : '');
 }
 
@@ -12368,10 +12382,10 @@ function renderSheetEmpty(draft, cat) {
     : isHeiljagyaeCategory(cat.id)
     ? 'AI가 <strong>아파트너 게시판 글</strong>과 <strong>추천 이미지 프롬프트 2개</strong>만<br>만들어드려요'
     : isGeneralAudienceCategory(cat.id)
-    ? 'AI가 <strong>블로그(문제 제기·셀프 케어·원리 설명)</strong>와 이미지 프롬프트 <strong>2장</strong>을 만들어드려요.<br>인스타는 블로그 <strong>발행완료</strong> 후, 쓰레드는 인스타 <strong>발행완료</strong> 후 생성돼요'
+    ? 'AI가 <strong>블로그(문제 제기·셀프 케어·원리 설명)</strong>와 이미지 프롬프트 <strong>2장</strong>을 만들어드려요.<br>블로그 <strong>발행완료</strong> 후 인스타·쓰레드 초안이 <strong>동시에</strong> 만들어져요'
     : isExpertCourseCategory(cat.id)
-    ? '교육·강의 <strong>영상 링크</strong> 또는 <strong>실습 사진</strong>을 먼저 올리면, AI가 그에 맞춰<br><strong>영상·사진 맥락 → 시연 포인트 → 원리 설명</strong> 글과 이미지 프롬프트 <strong>2장</strong>을 만들어요'
-    : 'AI가 <strong>블로그</strong>와 이미지 프롬프트 <strong>2장</strong>을 만들어드려요.<br>인스타는 블로그 <strong>발행완료</strong> 후, 쓰레드는 인스타 <strong>발행완료</strong> 후 생성돼요';
+    ? '교육·강의 <strong>영상 링크</strong> 또는 <strong>실습 사진</strong>을 먼저 올리면, AI가 그에 맞춰<br><strong>영상·사진 맥락 → 시연 포인트 → 원리 설명</strong> 글과 이미지 프롬프트 <strong>2장</strong>을 만들어요.<br>블로그 <strong>발행완료</strong> 후 인스타·쓰레드 초안이 <strong>동시에</strong> 만들어져요'
+    : 'AI가 <strong>블로그</strong>와 이미지 프롬프트 <strong>2장</strong>을 만들어드려요.<br>블로그 <strong>발행완료</strong> 후 인스타·쓰레드 초안이 <strong>동시에</strong> 만들어져요';
   const sourceNoteHtml = buildDraftReferencePreviewHTML_(draft, { catId: cat.id });
   const ytAnalysisHtml = draft.youtubeAnalysis
     ? `<div style="margin-bottom:16px;padding:12px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;">
@@ -12474,21 +12488,22 @@ function renderSheetContent(content) {
         addSourceHtml + sheetFullCopyBar_() +
         sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10, regen: 'insta.caption', copy: true }) +
         sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).map(function(h){ return String(h).replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동해요. 쓰레드 글은 그동안 백그라운드에서 만들어져요.</p>'
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동해요.</p>'
       );
     }
   } else if(tab==='threads'){
     var ths = content.threads;
     if(shouldShowThreadsPending_(content, state.selectedId)){
       bodyHTML = tabsHTML + buildThreadsPendingBox_(content, state.selectedId);
-    } else if(!ths || !String(ths.text || '').trim()){
+    } else if(!ths || !getThreadsBodyText_(ths)){
       bodyHTML = tabsHTML +
-        '<div class="sheet-insta-pending"><strong>쓰레드 글은 아직 없어요.</strong><br>인스타 탭에서 <strong>발행완료</strong>를 누르거나, 인스타 캡션이 있으면 하단 <strong>재생성</strong>으로 만들 수 있어요.</div>';
+        '<div class="sheet-insta-pending"><strong>쓰레드 글은 아직 없어요.</strong><br>블로그 탭에서 <strong>발행완료</strong>를 누르면 인스타·쓰레드 초안이 함께 만들어져요. 또는 블로그 글이 있으면 하단 <strong>재생성</strong>으로 만들 수 있어요.</div>';
     } else {
       bodyHTML = tabsHTML + addSourceHtml +
         sheetFullCopyBar_() +
-        sheetEditField_('쓰레드 본문', 'sheet-threads-body', ths.text || '', { rows: 14, regen: 'threads.text', copy: true }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">본문을 수정하거나 <strong>재생성</strong>으로 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 저장·복사 후 Threads 앱으로 이동해요.</p>';
+        sheetEditField_('본문 (게시글)', 'sheet-threads-body', getThreadsBodyText_(ths), { rows: 5, regen: 'threads.body', copy: true, help: '통념 뒤집기·궁금증 훅 한 줄. 해설은 넣지 마세요.' }) +
+        sheetEditField_('댓글 (재게시)', 'sheet-threads-comment', getThreadsCommentText_(ths), { rows: 12, regen: 'threads.comment', copy: true, help: '본문에 대한 해설·근거·과정·철학. 게시 후 본인 댓글(재게시)로 올리세요.' }) +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">먼저 <strong>본문</strong>을 게시한 뒤, <strong>댓글</strong> 박스 내용을 본인 댓글(재게시)로 붙여넣으세요. <strong>발행완료</strong>는 본문을 복사·저장합니다.</p>';
     }
   } else if(tab==='community'){
     const co = content.community;
@@ -12588,8 +12603,8 @@ function getTabCopyText(tab, content){
   }
   if(tab === 'threads'){
     const ths = content.threads;
-    if(!ths || !ths.text) return '';
-    return String(ths.text).trim();
+    if(!ths || !getThreadsBodyText_(ths)) return '';
+    return getThreadsFullPasteText_(ths);
   }
   if(tab === 'community'){
     const c = content.community;
@@ -12858,9 +12873,16 @@ function shouldShowInstaPending_(content, draftId){
   if(instaContentReady_(content)) return false;
   return !!(content && (content.instaPending || instaBgByDraft[draftId]));
 }
-function getSheetThreadsTextFromDom_(){
+function getSheetThreadsBodyFromDom_(){
   var el = document.getElementById('sheet-threads-body');
   return el ? String(el.value || '').trim() : '';
+}
+function getSheetThreadsCommentFromDom_(){
+  var el = document.getElementById('sheet-threads-comment');
+  return el ? String(el.value || '').trim() : '';
+}
+function getSheetThreadsTextFromDom_(){
+  return getSheetThreadsBodyFromDom_();
 }
 
 function hasThreadsDraftText_(content, draftId){
@@ -12871,10 +12893,13 @@ function hasThreadsDraftText_(content, draftId){
 
 function syncThreadsDraftFromDom_(content, draftId){
   if(!content || state.selectedId !== draftId || state.activeTab !== 'threads') return content;
-  var domText = getSheetThreadsTextFromDom_();
-  if(!domText) return content;
-  if(!content.threads) content.threads = { text: '' };
-  content.threads.text = domText;
+  var bodyText = getSheetThreadsBodyFromDom_();
+  var commentText = getSheetThreadsCommentFromDom_();
+  if(!bodyText && !commentText) return content;
+  if(!content.threads) content.threads = { body: '', comment: '', text: '' };
+  content.threads.body = bodyText;
+  content.threads.comment = commentText;
+  content.threads.text = bodyText;
   clearThreadsPendingMeta_(content);
   return content;
 }
@@ -13135,7 +13160,7 @@ function buildThreadsPendingBox_(content, draftId){
     '<span class="sheet-insta-pending-countdown" id="threads-pending-countdown" data-end-ms="' + endMs + '">' +
     escapeHtml(getThreadsPendingCountdownText_(content, draftId)) +
     '</span><br>' +
-    '인스타 앱에서 올리는 동안 백그라운드에서 생성합니다. 완료되면 이 글의 쓰레드 탭으로 바로 보여드려요.</div>';
+    '블로그 발행 후 인스타·쓰레드 초안을 동시에 만들고 있어요. 완료되면 이 글의 쓰레드 탭으로 바로 보여드려요.</div>';
 }
 function updateThreadsPendingCountdown_(){
   var el = document.getElementById('threads-pending-countdown');
@@ -13146,12 +13171,32 @@ function updateThreadsPendingCountdown_(){
 }
 function normalizeThreadsSnsBlock_(raw){
   if(!raw || typeof raw !== 'object') return null;
-  var text = String(raw.text != null ? raw.text : raw.body || raw.summary || '').trim();
-  if(!text) return null;
-  return { text: text };
+  var body = String(raw.body != null ? raw.body : '').trim();
+  var comment = String(raw.comment != null ? raw.comment : '').trim();
+  var legacyText = String(raw.text != null ? raw.text : raw.summary || '').trim();
+  if(!body && legacyText) body = legacyText;
+  if(!body && !comment) return null;
+  return { body: body, comment: comment, text: body };
+}
+function getThreadsBodyText_(ths){
+  if(!ths) return '';
+  return String(ths.body != null ? ths.body : ths.text || '').trim();
+}
+function getThreadsCommentText_(ths){
+  if(!ths) return '';
+  return String(ths.comment || '').trim();
 }
 function getThreadsSnsPlainText_(ths){
-  return ths && ths.text ? String(ths.text).trim() : '';
+  return getThreadsBodyText_(ths);
+}
+function getThreadsFullPasteText_(ths){
+  var body = getThreadsBodyText_(ths);
+  var comment = getThreadsCommentText_(ths);
+  if(!body && !comment) return '';
+  var parts = [];
+  if(body) parts.push('[본문 · 게시]\n' + body);
+  if(comment) parts.push('[댓글 · 재게시]\n' + comment);
+  return parts.join('\n\n');
 }
 function buildInstaSourceText_(ig){
   if(!ig) return '';
@@ -13209,24 +13254,30 @@ function tryNotifyThreadsReady_(topic, draftId, catId, ok, errMsg){
     n.onclick = function(){ n.close(); onClick(); };
   } catch(e){}
 }
-async function generateThreadsFromInsta_(catId, insta, topic){
+async function generateThreadsFromBlog_(catId, blog, topic){
   var threadsGuide = getCatPromptForGeneration_(catId, 'threads') || DEFAULT_THREADS_SNS_PROMPT;
   var baseInfo = getBasePrompt();
+  var expertScope = isExpertCourseCategory(catId)
+    ? '\n- 전문가 과정: 블로그·참고·영상 범위 **밖** 내용 추가 금지. 본문 훅·댓글 해설 모두 블로그 근거 안에서.\n'
+    : '';
+  var generalHint = isGeneralAudienceCategory(catId)
+    ? '\n- 일반인 글: 블로그 **문제 제기→원리 설명**에서 통념 하나를 골라 본문 훅으로, 원리·셀프케어 맥락은 댓글에서.\n'
+    : '';
   var prompt = baseInfo + '\n\n' +
     '카테고리: ' + (CATEGORIES[catId] ? CATEGORIES[catId].name : '') + '\n' +
     '주제: "' + (topic || '') + '"\n\n' +
-    '[쓰레드 변환 지침]\n' + threadsGuide + '\n\n' +
-    '아래는 **확정·수정된 인스타 캡션**입니다. 인스타 형식(해시태그·불릿·번호)을 그대로 옮기지 말고, 위 규칙대로 **Threads 한 포스트**로만 변환하세요.\n\n' +
-    'JSON만:\n{"threads":{"text":"쓰레드 본문 전체(줄바꿈 포함)"}}\n\n' +
-    '[인스타 원문]\n' + buildInstaSourceText_(insta);
+    '[쓰레드 작성 지침]\n' + threadsGuide + expertScope + generalHint + '\n' +
+    '아래 **블로그 글**을 인스타처럼 요약하지 말고, **본문(훅)+댓글(해설)** 2단으로 **새로** 작성하세요.\n\n' +
+    'JSON만:\n{"threads":{"body":"본문(게시글 — 궁금증·통념 뒤집기 한 줄)","comment":"댓글(재게시용 — 해설·근거·과정·철학)"}}\n\n' +
+    '[블로그 원문]\n' + buildBlogSourceText_(blog, catId);
 
-  var text = await callClaudePlanner_(prompt, { maxTokens: 2000, timeoutMs: THREADS_BG_TIMEOUT_MS });
+  var text = await callClaudePlanner_(prompt, { maxTokens: 2800, timeoutMs: THREADS_BG_TIMEOUT_MS });
   var raw = text.replace(/^```json\s*/i, '').replace(/```\s*$/g, '').trim();
   var parsed = JSON.parse(raw);
   var block = parsed.threads || parsed;
   return normalizeThreadsSnsBlock_(block);
 }
-function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
+function enqueueThreadsFromBlog_(draftId, catId, topic, blog, opts){
   opts = opts || {};
   var retryCount = opts.retryCount || 0;
   if(threadsBgByDraft[draftId]) return;
@@ -13237,7 +13288,7 @@ function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
   var endMs = startedMs + THREADS_BG_ESTIMATE_MS;
   threadsBgByDraft[draftId] = { startedMs: startedMs, endMs: endMs, topic: topic || '', catId: catId };
   beginGenIndicator();
-  var instaSnapshot = JSON.parse(JSON.stringify(insta || {}));
+  var blogSnapshot = JSON.parse(JSON.stringify(blog || {}));
   var label = String(topic || '쓰레드');
   if(label.length > 34) label = label.slice(0, 34) + '…';
   genActiveJob = { topic: label, endMs: endMs, kind: 'threads' };
@@ -13256,7 +13307,7 @@ function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
 
   (async function(){
     try {
-      var threads = await generateThreadsFromInsta_(catId, instaSnapshot, topic);
+      var threads = await generateThreadsFromBlog_(catId, blogSnapshot, topic);
       var content = getDraftContent_(draftId);
       if(content){
         content.threads = threads;
@@ -13300,7 +13351,7 @@ function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
       }
       if(shouldRetry){
         setTimeout(function(){
-          enqueueThreadsFromInsta_(draftId, catId, topic, instaSnapshot, { resume: true, retryCount: retryCount + 1 });
+          enqueueThreadsFromBlog_(draftId, catId, topic, blogSnapshot, { resume: true, retryCount: retryCount + 1 });
         }, 1200);
         if(!document.hidden){
           setAppToast('쓰레드 글 생성이 끊겨 다시 시도하고 있어요.', { duration: 5000, variant: 'ok' });
@@ -13323,7 +13374,7 @@ function reconcileThreadsPendingJobs_(reason){
     if(!isBlogInstaCategory(cat.id)) return;
     (cat.drafts || []).forEach(function(d){
       var content = getDraftContent_(d.id);
-      if(!content || !content.threadsPending || hasThreadsDraftText_(content, d.id) || !content.insta || threadsBgByDraft[d.id]) return;
+      if(!content || !content.threadsPending || hasThreadsDraftText_(content, d.id) || !content.blog || threadsBgByDraft[d.id]) return;
       var startedMs = parseInt(content.threadsPendingStartedAt, 10) || 0;
       if(startedMs && now - startedMs > THREADS_PENDING_RESTART_WINDOW_MS){
         clearThreadsPendingMeta_(content);
@@ -13334,7 +13385,7 @@ function reconcileThreadsPendingJobs_(reason){
         draftId: d.id,
         catId: cat.id,
         topic: d.topic || content.threadsPendingTopic || '',
-        insta: content.insta,
+        blog: content.blog,
         startedMs: startedMs
       });
     });
@@ -13346,7 +13397,7 @@ function reconcileThreadsPendingJobs_(reason){
     return (b.startedMs || 0) - (a.startedMs || 0);
   });
   var job = candidates[0];
-  enqueueThreadsFromInsta_(job.draftId, job.catId, job.topic, job.insta, { resume: true });
+  enqueueThreadsFromBlog_(job.draftId, job.catId, job.topic, job.blog, { resume: true });
   if(state.selectedId === job.draftId){
     state.selectedCatId = job.catId;
     state.activeTab = 'threads';
@@ -13651,7 +13702,7 @@ window.copyWholeTab_ = function(btn){
   if(tab === 'blog') text = buildBlogPasteTextForPublish_(clone.blog, catId);
   else if(tab === 'community') text = formatCommunityPostText(clone.community);
   else if(tab === 'insta') text = getInstaFullPasteText_(clone.insta);
-  else if(tab === 'threads') text = String((clone.threads && clone.threads.text) || '').trim();
+  else if(tab === 'threads') text = getThreadsFullPasteText_(clone.threads);
   else if(tab === 'thread') text = getThreadPlainText(normalizeThreadBlock(clone.thread));
   else text = getTabCopyText(tab, clone);
   text = String(text || '').trim();
@@ -13681,7 +13732,8 @@ var SHEET_FIELD_META_ = {
   'insta.hook':     { block: 'insta', label: '첫 줄 후킹', instr: '스크롤을 멈추게 하는 인스타 첫 줄 후킹 한 문장.' },
   'insta.caption':  { block: 'insta', label: '캡션', instr: '인스타 톤의 짧은 캡션 본문. 문단은 짧게, 이모지는 절제해서.' },
   'insta.hashtags': { block: 'insta', label: '해시태그', array: true, instr: '증상·지역·브랜드와 관련된 해시태그 8~12개.' },
-  'threads.text':      { block: 'threads', label: '쓰레드 본문', instr: 'Threads 톤의 짧고 담백한 본문. 한 호흡에 읽히도록.' },
+  'threads.body':    { block: 'threads', label: '본문 (게시글)', instr: '통념 뒤집기·궁금증 훅 한 줄(1~3문장). 교과서 vs 전문가, 쉬운 비유. 해설·근거는 쓰지 마세요.' },
+  'threads.comment': { block: 'threads', label: '댓글 (재게시)', instr: '본문의 물음·반전에 대한 해설·근거·과정·철학. 블로그 원리 설명 축을 압축. 본문과 같은 문장 반복 금지.' },
   'thread.topicTitle': { block: 'thread', label: '오늘의 한 줄', threadNorm: true, instr: '담백한 관찰·장면 한 줄. 짧은 감탄 가능. 따뜻한 위로·과한 감성 금지.' },
   'thread.summary':    { block: 'thread', label: '본문 (일상 나눔)', threadNorm: true, instr: '관찰 → 핵심 한 가지 → (선택) 짧은 감탄·철학 1문장. 담백·구어체. 과한 감성·설교 금지.' }
 };
@@ -13690,7 +13742,10 @@ function fieldValueToString_(meta, block){
   if(!block) return '';
   if(meta.array) return (block[fieldKeyOf_(meta)] || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
   if(meta.arrayLines) return (block[fieldKeyOf_(meta)] || []).join('\n');
-  return String(block[fieldKeyOf_(meta)] || '');
+  var key = fieldKeyOf_(meta);
+  if(meta.block === 'threads' && key === 'body') return getThreadsBodyText_(block);
+  if(meta.block === 'threads' && key === 'comment') return getThreadsCommentText_(block);
+  return String(block[key] || '');
 }
 function fieldKeyOf_(meta){ return meta.__field; }
 
@@ -13734,9 +13789,9 @@ window.regenSheetField_ = async function(key, btn){
   if(meta.block === 'insta' && content.blog){
     var blogSrc = buildBlogPasteTextForPublish_(content.blog, catId);
     if(blogSrc) sourceRef = '[원본 블로그 글 — 이 내용을 인스타 톤으로 옮기는 것이 목적]\n' + blogSrc;
-  } else if(meta.block === 'threads' && content.insta){
-    var instaSrc = getInstaFullPasteText_(content.insta);
-    if(instaSrc) sourceRef = '[원본 인스타 캡션 — 이 내용을 쓰레드 톤으로 옮기는 것이 목적]\n' + instaSrc;
+  } else if(meta.block === 'threads' && content.blog){
+    var blogSrc = buildBlogSourceText_(content.blog, catId);
+    if(blogSrc) sourceRef = '[원본 블로그 글 — 본문 훅+댓글 해설로 새로 쓰는 것이 목적. 인스타 요약 금지]\n' + blogSrc;
   }
   var outputGuide = meta.array
     ? 'JSON만 출력하세요: {"value": ["태그1", "태그2", ...]}  (# 없이 단어만)'
@@ -13776,6 +13831,7 @@ window.regenSheetField_ = async function(key, btn){
       block[meta.__field] = String(val || '').trim();
     }
     content[meta.block] = block;
+    if(meta.block === 'threads' && meta.__field === 'body') block.text = block.body || '';
     if(meta.threadNorm){ content.thread = normalizeThreadBlock(block) || block; }
     if(key === 'blog.title' || key === 'community.title'){
       syncThumbnailOverlayHook_(content, catId);
@@ -13909,9 +13965,12 @@ function applySheetInstaEdits_(content){
 function applySheetThreadsEdits_(content){
   if(!content) return content;
   var bodyEl = document.getElementById('sheet-threads-body');
-  if(!bodyEl) return content;
-  if(!content.threads) content.threads = { text: '' };
-  content.threads.text = String(bodyEl.value || '').trim();
+  var commentEl = document.getElementById('sheet-threads-comment');
+  if(!bodyEl && !commentEl) return content;
+  if(!content.threads) content.threads = { body: '', comment: '', text: '' };
+  if(bodyEl) content.threads.body = String(bodyEl.value || '').trim();
+  if(commentEl) content.threads.comment = String(commentEl.value || '').trim();
+  content.threads.text = content.threads.body || '';
   return content;
 }
 
@@ -14005,7 +14064,7 @@ function buildFinalTextForKey_(content, catId, key){
   if(!content) return '';
   if(key === 'blog') return content.blog ? getTabCopyText('blog', content) : '';
   if(key === 'insta') return content.insta ? getInstaFullPasteText_(content.insta) : '';
-  if(key === 'threads') return content.threads ? getThreadsSnsPlainText_(content.threads) : '';
+  if(key === 'threads') return content.threads ? getThreadsFullPasteText_(content.threads) : '';
   if(key === 'image') return getImagePromptTextForData_(content, catId);
   if(key === 'community') return content.community ? formatCommunityPostText(content.community) : '';
   if(key === 'thread'){
@@ -14126,10 +14185,11 @@ async function generateInstaFromBlog_(catId, blog, topic){
     '카테고리: ' + (CATEGORIES[catId] ? CATEGORIES[catId].name : '') + '\n' +
     '주제: "' + (topic || '') + '"\n\n' +
     '[인스타 작성 지침]\n' + instaGuide + '\n\n' +
-    '아래는 **확정·수정된 블로그 글**입니다. 블로그 전체를 옮기지 말고, **핵심과 후킹만** 짧은 인스타 한 포스트로 만드세요.\n' + expertScope + generalHint + expertHint + '\n' +
+    '아래는 **확정·수정된 블로그 글**입니다. 블로그 전체를 옮기지 말고, **현장 리포트** 톤의 짧은 인스타 한 포스트로 만드세요.\n' + expertScope + generalHint + expertHint + '\n' +
     '요구사항:\n' +
     '- hook: 블로그 제목·후킹에서 **기억에 남는 한 줄** (이모지 1개 전후, 25자 내외 권장)\n' +
-    '- caption: 공감 한 줄 → 핵심 포인트 **2~3개만**(번호 또는 •) → 실천 팁 1개 → 짧은 CTA. hook 제외 **180~380자** 목표\n' +
+    '- caption: **"오늘 ○○ 했더니 △△"** 현장·시연·결과 중심. 공감 한 줄 → 핵심 포인트 **2~3개만**(번호 또는 •) → 변화·포인트 1개 → 짧은 CTA. hook 제외 **180~380자** 목표\n' +
+    '- 과정·철학·통념 뒤집기는 인스타가 아니라 쓰레드용 — 인스타는 **결과·장면**에 집중\n' +
     '- 블로그 700자대 본문·목차 전체 나열 금지. 읽고 나서도 떠오르는 **한 가지 메시지**에 집중\n' +
     '- carousel: 반드시 빈 배열 []\n' +
     '- hashtags: 8~10개 (# 없이)\n\n' +
@@ -14200,12 +14260,13 @@ window.onSheetPublishComplete = async function(){
       state.activeTab = 'insta';
       setOpenDetailHash_(draftId, catId, 'insta');
       enqueueInstaFromBlog_(draftId, catId, draft ? draft.topic : '', content.blog);
+      enqueueThreadsFromBlog_(draftId, catId, draft ? draft.topic : '', content.blog);
       renderSheetContent(getDraftContent_(draftId) || content);
       renderTabs();
       renderMain();
       copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId));
       afterTabPublishSaved_(saveResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
-      setAppToast('블로그 저장 · 복사 · 앱 이동\n돌아오면 이 글의 인스타 탭을 바로 보여드려요.', { duration: 5500, variant: 'ok' });
+      setAppToast('블로그 저장 · 복사 · 앱 이동\n돌아오면 인스타·쓰레드 탭을 확인해 주세요.', { duration: 5500, variant: 'ok' });
     } catch(err){
       console.warn('[블로그 발행]', err);
       setAppToast(((err && err.message) || String(err)), { duration: 9000, variant: 'err' });
@@ -14242,20 +14303,12 @@ window.onSheetPublishComplete = async function(){
     if(pubBtn){ pubBtn.disabled = true; pubBtn.textContent = '저장 중…'; }
     try {
       var instaResult = commitSheetTabPublish_(draftId, catId, 'insta');
-      var catIg = CATEGORIES[catId];
-      var draftIg = catIg && catIg.drafts.find(function(d){ return d.id === draftId; });
-      var savedContent = getDraftContent_(draftId);
-      state.activeTab = 'threads';
-      setOpenDetailHash_(draftId, catId, 'threads');
-      if(savedContent && savedContent.insta){
-        enqueueThreadsFromInsta_(draftId, catId, draftIg ? draftIg.topic : '', savedContent.insta);
-      }
-      renderSheetContent(getDraftContent_(draftId) || savedContent);
+      renderSheetContent(getDraftContent_(draftId) || igContent);
       renderTabs();
       renderMain();
-      copyAndOpenInstagram_(savedContent && savedContent.insta ? getInstaFullPasteText_(savedContent.insta) : '');
+      copyAndOpenInstagram_(igContent && igContent.insta ? getInstaFullPasteText_(igContent.insta) : '');
       afterTabPublishSaved_(instaResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
-      setAppToast('인스타 저장 · 복사 · 앱 이동\n돌아오면 이 글의 쓰레드 탭을 바로 보여드려요.', { duration: 5500, variant: 'ok' });
+      setAppToast('인스타 저장 · 복사 · 앱 이동', { duration: 4500, variant: 'ok' });
     } catch(err){
       setAppToast(((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
     } finally {
@@ -14273,28 +14326,28 @@ window.onSheetPublishComplete = async function(){
       persistDraftContent_(draftId, thContent);
     }
     if(shouldShowThreadsPending_(thContent, draftId)){
-      setAppToast('쓰레드 글을 만들고 있어요.\n인스타 앱에서 올린 뒤, 잠시 후 쓰레드 탭을 확인해 주세요.', { duration: 5000, variant: 'ok' });
+      setAppToast('쓰레드 글을 만들고 있어요.\n블로그 발행 후 잠시 뒤 쓰레드 탭을 확인해 주세요.', { duration: 5000, variant: 'ok' });
       return;
     }
-    if(!thContent || !getThreadsSnsPlainText_(thContent.threads)){
-      setAppToast('쓰레드 글이 없어요.\n인스타 탭에서 발행완료를 먼저 눌러 주세요.', { duration: 4500, variant: 'err' });
+    if(!thContent || !getThreadsBodyText_(thContent.threads)){
+      setAppToast('쓰레드 글이 없어요.\n블로그 탭에서 발행완료를 먼저 눌러 주세요.', { duration: 4500, variant: 'err' });
       return;
     }
     applySheetThreadsEdits_(thContent);
-    if(!getThreadsSnsPlainText_(thContent.threads)){
-      setAppToast('쓰레드 본문을 입력해 주세요.', { duration: 4000, variant: 'err' });
+    if(!getThreadsBodyText_(thContent.threads)){
+      setAppToast('쓰레드 본문(게시글)을 입력해 주세요.', { duration: 4000, variant: 'err' });
       return;
     }
     if(pubBtn){ pubBtn.disabled = true; pubBtn.textContent = '저장 중…'; }
     try {
       var threadsResult = commitSheetTabPublish_(draftId, catId, 'threads');
       var savedTh = getDraftContent_(draftId);
-      copyAndOpenThreads_(savedTh && savedTh.threads ? getThreadsSnsPlainText_(savedTh.threads) : '');
+      copyAndOpenThreads_(savedTh && savedTh.threads ? getThreadsBodyText_(savedTh.threads) : '');
       closeSheet();
       renderTabs();
       renderMain();
       afterTabPublishSaved_(threadsResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
-      setAppToast('쓰레드 저장 · 복사 · 앱 이동\n글 입력란에 붙여넣기 하세요.', { duration: 5500, variant: 'ok' });
+      setAppToast('쓰레드 본문 저장 · 복사 · 앱 이동\n게시 후 댓글(재게시)란에 «댓글» 박스 내용을 붙여넣으세요.', { duration: 6500, variant: 'ok' });
     } catch(err){
       setAppToast(((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
     } finally {
@@ -15098,7 +15151,7 @@ ${blogInstaCat && pt==='threads' ? `
     ${promptResetBtnHtml_(state.editingCatId, 'threads')}
   </div>
   <textarea class="prompt-textarea" id="pt-threads" placeholder="Threads 톤, 구어체, 줄바꿈 리듬, 금지 표현 등을 입력하세요.">${escapeHtml(threadsVal)}</textarea>
-  <div class="prompt-hint">인스타 발행 후 자동 생성되는 쓰레드 글에 적용됩니다. 구어체·짧은 문장·전문가 동료 톤.</div>
+  <div class="prompt-hint">블로그 발행 후 자동 생성됩니다. 본문=통념 뒤집기 훅, 댓글=해설·근거·과정·철학(재게시용).</div>
 </div>` : ''}
 
 ${pt==='thread' && threadCat ? `
@@ -15873,16 +15926,16 @@ window.genContent = async function(ev){
       setAppToast('쓰레드 글을 만들고 있어요.\n잠시만 기다려 주세요.', { duration: 4500, variant: 'ok' });
       return;
     }
-    var thIgContent = getDraftContent_(draftId);
-    if(!thIgContent || !thIgContent.insta){
-      setAppToast('인스타 캡션이 없어요.\n인스타 탭에서 발행완료를 먼저 누르거나 인스타를 만들어 주세요.', { duration: 5000, variant: 'err' });
+    var thBlogContent = getDraftContent_(draftId);
+    if(!thBlogContent || !thBlogContent.blog){
+      setAppToast('블로그 글이 없어요.\n블로그 탭에서 초안을 먼저 만들어 주세요.', { duration: 5000, variant: 'err' });
       return;
     }
     var catTh = CATEGORIES[catId];
     var draftTh = catTh && catTh.drafts.find(function(d){ return d.id === draftId; });
     if(clickBtn) startButtonCountdown_(clickBtn, { estimateSec: Math.ceil(THREADS_BG_ESTIMATE_MS / 1000), busyLabel: '재생성 중', idleText: clickBtn.textContent });
-    enqueueThreadsFromInsta_(draftId, catId, draftTh ? draftTh.topic : '', thIgContent.insta);
-    setAppToast('인스타 캡션 기준으로 쓰레드 글을 다시 만들고 있어요…', { duration: 5000, variant: 'ok' });
+    enqueueThreadsFromBlog_(draftId, catId, draftTh ? draftTh.topic : '', thBlogContent.blog, { force: true });
+    setAppToast('블로그 글 기준으로 쓰레드(본문+댓글)를 다시 만들고 있어요…', { duration: 5000, variant: 'ok' });
     return;
   }
 

@@ -133,6 +133,22 @@
 
 <!-- Google Drive sync modal -->
 
+<div class="modal-overlay" id="sync-status-overlay" onclick="closeSyncStatusModal_(event)">
+  <div class="modal-box sync-status-box" style="max-width:460px;" onclick="event.stopPropagation()">
+    <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div class="modal-title" style="margin:0;">동기화 상태</div>
+      <button type="button" class="prompt-modal-close" onclick="closeSyncStatusModal_()" aria-label="닫기">×</button>
+    </div>
+    <div class="modal-desc" style="font-size:12px;margin-bottom:12px;">기기·서버·Drive 중 <strong>가장 높은 revision</strong>이 최신본입니다. 탭 복귀·5분 idle·저장 시 자동으로 맞춥니다.</div>
+    <div id="sync-status-body" class="sync-status-body">불러오는 중…</div>
+    <div id="sync-status-err" style="font-size:12px;color:#EF4444;min-height:18px;margin-top:8px;"></div>
+    <div class="sync-status-actions">
+      <button type="button" class="modal-btn" id="btn-sync-now" onclick="runManualFullSync_()">지금 동기화</button>
+      <button type="button" class="modal-btn" style="background:#F3F4F6;color:#374151;" onclick="closeSyncStatusModal_()">닫기</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="drive-modal-overlay" onclick="closeDriveModal(event)">
   <div class="modal-box" style="max-width:440px;" onclick="event.stopPropagation()">
     <div class="modal-title">구글 Drive</div>
@@ -159,6 +175,10 @@
     <button type="button" class="btn-drive-sync" id="btn-drive-sync" onclick="onDriveButtonClick()">
       <span class="drive-btn-main" id="drive-btn-main"><span class="drive-dot" id="drive-dot"></span><span id="drive-status">Drive</span></span>
       <span class="drive-btn-sub" id="drive-btn-sub">연동 안 됨</span>
+    </button>
+    <button type="button" class="btn-sync-status" id="btn-sync-status" onclick="openSyncStatusModal_()" title="동기화 상태">
+      <span class="sync-btn-main"><span class="sync-dot" id="sync-dot"></span><span id="sync-status-label">동기화</span></span>
+      <span class="sync-btn-sub" id="sync-btn-sub">확인</span>
     </button>
     <button class="api-badge" onclick="openApiModal()">
       <span class="api-dot" id="api-dot"></span>

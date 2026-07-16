@@ -1754,7 +1754,6 @@ const SUBGOAL_PLAN_GEN_ESTIMATE_SEC = 55;
 const YEAR_PLAN_GEN_ESTIMATE_SEC = 40;
 const TOPIC_FIVE_ESTIMATE_SEC = 25;
 const TOPIC_ONE_ESTIMATE_SEC = 14;
-const TOPICS_BATCH_ESTIMATE_SEC = 55;
 const TOPIC_REGEN_ESTIMATE_SEC = 20;
 const FLOW_PROPOSAL_ESTIMATE_SEC = 42;
 const SHEET_FIELD_REGEN_ESTIMATE_SEC = 18;
@@ -3340,11 +3339,6 @@ function countFilledTopicSlots_(catId, stepId){
 function stepNeedsMoreTopics_(catId, stepId){
   return countFilledTopicSlots_(catId, stepId) < 5;
 }
-function countStepsNeedingTopics_(catId){
-  var plan = getEffectiveSubGoalPlan_(catId);
-  if(!plan || !plan.steps || !plan.steps.length) return 0;
-  return plan.steps.filter(function(s){ return stepNeedsMoreTopics_(catId, String(s.id)); }).length;
-}
 function applyTopicToStepSlot_(catId, stepId, slotNum, topicData){
   if(!topicData || !topicData.topic) return false;
   var plan = getEffectiveSubGoalPlan_(catId);
@@ -3964,82 +3958,6 @@ function applyTopicsArrayToStep_(catId, stepId, topics){
   }
   return applied;
 }
-window.fillAllStepTopicsWithAI_ = async function(catId, opts){
-  opts = opts || {};
-  catId = catId != null ? catId : state.currentCat;
-  if(plannerAiBusy && !opts.silent) return { filled: 0, steps: 0 };
-  if(!state.apiKey){
-    if(!opts.silent) openApiModal();
-    return { filled: 0, steps: 0 };
-  }
-  var plan = getEffectiveSubGoalPlan_(catId);
-  var cat = CATEGORIES[catId];
-  if(!plan || !cat || !plan.steps.length) return { filled: 0, steps: 0 };
-  var needs = plan.steps.filter(function(s){
-    return stepNeedsMoreTopics_(catId, String(s.id));
-  });
-  if(!needs.length) return { filled: 0, steps: 0 };
-  if(!opts.silent && typeof setAppToast === 'function'){
-    setAppToast('부족한 ' + needs.length + '개 단계에 주제를 채우고 있어요…', { duration: 4500, variant: 'ok' });
-  }
-  if(!opts.silent && document.querySelector('.btn-fill-all-topics')){
-    startPlannerAiWait_({
-      estimateSec: TOPICS_BATCH_ESTIMATE_SEC,
-      busyLabel: '생성 중',
-      btnSelector: '.btn-fill-all-topics',
-      btnIdleText: '채우기'
-    });
-  }
-  plannerAiBusy = true;
-  var totalApplied = 0;
-  try {
-    var stepsBlock = plan.steps.map(function(s){
-      var ex = getDraftsForSubGoalStep_(catId, String(s.id));
-      var filled = countFilledTopicSlots_(catId, String(s.id));
-      var pinned = ex.filter(function(d){ return state.pinnedDraftIds && state.pinnedDraftIds[d.id]; }).map(function(d){ return d.topic; });
-      return 'stepId "' + s.id + '": ' + s.title + ' — ' + (s.summary || '') +
-        ' · 현재 ' + filled + '/5' +
-        (pinned.length ? ' · 고정: ' + pinned.join(', ') : '');
-    }).join('\n');
-    var prompt =
-buildTopicPlanPromptPrefix_(catId, null) + '\n\n' +
-'[하위 목표별 현황]\n' + stepsBlock + '\n\n' +
-'각 stepId마다 주제 5개. 각 topic·angle은 해당 단계 의도(rationale)와 분기별·프로그램 의도에 맞게.\n' +
-'JSON만: {"topicsByStep":{"1":[{"topic":"…","angle":"…"},…5개],"2":[…]}}';
-    var text = await callClaudePlanner_(prompt, { maxTokens: 5000 });
-    var obj = parsePlannerAiJsonObject_(text);
-    var byStep = obj.topicsByStep || {};
-    needs.forEach(function(step){
-      var sid = String(step.id);
-      var topics = byStep[sid] || byStep[step.id];
-      if(topics && topics.length){
-        var merged = mergeAiTopicsToStepSlots_(catId, sid, topics);
-        totalApplied += applyTopicsArrayToStep_(catId, sid, merged);
-      }
-    });
-    for(var i = 0; i < needs.length; i++){
-      var sid2 = String(needs[i].id);
-      if(stepNeedsMoreTopics_(catId, sid2)){
-        await suggestFiveTopicsForStep_(sid2, { silent: true });
-      }
-    }
-    save({ driveImmediate: true });
-    renderMain();
-    if(document.getElementById('plan-workshop-overlay').classList.contains('open')) refreshPlanWorkshopModal_();
-    if(!opts.silent && typeof setAppToast === 'function'){
-      setAppToast('단계별 주제를 채웠어요.', { duration: 4000, variant: 'ok' });
-    }
-    return { filled: totalApplied, steps: needs.length };
-  } catch(e){
-    if(!opts.silent && typeof setAppToast === 'function'){
-      setAppToast('주제 일괄 채우기 실패\n' + ((e && e.message) || e), { duration: 6000, variant: 'err' });
-    }
-    return { filled: 0, steps: needs.length, error: e };
-  } finally {
-    if(!opts.silent && document.querySelector('.btn-fill-all-topics')) stopPlannerAiWait_();
-    plannerAiBusy = false;
-  }
-};
 function getCategoryBrandGoal_(catId){
   var plan = getSubGoalPlan_(catId);
   if(plan && plan.steps && plan.steps.length){
@@ -4974,28 +4892,20 @@ function renderProgramRegenBtnHTML_(){
     (allPinned ? ' disabled title="재생성할 단계의 고정을 해제해 주세요"' : '') +
     ' onclick="regenerateProgramWorkshop_()">' + (hasSteps ? '단계 재생성' : (hasFoundation ? '단계 생성' : '기준 먼저 제안')) + '</button>';
 }
-function renderProgramFillTopicsBtnHTML_(catId){
-  var n = countStepsNeedingTopics_(catId);
-  if(!n) return '';
-  return '<button type="button" class="modal-btn ws-btn-ai btn-fill-all-topics"' +
-    plannerFnClickAttr_('fillAllStepTopicsWithAI_', catId) + '>부족한 주제 ' + n + '단계 채우기</button>';
-}
 function renderProgramWorkshopFooterHTML_(){
   var p = state.pendingSubGoalPlan;
   var catId = state.currentCat;
   var html = '';
   if(state.subGoalPlanGenerating && state.subGoalPlanGenerating.catId === catId) return html;
-  var fillBtn = renderProgramFillTopicsBtnHTML_(catId);
   if(p && p.catId === catId){
     var applyStP = getSubGoalPlanApplyBtnState_(catId);
     html += '<div class="ws-actions">' +
       renderProgramRegenBtnHTML_() +
-      fillBtn +
       renderPlanApplyBtnHTML_(applyStP) +
       '<button type="button" class="modal-btn-ghost" onclick="discardPendingSubGoalPlan_()">취소</button>' +
     '</div>';
   } else {
-    html += '<div class="ws-actions">' + renderProgramRegenBtnHTML_() + fillBtn + '</div>';
+    html += '<div class="ws-actions">' + renderProgramRegenBtnHTML_() + '</div>';
   }
   return html;
 }
@@ -6047,15 +5957,9 @@ function renderProgramRoadmapHTML_(catId){
   var activeId = plan ? getActiveSubGoalStepId_(catId) : null;
   var strip = renderPlanWorkshopStripHTML_(catId);
   var isGenerating = state.subGoalPlanGenerating && state.subGoalPlanGenerating.catId === catId;
-  var needTopicSteps = countStepsNeedingTopics_(catId);
   var html = strip + '<div class="planner-layer program-layer ' + getPlanTierClass_('program') + (isGenerating ? ' is-generating' : '') + (pendingPreview ? ' pending-preview' : '') + '" data-plan-tier="2">' +
     '<div class="planner-layer-head">' +
       '<div class="planner-layer-kicker">' + escapeHtml(cat.name) + ' · ' + escapeHtml(cat.audience) + '</div>' +
-      '<div class="planner-layer-actions">' +
-        (needTopicSteps > 0 && plan && plan.steps.length
-          ? '<button type="button" class="layer-btn primary-plan btn-fill-all-topics"' + plannerFnClickAttr_('fillAllStepTopicsWithAI_', catId) + '>부족한 주제 ' + needTopicSteps + '단계 AI 채우기</button>'
-          : '') +
-      '</div>' +
     '</div>';
   if(pendingPreview){
     html += '<div class="program-pending-banner">' +

@@ -1507,6 +1507,7 @@ width: 100%; max-width: 100%; box-sizing: border-box; display: block;
 background: #F8F7F4; border: 1px solid #E5E7EB; border-radius: 10px;
 padding: 12px 14px; font-size: 16px; line-height: 1.75; color: #374151; font-family: inherit;
 resize: none; overflow: hidden; min-height: 2.5em;
+white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere;
 }
 .sheet-edit:focus { outline: none; border-color: #2DD4BF; background: #fff; }
 .sheet-edit-title { font-size: 16px; font-weight: 700; color: #1A1A1A; }
@@ -2495,9 +2496,14 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .drive-label { font-size: 11px; font-weight: 700; color: #6B7280; display: block; margin-bottom: 6px; }
 
 @media (min-width: 640px) {
-.detail-sheet { max-width: 480px; left: 50%; right: auto; transform: translateX(-50%) translateY(100%); border-radius: 20px; bottom: 20px; }
+.detail-sheet {
+  max-width: min(640px, calc(100vw - 32px));
+  left: 50%; right: auto;
+  transform: translateX(-50%) translateY(100%);
+  border-radius: 20px; bottom: 20px;
+}
 .detail-sheet.open { transform: translateX(-50%) translateY(0); }
-.prompt-modal { border-radius: 20px; max-width: 560px; bottom: 20px; }
+.prompt-modal { border-radius: 20px; max-width: min(640px, calc(100vw - 32px)); bottom: 20px; }
 
   #main-content {
     max-width: 960px;
@@ -2516,12 +2522,20 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 }
 
+/* iPad·와이드 태블릿: 초안 시트 가급적 넓게 */
+@media (min-width: 768px) {
+  .detail-sheet { max-width: min(760px, calc(100vw - 40px)); }
+  .prompt-modal { max-width: min(720px, calc(100vw - 40px)); }
+}
+
 @media (min-width: 1024px) {
   #main-content { max-width: 1200px; }
   .cards-wrap {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 14px;
   }
+  .detail-sheet { max-width: min(900px, calc(100vw - 48px)); }
+  .prompt-modal { max-width: min(840px, calc(100vw - 48px)); }
 }
 
 /* ── 지점·브랜딩 메뉴얼 ── */

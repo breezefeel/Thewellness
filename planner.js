@@ -6921,30 +6921,40 @@ function sanitizeCatPromptKeys_(catId){
 function normalizePromptTextForCompare_(text){
   return String(text || '').replace(/\r\n/g, '\n').trim();
 }
-function getPromptCompareValue_(catId, type){
-  var el = document.getElementById('pt-' + type);
-  if(el) return el.value;
+/** 저장된 값만 (렌더 중 stale DOM textarea 오염 방지) */
+function getPromptStoredValue_(catId, type){
   if(type === 'base') return getBasePrompt();
   return getCatPrompt(catId, type);
 }
-function isPromptAtDefault_(catId, type){
+/** 화면에 열린 textarea가 있으면 그 값, 없으면 저장값 */
+function getPromptCompareValue_(catId, type){
+  var el = document.getElementById('pt-' + type);
+  if(el) return el.value;
+  return getPromptStoredValue_(catId, type);
+}
+/**
+ * @param {boolean} [useLiveDom] true면 현재 textarea 입력 반영(입력 중·리셋 클릭).
+ *   false/생략이면 저장값만 — render 템플릿 평가 시 이전 탭 DOM을 읽지 않음.
+ */
+function isPromptAtDefault_(catId, type, useLiveDom){
   var def = type === 'base' ? String(DEFAULT_PROMPTS.base || '') : getDefaultCatPrompt_(catId, type);
   if(type !== 'base' && !def) return true;
-  return normalizePromptTextForCompare_(getPromptCompareValue_(catId, type)) === normalizePromptTextForCompare_(def);
+  var cur = useLiveDom ? getPromptCompareValue_(catId, type) : getPromptStoredValue_(catId, type);
+  return normalizePromptTextForCompare_(cur) === normalizePromptTextForCompare_(def);
 }
-function isCatPromptsAllDefault_(catId){
+function isCatPromptsAllDefault_(catId, useLiveDom){
   var types = getPromptTypesForCat_(catId);
   if(!types.length) return true;
-  return types.every(function(t){ return isPromptAtDefault_(catId, t); });
+  return types.every(function(t){ return isPromptAtDefault_(catId, t, useLiveDom); });
 }
 function promptResetBtnHtml_(catId, type){
-  var atDefault = isPromptAtDefault_(catId, type);
+  var atDefault = isPromptAtDefault_(catId, type, false);
   return '<button type="button" class="prompt-reset-btn' + (atDefault ? ' is-at-default' : ' is-modified') + '"' +
     (atDefault ? ' disabled title="현재 내용이 기본값과 같아요"' : ' title="기본값과 다릅니다. 누르면 되돌려요"') +
     ' onclick="resetPrompt(\'' + type + '\')">기본값으로</button>';
 }
 function promptResetAllBtnHtml_(catId){
-  var atDefault = isCatPromptsAllDefault_(catId);
+  var atDefault = isCatPromptsAllDefault_(catId, false);
   return '<button type="button" class="prompt-reset-all-btn' + (atDefault ? ' is-at-default' : ' is-modified') + '"' +
     (atDefault ? ' disabled title="이 프로그램 프롬프트가 모두 기본값이에요"' : ' title="수정된 채널 지침을 모두 기본값으로 되돌려요"') +
     ' onclick="resetAllPromptsForCat()">이 프로그램 전체 기본값으로</button>';
@@ -6960,7 +6970,7 @@ function updatePromptResetButtons_(){
     if(!section) return;
     var btn = section.querySelector('.prompt-reset-btn');
     if(!btn) return;
-    var atDefault = isPromptAtDefault_(catId, type);
+    var atDefault = isPromptAtDefault_(catId, type, true);
     btn.disabled = atDefault;
     btn.classList.toggle('is-at-default', atDefault);
     btn.classList.toggle('is-modified', !atDefault);
@@ -6968,7 +6978,7 @@ function updatePromptResetButtons_(){
   });
   var allBtn = document.querySelector('.prompt-reset-all-btn');
   if(allBtn && types.length){
-    var allDefault = isCatPromptsAllDefault_(catId);
+    var allDefault = isCatPromptsAllDefault_(catId, true);
     allBtn.disabled = allDefault;
     allBtn.classList.toggle('is-at-default', allDefault);
     allBtn.classList.toggle('is-modified', !allDefault);
@@ -7219,9 +7229,9 @@ const DEFAULT_HEILJAGYAE_COMMUNITY_PROMPT = `힐스테이트 자이 계양 **아
 인사말·마무리는 앱에서 고정 문구로 붙입니다.
 
 [글 흐름 — 반드시 이 순서]
-1. **문제 제기** (problem): 일상 장면에서 공감되는 불편·궁금증을 **자연스러운 문장 2~4개**로. 불릿·번호 나열 금지. 마지막 문장에서 **짧은 시간·일상 공간으로 해결 가능**하다는 뉘앙스로 이어지기.
+1. **문제 제기** (problem): 일상 장면에서 공감되는 불편·궁금증을 **자연스러운 문장 2~4개**로. 불릿·번호 나열 금지. 문장(문단) 사이 **빈 줄**. 마지막 문장에서 **짧은 시간·일상 공간으로 해결 가능**하다는 뉘앙스로 이어지기.
 2. **해결책 제시** (selfCare): **👉 로 시작**. 동작·자세·**초·회·분** 숫자를 앞쪽에 배치해 핵심이 먼저 보이게. "지금 바로 해보세요" 같은 가벼운 멘트 OK. "아 시원하다" 지점에서 멈추라는 뉘앙스.
-3. **원리 설명** (explanation): 동작 **뒤에** 왜 도움이 되는지 **2~5문장**. 정의 한 줄 + **비유 한 줄**(쿠션 털기, 고양이 기지개 등) + 복잡하지 않다·도구 필요 없다는 마무리.
+3. **원리 설명** (explanation): 동작 **뒤에** 왜 도움이 되는지 **2~5문장**. 문단 사이 빈 줄. 정의 한 줄 + **비유 한 줄**(쿠션 털기, 고양이 기지개 등) + 복잡하지 않다·도구 필요 없다는 마무리.
 
 [형식]
 - title: 🌿 로 시작, 질문형·공감형 한 줄 (낚시·과장 금지)
@@ -7408,9 +7418,9 @@ ${MEDICAL_COMPLIANCE_RULE}
 ${GEO_CONTENT_STRUCTURE_RULE}
 
 [글 흐름 — 반드시 이 순서·필드]
-1. **문제 제기** (problem): 일상 장면에서 공감되는 불편·궁금증 2~4문장. 불릿·번호 나열 금지. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스.
+1. **문제 제기** (problem): 일상 장면에서 공감되는 불편·궁금증 2~4문장. 불릿·번호 나열 금지. 문장(문단) 사이에는 **빈 줄**로 띄워 가독성 확보. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스.
 2. **셀프 케어** (selfCare): **👉 로 시작**. 동작·자세·**초·회·분**을 앞쪽에. "아 시원하다" 지점에서 멈추라는 뉘앙스. 무리·재통증 주의 한 줄. 통증이 심하면 병원 먼저 한 줄.
-3. **원리 설명** (explanation): **맨 앞 2~3문장 TL;DR(핵심 결론)** → 동작 **뒤에** 왜 도움이 되는지 + GEO 구조. 비유 한 줄. 병원 치료가 필요한 경우와 **프로그램 병행**이 맞는 경우를 구분.
+3. **원리 설명** (explanation): **맨 앞 2~3문장 TL;DR(핵심 결론)** → 동작 **뒤에** 왜 도움이 되는지 + GEO 구조. 비유 한 줄. 병원 치료가 필요한 경우와 **프로그램 병행**이 맞는 경우를 구분. **문단 사이 빈 줄**로 읽기 쉽게.
 
 [형식]
 - title: 호기심·질문형 한 줄 (35자 내외, 네이버 SEO 고려, 과장 금지)
@@ -14009,14 +14019,14 @@ function formatCommunityPostText(c){
     '',
     COMMUNITY_FIXED_GREETING,
     '',
-    getCommunityProblemText_(co),
+    ensureProseParagraphBreaks_(getCommunityProblemText_(co)),
     '',
     (co.selfCare || '').trim(),
     '',
-    (co.explanation || '').trim(),
+    ensureProseParagraphBreaks_(co.explanation || ''),
     '',
     COMMUNITY_FIXED_CLOSING
-  ].join('\n');
+  ].join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function isStructuredGeneralBlog_(b){
@@ -14064,13 +14074,13 @@ function formatGeneralBlogPostText(b){
   return [
     (b.title || '').trim(),
     '',
-    getGeneralBlogProblemText_(b),
+    ensureProseParagraphBreaks_(getGeneralBlogProblemText_(b)),
     '',
     (b.selfCare || '').trim(),
     '',
-    (b.explanation || '').trim(),
+    ensureProseParagraphBreaks_(b.explanation || ''),
     '',
-    (b.cta || '').trim(),
+    ensureProseParagraphBreaks_(b.cta || ''),
     tags
   ].filter(function(p, i, arr){
     if(i === 0) return true;
@@ -14401,7 +14411,7 @@ function renderSheetContent(content) {
       bodyHTML = tabsHTML + addSourceHtml +
         sheetFullCopyBar_() +
         sheetEditField_('오늘의 한 줄', 'sheet-thread-title', th.topicTitle || '', { rows: 2, title: true, regen: 'thread.topicTitle', copy: true }) +
-        sheetEditField_('본문 (일상 나눔)', 'sheet-thread-summary', th.summary || '', { rows: 10, regen: 'thread.summary', copy: true }) +
+        sheetEditField_('본문 (일상 나눔)', 'sheet-thread-summary', th.summary || '', { rows: 10, regen: 'thread.summary', copy: true, paragraphs: true }) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 최종본이 저장돼요.</p>';
     }
   } else if(tab==='blog'){
@@ -14411,10 +14421,10 @@ function renderSheetContent(content) {
       bodyHTML = composeSheetTabLayout_(tab,
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }),
         addSourceHtml + sheetFullCopyBar_() +
-        sheetEditField_('문제 제기', 'sheet-blog-problem', getGeneralBlogProblemText_(b), { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지', regen: 'blog.problem', copy: true }) +
+        sheetEditField_('문제 제기', 'sheet-blog-problem', getGeneralBlogProblemText_(b), { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지', regen: 'blog.problem', copy: true, paragraphs: true }) +
         sheetEditField_('셀프 케어', 'sheet-blog-selfcare', b.selfCare || '', { rows: 8, help: '👉 로 시작 · 동작·초·회·분을 앞쪽에 · 단계 사이 빈 줄', regen: 'blog.selfCare', copy: true, stepPreview: true }) +
-        sheetEditField_('원리 설명', 'sheet-blog-explanation', b.explanation || '', { rows: 6, regen: 'blog.explanation', copy: true }) +
-        sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true }) +
+        sheetEditField_('원리 설명', 'sheet-blog-explanation', b.explanation || '', { rows: 6, regen: 'blog.explanation', copy: true, paragraphs: true }) +
+        sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요. 인스타 캡션은 그동안 백그라운드에서 만들어져요.</p>'
       );
@@ -14425,10 +14435,10 @@ function renderSheetContent(content) {
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }),
         sheetFullCopyBar_() +
         expertRefHtml +
-        sheetEditField_('영상·사진 맥락', 'sheet-blog-hook', b.hook, { rows: 4, help: '이번 영상·사진에서 다룬 장면·상황', regen: 'blog.hook', copy: true }) +
+        sheetEditField_('영상·사진 맥락', 'sheet-blog-hook', b.hook, { rows: 4, help: '이번 영상·사진에서 다룬 장면·상황', regen: 'blog.hook', copy: true, paragraphs: true }) +
         sheetEditField_('시연·핵심 포인트', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '손 위치·동작·주의사항 — 한 줄에 하나씩', regen: 'blog.outline', copy: true }) +
-        sheetEditField_('원리 설명', 'sheet-blog-draft', b.draft, { rows: 12, help: '본문의 중심. 왜 이렇게 하는지·짧은 메커니즘', regen: 'blog.draft', copy: true }) +
-        sheetEditField_('마무리', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true }) +
+        sheetEditField_('원리 설명', 'sheet-blog-draft', b.draft, { rows: 12, help: '본문의 중심. 왜 이렇게 하는지·짧은 메커니즘', regen: 'blog.draft', copy: true, paragraphs: true }) +
+        sheetEditField_('마무리', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분 · 3~5개 권장', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>발행완료</strong>를 누르면 저장·복사돼요.</p>'
       );
@@ -14436,10 +14446,10 @@ function renderSheetContent(content) {
       bodyHTML = composeSheetTabLayout_(tab,
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }),
         addSourceHtml + sheetFullCopyBar_() +
-        sheetEditField_('후킹 오프닝', 'sheet-blog-hook', b.hook, { rows: 4, regen: 'blog.hook', copy: true }) +
+        sheetEditField_('후킹 오프닝', 'sheet-blog-hook', b.hook, { rows: 4, regen: 'blog.hook', copy: true, paragraphs: true }) +
         sheetEditField_('목차 구성', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '한 줄에 소제목 하나씩', regen: 'blog.outline', copy: true }) +
-        sheetEditField_('본문 초안', 'sheet-blog-draft', b.draft, { rows: 14, regen: 'blog.draft', copy: true }) +
-        sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true }) +
+        sheetEditField_('본문 초안', 'sheet-blog-draft', b.draft, { rows: 14, regen: 'blog.draft', copy: true, paragraphs: true }) +
+        sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요.</p>'
       );
@@ -14456,7 +14466,7 @@ function renderSheetContent(content) {
       bodyHTML = composeSheetTabLayout_(tab,
         sheetEditField_('첫 줄 후킹', 'sheet-insta-hook', ig.hook, { rows: 2, title: true, regen: 'insta.hook', copy: true }),
         addSourceHtml + sheetFullCopyBar_() +
-        sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10, regen: 'insta.caption', copy: true }) +
+        sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10, regen: 'insta.caption', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).map(function(h){ return String(h).replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동해요.</p>'
       );
@@ -14471,8 +14481,8 @@ function renderSheetContent(content) {
     } else {
       bodyHTML = tabsHTML + addSourceHtml +
         sheetFullCopyBar_() +
-        sheetEditField_('본문 (게시글)', 'sheet-threads-body', getThreadsBodyText_(ths), { rows: 5, regen: 'threads.body', copy: true, help: '통념 뒤집기·궁금증 훅 한 줄. 해설은 넣지 마세요.' }) +
-        sheetEditField_('댓글 (재게시)', 'sheet-threads-comment', getThreadsCommentText_(ths), { rows: 12, regen: 'threads.comment', copy: true, help: '본문에 대한 해설·근거·과정·철학. 게시 후 본인 댓글(재게시)로 올리세요.' }) +
+        sheetEditField_('본문 (게시글)', 'sheet-threads-body', getThreadsBodyText_(ths), { rows: 5, regen: 'threads.body', copy: true, help: '통념 뒤집기·궁금증 훅 한 줄. 해설은 넣지 마세요.', paragraphs: true }) +
+        sheetEditField_('댓글 (재게시)', 'sheet-threads-comment', getThreadsCommentText_(ths), { rows: 12, regen: 'threads.comment', copy: true, help: '본문에 대한 해설·근거·과정·철학. 게시 후 본인 댓글(재게시)로 올리세요.', paragraphs: true }) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">먼저 <strong>본문</strong>을 게시한 뒤, <strong>댓글</strong> 박스 내용을 본인 댓글(재게시)로 붙여넣으세요. <strong>발행완료</strong>는 본문을 복사·저장합니다.</p>';
     }
   } else if(tab==='community'){
@@ -14488,9 +14498,9 @@ function renderSheetContent(content) {
         addSourceHtml + sheetFullCopyBar_() +
         `<div class="cb"><div class="cb-label">인사말 (고정)</div>
           <div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">${escapeHtml(COMMUNITY_FIXED_GREETING)}</div></div>
-        ${sheetEditField_('문제 제기', 'sheet-community-problem', problemText, { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지, 자연스러운 문장으로', regen: 'community.problem', copy: true })}
+        ${sheetEditField_('문제 제기', 'sheet-community-problem', problemText, { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지, 자연스러운 문장으로', regen: 'community.problem', copy: true, paragraphs: true })}
         ${sheetEditField_('셀프 케어 (해결책)', 'sheet-community-selfcare', coNorm.selfCare || '', { rows: 8, help: '👉 로 시작 · 동작·초·회·분을 앞쪽에 · 단계 사이 빈 줄', regen: 'community.selfCare', copy: true, stepPreview: true })}
-        ${sheetEditField_('원리 설명', 'sheet-community-explanation', coNorm.explanation || '', { rows: 6, regen: 'community.explanation', copy: true })}
+        ${sheetEditField_('원리 설명', 'sheet-community-explanation', coNorm.explanation || '', { rows: 6, regen: 'community.explanation', copy: true, paragraphs: true })}
         <div class="cb"><div class="cb-label">마무리 (고정)</div>
           <div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">${escapeHtml(COMMUNITY_FIXED_CLOSING)}</div></div>
         <p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 눌러 바로 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 게시판 최종본이 저장돼요. 상단 <strong>전체 복사</strong>는 인사말·마무리까지 포함해 복사돼요.</p>`
@@ -15631,8 +15641,54 @@ function sheetEditField_(label, id, value, opts){
   var oninput = 'autoGrowTextarea_(this)' + (opts.stepPreview ? ';renderSelfCareStepsPreview_(this)' : '');
   var previewAttr = opts.stepPreview ? ' data-selfcare-preview="1"' : '';
   var previewHost = opts.stepPreview ? '<div class="selfcare-steps" data-steps-for="' + id + '"></div>' : '';
+  var displayValue = opts.paragraphs ? ensureProseParagraphBreaks_(value) : (value || '');
   return '<div class="' + wrapCls + '"><div class="cb-label">' + escapeHtml(label) + tools + '</div>' + help +
-    '<textarea class="' + cls + '" id="' + id + '" rows="' + rows + '"' + previewAttr + ' oninput="' + oninput + '">' + escapeHtml(value || '') + '</textarea>' + previewHost + '</div>';
+    '<textarea class="' + cls + '" id="' + id + '" rows="' + rows + '"' + previewAttr + ' oninput="' + oninput + '">' + escapeHtml(displayValue) + '</textarea>' + previewHost + '</div>';
+}
+
+/**
+ * 긴 산문 가독성: 문단(문장) 사이에 빈 줄.
+ * 이미 문단 구분·목록·셀프케어(👉)가 있으면 손대지 않음.
+ */
+function ensureProseParagraphBreaks_(text){
+  var t = String(text || '').replace(/\r\n/g, '\n').trim();
+  if(!t) return '';
+  if(/(^|\n)\s*👉/.test(t)) return t.replace(/\n{3,}/g, '\n\n');
+  if(/(^|\n)\s*(?:[-•*]|\d+[.)])\s/.test(t)) return t.replace(/\n{3,}/g, '\n\n');
+  if(/\n[ \t]*\n/.test(t)) return t.replace(/\n{3,}/g, '\n\n');
+  if(t.indexOf('\n') !== -1){
+    var lines = t.split(/\n+/).map(function(l){ return l.trim(); }).filter(Boolean);
+    if(lines.length >= 2){
+      var avg = lines.reduce(function(s, l){ return s + l.length; }, 0) / lines.length;
+      if(avg >= 24) return lines.join('\n\n');
+    }
+    return t;
+  }
+  if(t.length < 72) return t;
+  var sentences = splitProseSentences_(t);
+  if(sentences.length < 2) return t;
+  return sentences.join('\n\n');
+}
+function splitProseSentences_(text){
+  var t = String(text || '').trim();
+  if(!t) return [];
+  var parts = [];
+  var buf = '';
+  for(var i = 0; i < t.length; i++){
+    var ch = t.charAt(i);
+    buf += ch;
+    var end = /[.!?。？！]/.test(ch);
+    var next = t.charAt(i + 1);
+    if(end && (!next || /\s/.test(next))){
+      var s = buf.trim();
+      if(s) parts.push(s);
+      buf = '';
+      while(i + 1 < t.length && /\s/.test(t.charAt(i + 1))) i++;
+    }
+  }
+  var rest = buf.trim();
+  if(rest) parts.push(rest);
+  return parts.length ? parts : [t];
 }
 
 /* ── 구분 박스: 박스별 복사·재생성 + 상단 전체 복사 + 셀프 케어 단계 미리보기 ── */
@@ -17087,7 +17143,7 @@ function renderPromptModal() {
     ${promptTypes.length ? `
     <div class="prompt-cat-reset-bar">
       <span class="prompt-cat-reset-hint">이 프로그램: ${resetAllTypesLabel}</span>
-      <button type="button" class="prompt-reset-all-btn${isCatPromptsAllDefault_(state.editingCatId) ? ' is-at-default' : ' is-modified'}" onclick="resetAllPromptsForCat()"${isCatPromptsAllDefault_(state.editingCatId) ? ' disabled title="이 프로그램 프롬프트가 모두 기본값이에요"' : ' title="수정된 채널 지침을 모두 기본값으로 되돌려요"'}>이 프로그램 전체 기본값으로</button>
+      ${promptResetAllBtnHtml_(state.editingCatId)}
     </div>` : ''}
 
     <div class="prompt-tabs-scroll">
@@ -17166,6 +17222,7 @@ ${pt==='base' ? `
 `;
   bindPromptTextareaAutosave_();
   bindPromptIdentityAutosave_();
+  updatePromptResetButtons_();
 }
 
 function bindPromptIdentityAutosave_(){
@@ -17280,7 +17337,7 @@ if(baseEl) state.prompts.base = baseEl.value;
 }
 
 window.resetPrompt = function(type) {
-  if(isPromptAtDefault_(state.editingCatId, type)){
+  if(isPromptAtDefault_(state.editingCatId, type, true)){
     if(typeof setAppToast === 'function') setAppToast('이미 기본값과 같아요.', { duration: 2800, variant: 'ok' });
     return;
   }
@@ -17308,7 +17365,7 @@ window.resetAllPromptsForCat = function(){
   if(isOpsManualCategory(catId)) return;
   var types = getPromptTypesForCat_(catId);
   if(!types.length) return;
-  if(isCatPromptsAllDefault_(catId)){
+  if(isCatPromptsAllDefault_(catId, true)){
     if(typeof setAppToast === 'function') setAppToast('이 프로그램 프롬프트가 모두 기본값이에요.', { duration: 2800, variant: 'ok' });
     return;
   }
@@ -17649,9 +17706,9 @@ ${hjImgGuide}
 {
 "community": {
 "title": "🌿 질문형·공감형 한 줄",
-"problem": "문제 제기 2~4문장. 불릿·번호 없이 자연스럽게. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스",
+"problem": "문제 제기 2~4문장. 불릿·번호 없이 자연스럽게. 문장(문단) 사이 빈 줄. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스",
 "selfCare": "👉 로 시작. 동작·자세·초·회·분을 앞쪽에. '시원한 지점에서 멈추기' 뉘앙스",
-"explanation": "원리 설명 2~5문장. 왜 도움이 되는지+비유+복잡하지 않다는 마무리. 옆집 이웃 톤"
+"explanation": "원리 설명 2~5문장. 문단 사이 빈 줄. 왜 도움이 되는지+비유+복잡하지 않다는 마무리. 옆집 이웃 톤"
 },
 ${heiljagyaeImgJsonTail}
 }
@@ -17682,9 +17739,9 @@ ${imagePromptGuide}
 {
 "blog": {
 "title": "호기심·질문형 한 줄. 증상형이면 증상+지역·프로그램 키워드를 자연스럽게 (35자 내외, 과장 금지)",
-"problem": "문제 제기 2~4문장. 불릿·번호 없이. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스",
+"problem": "문제 제기 2~4문장. 불릿·번호 없이. 문장(문단) 사이 빈 줄. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스",
 "selfCare": "👉 로 시작. 동작·자세·초·회·분을 앞쪽에. '시원한 지점에서 멈추기' 뉘앙스",
-"explanation": "맨 앞 2~3문장 TL;DR(핵심 결론) → 원리 설명+GEO 구조. 왜 도움이 되는지+비유+복잡하지 않다는 마무리",
+"explanation": "맨 앞 2~3문장 TL;DR(핵심 결론) → 원리 설명+GEO 구조. 문단 사이 빈 줄. 왜 도움이 되는지+비유+복잡하지 않다는 마무리",
 "cta": "마무리 행동 유도 (미카닥 박준규·블로그/상담·증상 허브 URL 자연스럽게 언급)",
 "hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6"]
 },

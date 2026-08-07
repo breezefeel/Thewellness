@@ -2506,6 +2506,70 @@ background: #F3F4F6; color: #9CA3AF; cursor: not-allowed; opacity: 1;
 .btn-prompt-download-header.is-modified:not(:disabled) {
 background: #ECFDF5; color: #047857;
 }
+.prompt-mod-status {
+margin: 0 0 14px;
+padding: 12px 14px;
+border-radius: 12px;
+border: 1px solid #E5E7EB;
+line-height: 1.45;
+}
+.prompt-mod-status.is-default {
+background: #F9FAFB;
+border-color: #E5E7EB;
+color: #4B5563;
+}
+.prompt-mod-status.is-modified {
+background: #FFFBEB;
+border-color: #FCD34D;
+color: #78350F;
+}
+.prompt-mod-status-title {
+font-size: 13px;
+font-weight: 800;
+margin: 0 0 4px;
+}
+.prompt-mod-status-desc {
+font-size: 12px;
+opacity: 0.92;
+}
+.prompt-mod-status-desc strong { font-weight: 800; }
+.prompt-mod-chips {
+display: flex;
+flex-wrap: wrap;
+gap: 6px;
+margin-top: 10px;
+}
+.prompt-mod-chip {
+border: 1px solid #F59E0B;
+background: #FFF;
+color: #92400E;
+border-radius: 999px;
+padding: 4px 10px;
+font-size: 11px;
+font-weight: 700;
+cursor: pointer;
+font-family: inherit;
+-webkit-tap-highlight-color: transparent;
+}
+.prompt-mod-chip:hover { background: #FEF3C7; }
+.prompt-mod-chip-more {
+font-size: 11px;
+color: #92400E;
+align-self: center;
+padding: 0 4px;
+}
+.cat-tab.has-prompt-mod {
+position: relative;
+}
+.prompt-cat-mod-dot {
+display: inline-block;
+width: 6px;
+height: 6px;
+margin-left: 4px;
+border-radius: 50%;
+background: #F59E0B;
+vertical-align: middle;
+}
 .prompt-modal-close {
 background: #F3F4F6; border: none; border-radius: 8px;
 width: 30px; height: 30px; font-size: 14px; cursor: pointer;
@@ -3117,6 +3181,21 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   padding: 10px 12px; border-radius: 10px; background: #F0FDF4; border: 1px solid #BBF7D0;
 }
 .sync-status-summary.pending { background: #FFFBEB; border-color: #FDE68A; }
+.sync-status-action-hint {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  color: #1E3A8A;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sync-status-action-hint strong {
+  display: inline-block;
+  margin-right: 4px;
+  font-weight: 800;
+}
 .sync-status-summary.warn { background: #FEF2F2; border-color: #FECACA; }
 .sync-status-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
 #sync-preview-overlay { z-index: 320; }

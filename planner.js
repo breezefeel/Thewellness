@@ -8915,15 +8915,74 @@ function isCatPromptsAllDefault_(catId, useLiveDom){
   if(!types.length) return true;
   return types.every(function(t){ return isPromptAtDefault_(catId, t, useLiveDom); });
 }
-/** 기본값과 다른 프롬프트가 하나라도 있는지 (base + 전 프로그램 채널) */
-function hasAnyLivePromptModifications_(useLiveDom){
-  if(!isPromptAtDefault_(0, 'base', useLiveDom)) return true;
+/** 기본값과 다른 프롬프트 목록 (base + 전 프로그램 채널) */
+function collectLivePromptModifications_(useLiveDom){
+  var out = [];
+  if(!isPromptAtDefault_(0, 'base', useLiveDom)){
+    out.push({ catId: null, type: 'base', label: '공통 기본' });
+  }
   var ids = getPromptModalCatIds_();
   for(var i = 0; i < ids.length; i++){
-    if(!isCatPromptsAllDefault_(ids[i], useLiveDom)) return true;
+    var catId = ids[i];
+    var cat = CATEGORIES[catId];
+    var catName = (cat && cat.name) || ('프로그램 ' + catId);
+    var types = getPromptTypesForCat_(catId);
+    for(var j = 0; j < types.length; j++){
+      var type = types[j];
+      if(isPromptAtDefault_(catId, type, useLiveDom)) continue;
+      out.push({
+        catId: catId,
+        type: type,
+        label: catName + ' · ' + getPromptTypeLabelKr_(type)
+      });
+    }
   }
-  return false;
+  return out;
 }
+/** 기본값과 다른 프롬프트가 하나라도 있는지 (base + 전 프로그램 채널) */
+function hasAnyLivePromptModifications_(useLiveDom){
+  return collectLivePromptModifications_(useLiveDom).length > 0;
+}
+function formatPromptModSummaryForTitle_(mods, maxN){
+  maxN = maxN || 10;
+  if(!mods || !mods.length) return '';
+  var lines = mods.slice(0, maxN).map(function(m){ return '· ' + m.label; });
+  if(mods.length > maxN) lines.push('· 외 ' + (mods.length - maxN) + '곳');
+  return lines.join('\n');
+}
+function buildPromptModStatusBannerHtml_(useLiveDom){
+  var mods = collectLivePromptModifications_(useLiveDom);
+  if(!mods.length){
+    return '<div class="prompt-mod-status is-default" id="prompt-mod-status" role="status">' +
+      '<div class="prompt-mod-status-title">앱 기본값과 같아요</div>' +
+      '<div class="prompt-mod-status-desc">코드에 들어 있는 기본 지침과 같습니다. Cursor에서 고칠 때 <strong>받을 필요 없어요</strong>.</div>' +
+      '</div>';
+  }
+  var chips = mods.slice(0, 14).map(function(m){
+    var catArg = m.catId == null ? 'null' : String(m.catId);
+    return '<button type="button" class="prompt-mod-chip" onclick="jumpToPromptModification_(' + catArg + ', \'' + m.type + '\')">' +
+      escapeHtml(m.label) + '</button>';
+  }).join('');
+  if(mods.length > 14){
+    chips += '<span class="prompt-mod-chip-more">외 ' + (mods.length - 14) + '곳</span>';
+  }
+  return '<div class="prompt-mod-status is-modified" id="prompt-mod-status" role="status">' +
+    '<div class="prompt-mod-status-title">자체 수정 ' + mods.length + '곳 · Cursor 받을 때 참고용</div>' +
+    '<div class="prompt-mod-status-desc">앱 기본과 다른 지침이 있습니다. Cursor로 더 손볼 때 <strong>다운로드·복사</strong>를 권장합니다. 칩을 누르면 해당 칸으로 이동합니다.</div>' +
+    '<div class="prompt-mod-chips">' + chips + '</div>' +
+    '</div>';
+}
+window.jumpToPromptModification_ = function(catId, type){
+  type = String(type || '');
+  if(type === 'base'){
+    state.promptTab = 'base';
+    renderPromptModal();
+    return;
+  }
+  if(catId != null && !isNaN(Number(catId))) state.editingCatId = Number(catId);
+  state.promptTab = type;
+  renderPromptModal();
+};
 function touchPromptsUpdatedAt_(){
   state.promptsUpdatedAt = new Date().toISOString();
 }
@@ -8946,12 +9005,20 @@ function formatPromptModDateLabel_(iso){
 function updatePromptDownloadButton_(){
   var btns = document.querySelectorAll('.btn-prompt-download-header, .btn-prompt-cursor-file, .btn-prompt-cursor-copy');
   if(!btns.length) return;
-  var modified = hasAnyLivePromptModifications_(true);
+  var mods = collectLivePromptModifications_(true);
+  var modified = mods.length > 0;
   var iso = getLivePromptsLastModifiedIso_();
   var dateLabel = formatPromptModDateLabel_(iso);
   var fullWhen = '';
   if(iso){
     try { fullWhen = new Date(iso).toLocaleString('ko-KR'); } catch(e){}
+  }
+  var modSummary = formatPromptModSummaryForTitle_(mods, 12);
+  var statusEl = document.getElementById('prompt-mod-status');
+  if(statusEl){
+    var wrap = document.createElement('div');
+    wrap.innerHTML = buildPromptModStatusBannerHtml_(true);
+    if(wrap.firstChild) statusEl.replaceWith(wrap.firstChild);
   }
   btns.forEach(function(btn){
     if(!btn) return;
@@ -8960,30 +9027,33 @@ function updatePromptDownloadButton_(){
     btn.classList.toggle('is-modified', modified);
     if(btn.classList.contains('btn-prompt-download-header')){
       if(modified){
-        btn.textContent = dateLabel ? ('다운로드 · ' + dateLabel) : '다운로드 · 수정됨';
-        btn.title = '수정된 현재 프롬프트를 파일로 저장 · Cursor 개선용' +
+        btn.textContent = dateLabel
+          ? ('다운로드 · 수정 ' + mods.length + ' · ' + dateLabel)
+          : ('다운로드 · 수정 ' + mods.length);
+        btn.title = '기본과 다른 지침 ' + mods.length + '곳 · Cursor 개선용으로 저장\n' +
+          modSummary +
           (fullWhen ? '\n마지막 수정: ' + fullWhen : '');
       } else {
         btn.textContent = '다운로드';
-        btn.title = '기본값과 같아요. 수정하거나 자동 개선된 뒤에 받을 수 있어요.';
+        btn.title = '앱 기본값과 같아요. Cursor에 받을 필요 없어요.';
       }
     } else if(btn.classList.contains('btn-prompt-cursor-copy')){
-      btn.textContent = 'Cursor용 복사';
       if(modified){
-        btn.title = '수정된 현재 프롬프트를 클립보드에 복사' +
+        btn.textContent = '복사 · 수정 ' + mods.length;
+        btn.title = '기본과 다른 지침 ' + mods.length + '곳 · 클립보드 복사\n' + modSummary +
           (fullWhen ? '\n마지막 수정: ' + fullWhen : '');
       } else {
-        btn.title = '기본값과 같아요. 수정 후 복사할 수 있어요.';
+        btn.textContent = 'Cursor용 복사';
+        btn.title = '앱 기본값과 같아요. 받을 필요 없어요.';
       }
     } else {
-      // footer「파일」
       if(modified){
-        btn.textContent = dateLabel ? ('파일 · ' + dateLabel) : '파일';
-        btn.title = '홈페이지 폴더에 저장하면 Cursor가 읽을 수 있어요' +
+        btn.textContent = dateLabel ? ('파일 · ' + mods.length + ' · ' + dateLabel) : ('파일 · ' + mods.length);
+        btn.title = '기본과 다른 지침 ' + mods.length + '곳 · 파일로 저장\n' + modSummary +
           (fullWhen ? '\n마지막 수정: ' + fullWhen : '');
       } else {
         btn.textContent = '파일';
-        btn.title = '기본값과 같아요. 수정 후 받을 수 있어요.';
+        btn.title = '앱 기본값과 같아요. 받을 필요 없어요.';
       }
     }
   });
@@ -11805,7 +11875,10 @@ function schedulePlannerGasPush_(immediate){
     plannerGasPushNow_().catch(function(err){ console.warn('[서버 동기화]', err); });
   };
   if(immediate && !forceDelay) run();
-  else plannerGasPushTimer = setTimeout(run, forceDelay ? Math.max(2500, quietUntil - Date.now()) : 2500);
+  else {
+    plannerGasPushTimer = setTimeout(run, forceDelay ? Math.max(2500, quietUntil - Date.now()) : 2500);
+    try { updateSyncStatusUI_(); } catch(eUiPush){}
+  }
 }
 function clearPlannerGasRetry_(){
   if(plannerGasRetryTimer_) clearTimeout(plannerGasRetryTimer_);
@@ -12470,6 +12543,17 @@ function isPlannerSyncBusy_(){
   // 예약된 푸시·재시도도 ‘진행 중’으로 표시 (클릭 대기처럼 오해되지 않게)
   return !!(_plannerSyncUiBusy || plannerGasPushTimer || plannerGasRetryTimer_ || driveUploadTimer);
 }
+/** 실제 HTTP/머지 작업 중 (타이머 대기와 구분) */
+function isPlannerSyncTransferring_(){
+  return !!_plannerSyncUiBusy;
+}
+function countPendingSyncItems_(){
+  var outbox = (state.syncOutbox || []).length;
+  var dirtyKeys = Object.keys(state.syncDirtyEntityKeys || {}).length;
+  var n = Math.max(outbox, dirtyKeys);
+  if((state.syncDirty || state.syncNeedsSnapshot) && n < 1) n = 1;
+  return n;
+}
 function isServerSyncConfigured_(){
   return !!(getPlannerGasUrl_() && location.protocol !== 'file:');
 }
@@ -12486,28 +12570,74 @@ function getSyncStatusInfo_(remoteMeta){
   var remoteRev = remoteMeta && remoteMeta.rev != null ? remoteMeta.rev : null;
   var remoteAt = remoteMeta && remoteMeta.savedAt ? remoteMeta.savedAt : '';
   var remoteBy = remoteMeta && remoteMeta.lastModifiedBy ? remoteMeta.lastModifiedBy : '';
+  var transferring = isPlannerSyncTransferring_();
+  var retryScheduled = !!plannerGasRetryTimer_;
+  var queuedPush = !!(!transferring && (plannerGasPushTimer || driveUploadTimer));
   var busy = isPlannerSyncBusy_();
   var serverOn = isServerSyncConfigured_();
   var driveOn = hasDriveValidToken_();
   var serverPending = serverOn && !!state.syncDirty;
   var drivePending = driveOn && !!state.syncDirty;
   var remoteNewer = remoteRev != null && remoteRev > localRev;
-  var retryScheduled = !!plannerGasRetryTimer_;
+  var pendingCount = countPendingSyncItems_();
+  var phase = 'ok';
   var overall = 'ok';
-  if(busy) overall = 'syncing';
-  else if(plannerLastSyncError_ && !retryScheduled) overall = 'warn';
-  else if(!serverOn && location.protocol === 'file:') overall = 'warn';
-  else if(serverPending || drivePending) overall = 'pending';
-  else if(remoteNewer) overall = 'pending';
-  else if(serverOn && !serverRev && localRev > 0) overall = 'pending';
+  if(transferring){
+    phase = 'transferring';
+    overall = 'syncing';
+  } else if(retryScheduled){
+    phase = 'retry_wait';
+    overall = 'pending';
+  } else if(queuedPush){
+    phase = 'queued';
+    overall = 'pending';
+  } else if(plannerLastSyncError_ && !retryScheduled){
+    phase = 'warn';
+    overall = 'warn';
+  } else if(!serverOn && location.protocol === 'file:'){
+    phase = 'warn';
+    overall = 'warn';
+  } else if(remoteNewer && !serverPending && !drivePending){
+    phase = 'pull';
+    overall = 'pending';
+  } else if(serverPending || drivePending || (serverOn && !serverRev && localRev > 0)){
+    phase = 'pending';
+    overall = 'pending';
+  } else if(busy){
+    phase = 'queued';
+    overall = 'syncing';
+  }
+
+  var actionHint = '';
   var summary = '';
-  if(busy && retryScheduled) summary = '서버 응답이 지연되어 자동 재시도 중입니다. 클릭할 필요 없이 이어집니다.';
-  else if(busy) summary = '동기화를 진행 중이에요. 잠시만 기다려 주세요. (자동으로 진행됩니다)';
-  else if(plannerLastSyncError_) summary = '최근 서버 반영 지연: ' + plannerLastSyncError_;
-  else if(remoteNewer) summary = '서버에 이 기기보다 최신 데이터(rev ' + remoteRev + ')가 있어요. 「지금 동기화」로 받아오거나 잠시 기다리면 맞춰집니다.';
-  else if(serverPending || drivePending) summary = '이 기기 변경이 서버·Drive에 반영되는 중이에요. 자동으로 올라가며, 급하면 「지금 동기화」를 눌러도 됩니다.';
-  else if(!serverOn) summary = '서버 URL이 없거나 file:// 로 열려 있어요. https로 열면 기기 간 동기화가 됩니다.';
-  else summary = '이 기기·서버·Drive가 같은 revision 기준으로 맞춰져 있어요.';
+  if(phase === 'transferring'){
+    summary = '지금 서버·Drive와 주고받는 중이에요. 끝날 때까지 잠시만 기다려 주세요.';
+    actionHint = '기다리면 됩니다. 헤더 「동기화」는 눌러도 되고, 안 눌러도 자동으로 끝납니다.';
+  } else if(phase === 'retry_wait'){
+    summary = '서버 응답이 느려 자동 재시도 대기 중이에요' +
+      (plannerGasRetryCount_ ? ' (' + plannerGasRetryCount_ + '회차)' : '') +
+      (plannerLastSyncError_ ? '. ' + plannerLastSyncError_ : '.');
+    actionHint = '기본적으로 기다리면 됩니다. 급하면 「동기화」→ 하단 「지금 동기화」를 누르세요.';
+  } else if(phase === 'queued'){
+    summary = '곧 자동으로 올리도록 예약돼 있어요. (보통 수 초 뒤)';
+    actionHint = '기다리면 됩니다. 급하면 「동기화」→「지금 동기화」.';
+  } else if(phase === 'pull'){
+    summary = '서버에 이 기기보다 최신 데이터(rev ' + remoteRev + ')가 있어요.';
+    actionHint = '「동기화」버튼을 누른 뒤 「지금 동기화」로 받아오세요.';
+  } else if(phase === 'pending'){
+    summary = '이 기기 변경이 아직 서버·Drive에 다 반영되지 않았어요' +
+      (pendingCount ? ' (남은 약 ' + pendingCount + '건)' : '') + '.';
+    actionHint = '자동으로 올라갑니다. 오래 멈추면 「동기화」→「지금 동기화」를 누르세요.';
+  } else if(phase === 'warn'){
+    summary = plannerLastSyncError_
+      ? ('최근 서버 반영 문제: ' + plannerLastSyncError_)
+      : '서버 URL이 없거나 file:// 로 열려 있어요. https로 열면 기기 간 동기화가 됩니다.';
+    actionHint = '「동기화」창에서 상태를 확인한 뒤 「지금 동기화」를 시도해 보세요.';
+  } else {
+    summary = '이 기기·서버·Drive가 같은 revision 기준으로 맞춰져 있어요.';
+    actionHint = '할 일 없음. 변경이 생기면 자동으로 반영됩니다.';
+  }
+
   var lastReason = '';
   try { lastReason = localStorage.getItem(SYNC_LAST_REASON_KEY) || ''; } catch(e2){}
   return {
@@ -12522,6 +12652,11 @@ function getSyncStatusInfo_(remoteMeta){
     remoteAt: remoteAt,
     remoteBy: remoteBy,
     busy: busy,
+    transferring: transferring,
+    queuedPush: queuedPush,
+    phase: phase,
+    pendingCount: pendingCount,
+    actionHint: actionHint,
     serverOn: serverOn,
     driveOn: driveOn,
     serverPending: serverPending,
@@ -12631,17 +12766,21 @@ function updateSyncStatusUI_(){
   btn.classList.add(info.overall);
   if(label) label.textContent = '동기화';
   if(sub){
-    if(info.busy || info.retryScheduled) sub.textContent = '진행 중…';
-    else if(info.overall === 'pending'){
-      sub.textContent = (info.remoteNewer && !info.serverPending && !info.drivePending)
-        ? ('받을 내용 · ' + info.localRev)
-        : ('반영 중 · ' + info.localRev);
+    if(info.phase === 'transferring') sub.textContent = '전송 중';
+    else if(info.phase === 'retry_wait') sub.textContent = '대기·재시도';
+    else if(info.phase === 'queued') sub.textContent = '대기·곧 전송';
+    else if(info.phase === 'pull') sub.textContent = '받을 내용';
+    else if(info.phase === 'pending'){
+      sub.textContent = info.pendingCount > 0
+        ? ('남은 ' + info.pendingCount + '건')
+        : '반영 대기';
     }
     else if(info.overall === 'ok') sub.textContent = '최신 · ' + info.localRev;
     else if(info.overall === 'warn') sub.textContent = '확인 필요';
     else sub.textContent = String(info.localRev);
   }
-  btn.title = '동기화 및 설정 — ' + info.summary;
+  btn.title = '동기화 및 설정\n' + info.summary +
+    (info.actionHint ? '\n\n할 일: ' + info.actionHint : '');
   try { refreshSyncStatusBodyHtml_(info); } catch(eBody){}
 }
 function renderSyncStatusBodyHTML_(info){
@@ -12674,6 +12813,11 @@ function renderSyncStatusBodyHTML_(info){
       ? '개인 Claude API로 동작 중입니다. 서버 키를 쓰면 직원 브라우저에 키가 남지 않습니다.'
       : '서버 CLAUDE_API_KEY 또는 개인 API 키가 필요합니다.');
   var html = '<div class="sync-status-summary ' + (info.overall === 'ok' ? '' : info.overall) + '">' + escapeHtml(info.summary) + '</div>';
+  if(info.actionHint){
+    html += '<div class="sync-status-action-hint">' +
+      '<strong>할 일</strong> ' + escapeHtml(info.actionHint) +
+      '</div>';
+  }
 
   // 1. 사용자 이메일
   html += row(
@@ -12688,18 +12832,37 @@ function renderSyncStatusBodyHTML_(info){
   );
 
   // 2. 이 기기
+  var localBadge = info.transferring ? 'syncing' : (info.phase === 'pending' || info.phase === 'queued' || info.phase === 'retry_wait' ? 'pending' : 'ok');
+  var localText = info.transferring
+    ? '전송 중'
+    : (info.phase === 'retry_wait'
+      ? '대기·재시도'
+      : (info.phase === 'queued'
+        ? '대기·곧 전송'
+        : (info.pendingCount > 0 && (info.serverPending || info.drivePending)
+          ? ('남은 ' + info.pendingCount + '건')
+          : '기준')));
   html += row(
     '2. 이 기기',
-    info.busy ? 'syncing' : 'ok',
-    info.busy ? '저장/동기화 중' : '기준',
+    localBadge,
+    localText,
     'revision <strong>' + info.localRev + '</strong> · 마지막 저장 <strong>' + escapeHtml(localFmt) + '</strong>' +
+      (info.pendingCount ? '<br>미반영 변경 약 <strong>' + info.pendingCount + '</strong>건' : '') +
       '<br>기기 ID는 자동으로 관리됩니다.'
   );
 
   // 3. 서버 (GAS)
   if(info.serverOn){
-    var sBadge = info.busy ? 'syncing' : (info.serverPending ? 'pending' : (info.remoteNewer ? 'pending' : (info.serverRev ? 'ok' : 'off')));
-    var sText = info.busy ? '진행 중' : (info.serverPending ? '반영 중' : (info.remoteNewer ? '서버가 더 최신' : (info.serverRev ? '일치' : '미확인')));
+    var sBadge = info.transferring ? 'syncing' : (info.serverPending || info.retryScheduled || info.queuedPush ? 'pending' : (info.remoteNewer ? 'pending' : (info.serverRev ? 'ok' : 'off')));
+    var sText = info.transferring
+      ? '전송 중'
+      : (info.retryScheduled
+        ? '대기·재시도'
+        : (info.queuedPush
+          ? '대기·곧 전송'
+          : (info.serverPending
+            ? (info.pendingCount ? ('남은 ' + info.pendingCount + '건') : '반영 대기')
+            : (info.remoteNewer ? '서버가 더 최신' : (info.serverRev ? '일치' : '미확인')))));
     var sMeta = '마지막 확인 revision <strong>' + info.serverRev + '</strong>';
     if(info.serverAt) sMeta += ' · <strong>' + escapeHtml(formatDriveTimeShort(info.serverAt)) + '</strong>';
     if(info.remoteRev != null){
@@ -12707,7 +12870,7 @@ function renderSyncStatusBodyHTML_(info){
       if(info.remoteAt) sMeta += ' · <strong>' + escapeHtml(formatDriveTimeShort(info.remoteAt)) + '</strong>';
       if(info.remoteBy) sMeta += '<br>마지막 수정자 <strong>' + escapeHtml(info.remoteBy) + '</strong>';
     }
-    sMeta += '<br>팀 기준본입니다. 하단 「지금 동기화」로 맞출 수 있어요.';
+    sMeta += '<br>팀 기준본입니다. 급하면 하단 「지금 동기화」로 바로 맞출 수 있어요.';
     html += row('3. 서버 (GAS)', sBadge, sText, sMeta);
   } else {
     html += row(
@@ -12722,8 +12885,14 @@ function renderSyncStatusBodyHTML_(info){
   // 4. Google Drive
   var driveTitle = PLANNER_TEAM_MODE ? '4. Google Drive (개인 백업)' : '4. Google Drive';
   if(hasDriveConnection_()){
-    var dBadge = info.driveOn ? (info.busy && info.drivePending ? 'syncing' : (info.drivePending ? 'pending' : (info.driveRev ? 'ok' : 'off'))) : 'warn';
-    var dText = !info.driveOn ? '로그인 필요' : (info.drivePending ? (info.busy ? '진행 중' : '반영 중') : (info.driveRev ? '일치' : '미업로드'));
+    var dBadge = info.driveOn ? (info.transferring && info.drivePending ? 'syncing' : (info.drivePending ? 'pending' : (info.driveRev ? 'ok' : 'off'))) : 'warn';
+    var dText = !info.driveOn
+      ? '로그인 필요'
+      : (info.transferring && info.drivePending
+        ? '전송 중'
+        : (info.drivePending
+          ? (info.pendingCount ? ('남은 ' + info.pendingCount + '건') : '반영 대기')
+          : (info.driveRev ? '일치' : '미업로드')));
     var dMeta = info.driveRev ? ('마지막 revision <strong>' + info.driveRev + '</strong>') : '아직 Drive에 올린 기록이 없어요.';
     if(info.driveAt) dMeta += ' · <strong>' + escapeHtml(formatDriveTimeShort(info.driveAt)) + '</strong>';
     dMeta += '<br>팀 서버를 덮어쓰지 않는 개인 백업입니다.';
@@ -12755,7 +12924,7 @@ function renderSyncStatusBodyHTML_(info){
     '<button type="button" class="modal-btn sync-settings-mini-btn" onclick="openApiModalFromSync_()">AI·토큰·자동초안 설정</button>' +
       '<button type="button" class="modal-btn-ghost sync-settings-mini-btn" onclick="copyPlannerTeamInviteLink_()">직원 초대 링크 복사</button>'
   );
-  html += '<div class="sync-status-row-meta" style="padding:0 2px;color:#9CA3AF;">revision은 서버가 동기화 성공 때마다 발급합니다. 「반영 중」은 클릭 대기가 아니라, 이 기기 변경이 자동으로 올라가는 중입니다.</div>';
+  html += '<div class="sync-status-row-meta" style="padding:0 2px;color:#9CA3AF;">헤더 문구 안내: <strong>전송 중</strong>=지금 주고받는 중 · <strong>대기·재시도/곧 전송</strong>=기다리거나 급하면 「지금 동기화」 · <strong>남은 N건</strong>=아직 안 올라간 변경. revision은 성공 시 서버가 발급합니다.</div>';
   html += '<div data-sync-history-slot>' + renderSyncHistoryListHtml_(_syncHistoryMetaCache_) + '</div>';
   var backupMeta = readPreSyncBackupMeta_();
   if(backupMeta){
@@ -26454,8 +26623,9 @@ function renderPromptModal() {
   const modalCatIds = getPromptModalCatIds_();
   const catTabs = modalCatIds.map(function(i){
     var c = CATEGORIES[i];
-    return '<button class="cat-tab' + (state.editingCatId === i ? ' active' : '') + '" onclick="switchPromptCat(' + i + ')" style="color:' + (state.editingCatId === i ? c.color : '#6B6B6B') + ';border-bottom-color:' + (state.editingCatId === i ? c.color : 'transparent') + ';font-size:11px;padding:8px 10px;">' +
-      c.name +
+    var hasMod = !isCatPromptsAllDefault_(i, false);
+    return '<button class="cat-tab' + (state.editingCatId === i ? ' active' : '') + (hasMod ? ' has-prompt-mod' : '') + '" onclick="switchPromptCat(' + i + ')" style="color:' + (state.editingCatId === i ? c.color : '#6B6B6B') + ';border-bottom-color:' + (state.editingCatId === i ? c.color : 'transparent') + ';font-size:11px;padding:8px 10px;">' +
+      c.name + (hasMod ? '<span class="prompt-cat-mod-dot" aria-hidden="true"></span>' : '') +
     '</button>';
   }).join('');
 
@@ -26480,10 +26650,17 @@ function renderPromptModal() {
   const strategyGuideVal = escapeHtml(getProgramStrategyGuide_(state.editingCatId));
 
   const channelTabBtns = channelTabs.map(function(t){
-    return '<button class="prompt-tab' + (pt === t.id ? ' active' : '') + '" onclick="switchPromptTab(\'' + t.id + '\')">' + t.label + '</button>';
+    var typeMod = t.id !== 'base'
+      ? !isPromptAtDefault_(state.editingCatId, t.id, false)
+      : !isPromptAtDefault_(0, 'base', false);
+    return '<button class="prompt-tab' + (pt === t.id ? ' active' : '') + (typeMod ? ' has-prompt-mod' : '') + '" onclick="switchPromptTab(\'' + t.id + '\')">' +
+      t.label + (typeMod ? '<span class="prompt-cat-mod-dot" aria-hidden="true"></span>' : '') +
+      '</button>';
   }).join('');
 
   document.getElementById('prompt-modal-body').innerHTML = `
+    ${buildPromptModStatusBannerHtml_(false)}
+
     <div class="prompt-modal-cat-scroll">
       <div class="cat-tabs-wrap" style="background:#F8F7F4;border-top:none;border-bottom:1px solid #E5E7EB;">
         <div class="cat-tabs" style="padding:0 8px;">${catTabs}</div>

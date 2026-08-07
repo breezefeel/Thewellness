@@ -375,6 +375,13 @@ var OPS_NAVER_KW_CSV_HEADER_LINES = [
   '광고그룹ID(필수),키워드(필수),PC URL(선택),모바일 URL(선택),"키워드입찰가(선택,숫자만)"'
 ];
 var OPS_NAVER_KW_MAX_ROWS = 10000;
+/** 네이버 검색광고: 광고그룹당 키워드 최대 */
+var OPS_NAVER_KW_PER_ADGROUP = 1000;
+/** 키워드 글자 수 상한(등록 실패 예방) */
+var OPS_NAVER_KW_MAX_CHARS = 25;
+/** 검색광고 키워드 입찰가: 70~100000원, 10원 단위 */
+var OPS_NAVER_KW_BID_MIN = 70;
+var OPS_NAVER_KW_BID_MAX = 100000;
 function opsDefaultNaverNeighborhoods_(branchKey){
   if(branchKey === 'jakjeon'){
     return ['작전', '작전역', '계양', '계양역', '임학', '임학역', '계산', '계산역', '귤현', '박촌', '인천'];
@@ -383,27 +390,70 @@ function opsDefaultNaverNeighborhoods_(branchKey){
 }
 function opsNaverKwSeedKeywords_(){
   var seed = (typeof OPS_NAVER_KW_SEED !== 'undefined' && OPS_NAVER_KW_SEED) ? OPS_NAVER_KW_SEED : null;
-  return seed && Array.isArray(seed.keywords) ? seed.keywords.slice() : [];
+  if(!seed || !Array.isArray(seed.keywords)) return [];
+  return parseOpsNaverKwLines_(seed.keywords.join('\n'));
+}
+function opsNaverKwPreferredLandingUrl_(){
+  return String((OPS_BRAND_COPY && OPS_BRAND_COPY.profileUrl) || '').trim() || 'https://breezefeel.github.io/drpark/';
 }
 function opsNaverKwSeedMeta_(){
   var seed = (typeof OPS_NAVER_KW_SEED !== 'undefined' && OPS_NAVER_KW_SEED) ? OPS_NAVER_KW_SEED : {};
+  var legacyHost = /htcenter\.co\.kr/i;
+  var pc = String(seed.pcUrl || '').trim();
+  var mo = String(seed.mobileUrl || '').trim();
+  if(!pc || legacyHost.test(pc)) pc = opsNaverKwPreferredLandingUrl_();
+  if(!mo || legacyHost.test(mo)) mo = pc;
   return {
     adGroupId: String(seed.adGroupId || '').trim(),
-    pcUrl: String(seed.pcUrl || OPS_BRAND_COPY.profileUrl || '').trim(),
-    mobileUrl: String(seed.mobileUrl || seed.pcUrl || OPS_BRAND_COPY.profileUrl || '').trim(),
-    bid: String(seed.bid || '70').trim()
+    pcUrl: pc,
+    mobileUrl: mo,
+    bid: normalizeOpsNaverKwBid_(seed.bid || '70')
   };
 }
 function isOpsNaverKwItemId_(itemId){
   return itemId === 'ops-y-23' || itemId === 'ops-j-23';
+}
+function normalizeOpsNaverKwUrl_(url){
+  var s = String(url || '').trim();
+  if(!s) return '';
+  if(!/^https?:\/\//i.test(s)) s = 'https://' + s;
+  return s;
+}
+/** 입찰가: 숫자만 · 10원 단위 · 70~100000 */
+function normalizeOpsNaverKwBid_(raw){
+  var n = parseInt(String(raw || '').replace(/[^\d]/g, ''), 10);
+  if(!n || isNaN(n)) n = OPS_NAVER_KW_BID_MIN;
+  if(n < OPS_NAVER_KW_BID_MIN) n = OPS_NAVER_KW_BID_MIN;
+  if(n > OPS_NAVER_KW_BID_MAX) n = OPS_NAVER_KW_BID_MAX;
+  n = Math.round(n / 10) * 10;
+  if(n < OPS_NAVER_KW_BID_MIN) n = OPS_NAVER_KW_BID_MIN;
+  return String(n);
+}
+/** 등록용 키워드 정규화: 공백 정리 · 영문 소문자 · 길이 제한 검사는 별도 */
+function normalizeOpsNaverKwKeyword_(kw){
+  return String(kw || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[A-Z]/g, function(ch){ return ch.toLowerCase(); });
+}
+function parseOpsNaverKwAdGroupIds_(raw){
+  var seen = {};
+  var out = [];
+  String(raw || '').split(/[\s,，;/|]+/).forEach(function(part){
+    var t = String(part || '').trim();
+    if(!t || seen[t]) return;
+    seen[t] = true;
+    out.push(t);
+  });
+  return out;
 }
 function getOpsNaverKwState_(itemId){
   var om = getOpsManualState_();
   if(!om.keywordAds || typeof om.keywordAds !== 'object') om.keywordAds = {};
   var branchKey = opsPlaceBranchKey_(itemId);
   var cur = om.keywordAds[itemId];
+  var meta = opsNaverKwSeedMeta_();
   if(!cur || typeof cur !== 'object'){
-    var meta = opsNaverKwSeedMeta_();
     cur = {
       keywords: opsNaverKwSeedKeywords_(),
       neighborhoods: opsDefaultNaverNeighborhoods_(branchKey),
@@ -411,20 +461,37 @@ function getOpsNaverKwState_(itemId){
       pcUrl: meta.pcUrl,
       mobileUrl: meta.mobileUrl,
       bid: meta.bid,
-      joinMode: 'space'
+      joinMode: 'none'
     };
     om.keywordAds[itemId] = cur;
   }
   if(!Array.isArray(cur.keywords)) cur.keywords = [];
   if(!Array.isArray(cur.neighborhoods)) cur.neighborhoods = [];
-  if(!cur.joinMode) cur.joinMode = 'space';
+  // 예전에 빈 시드로 저장된 경우 → 시드가 있으면 자동 복구
+  if(!cur.keywords.length){
+    var seedKw = opsNaverKwSeedKeywords_();
+    if(seedKw.length) cur.keywords = seedKw;
+  }
+  if(!cur.neighborhoods.length){
+    cur.neighborhoods = opsDefaultNaverNeighborhoods_(branchKey);
+  }
+  if(!cur.joinMode) cur.joinMode = 'none';
+  if(!String(cur.adGroupId || '').trim() && meta.adGroupId) cur.adGroupId = meta.adGroupId;
+  if(!String(cur.bid || '').trim()) cur.bid = meta.bid;
+  else cur.bid = normalizeOpsNaverKwBid_(cur.bid);
+  // 구형 랜딩 URL 교체
+  if(!cur.pcUrl || /htcenter\.co\.kr/i.test(cur.pcUrl)) cur.pcUrl = meta.pcUrl;
+  if(!cur.mobileUrl || /htcenter\.co\.kr/i.test(cur.mobileUrl)) cur.mobileUrl = meta.mobileUrl || cur.pcUrl;
   return cur;
 }
-function parseOpsNaverKwLines_(text){
+/** 키워드·동네 목록 파싱. 기본은 줄바꿈만 구분(쉼표 포함 키워드 보존). allowCommaSplit로 프롬프트 추가 시 쉼표도 허용. */
+function parseOpsNaverKwLines_(text, opts){
+  opts = opts || {};
   var seen = {};
   var out = [];
-  String(text || '').split(/\r?\n/).forEach(function(line){
-    var t = String(line || '').trim();
+  var splitRe = opts.allowCommaSplit ? /[\r\n,，]+/ : /[\r\n]+/;
+  String(text || '').split(splitRe).forEach(function(line){
+    var t = normalizeOpsNaverKwKeyword_(line);
     if(!t || seen[t]) return;
     seen[t] = true;
     out.push(t);
@@ -438,13 +505,13 @@ function buildOpsNaverKwCombined_(kwState){
   var seen = {};
   var out = [];
   hoods.forEach(function(hood){
-    var h = String(hood || '').trim();
+    var h = normalizeOpsNaverKwKeyword_(hood);
     if(!h) return;
     kws.forEach(function(kw){
-      var k = String(kw || '').trim();
+      var k = normalizeOpsNaverKwKeyword_(kw);
       if(!k) return;
-      var combined = h + sep + k;
-      if(seen[combined]) return;
+      var combined = normalizeOpsNaverKwKeyword_(h + sep + k);
+      if(!combined || seen[combined]) return;
       seen[combined] = true;
       out.push(combined);
     });
@@ -455,9 +522,11 @@ function buildOpsNaverKwCsvRows_(kwState, mode){
   mode = mode || 'both';
   var list = [];
   var seen = {};
+  var skippedLong = 0;
   function pushKw(kw){
-    var t = String(kw || '').trim();
+    var t = normalizeOpsNaverKwKeyword_(kw);
     if(!t || seen[t]) return;
+    if(t.length > OPS_NAVER_KW_MAX_CHARS){ skippedLong++; return; }
     seen[t] = true;
     list.push(t);
   }
@@ -467,6 +536,7 @@ function buildOpsNaverKwCsvRows_(kwState, mode){
   if(mode === 'combo' || mode === 'both'){
     buildOpsNaverKwCombined_(kwState).forEach(pushKw);
   }
+  list._skippedLong = skippedLong;
   return list;
 }
 function escapeOpsNaverKwCsvCell_(val){
@@ -474,26 +544,64 @@ function escapeOpsNaverKwCsvCell_(val){
   if(/[",\r\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
   return s;
 }
-function buildOpsNaverKwCsvText_(kwState, mode){
-  var rows = buildOpsNaverKwCsvRows_(kwState, mode);
-  if(rows.length > OPS_NAVER_KW_MAX_ROWS){
-    rows = rows.slice(0, OPS_NAVER_KW_MAX_ROWS);
-  }
-  var gid = String(kwState.adGroupId || '').trim();
-  var pc = String(kwState.pcUrl || '').trim();
-  var mo = String(kwState.mobileUrl || pc).trim();
-  var bid = String(kwState.bid || '').trim();
+function buildOpsNaverKwCsvChunkText_(rows, adGroupId, pcUrl, mobileUrl, bid){
+  var gid = String(adGroupId || '').trim();
+  var pc = normalizeOpsNaverKwUrl_(pcUrl);
+  var mo = normalizeOpsNaverKwUrl_(mobileUrl || '');
+  // 네이버: 웹사이트 URL이 1개면 PC·모바일에 동일 URL을 2번 입력
+  if(pc && !mo) mo = pc;
+  if(mo && !pc) pc = mo;
+  var bidNum = normalizeOpsNaverKwBid_(bid);
   var lines = OPS_NAVER_KW_CSV_HEADER_LINES.slice();
-  rows.forEach(function(kw){
+  (rows || []).forEach(function(kw){
     lines.push([
       escapeOpsNaverKwCsvCell_(gid),
-      escapeOpsNaverKwCsvCell_(kw),
+      escapeOpsNaverKwCsvCell_(normalizeOpsNaverKwKeyword_(kw)),
       escapeOpsNaverKwCsvCell_(pc),
       escapeOpsNaverKwCsvCell_(mo),
-      escapeOpsNaverKwCsvCell_(bid)
+      escapeOpsNaverKwCsvCell_(bidNum)
     ].join(','));
   });
-  return { text: lines.join('\r\n') + '\r\n', count: rows.length, truncated: buildOpsNaverKwCsvRows_(kwState, mode).length > OPS_NAVER_KW_MAX_ROWS };
+  return lines.join('\r\n') + '\r\n';
+}
+function chunkOpsNaverKwRows_(rows, size){
+  size = size || OPS_NAVER_KW_PER_ADGROUP;
+  var chunks = [];
+  for(var i = 0; i < rows.length; i += size){
+    chunks.push(rows.slice(i, i + size));
+  }
+  return chunks;
+}
+function syncOpsNaverKwPanelFromDom_(itemId){
+  var st = getOpsNaverKwState_(itemId);
+  var panel = document.querySelector('.ops-kw-panel[data-ops-kw="' + itemId + '"]');
+  if(!panel) return st;
+  var kwTa = panel.querySelector('textarea[data-ops-kw-field="keywords"]');
+  var hoodTa = panel.querySelector('textarea[data-ops-kw-field="neighborhoods"]');
+  if(kwTa) st.keywords = parseOpsNaverKwLines_(kwTa.value);
+  if(hoodTa) st.neighborhoods = parseOpsNaverKwLines_(hoodTa.value);
+  var joinSel = panel.querySelector('select[data-ops-kw-meta="joinMode"]');
+  if(joinSel) st.joinMode = joinSel.value === 'none' ? 'none' : 'space';
+  ['adGroupId', 'bid', 'pcUrl', 'mobileUrl'].forEach(function(key){
+    var el = panel.querySelector('[data-ops-kw-meta="' + key + '"]');
+    if(!el) return;
+    st[key] = String(el.value || '').trim();
+  });
+  if(st.bid) st.bid = normalizeOpsNaverKwBid_(st.bid);
+  // PC·모바일 중 하나만 있으면 서로 맞춤
+  st.pcUrl = normalizeOpsNaverKwUrl_(st.pcUrl);
+  st.mobileUrl = normalizeOpsNaverKwUrl_(st.mobileUrl);
+  if(st.pcUrl && !st.mobileUrl) st.mobileUrl = st.pcUrl;
+  if(st.mobileUrl && !st.pcUrl) st.pcUrl = st.mobileUrl;
+  return st;
+}
+function buildOpsNaverKwCsvText_(kwState, mode){
+  var rows = buildOpsNaverKwCsvRows_(kwState, mode);
+  var skippedLong = rows._skippedLong || 0;
+  var truncated = rows.length > OPS_NAVER_KW_MAX_ROWS;
+  if(truncated) rows = rows.slice(0, OPS_NAVER_KW_MAX_ROWS);
+  var text = buildOpsNaverKwCsvChunkText_(rows, kwState.adGroupId, kwState.pcUrl, kwState.mobileUrl, kwState.bid);
+  return { text: text, count: rows.length, truncated: truncated, skippedLong: skippedLong, rows: rows };
 }
 function buildOpsDeployFiles_(){
   return '배포 대상(확인 후 업로드):\n' +
@@ -826,13 +934,13 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
     return [
       { id:'kw-base', title:'일반 키워드 리스트',
         brief: opsPurposeIntent_('검수된 일반 키워드를 확인하고 추가·수정합니다.', '아래 키워드 패널에서 목록을 편집하세요.'),
-        text: opsProposalWithReason_('정리본 시드(약 728개)를 기본으로 불러옵니다. 한 줄에 하나씩 추가·삭제하고, 필요하면 재생성으로 시드를 다시 불러오세요.', '수술·홍보성 키워드는 이미 제외된 상태를 권장합니다.') },
+        text: opsProposalWithReason_('정리본 시드(약 ' + (opsNaverKwSeedKeywords_().length || 728) + '개)를 기본으로 불러옵니다. 한 줄에 하나씩 추가·삭제하고, 필요하면 재생성으로 시드를 다시 불러오세요.', '수술·홍보성 키워드는 이미 제외된 상태를 권장합니다.') },
       { id:'kw-hood', title:'동네 이름 붙이기',
         brief: opsPurposeIntent_('지점 상권 동네명을 리스트로 만듭니다.', '예: ' + hoodSample),
         text: opsProposalWithReason_('동네명 한 줄씩 입력 → 조합 미리보기로 「동네 + 키워드」를 확인 → CSV 다운로드.', '패턴 예: 약수 허리통증 / 약수역 허리통증') },
       { id:'kw-csv', title:'대량등록 CSV',
         brief: opsPurposeIntent_('네이버 검색광고 키워드 일괄등록 템플릿으로 내려받습니다.', '1~6행 안내문은 삭제하지 마세요.'),
-        text: opsProposalWithReason_('광고그룹ID·URL·입찰가를 채운 뒤 「일반만 / 동네조합만 / 둘 다」 중 선택해 다운로드합니다. 한 파일 최대 10,000행입니다.', '업로드 전 광고그룹ID가 실제 계정과 같은지 확인하세요.') }
+        text: opsProposalWithReason_('광고그룹ID·URL·입찰가를 채운 뒤 「일반만 / 동네조합만 / 둘 다」 중 선택해 다운로드합니다. 1,000개 단위로 광고그룹ID가 자동 배정되며, CSV는 한 파일로 저장됩니다. 합산이 많으면 광고그룹을 미리 여러 개 만들고 ID를 모두 넣으세요.', '업로드 전 광고그룹ID·랜딩 URL이 실제 계정과 같은지 확인하세요.') }
     ];
   }
   if(byId === 'ops-y-17' || byId === 'ops-j-17'){
@@ -1766,20 +1874,20 @@ const OPS_MANUAL_SECTIONS = [
   ]},
 ];
 
-/** 카테고리별 프로그램 라인 (미카닥 박준규 · Re:Al 등) */
+/** 카테고리별 프로그램 라인 (미카닥 박준규 · 리얼무브먼트 등) */
 const CAT_PROGRAM_LINE = {
   0: '미카닥 박준규 · 도수치료',
-  1: 'Re:Al Movement',
-  2: 'Re:Al Face',
+  1: '리얼무브먼트',
+  2: '리얼페이스',
   3: '미카닥 박준규 · CMT 전문가',
   4: '미카닥 박준규 · IFC 전문가',
-  5: 'Re:Al Movement · 전문가',
+  5: '리얼무브먼트 · 전문가',
   6: '미카닥 박준규 · 일상',
   7: '힐자계 · 입주민'
 };
 const CAT_DEFAULT_SERIES = {
   0: 'PSP · 도수 이해',
-  1: 'PAR · Re:Al Movement',
+  1: 'PAR · 리얼무브먼트',
   2: '작은얼굴 · 구조 교정',
   3: 'CMT · 임상 노트',
   4: 'IFC · 얼굴 구조',
@@ -1789,11 +1897,11 @@ const CAT_DEFAULT_SERIES = {
 };
 const CAT_DEFAULT_PILLAR = {
   0: 'PSP · 구조→기능',
-  1: 'Re:Al Movement · PAR',
-  2: 'Re:Al Face · 구조 교정',
+  1: '리얼무브먼트 · PAR',
+  2: '리얼페이스 · 구조 교정',
   3: '전문가 · 평가-치료',
   4: '전문가 · 구조 접근',
-  5: 'Re:Al Movement · PAR',
+  5: '리얼무브먼트 · PAR',
   6: '신뢰 · 과장 없는 설명',
   7: '입주민 · 가벼운 셀프 케어'
 };
@@ -1801,11 +1909,11 @@ const CAT_DEFAULT_PILLAR = {
 /** 썸네일 상단 고정 멘트 (브랜드 · 프로그램) */
 const CAT_IMAGE_THUMBNAIL_FIXED = {
   0: { brand: '리얼무브먼트', program: '도수치료 · PSP' },
-  1: { brand: '리얼무브먼트', program: 'Re:Al Movement · PAR' },
-  2: { brand: '리얼무브먼트', program: 'Re:Al Face · 구조 교정' },
+  1: { brand: '리얼무브먼트', program: '리얼무브먼트 · PAR' },
+  2: { brand: '리얼무브먼트', program: '리얼페이스 · 구조 교정' },
   3: { brand: '미카닥 박준규', program: 'CMT · 임상 노트' },
   4: { brand: '미카닥 박준규', program: 'IFC · 얼굴 구조' },
-  5: { brand: '미카닥 박준규', program: 'Re:Al Movement · 전문가' },
+  5: { brand: '미카닥 박준규', program: '리얼무브먼트 · 전문가' },
   6: { brand: '미카닥 박준규', program: '일상' },
   7: { brand: '힐자계', program: '입주민 셀프 케어' }
 };
@@ -4949,13 +5057,19 @@ window.togglePublishRecCurrentTabOnly_ = function(on){
 function getCategoryProgramLine_(catId){
   var cat = CATEGORIES[catId];
   if(!cat) return '';
-  return cat.programLine || CAT_PROGRAM_LINE[catId] || cat.name;
+  return localizeProgramDisplayName_(cat.programLine || CAT_PROGRAM_LINE[catId] || cat.name);
+}
+/** 고객·초안 표기용: Re:Al Movement → 리얼무브먼트 */
+function localizeProgramDisplayName_(text){
+  return String(text || '')
+    .replace(/Re:\s*Al\s*Movement/gi, '리얼무브먼트')
+    .replace(/Re:\s*Al\s*Face/gi, '리얼페이스');
 }
 function getDefaultSeriesForCat_(catId){
-  return CAT_DEFAULT_SERIES[catId] || (CATEGORIES[catId] ? CATEGORIES[catId].name : '');
+  return localizeProgramDisplayName_(CAT_DEFAULT_SERIES[catId] || (CATEGORIES[catId] ? CATEGORIES[catId].name : ''));
 }
 function getDefaultPillarForCat_(catId){
-  return CAT_DEFAULT_PILLAR[catId] || getCategoryProgramLine_(catId);
+  return localizeProgramDisplayName_(CAT_DEFAULT_PILLAR[catId] || getCategoryProgramLine_(catId));
 }
 function applyTopicsArrayToStep_(catId, stepId, topics){
   if(!getSubGoalPlan_(catId) || !CATEGORIES[catId]) return 0;
@@ -5074,7 +5188,12 @@ function getDraftBrandMeta_(draft, catId, draftIndex){
   var step = draft && draft.step ? String(draft.step).trim() : (idx >= 0 && total ? (idx + 1) + '/' + total : '');
   var pillar = draft && draft.pillar ? String(draft.pillar).trim() : getDefaultPillarForCat_(catId);
   var rationale = draft && draft.rationale ? String(draft.rationale).trim() : '';
-  return { series: series, step: step, pillar: pillar, rationale: rationale };
+  return {
+    series: localizeProgramDisplayName_(series),
+    step: step,
+    pillar: localizeProgramDisplayName_(pillar),
+    rationale: rationale
+  };
 }
 function formatDraftStepBadgeForDisplay_(draft, catId, draftIndex){
   var idx = typeof draftIndex === 'number' ? draftIndex : -1;
@@ -5131,10 +5250,10 @@ function applyTopicFieldsToDraft_(draft, obj, catId){
   if(!draft || !obj) return;
   if(obj.topic) draft.topic = String(obj.topic).trim();
   if(obj.angle != null) draft.angle = String(obj.angle || '').trim();
-  if(obj.series) draft.series = String(obj.series).trim();
+  if(obj.series) draft.series = localizeProgramDisplayName_(String(obj.series).trim());
   else if(!draft.series) draft.series = getDefaultSeriesForCat_(catId);
   if(obj.step) draft.step = String(obj.step).trim();
-  if(obj.pillar) draft.pillar = String(obj.pillar).trim();
+  if(obj.pillar) draft.pillar = localizeProgramDisplayName_(String(obj.pillar).trim());
   else if(!draft.pillar) draft.pillar = getDefaultPillarForCat_(catId);
   if(obj.rationale) draft.rationale = stripTopicRationaleStepPrefix_(String(obj.rationale).trim());
   if(obj.topic || obj.angle != null || obj.rationale || obj.pillar) delete draft.writingBrief;
@@ -5182,7 +5301,10 @@ function buildBrandContextForPrompt_(catId, draft){
       lines.push('글 풀기(각도): ' + draft.angle);
     }
   }
-  lines.push('', '위 메시지·시리즈와 모순되지 않게, 미카닥 박준규·Re:Al 브랜드 톤을 유지하세요.');
+  lines.push('', '위 메시지·시리즈와 모순되지 않게, 미카닥 박준규·리얼무브먼트 브랜드 톤을 유지하세요.');
+  if(isGeneralAudienceCategory(catId)){
+    lines.push('일반인 채널에서는 프로그램명을 「리얼무브먼트」「리얼페이스」로 표기하세요. (영문 Re:Al Movement / Re:Al Face 남발 금지)');
+  }
   return lines.join('\n');
 }
 function buildTopicBrandJsonGuide_(catId){
@@ -5606,10 +5728,13 @@ function discardPendingForWorkshopMode_(){
 }
 function closePlanWorkshopForce_(){
   hidePlanWorkshopLeaveDialog_();
-  document.getElementById('plan-workshop-overlay').classList.remove('open');
+  var ov = document.getElementById('plan-workshop-overlay');
+  var wasOpen = !!(ov && ov.classList.contains('open'));
+  if(ov) ov.classList.remove('open');
   if(state.planWorkshopMode === 'topic') state.topicEditStepId = null;
   state.planWorkshopMode = null;
   releaseModalFocusTrap_();
+  if(wasOpen) unlockBodyScroll_();
   renderMain();
 }
 function showPlanWorkshopLeaveDialog_(){
@@ -5721,7 +5846,9 @@ window.openPlanWorkshop_ = function(mode, stepId){
   state.planWorkshopMode = mode || 'year';
   if(mode === 'topic' && stepId != null) state.topicEditStepId = String(stepId);
   refreshPlanWorkshopModal_();
+  var alreadyOpen = overlay.classList.contains('open');
   overlay.classList.add('open');
+  if(!alreadyOpen) lockBodyScroll_();
   trapFocusIn_(document.querySelector('#plan-workshop-overlay .plan-workshop-box'));
   scheduleWorkshopTextareaGrow_();
 };
@@ -8621,6 +8748,7 @@ let state = {
   selectedId: null,
   activeTab: 'blog',
   prompts: null, // null이면 DEFAULT_PROMPTS 사용
+  promptsUpdatedAt: '', // 프롬프트 마지막 수정 시각 (수동·자동 재수정)
   promptTab: 'blog',
   editingCatId: 0,
   promptRefineMilestones: {}, // catId → 마지막 반영한 발행 N건 (3, 6, …)
@@ -8755,10 +8883,21 @@ function getPromptStoredValue_(catId, type){
   if(type === 'base') return getBasePrompt();
   return getCatPrompt(catId, type);
 }
-/** 화면에 열린 textarea가 있으면 그 값, 없으면 저장값 */
+/**
+ * 화면에 열린 textarea가 「이 cat·이 type」용일 때만 live DOM, 아니면 저장값.
+ * pt-blog 등은 프로그램 공통 id라서, 다른 cat까지 현재 textarea로 비교하면 다운로드 on/off가 틀어진다.
+ */
 function getPromptCompareValue_(catId, type){
-  var el = document.getElementById('pt-' + type);
-  if(el) return el.value;
+  var liveOk = false;
+  if(type === 'base'){
+    liveOk = !!(document.getElementById('pt-base') && state.promptTab === 'base');
+  } else if(state.editingCatId != null && Number(state.editingCatId) === Number(catId)){
+    liveOk = !!(document.getElementById('pt-' + type) && state.promptTab === type);
+  }
+  if(liveOk){
+    var el = document.getElementById('pt-' + type);
+    if(el) return el.value;
+  }
   return getPromptStoredValue_(catId, type);
 }
 /**
@@ -8775,6 +8914,79 @@ function isCatPromptsAllDefault_(catId, useLiveDom){
   var types = getPromptTypesForCat_(catId);
   if(!types.length) return true;
   return types.every(function(t){ return isPromptAtDefault_(catId, t, useLiveDom); });
+}
+/** 기본값과 다른 프롬프트가 하나라도 있는지 (base + 전 프로그램 채널) */
+function hasAnyLivePromptModifications_(useLiveDom){
+  if(!isPromptAtDefault_(0, 'base', useLiveDom)) return true;
+  var ids = getPromptModalCatIds_();
+  for(var i = 0; i < ids.length; i++){
+    if(!isCatPromptsAllDefault_(ids[i], useLiveDom)) return true;
+  }
+  return false;
+}
+function touchPromptsUpdatedAt_(){
+  state.promptsUpdatedAt = new Date().toISOString();
+}
+function getLivePromptsLastModifiedIso_(){
+  var best = String(state.promptsUpdatedAt || '');
+  var times = state.syncEntityUpdatedAt || {};
+  Object.keys(times).forEach(function(k){
+    if(k !== 'prompt:base' && !/^prompt:\d+:/.test(k)) return;
+    var t = String(times[k] || '');
+    if(t && t > best) best = t;
+  });
+  return best;
+}
+function formatPromptModDateLabel_(iso){
+  if(!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
+  } catch(e){ return ''; }
+}
+function updatePromptDownloadButton_(){
+  var btns = document.querySelectorAll('.btn-prompt-download-header, .btn-prompt-cursor-file, .btn-prompt-cursor-copy');
+  if(!btns.length) return;
+  var modified = hasAnyLivePromptModifications_(true);
+  var iso = getLivePromptsLastModifiedIso_();
+  var dateLabel = formatPromptModDateLabel_(iso);
+  var fullWhen = '';
+  if(iso){
+    try { fullWhen = new Date(iso).toLocaleString('ko-KR'); } catch(e){}
+  }
+  btns.forEach(function(btn){
+    if(!btn) return;
+    btn.disabled = !modified;
+    btn.classList.toggle('is-at-default', !modified);
+    btn.classList.toggle('is-modified', modified);
+    if(btn.classList.contains('btn-prompt-download-header')){
+      if(modified){
+        btn.textContent = dateLabel ? ('다운로드 · ' + dateLabel) : '다운로드 · 수정됨';
+        btn.title = '수정된 현재 프롬프트를 파일로 저장 · Cursor 개선용' +
+          (fullWhen ? '\n마지막 수정: ' + fullWhen : '');
+      } else {
+        btn.textContent = '다운로드';
+        btn.title = '기본값과 같아요. 수정하거나 자동 개선된 뒤에 받을 수 있어요.';
+      }
+    } else if(btn.classList.contains('btn-prompt-cursor-copy')){
+      btn.textContent = 'Cursor용 복사';
+      if(modified){
+        btn.title = '수정된 현재 프롬프트를 클립보드에 복사' +
+          (fullWhen ? '\n마지막 수정: ' + fullWhen : '');
+      } else {
+        btn.title = '기본값과 같아요. 수정 후 복사할 수 있어요.';
+      }
+    } else {
+      // footer「파일」
+      if(modified){
+        btn.textContent = dateLabel ? ('파일 · ' + dateLabel) : '파일';
+        btn.title = '홈페이지 폴더에 저장하면 Cursor가 읽을 수 있어요' +
+          (fullWhen ? '\n마지막 수정: ' + fullWhen : '');
+      } else {
+        btn.textContent = '파일';
+        btn.title = '기본값과 같아요. 수정 후 받을 수 있어요.';
+      }
+    }
+  });
 }
 function promptResetBtnHtml_(catId, type){
   var atDefault = isPromptAtDefault_(catId, type, false);
@@ -8813,6 +9025,7 @@ function updatePromptResetButtons_(){
     allBtn.classList.toggle('is-modified', !allDefault);
     allBtn.title = allDefault ? '이 프로그램 프롬프트가 모두 기본값이에요' : '수정된 채널 지침을 모두 기본값으로 되돌려요';
   }
+  updatePromptDownloadButton_();
 }
 function getCatPrompt(catId, type) {
   const catPrompts = getPrompts().categories[catId] || {};
@@ -8917,36 +9130,60 @@ function trapFocusIn_(rootEl){
   }, 60);
 }
 function restoreDetailFocusTrapIfOpen_(){
-  if(document.getElementById('detail-overlay').classList.contains('open')){
-    trapFocusIn_(document.getElementById('detail-sheet'));
+  var ov = document.getElementById('detail-overlay');
+  var sheet = document.getElementById('detail-sheet');
+  if(ov && ov.classList.contains('open') && sheet){
+    trapFocusIn_(sheet);
   }
 }
+function plannerOverlayIsOpen_(id){
+  var el = document.getElementById(id);
+  return !!(el && el.classList.contains('open'));
+}
+/** Escape — z-index 높은 것부터 (누락 노드·순서 오류 방지) */
 function closeTopmostPlannerOverlay_(){
-  if(document.getElementById('sync-status-overlay').classList.contains('open')){
-    closeSyncStatusModal_();
-    return true;
-  }
-  if(document.getElementById('drive-modal-overlay').classList.contains('open')){
-    closeDriveModal();
-    return true;
-  }
-  if(document.getElementById('prompt-modal-overlay').classList.contains('open')){
-    closePromptModal();
-    return true;
-  }
-  if(document.getElementById('plan-ws-leave-overlay').classList.contains('open')){
-    planWorkshopLeaveStay_();
-    return true;
-  }
-  if(document.getElementById('plan-workshop-overlay').classList.contains('open')){
-    closePlanWorkshop_();
-    return true;
-  }
-  if(document.getElementById('api-modal').classList.contains('open')){
+  // #api-modal z=360 (기획/프롬프트보다 위)
+  if(plannerOverlayIsOpen_('api-modal')){
     closeApiModal();
     return true;
   }
-  if(document.getElementById('detail-overlay').classList.contains('open')){
+  if(plannerOverlayIsOpen_('color-preview-overlay')){
+    forceCloseProgramColorPreview_();
+    return true;
+  }
+  if(plannerOverlayIsOpen_('plan-ws-leave-overlay')){
+    planWorkshopLeaveStay_();
+    return true;
+  }
+  if(plannerOverlayIsOpen_('sync-preview-overlay')){
+    if(typeof closeSyncPreviewModal_ === 'function') closeSyncPreviewModal_();
+    return true;
+  }
+  if(plannerOverlayIsOpen_('sync-status-overlay')){
+    if(typeof closeSyncStatusModal_ === 'function') closeSyncStatusModal_();
+    return true;
+  }
+  if(plannerOverlayIsOpen_('drive-modal-overlay')){
+    if(typeof closeDriveModal === 'function') closeDriveModal();
+    return true;
+  }
+  if(plannerOverlayIsOpen_('prompt-modal-overlay')){
+    closePromptModal();
+    return true;
+  }
+  if(plannerOverlayIsOpen_('links-modal-overlay')){
+    if(typeof closeLinksModal_ === 'function') closeLinksModal_();
+    else {
+      var linksOv = document.getElementById('links-modal-overlay');
+      if(linksOv) linksOv.classList.remove('open');
+    }
+    return true;
+  }
+  if(plannerOverlayIsOpen_('plan-workshop-overlay')){
+    closePlanWorkshop_();
+    return true;
+  }
+  if(plannerOverlayIsOpen_('detail-overlay')){
     closeSheet();
     return true;
   }
@@ -9277,7 +9514,8 @@ function shadeHexColor_(hex, amount){
   return '#' + pad(r) + pad(g) + pad(b);
 }
 
-/** 프로그램별 망고보드 7장 팔레트 — navy / gold / devon / green + 전문가 변형 */
+/** 프로그램별 망고보드 7장 팔레트 — navy / gold / devon / green + 전문가 변형
+ *  색상미리보기.html DATA.mango 와 동일. 변경 시 둘 다 맞출 것. */
 const MANGO_PALETTES_BY_CAT = {
   0: {
     key: 'navy',
@@ -9407,6 +9645,265 @@ function getMangoPaletteForCat_(catId){
   if(isNaN(id) || !MANGO_PALETTES_BY_CAT[id]) return MANGO_PALETTES_BY_CAT[1];
   return MANGO_PALETTES_BY_CAT[id];
 }
+
+/**
+ * 색상미리보기.html 과 동일 구조 — 망고·썸네일·탭 브랜드를 한곳에.
+ * 팔레트 숫자는 MANGO_PALETTES_BY_CAT / THUMB_SCRIM_BY_CAT / CATEGORIES.color 가 원본.
+ */
+function sanitizeCssHexColor_(hex, fallback){
+  var s = String(hex || '').trim();
+  if(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s)) return s;
+  return fallback || '#94A3B8';
+}
+function getProgramColorPreviewEntry_(catId){
+  var id = parseInt(catId, 10);
+  if(isNaN(id) || !MANGO_PALETTES_BY_CAT[id]) id = 1;
+  var cat = CATEGORIES[id] || CATEGORIES[1];
+  var mango = getMangoPaletteForCat_(id);
+  var thumbRaw = THUMB_SCRIM_BY_CAT[id] || THUMB_SCRIM_BY_CAT[1] || {};
+  var brandPreset = (typeof getThumbBrandPreset_ === 'function')
+    ? getThumbBrandPreset_(id)
+    : { hero: cat.name, tagline: '' };
+  var brand = sanitizeCssHexColor_(cat.color || mango.point, '#8B7355');
+  return {
+    id: id,
+    name: cat.name,
+    axis: mango.key || '',
+    audience: cat.audience || '',
+    brand: brand,
+    mango: {
+      bg: sanitizeCssHexColor_(mango.bg, '#F8FAFC'),
+      bg2: sanitizeCssHexColor_(mango.bg2, '#F1F5F9'),
+      head: sanitizeCssHexColor_(mango.head, '#0F172A'),
+      point: sanitizeCssHexColor_(mango.point, brand),
+      card: sanitizeCssHexColor_(mango.card, '#FFFFFF'),
+      card2: sanitizeCssHexColor_(mango.card2, '#F8FAFC'),
+      divider: sanitizeCssHexColor_(mango.divider, mango.head || '#0F172A'),
+      desc: mango.desc || '',
+      key: mango.key || '',
+      label: mango.label || cat.name
+    },
+    thumb: {
+      tint: sanitizeCssHexColor_(thumbRaw.tint, '#0F172A'),
+      tint2: sanitizeCssHexColor_(thumbRaw.tint2, brand),
+      glow: sanitizeCssHexColor_(thumbRaw.glow, brand)
+    },
+    hero: brandPreset.hero || cat.name,
+    tag: brandPreset.tagline || ''
+  };
+}
+function getProgramColorPreviewCatIds_(){
+  // 일반↔전문가 쌍: 무브먼트 / 페이스 / 도수 / 일상·커뮤니티 (+ 운영)
+  var preferred = [1, 5, 2, 4, 0, 3, 7, 6, 8];
+  var seen = {};
+  var out = [];
+  preferred.forEach(function(id){
+    if(MANGO_PALETTES_BY_CAT[id] && !seen[id]){
+      seen[id] = true;
+      out.push(id);
+    }
+  });
+  Object.keys(MANGO_PALETTES_BY_CAT).forEach(function(k){
+    var id = parseInt(k, 10);
+    if(isNaN(id) || seen[id]) return;
+    out.push(id);
+  });
+  return out;
+}
+/** 탭 구분선 위치 — 쌍 사이 (무브먼트 | 페이스 | 도수 | 일상 | 운영) */
+function getProgramColorPreviewTabBreakAfterIds_(){
+  return { 5: 1, 4: 1, 3: 1, 6: 1 };
+}
+function isProgramColorPreviewOpen_(){
+  var ov = document.getElementById('color-preview-overlay');
+  return !!(ov && ov.classList.contains('open'));
+}
+function buildProgramColorPreviewBarHtml_(catId){
+  var entry = getProgramColorPreviewEntry_(catId);
+  return '<div class="img-color-preview-bar">' +
+    '<button type="button" class="btn-color-preview" onclick="openProgramColorPreview_(' + entry.id + ')" title="망고보드·썸네일·탭 브랜드 색 확인">' +
+    '<span class="btn-color-preview-dot" style="background:' + entry.brand + '"></span>' +
+    '<span class="btn-color-preview-label">색상 미리보기</span>' +
+    '<span class="btn-color-preview-name" style="color:' + entry.brand + '">' + escapeHtml(entry.name) + '</span>' +
+    '</button></div>';
+}
+function colorPreviewSwatchHtml_(label, hex){
+  var h = sanitizeCssHexColor_(hex, '#CCCCCC');
+  return '<button type="button" class="cp-swatch" data-hex="' + h + '" onclick="copyProgramColorSwatch_(this)" title="클릭하면 hex 복사">' +
+    '<span class="cp-swatch-color" style="background:' + h + '"></span>' +
+    '<span class="cp-swatch-label">' + escapeHtml(label) + '</span>' +
+    '<span class="cp-swatch-hex">' + escapeHtml(h.toUpperCase()) + '</span>' +
+    '</button>';
+}
+function colorPreviewThumbGradient_(t){
+  t = t || {};
+  var tint = sanitizeCssHexColor_(t.tint, '#111111');
+  var tint2 = sanitizeCssHexColor_(t.tint2, '#666666');
+  return 'linear-gradient(180deg, transparent 0%, ' + tint + '88 35%, ' +
+    tint2 + 'cc 70%, ' + tint + 'ee 100%)';
+}
+function renderProgramColorPreviewBody_(catId){
+  var p = getProgramColorPreviewEntry_(catId);
+  var m = p.mango;
+  var t = p.thumb;
+  var body = document.getElementById('color-preview-body');
+  if(!body) return;
+  body.innerHTML =
+    '<div class="cp-head">' +
+      '<div class="cp-brand-dot" style="background:' + p.brand + '"></div>' +
+      '<div>' +
+        '<div class="cp-title">' + escapeHtml(p.name) + '</div>' +
+        '<div class="cp-meta">' + escapeHtml(p.axis) + ' · ' + escapeHtml(p.audience) +
+          ' · 탭 브랜드 ' + escapeHtml(String(p.brand).toUpperCase()) + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="cp-section">' +
+      '<h3>망고보드 팔레트 · ' + escapeHtml(m.desc || '') + '</h3>' +
+      '<div class="cp-swatches">' +
+        colorPreviewSwatchHtml_('배경 bg', m.bg) +
+        colorPreviewSwatchHtml_('배경2 bg2', m.bg2) +
+        colorPreviewSwatchHtml_('헤드 head', m.head) +
+        colorPreviewSwatchHtml_('포인트 point', m.point) +
+        colorPreviewSwatchHtml_('카드 card', m.card) +
+        colorPreviewSwatchHtml_('카드2 card2', m.card2) +
+        colorPreviewSwatchHtml_('구분선 divider', m.divider) +
+        colorPreviewSwatchHtml_('탭 brand', p.brand) +
+      '</div>' +
+      '<div class="cp-mock-row">' +
+        '<div>' +
+          '<div class="cp-mock-label">망고 슬라이드 목업</div>' +
+          '<div class="cp-mango-mock" style="background:linear-gradient(180deg,' + m.bg + ' 0%,' + m.bg2 + ' 100%);color:' + m.head + '">' +
+            '<div class="cp-mango-head">허리가 뻐근한<br>진짜 이유</div>' +
+            '<div class="cp-mango-divider" style="background:' + m.divider + '"></div>' +
+            '<div class="cp-mango-bullet">• 관절과 연부조직이 함께<br>• 쉬운 말로 설명</div>' +
+            '<div class="cp-mango-card" style="background:' + m.card + ';color:' + m.point + '">STEP · 주의 카드</div>' +
+          '</div>' +
+        '</div>' +
+        '<div>' +
+          '<div class="cp-mock-label">썸네일 스크림 · tint / tint2 / glow</div>' +
+          '<div class="cp-swatches" style="margin-bottom:10px">' +
+            colorPreviewSwatchHtml_('tint', t.tint) +
+            colorPreviewSwatchHtml_('tint2', t.tint2) +
+            colorPreviewSwatchHtml_('glow', t.glow) +
+          '</div>' +
+          '<div class="cp-thumb-mock">' +
+            '<div class="cp-thumb-photo"></div>' +
+            '<div class="cp-thumb-scrim" style="background:' + colorPreviewThumbGradient_(t) + '">' +
+              '<div class="cp-thumb-hero">' + escapeHtml(p.hero) + '</div>' +
+              '<div class="cp-thumb-tag">' + escapeHtml(p.tag) + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<p class="cp-footnote">색을 누르면 hex가 복사됩니다. 원본: MANGO_PALETTES_BY_CAT · THUMB_SCRIM_BY_CAT · CATEGORIES.color</p>';
+}
+function renderProgramColorPreviewTabs_(activeId){
+  var tabsEl = document.getElementById('color-preview-tabs');
+  if(!tabsEl) return;
+  var breaks = getProgramColorPreviewTabBreakAfterIds_();
+  var html = '';
+  getProgramColorPreviewCatIds_().forEach(function(id){
+    var entry = getProgramColorPreviewEntry_(id);
+    var active = id === activeId ? ' active' : '';
+    html += '<button type="button" class="cp-tab' + active + '" data-cat-id="' + id + '"' +
+      ' onclick="switchProgramColorPreviewTab_(' + id + ')"' +
+      ' style="--cp-tab-brand:' + entry.brand + '">' +
+      '<span class="cp-tab-dot" style="background:' + entry.brand + '"></span>' +
+      escapeHtml(entry.name) +
+      '</button>';
+    if(breaks[id]) html += '<span class="cp-tab-gap" aria-hidden="true"></span>';
+  });
+  tabsEl.innerHTML = html;
+  requestAnimationFrame(function(){
+    var activeBtn = tabsEl.querySelector('.cp-tab.active');
+    if(activeBtn && typeof activeBtn.scrollIntoView === 'function'){
+      try { activeBtn.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); } catch(e){
+        try { activeBtn.scrollIntoView(false); } catch(e2){}
+      }
+    }
+  });
+}
+window.openProgramColorPreview_ = function(catId){
+  var id = parseInt(catId, 10);
+  if(isNaN(id)) id = state.selectedCatId != null ? state.selectedCatId : 1;
+  if(!MANGO_PALETTES_BY_CAT[id]) id = 1;
+  state.colorPreviewCatId = id;
+  var ov = document.getElementById('color-preview-overlay');
+  var box = document.getElementById('color-preview-box');
+  if(!ov || !box) return;
+  var alreadyOpen = ov.classList.contains('open');
+  renderProgramColorPreviewTabs_(id);
+  renderProgramColorPreviewBody_(id);
+  if(!alreadyOpen){
+    ov.classList.add('open');
+    lockBodyScroll_();
+    setTimeout(function(){
+      box.classList.add('open');
+      trapFocusIn_(box);
+      var activeBtn = box.querySelector('.cp-tab.active');
+      if(activeBtn){
+        try { activeBtn.focus(); } catch(e){}
+      }
+    }, 10);
+  } else {
+    var activeBtn = box.querySelector('.cp-tab.active');
+    if(activeBtn){
+      try { activeBtn.focus(); } catch(e){}
+    }
+  }
+};
+window.switchProgramColorPreviewTab_ = function(catId){
+  var id = parseInt(catId, 10);
+  if(isNaN(id) || !MANGO_PALETTES_BY_CAT[id]) return;
+  if(state.colorPreviewCatId === id){
+    renderProgramColorPreviewTabs_(id);
+    return;
+  }
+  state.colorPreviewCatId = id;
+  renderProgramColorPreviewTabs_(id);
+  renderProgramColorPreviewBody_(id);
+  var activeBtn = document.querySelector('#color-preview-tabs .cp-tab.active');
+  if(activeBtn){
+    try { activeBtn.focus(); } catch(e){}
+  }
+};
+window.closeProgramColorPreview_ = function(e){
+  // 오버레이 배경 클릭만 닫기. X 버튼은 인자 없이 호출.
+  if(e && e.target && e.target.id !== 'color-preview-overlay') return;
+  forceCloseProgramColorPreview_();
+};
+window.forceCloseProgramColorPreview_ = function(skipRestore){
+  var ov = document.getElementById('color-preview-overlay');
+  var box = document.getElementById('color-preview-box');
+  if(!ov || !ov.classList.contains('open')){
+    if(box) box.classList.remove('open');
+    return;
+  }
+  // open 클래스를 즉시 제거해 중복 닫기·스크롤 잠금 이중 unlock 방지
+  ov.classList.remove('open');
+  if(box) box.classList.remove('open');
+  releaseModalFocusTrap_();
+  unlockBodyScroll_();
+  scheduleAppToastLift_();
+  if(!skipRestore) restoreDetailFocusTrapIfOpen_();
+};
+window.copyProgramColorSwatch_ = function(btn){
+  if(!btn) return;
+  var hex = sanitizeCssHexColor_(btn.getAttribute('data-hex'), '');
+  if(!hex) return;
+  var done = function(){
+    btn.classList.add('copied');
+    setTimeout(function(){ btn.classList.remove('copied'); }, 900);
+    if(typeof setAppToast === 'function') setAppToast(hex.toUpperCase() + ' 복사됨', { duration: 1600, variant: 'ok' });
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(hex).then(done).catch(function(){ window.prompt('복사할 색상:', hex); });
+  } else {
+    window.prompt('복사할 색상:', hex);
+  }
+};
+
 /** 페이스·IFC=여성 / 도수·CMT·무브먼트·Re:Al움직임=남성 */
 function getMangoModelGuideForCat_(catId){
   var id = parseInt(catId, 10);
@@ -9617,14 +10114,15 @@ const DEFAULT_EXPERT_COURSE_SCOPE_RULE = `[범위·집중 — 최우선]
 const BLOG_CONTENT_VOICE_RULE = '미카닥 박준규 톤 — 따뜻하고 신뢰감 있는 **설명하는 전문가**. **존댓말(해요체)**로 씀(~해요/~이에요/~습니다). 한다체·반말(~한다/~이다) 금지. 제목·서명·헤드라인에 Doctor·닥터·원장님을 쓰지 않음. 과장·즉효 약속 금지.';
 const MEDICAL_COMPLIANCE_RULE = `[의료법·포지셔닝 — 필수]
 - 작성자(미카닥 박준규)는 **현재 병원에서 근무하지 않습니다**. 진단·처방·치료행위를 하거나 암시하지 마세요.
-- **치료가 필요할 수 있는 상황**은 원인·징후를 **교육적으로** 설명한 뒤, **병원 진료·검사·의사 처방 치료를 먼저 권하는** 문장을 넣으세요.
-- 제공 범위는 **운동·재활·웰니스 프로그램**(Re:Al Movement, P-스트레칭, 기능운동 등)이며, 병원 치료와 **병행**하는 흐름으로 씁니다.
+- 제공 범위는 **운동·재활·웰니스 프로그램**(리얼무브먼트, P-스트레칭, 기능운동 등)이며, 의료행위가 아님을 전제로 씁니다.
 - "완치""치료한다""진단 확정""처방""수술 대신" 등 **의료행위 연상** 표현 금지. "이해를 돕기 위한 일반 정보"·"생활·운동 관리 참고" 톤.
-- 응급·적신호(마비, 대소변 장애, 발열·체중감소 동반, 사고 직후 급격한 악화 등)는 **즉시 병원** 권고.`;
+- **병원 진료 안내는 셀프 케어(selfCare)에 한 문장만** 넣으세요. problem·explanation·cta·FAQ에는 병원·진료·병원 상담을 반복하지 마세요.
+- 적신호(마비, 대소변 장애, 발열·체중감소 동반, 사고 직후 급격한 악화 등)도 **그 한 문장**에만 녹이세요.`;
 
 const GEO_CONTENT_STRUCTURE_RULE = `[GEO · AI 인용 가능 구조 — explanation 필드에 자연스럽게 녹이기]
 **explanation 맨 앞 2~3문장은 TL;DR(핵심 결론 요약)**으로 시작할 것. AI가 먼저 발췌할 수 있게 결론을 선제시한 뒤, 아래 요소를 번호·"N단계" 표기 없이 문단으로 이어 연결:
-① (TL;DR — 위에서 이미 작성) ② 자가 점검 2~4개 ③ 가능한 원인 ④ 병원 진료 신호 vs 운동·프로그램으로 관리 가능한 경우 ⑤ 안전한 셀프 확인·이완 ⑥ 주의·금기 ⑦ 근골격계 전문가 관점 ⑧ 익명 사례 톤의 변화(숫자는 예시로) ⑨ FAQ 2~3개 ⑩ 다음 행동(병원 상담 또는 프로그램 상담) — 주제와 맞으면 프로필 증상 허브 딥링크 1개 포함 가능`;
+① (TL;DR — 위에서 이미 작성) ② 자가 점검 2~4개 ③ 가능한 원인 ④ 생활·운동으로 관리할 때 참고할 점 ⑤ 안전한 셀프 확인·이완 ⑥ 주의·금기(무리 금지) ⑦ 근골격계 전문가 관점 ⑧ 익명 사례 톤의 변화(숫자는 예시로) ⑨ FAQ 2~3개 ⑩ 다음 행동(프로그램·프로필 안내) — 주제와 맞으면 프로필 증상 허브 딥링크 1개 포함 가능
+※ explanation·FAQ에 병원 진료 안내를 다시 쓰지 마세요. (병원 안내는 selfCare 한 줄만)`;
 
 const DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW = `**일반인 독자**용 블로그입니다. ${BLOG_CONTENT_VOICE_RULE}
 
@@ -9637,14 +10135,14 @@ ${MEDICAL_COMPLIANCE_RULE}
 ${GEO_CONTENT_STRUCTURE_RULE}
 
 [글 흐름 — 반드시 이 순서·필드]
-1. **문제 제기** (problem): 일상 장면에서 공감되는 불편·궁금증 2~4문장. 불릿·번호 나열 금지. 문장(문단) 사이에는 **빈 줄**로 띄워 가독성 확보. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스.
-2. **셀프 케어** (selfCare): **👉 로 시작**. 동작·자세·**초·회·분**을 앞쪽에. "아 시원하다" 지점에서 멈추라는 뉘앙스. 무리·재통증 주의 한 줄. 통증이 심하면 병원 먼저 한 줄.
-3. **원리 설명** (explanation): **맨 앞 2~3문장 TL;DR(핵심 결론)** → 동작 **뒤에** 왜 도움이 되는지 + GEO 구조. 비유 한 줄. 병원 치료가 필요한 경우와 **프로그램 병행**이 맞는 경우를 구분. **문단 사이 빈 줄**로 읽기 쉽게.
+1. **문제 제기** (problem): 일상 장면에서 공감되는 불편·궁금증 2~4문장. 불릿·번호 나열 금지. 문장(문단) 사이에는 **빈 줄**로 띄워 가독성 확보. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스. **병원 안내 금지**.
+2. **셀프 케어** (selfCare): **👉 로 시작**. 동작·자세·**초·회·분**을 앞쪽에. "아 시원하다" 지점에서 멈추라는 뉘앙스. 무리·재통증 주의 한 줄. **병원 진료 권고는 여기에만 한 문장**(통증·적신호 시 병원 먼저). 같은 글을 다른 필드에서 반복하지 마세요.
+3. **원리 설명** (explanation): **맨 앞 2~3문장 TL;DR(핵심 결론)** → 동작 **뒤에** 왜 도움이 되는지 + GEO 구조. 비유 한 줄. **병원·진료 안내 반복 금지**. **문단 사이 빈 줄**로 읽기 쉽게.
 
 [형식]
 - title: 호기심·질문형 한 줄 (35자 내외, 네이버 SEO 고려, 과장 금지)
 - problem / selfCare / explanation: 위 순서대로 각각 별도 필드. "N단계 —" 같은 순서 표기 금지
-- cta: 병원 상담 또는 Re:Al·프로그램 상담 중 맥락에 맞게 (과장·즉시 예약 압박 금지). 주제와 맞는 증상 허브 URL 1개 포함 권장 — 허리 ?hub=back · 목 ?hub=neck · 어깨 ?hub=shoulder · 무릎 ?hub=knee · 골반 ?hub=pelvis (기본 ${PROFILE_BRAND_URL})
+- cta: 리얼무브먼트·프로그램·프로필 안내 (과장·즉시 예약 압박 금지). **병원 상담 문구는 넣지 마세요.** 주제와 맞는 증상 허브 URL 1개 포함 권장 — 허리 ?hub=back · 목 ?hub=neck · 어깨 ?hub=shoulder · 무릎 ?hub=knee · 골반 ?hub=pelvis (기본 ${PROFILE_BRAND_URL})
 - hashtags: 6~8개 (# 없이)`;
 
 function buildExpertCourseBlogPrompt_(opts){
@@ -9917,6 +10415,37 @@ function migrateUniversalContentFlowPrompts_(){
   return changed;
 }
 
+/** 저장 프롬프트: 병원 안내를 셀프 케어 1회로 제한 */
+function migrateHospitalGuidanceOnceInSelfCare_(){
+  if(!state.prompts) return false;
+  var changed = false;
+  var marker = '[병원 안내 — 셀프 케어 1회만]';
+  var addendum =
+    marker + '\n' +
+    '- 병원·진료 권고는 **셀프 케어(selfCare)에 한 문장만** 적으세요.\n' +
+    '- problem·explanation·cta·FAQ에는 병원 안내·병원 상담을 반복하지 마세요.\n' +
+    '- 적신호(마비·대소변 장애·급악화 등)도 그 한 줄에만 녹이세요.';
+  function ensureAddendum_(text){
+    var t = String(text || '');
+    if(!t.trim()) return { text: t, changed: false };
+    if(t.indexOf(marker) >= 0) return { text: t, changed: false };
+    return { text: t.trim() + '\n\n' + addendum, changed: true };
+  }
+  if(state.prompts.base){
+    var b = ensureAddendum_(state.prompts.base);
+    if(b.changed){ state.prompts.base = b.text; changed = true; }
+  }
+  if(state.prompts.categories){
+    [0, 1, 2].forEach(function(catId){
+      var cat = state.prompts.categories[catId];
+      if(!cat || !cat.blog) return;
+      var next = ensureAddendum_(cat.blog);
+      if(next.changed){ cat.blog = next.text; changed = true; }
+    });
+  }
+  return changed;
+}
+
 /** 저장 프롬프트에 채널별 말투 기본값(블로그·인스타 존댓말 / 쓰레드 반말) 반영 */
 function migrateSpeechStylePromptDefaults_(){
   if(!state.prompts || !state.prompts.categories) return false;
@@ -10081,6 +10610,9 @@ var APP_TOAST_GAP = 10;
 var APP_TOAST_BASE_BOTTOM = 22;
 var _bodyScrollLockY = 0;
 var _bodyScrollLockCount = 0;
+/** 시트/프롬프트 지연 unlock이 재오픈 뒤에 실행되지 않도록 */
+var _detailCloseGen_ = 0;
+var _promptCloseGen_ = 0;
 
 function lockBodyScroll_() {
   if (_bodyScrollLockCount === 0) {
@@ -10106,6 +10638,37 @@ function unlockBodyScroll_() {
   document.body.style.width = '';
   document.body.style.overflow = '';
   window.scrollTo(0, _bodyScrollLockY);
+}
+/** body scroll lock을 쓰는 오버레이 — .open만 지우면 잠금이 남는다 */
+var SCROLL_LOCKED_OVERLAY_IDS_ = {
+  'api-modal': 1,
+  'sync-status-overlay': 1,
+  'sync-preview-overlay': 1,
+  'drive-modal-overlay': 1,
+  'links-modal-overlay': 1,
+  'sync-conflict-overlay': 1,
+  'sync-bootstrap-choice-overlay': 1
+};
+function dismissPlannerOverlayOpenState_(id){
+  var el = document.getElementById(id);
+  if(!el) return false;
+  var wasOpen = el.classList.contains('open') || el.classList.contains('show');
+  el.classList.remove('open');
+  el.classList.remove('show');
+  if(wasOpen && SCROLL_LOCKED_OVERLAY_IDS_[id]) unlockBodyScroll_();
+  return wasOpen;
+}
+function openScrollLockedOverlayEl_(el){
+  if(!el) return;
+  var already = el.classList.contains('open');
+  el.classList.add('open');
+  if(!already) lockBodyScroll_();
+}
+function closeScrollLockedOverlayEl_(el){
+  if(!el) return;
+  var wasOpen = el.classList.contains('open');
+  el.classList.remove('open');
+  if(wasOpen) unlockBodyScroll_();
 }
 
 function settleBottomSheet_(el) {
@@ -10968,6 +11531,7 @@ function getPersistPayload(){
     syncEntityTombstones: state.syncEntityTombstones || {},
     chatgptOpenUrl: state.chatgptOpenUrl,
     prompts: state.prompts,
+    promptsUpdatedAt: state.promptsUpdatedAt || '',
     promptRefineMilestones: state.promptRefineMilestones || {},
     dailyAutoLast: dailyLast
   };
@@ -12273,7 +12837,9 @@ window.openSyncStatusModal_ = async function(){
   if(!overlay || !body) return;
   if(err) err.textContent = '';
   _syncStatusModalRemote = null;
+  var alreadyOpen = overlay.classList.contains('open');
   overlay.classList.add('open');
+  if(!alreadyOpen) lockBodyScroll_();
   refreshSyncStatusBodyHtml_(getSyncStatusInfo_());
   refreshSyncHistoryInModal_();
   var waitNote = document.createElement('div');
@@ -12295,8 +12861,10 @@ window.openSyncStatusModal_ = async function(){
 window.closeSyncStatusModal_ = function(ev){
   if(ev && ev.target && ev.currentTarget && ev.target !== ev.currentTarget) return;
   var overlay = document.getElementById('sync-status-overlay');
+  var wasOpen = !!(overlay && overlay.classList.contains('open'));
   if(overlay) overlay.classList.remove('open');
   _syncStatusModalRemote = null;
+  if(wasOpen) unlockBodyScroll_();
 };
 function setPlannerBootstrapUi_(mode, message){
   var overlay = document.getElementById('sync-bootstrap-overlay');
@@ -13081,13 +13649,9 @@ function openPlannerBootstrapSyncChoice_(local, remote, serverRevision){
     });
   }
   ['sync-bootstrap-overlay', 'api-modal', 'drive-oauth-busy', 'sync-status-overlay', 'sync-preview-overlay'].forEach(function(id){
-    var el = document.getElementById(id);
-    if(!el) return;
-    el.classList.remove('open');
-    el.classList.remove('show');
+    dismissPlannerOverlayOpenState_(id);
   });
-  var overlay = document.getElementById('sync-bootstrap-choice-overlay');
-  if(overlay) overlay.classList.add('open');
+  openScrollLockedOverlayEl_(document.getElementById('sync-bootstrap-choice-overlay'));
   var applyBtn = document.getElementById('sync-bootstrap-choice-apply');
   if(applyBtn){
     applyBtn.disabled = false;
@@ -13126,7 +13690,7 @@ window.applyPlannerBootstrapChoice_ = async function(){
     applyBtn.textContent = '적용 중…';
   }
   var overlay = document.getElementById('sync-bootstrap-choice-overlay');
-  if(overlay) overlay.classList.remove('open');
+  closeScrollLockedOverlayEl_(overlay);
   plannerBootstrapChoicePending_ = null;
   state._bootstrapChoiceDone = true;
   try {
@@ -13268,7 +13832,7 @@ function restoreBootstrapDiffItemFromLocal_(localPayload, item){
 window.skipPlannerBootstrapChoiceKeepLocal_ = function(){
   var pending = plannerBootstrapChoicePending_;
   var overlay = document.getElementById('sync-bootstrap-choice-overlay');
-  if(overlay) overlay.classList.remove('open');
+  closeScrollLockedOverlayEl_(overlay);
   plannerBootstrapChoicePending_ = null;
   state._bootstrapChoiceDone = true;
   if(pending && pending.serverRevision > (parseInt(state.syncRevision, 10) || 0)){
@@ -13311,7 +13875,7 @@ window.continuePlannerWithLocalData_ = function(){
     state._bootstrapChoiceDone = true;
     plannerBootstrapChoicePending_ = null;
     var choiceOv = document.getElementById('sync-bootstrap-choice-overlay');
-    if(choiceOv) choiceOv.classList.remove('open');
+    closeScrollLockedOverlayEl_(choiceOv);
     unlockPlannerBootstrapLocal_({
       toast: '서버 동기화를 건너뛰고 이 기기 데이터로 열었어요.\n나중에 「지금 동기화」로 다시 맞출 수 있어요.',
       toastMs: 6500
@@ -13373,7 +13937,7 @@ function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts){
     state.syncNeedsSnapshot = true;
     plannerSyncConflictPending_ = null;
     var ov = document.getElementById('sync-conflict-overlay');
-    if(ov) ov.classList.remove('open');
+    closeScrollLockedOverlayEl_(ov);
     if(!plannerSyncBootstrapReady_) plannerSyncBootstrapReady_ = true;
     save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
     if(typeof setAppToast === 'function'){
@@ -13391,12 +13955,9 @@ function autoResolveConflictsKeepLocal_(local, remote, serverRevision, conflicts
   keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts);
 }
 function renderPlannerConflictUi_(pending){
-  // 다른 오버레이가 클릭을 가로채지 못하게 전부 닫음
-  ['sync-bootstrap-overlay', 'api-modal', 'drive-oauth-busy', 'sync-status-overlay', 'sync-bootstrap-choice-overlay'].forEach(function(id){
-    var el = document.getElementById(id);
-    if(!el) return;
-    el.classList.remove('open');
-    el.classList.remove('show');
+  // 다른 오버레이가 클릭을 가로채지 못하게 전부 닫음 (스크롤 잠금도 함께 해제)
+  ['sync-bootstrap-overlay', 'api-modal', 'drive-oauth-busy', 'sync-status-overlay', 'sync-preview-overlay', 'sync-bootstrap-choice-overlay'].forEach(function(id){
+    dismissPlannerOverlayOpenState_(id);
   });
   var list = document.getElementById('sync-conflict-list');
   if(list){
@@ -13438,8 +13999,7 @@ function renderPlannerConflictUi_(pending){
   }
   var keepBtn = document.getElementById('sync-conflict-keep-local');
   if(keepBtn) keepBtn.disabled = false;
-  var overlay = document.getElementById('sync-conflict-overlay');
-  if(overlay) overlay.classList.add('open');
+  openScrollLockedOverlayEl_(document.getElementById('sync-conflict-overlay'));
 }
 function bindPlannerConflictButtons_(){
   var applyBtn = document.getElementById('sync-conflict-apply');
@@ -13472,7 +14032,7 @@ window.applyAllConflictsKeepLocal_ = function(){
   if(keepBtn) keepBtn.disabled = true;
   if(applyBtn){ applyBtn.disabled = true; applyBtn.textContent = '적용 중…'; }
   var overlay = document.getElementById('sync-conflict-overlay');
-  if(overlay) overlay.classList.remove('open');
+  closeScrollLockedOverlayEl_(overlay);
   var snap = pending;
   plannerSyncConflictPending_ = null;
   // 즉시 피드백 후 가벼운 경로 (전체 merge 금지)
@@ -13588,7 +14148,7 @@ window.applyPlannerConflictChoices_ = async function(){
     applyBtn.textContent = '적용 중…';
   }
   var overlayEarly = document.getElementById('sync-conflict-overlay');
-  if(overlayEarly) overlayEarly.classList.remove('open');
+  closeScrollLockedOverlayEl_(overlayEarly);
   if(typeof setAppToast === 'function') setAppToast('선택 내용을 적용하는 중…', { duration: 2200, variant: 'ok' });
 
   // 라디오 선택을 모달 DOM이 사라지기 전에 스냅샷
@@ -13650,7 +14210,7 @@ window.applyPlannerConflictChoices_ = async function(){
     console.warn('[충돌 적용]', err);
     plannerSyncConflictPending_ = snap;
     var recoverOverlay = document.getElementById('sync-conflict-overlay');
-    if(recoverOverlay) recoverOverlay.classList.add('open');
+    openScrollLockedOverlayEl_(recoverOverlay);
     if(typeof setAppToast === 'function'){
       setAppToast('충돌 적용 중 오류가 났어요.\n' + ((err && err.message) || err) +
         '\n「전부 이 기기로 적용」을 권장합니다.', { duration: 7000, variant: 'err' });
@@ -13934,8 +14494,10 @@ async function fetchRemotePayloadForSyncPreview_(){
 window.closeSyncPreviewModal_ = function(ev){
   if(ev && ev.target && ev.currentTarget && ev.target !== ev.currentTarget) return;
   var ov = document.getElementById('sync-preview-overlay');
+  var wasOpen = !!(ov && ov.classList.contains('open'));
   if(ov) ov.classList.remove('open');
   _manualSyncPreviewCache_ = null;
+  if(wasOpen) unlockBodyScroll_();
 };
 window.startManualSyncPreview_ = async function(){
   var err = document.getElementById('sync-status-err');
@@ -13944,7 +14506,9 @@ window.startManualSyncPreview_ = async function(){
   var previewBody = document.getElementById('sync-preview-body');
   if(!previewOv || !previewBody) return runManualFullSync_();
   previewBody.textContent = '단계 배치 정리 후 서버와 비교하는 중… (최대 약 60초)';
+  var alreadyOpen = previewOv.classList.contains('open');
   previewOv.classList.add('open');
+  if(!alreadyOpen) lockBodyScroll_();
   _manualSyncPreviewCache_ = null;
   try {
     if(!isServerSyncConfigured_()){
@@ -14330,6 +14894,7 @@ function applyPersistPayload(s, opts){
   }
   state.chatgptOpenUrl = s.chatgptOpenUrl || '';
   state.prompts = s.prompts !== undefined ? s.prompts : null;
+  state.promptsUpdatedAt = s.promptsUpdatedAt || '';
   state.promptRefineMilestones = s.promptRefineMilestones || {};
   state.branding = s.branding && typeof s.branding === 'object' ? s.branding : null;
   state.draftBrandOverrides = s.draftBrandOverrides && typeof s.draftBrandOverrides === 'object' ? s.draftBrandOverrides : {};
@@ -14415,8 +14980,9 @@ function applyPersistPayload(s, opts){
   if(migrateLegacyBaseAffiliationPrompt_()) migrated = true;
   if(migrateLegacyExpertCoursePrompts_()) migrated = true;
   if(migrateUniversalContentFlowPrompts_()) migrated = true;
-  if(migrateSpeechStylePromptDefaults_()) migrated = true;
-  if(migrateMangoImagePromptDefaults_()) migrated = true;
+  if(migrateSpeechStylePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateHospitalGuidanceOnceInSelfCare_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrated){
     if(opts && opts.authoritativeAdopt) state._postAdoptMigration = true;
     else {
@@ -15781,13 +16347,20 @@ window.openDriveModal = function(){
   }
   var err = document.getElementById('drive-modal-err');
   if(err) err.textContent = '';
-  document.getElementById('drive-modal-overlay').classList.add('open');
+  var ov = document.getElementById('drive-modal-overlay');
+  if(!ov) return;
+  var alreadyOpen = ov.classList.contains('open');
+  ov.classList.add('open');
+  if(!alreadyOpen) lockBodyScroll_();
   trapFocusIn_(document.querySelector('#drive-modal-overlay .modal-box'));
 };
 window.closeDriveModal = function(ev){
   if(ev && ev.target !== document.getElementById('drive-modal-overlay')) return;
-  document.getElementById('drive-modal-overlay').classList.remove('open');
+  var ov = document.getElementById('drive-modal-overlay');
+  var wasOpen = !!(ov && ov.classList.contains('open'));
+  if(ov) ov.classList.remove('open');
   releaseModalFocusTrap_();
+  if(wasOpen) unlockBodyScroll_();
 };
 window.driveLoginAndUpload = async function(){
   var errEl = document.getElementById('drive-modal-err');
@@ -15960,8 +16533,9 @@ function runDeferredBootMigrations_(){
     if(migrateLegacyBaseAffiliationPrompt_()) migrated = true;
     if(migrateLegacyExpertCoursePrompts_()) migrated = true;
     if(migrateUniversalContentFlowPrompts_()) migrated = true;
-    if(migrateSpeechStylePromptDefaults_()) migrated = true;
-    if(migrateMangoImagePromptDefaults_()) migrated = true;
+    if(migrateSpeechStylePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
+    if(migrateHospitalGuidanceOnceInSelfCare_()){ migrated = true; touchPromptsUpdatedAt_(); }
+    if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrated){
       state.syncDirty = true;
       state.syncNeedsSnapshot = true;
@@ -16464,14 +17038,16 @@ function saveKey() {
   var dailyAutoEl = document.getElementById('daily-auto-enabled');
   if(dailyAutoEl) setDailyAutoEnabled_(!!dailyAutoEl.checked);
   save();
-  document.getElementById('api-modal').classList.remove('open');
-  releaseModalFocusTrap_();
+  closeApiModal();
   updateApiBadge();
   renderMain();
 }
 function closeApiModal(){
-  document.getElementById('api-modal').classList.remove('open');
+  var modal = document.getElementById('api-modal');
+  var wasOpen = !!(modal && modal.classList.contains('open'));
+  if(modal) modal.classList.remove('open');
   releaseModalFocusTrap_();
+  if(wasOpen) unlockBodyScroll_();
 }
 window.closeApiModal = closeApiModal;
 function closeApiModalBackdrop(ev){
@@ -16497,7 +17073,10 @@ function openApiModal() {
   if(dailyAutoEl) dailyAutoEl.checked = isDailyAutoEnabled_();
   updateGeminiServerStatusUI_();
   refreshPlannerServerCaps_();
-  document.getElementById('api-modal').classList.add('open');
+  var apiModal = document.getElementById('api-modal');
+  var alreadyOpen = !!(apiModal && apiModal.classList.contains('open'));
+  if(apiModal) apiModal.classList.add('open');
+  if(!alreadyOpen) lockBodyScroll_();
   trapFocusIn_(document.querySelector('#api-modal .modal-box'));
 }
 function updateApiBadge() {
@@ -17108,10 +17687,18 @@ function renderOpsNaverKwPanelHTML_(itemId){
   var baseCount = (st.keywords || []).length;
   var hoodCount = (st.neighborhoods || []).length;
   var comboCount = combo.length;
-  var bothCount = buildOpsNaverKwCsvRows_(st, 'both').length;
+  var bothRows = buildOpsNaverKwCsvRows_(st, 'both');
+  var bothCount = bothRows.length;
+  var skippedLong = bothRows._skippedLong || 0;
+  var groupsNeeded = Math.max(1, Math.ceil(bothCount / OPS_NAVER_KW_PER_ADGROUP));
+  var seedCount = opsNaverKwSeedKeywords_().length;
+  var adGroupIds = parseOpsNaverKwAdGroupIds_(st.adGroupId);
+  var adGroupHint = adGroupIds.length
+    ? ('광고그룹 ' + adGroupIds.length + '개 입력됨 · 합산 ' + bothCount.toLocaleString() + '개 → 약 ' + groupsNeeded + '개 그룹 필요')
+    : ('합산 ' + bothCount.toLocaleString() + '개 → 광고그룹 약 ' + groupsNeeded + '개 필요 (그룹당 ' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개)');
   return '<div class="ops-kw-panel" data-ops-kw="' + escapeHtml(itemId) + '">' +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>일반 키워드 설정하기</strong> <span class="ops-review-group-hint">한 줄에 하나 · 추가·수정 후 저장</span>' +
+      '<div class="ops-review-group-title"><strong>일반 키워드 설정하기</strong> <span class="ops-review-group-hint">한 줄에 하나 · 시드 ' + seedCount + '개</span>' +
         '<span class="ops-review-group-progress">' + baseCount + '개</span></div>' +
       '<textarea class="ops-review-input ops-kw-textarea" rows="8" data-ops-kw-field="keywords" placeholder="예: 허리통증&#10;거북목교정" onchange="setOpsNaverKwList_(\'' + itemId + '\', \'keywords\', this.value)">' + escapeHtml(kwText) + '</textarea>' +
       '<div class="ops-kw-actions">' +
@@ -17129,23 +17716,25 @@ function renderOpsNaverKwPanelHTML_(itemId){
         '<button type="button" class="ops-kw-btn" onclick="focusOpsNaverKwField_(\'' + itemId + '\', \'neighborhoods\')">수정</button>' +
         '<button type="button" class="ops-kw-btn ops-kw-btn-regen" onclick="regenOpsNaverKwList_(\'' + itemId + '\', \'neighborhoods\')">재생성</button>' +
         '<label class="ops-kw-join"><span>연결</span>' +
-          '<select onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'joinMode\', this.value)">' +
-            '<option value="space"' + (st.joinMode !== 'none' ? ' selected' : '') + '>띄어쓰기 (약수 허리통증)</option>' +
-            '<option value="none"' + (st.joinMode === 'none' ? ' selected' : '') + '>붙여쓰기 (약수허리통증)</option>' +
+          '<select data-ops-kw-meta="joinMode" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'joinMode\', this.value)">' +
+            '<option value="none"' + (st.joinMode !== 'space' ? ' selected' : '') + '>붙여쓰기 (약수허리통증) · 권장</option>' +
+            '<option value="space"' + (st.joinMode === 'space' ? ' selected' : '') + '>띄어쓰기 (약수 허리통증)</option>' +
           '</select></label>' +
       '</div>' +
       '<div class="ops-kw-preview-head">조합 미리보기 <span>' + comboCount.toLocaleString() + '개</span></div>' +
       '<pre class="ops-kw-preview">' + escapeHtml(comboPreview || '(동네·키워드를 입력하면 여기에 표시됩니다)') + '</pre>' +
     '</div>' +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>대량등록 CSV 다운로드</strong> <span class="ops-review-group-hint">네이버 키워드 일괄등록 템플릿</span></div>' +
+      '<div class="ops-review-group-title"><strong>대량등록 CSV 다운로드</strong> <span class="ops-review-group-hint">네이버 키워드 일괄등록 · 그룹당 ' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개</span></div>' +
       '<div class="ops-kw-meta-grid">' +
-        '<label class="ops-kw-meta"><span>광고그룹ID</span><input type="text" value="' + escapeHtml(st.adGroupId || '') + '" placeholder="grp-a001-…" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'adGroupId\', this.value)" /></label>' +
-        '<label class="ops-kw-meta"><span>입찰가</span><input type="text" value="' + escapeHtml(st.bid || '') + '" placeholder="70" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'bid\', this.value)" /></label>' +
-        '<label class="ops-kw-meta ops-kw-meta-wide"><span>PC URL</span><input type="text" value="' + escapeHtml(st.pcUrl || '') + '" placeholder="https://…" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'pcUrl\', this.value)" /></label>' +
-        '<label class="ops-kw-meta ops-kw-meta-wide"><span>모바일 URL</span><input type="text" value="' + escapeHtml(st.mobileUrl || '') + '" placeholder="https://…" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'mobileUrl\', this.value)" /></label>' +
+        '<label class="ops-kw-meta ops-kw-meta-wide"><span>광고그룹ID (여러 개면 쉼표·줄바꿈)</span><textarea rows="2" data-ops-kw-meta="adGroupId" placeholder="grp-a001-…&#10;grp-a001-…" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'adGroupId\', this.value)">' + escapeHtml(st.adGroupId || '') + '</textarea></label>' +
+        '<label class="ops-kw-meta"><span>입찰가 (70~100000 · 10원 단위)</span><input type="text" data-ops-kw-meta="bid" inputmode="numeric" value="' + escapeHtml(st.bid || '') + '" placeholder="70" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'bid\', this.value)" /></label>' +
+        '<label class="ops-kw-meta ops-kw-meta-wide"><span>PC URL</span><input type="text" data-ops-kw-meta="pcUrl" value="' + escapeHtml(st.pcUrl || '') + '" placeholder="https://…" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'pcUrl\', this.value)" /></label>' +
+        '<label class="ops-kw-meta ops-kw-meta-wide"><span>모바일 URL</span><input type="text" data-ops-kw-meta="mobileUrl" value="' + escapeHtml(st.mobileUrl || '') + '" placeholder="https://…" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'mobileUrl\', this.value)" /></label>' +
       '</div>' +
-      '<div class="ops-kw-dl-counts">일반 ' + baseCount.toLocaleString() + ' · 동네조합 ' + comboCount.toLocaleString() + ' · 합산(중복제거) ' + bothCount.toLocaleString() + ' / 최대 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() + '</div>' +
+      '<div class="ops-kw-dl-counts">일반 ' + baseCount.toLocaleString() + ' · 동네조합 ' + comboCount.toLocaleString() + ' · 합산(중복·' + OPS_NAVER_KW_MAX_CHARS + '자 초과 제외) ' + bothCount.toLocaleString() + ' / 파일 최대 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() +
+        (skippedLong ? ' · <span class="ops-kw-warn">' + skippedLong + '개 길이초과 제외</span>' : '') +
+        '<br><span class="ops-kw-adgroup-hint">' + escapeHtml(adGroupHint) + '</span></div>' +
       '<div class="ops-kw-actions ops-kw-dl-actions">' +
         '<button type="button" class="ops-kw-btn ops-kw-btn-dl" onclick="downloadOpsNaverKwCsv_(\'' + itemId + '\', \'base\')">일반 키워드만</button>' +
         '<button type="button" class="ops-kw-btn ops-kw-btn-dl" onclick="downloadOpsNaverKwCsv_(\'' + itemId + '\', \'combo\')">동네 조합만</button>' +
@@ -17165,11 +17754,14 @@ function setOpsNaverKwList_(itemId, field, text){
 window.setOpsNaverKwList_ = setOpsNaverKwList_;
 function setOpsNaverKwMeta_(itemId, field, value){
   var st = getOpsNaverKwState_(itemId);
-  st[field] = String(value || '').trim();
+  var v = String(value || '').trim();
+  if(field === 'bid') v = normalizeOpsNaverKwBid_(v);
+  if(field === 'pcUrl' || field === 'mobileUrl') v = normalizeOpsNaverKwUrl_(v);
+  st[field] = v;
   var om = getOpsManualState_();
   om.updatedAt = new Date().toISOString();
   save({ skipDriveUpload: true, skipGasPush: true });
-  if(field === 'joinMode') refreshOpsNaverKwPanel_(itemId);
+  if(field === 'joinMode' || field === 'adGroupId' || field === 'bid') refreshOpsNaverKwPanel_(itemId);
 }
 window.setOpsNaverKwMeta_ = setOpsNaverKwMeta_;
 function focusOpsNaverKwField_(itemId, field){
@@ -17184,9 +17776,9 @@ function focusOpsNaverKwField_(itemId, field){
 window.focusOpsNaverKwField_ = focusOpsNaverKwField_;
 function addOpsNaverKwLine_(itemId, field){
   var label = field === 'neighborhoods' ? '추가할 동네 이름' : '추가할 키워드';
-  var raw = window.prompt(label);
+  var raw = window.prompt(label + ' (여러 개는 쉼표·줄바꿈)');
   if(raw == null) return;
-  var parts = String(raw).split(/[,，\n]+/).map(function(s){ return s.trim(); }).filter(Boolean);
+  var parts = parseOpsNaverKwLines_(raw, { allowCommaSplit: true });
   if(!parts.length) return;
   var st = getOpsNaverKwState_(itemId);
   var list = Array.isArray(st[field]) ? st[field].slice() : [];
@@ -17212,7 +17804,7 @@ function regenOpsNaverKwList_(itemId, field){
   } else {
     var seed = opsNaverKwSeedKeywords_();
     if(!seed.length){
-      if(typeof setAppToast === 'function') setAppToast('시드 키워드 파일이 없습니다. ops-naver-kw-seed.js를 확인하세요.', { duration: 4000, variant: 'err' });
+      if(typeof setAppToast === 'function') setAppToast('시드 키워드가 비어 있습니다. ops-naver-kw-seed.js에 keywords 배열이 있는지 확인하세요.', { duration: 4500, variant: 'err' });
       return;
     }
     if(!window.confirm('일반 키워드를 정리본 시드(' + seed.length + '개)로 다시 불러올까요? 현재 목록은 덮어씁니다.')) return;
@@ -17220,6 +17812,8 @@ function regenOpsNaverKwList_(itemId, field){
     var meta = opsNaverKwSeedMeta_();
     if(!st.adGroupId) st.adGroupId = meta.adGroupId;
     if(!st.bid) st.bid = meta.bid;
+    if(!st.pcUrl || /htcenter\.co\.kr/i.test(st.pcUrl)) st.pcUrl = meta.pcUrl;
+    if(!st.mobileUrl || /htcenter\.co\.kr/i.test(st.mobileUrl)) st.mobileUrl = meta.mobileUrl;
   }
   getOpsManualState_().updatedAt = new Date().toISOString();
   save({ skipDriveUpload: false, gasImmediate: true, driveImmediate: true });
@@ -17238,27 +17832,8 @@ function refreshOpsNaverKwPanel_(itemId){
   if(old && next) old.replaceWith(next);
   else if(next) panel.insertBefore(next, panel.firstChild);
 }
-function downloadOpsNaverKwCsv_(itemId, mode){
-  var st = getOpsNaverKwState_(itemId);
-  if(!String(st.adGroupId || '').trim()){
-    if(typeof setAppToast === 'function') setAppToast('광고그룹ID를 먼저 입력해 주세요.', { duration: 3500, variant: 'err' });
-    else alert('광고그룹ID를 먼저 입력해 주세요.');
-    return;
-  }
-  var total = buildOpsNaverKwCsvRows_(st, mode).length;
-  if(!total){
-    if(typeof setAppToast === 'function') setAppToast('다운로드할 키워드가 없습니다.', { duration: 3000, variant: 'err' });
-    return;
-  }
-  if(total > OPS_NAVER_KW_MAX_ROWS){
-    if(!window.confirm('키워드가 ' + total.toLocaleString() + '개입니다. 템플릿 최대 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() + '개만 저장합니다. 계속할까요?')) return;
-  }
-  var built = buildOpsNaverKwCsvText_(st, mode);
-  var modeLabel = mode === 'base' ? '일반' : (mode === 'combo' ? '동네조합' : '일반+동네');
-  var branchKey = opsPlaceBranchKey_(itemId);
-  var place = branchKey === 'jakjeon' ? '작전' : '약수';
-  var filename = '네이버키워드_' + place + '_' + modeLabel + '_' + built.count + '개.csv';
-  var blob = new Blob(['\ufeff' + built.text], { type: 'text/csv;charset=utf-8' });
+function triggerOpsNaverKwFileDownload_(filename, csvText){
+  var blob = new Blob(['\ufeff' + csvText], { type: 'text/csv;charset=utf-8' });
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
@@ -17266,8 +17841,92 @@ function downloadOpsNaverKwCsv_(itemId, mode){
   document.body.appendChild(a);
   a.click();
   setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); }, 800);
+}
+function downloadOpsNaverKwCsv_(itemId, mode){
+  var st = syncOpsNaverKwPanelFromDom_(itemId);
+  getOpsManualState_().updatedAt = new Date().toISOString();
+  save({ skipDriveUpload: true, skipGasPush: true });
+
+  var adGroupIds = parseOpsNaverKwAdGroupIds_(st.adGroupId);
+  if(!adGroupIds.length){
+    if(typeof setAppToast === 'function') setAppToast('광고그룹ID를 먼저 입력해 주세요.\n1000개 이상이면 그룹을 여러 개 만들어 ID를 쉼표로 넣으세요.', { duration: 5200, variant: 'err' });
+    else alert('광고그룹ID를 먼저 입력해 주세요.');
+    return;
+  }
+  var pc = normalizeOpsNaverKwUrl_(st.pcUrl);
+  var mo = normalizeOpsNaverKwUrl_(st.mobileUrl);
+  if(pc && !mo) mo = pc;
+  if(mo && !pc) pc = mo;
+  if(!pc || !/^https?:\/\//i.test(pc)){
+    if(typeof setAppToast === 'function') setAppToast('PC 또는 모바일 URL을 http:// 또는 https:// 로 입력해 주세요.', { duration: 4000, variant: 'err' });
+    return;
+  }
+  st.pcUrl = pc;
+  st.mobileUrl = mo;
+  st.bid = normalizeOpsNaverKwBid_(st.bid);
+
+  var rows = buildOpsNaverKwCsvRows_(st, mode);
+  var skippedLong = rows._skippedLong || 0;
+  if(!rows.length){
+    if(typeof setAppToast === 'function'){
+      setAppToast(skippedLong
+        ? ('다운로드할 키워드가 없습니다. (' + skippedLong + '개는 ' + OPS_NAVER_KW_MAX_CHARS + '자 초과로 제외됨)')
+        : '다운로드할 키워드가 없습니다.', { duration: 4000, variant: 'err' });
+    }
+    return;
+  }
+  var truncated = false;
+  if(rows.length > OPS_NAVER_KW_MAX_ROWS){
+    if(!window.confirm('키워드가 ' + rows.length.toLocaleString() + '개입니다. 템플릿 최대 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() + '개만 저장합니다. 계속할까요?')) return;
+    rows = rows.slice(0, OPS_NAVER_KW_MAX_ROWS);
+    truncated = true;
+  }
+
+  var chunks = chunkOpsNaverKwRows_(rows, OPS_NAVER_KW_PER_ADGROUP);
+  if(chunks.length > adGroupIds.length){
+    var need = chunks.length;
+    var cap = adGroupIds.length * OPS_NAVER_KW_PER_ADGROUP;
+    var msg = '키워드 ' + rows.length.toLocaleString() + '개 → 광고그룹 ' + need + '개 필요(그룹당 ' + OPS_NAVER_KW_PER_ADGROUP + '개).\n' +
+      '지금 ID는 ' + adGroupIds.length + '개라서 최대 ' + cap.toLocaleString() + '개만 안전하게 등록됩니다.\n\n' +
+      '· 확인: 앞 ' + cap.toLocaleString() + '개만 CSV로 받기\n' +
+      '· 취소: 광고그룹을 ' + need + '개 만든 뒤 ID를 모두 넣고 다시 받기';
+    if(!window.confirm(msg)) return;
+    rows = rows.slice(0, cap);
+    chunks = chunkOpsNaverKwRows_(rows, OPS_NAVER_KW_PER_ADGROUP);
+    truncated = true;
+  }
+
+  var modeLabel = mode === 'base' ? '일반' : (mode === 'combo' ? '동네조합' : '일반+동네');
+  var branchKey = opsPlaceBranchKey_(itemId);
+  var place = branchKey === 'jakjeon' ? '작전' : '약수';
+
+  // 네이버 대량등록은 파일 1개에 여러 광고그룹ID 행을 넣을 수 있음 → 한 장으로 합침
+  var allLines = OPS_NAVER_KW_CSV_HEADER_LINES.slice();
+  var bidNum = normalizeOpsNaverKwBid_(st.bid);
+  chunks.forEach(function(chunk, idx){
+    var gid = adGroupIds[idx];
+    if(!gid) return;
+    chunk.forEach(function(kw){
+      allLines.push([
+        escapeOpsNaverKwCsvCell_(gid),
+        escapeOpsNaverKwCsvCell_(kw),
+        escapeOpsNaverKwCsvCell_(st.pcUrl),
+        escapeOpsNaverKwCsvCell_(st.mobileUrl),
+        escapeOpsNaverKwCsvCell_(bidNum)
+      ].join(','));
+    });
+  });
+  var csvText = allLines.join('\r\n') + '\r\n';
+  var filename = '네이버키워드_' + place + '_' + modeLabel + '_' + rows.length + '개_' + chunks.length + '그룹.csv';
+  triggerOpsNaverKwFileDownload_(filename, csvText);
+
+  refreshOpsNaverKwPanel_(itemId);
   if(typeof setAppToast === 'function'){
-    setAppToast(filename + (built.truncated ? ' (10,000개로 잘림)' : '') + ' 다운로드', { duration: 3500 });
+    var tip = filename + ' 다운로드' +
+      (truncated ? ' (수량 조정됨)' : '') +
+      (skippedLong ? ' · ' + skippedLong + '개 길이초과 제외' : '') +
+      '\n' + chunks.length + '개 광고그룹 · 그룹당 ≤' + OPS_NAVER_KW_PER_ADGROUP + '개';
+    setAppToast(tip, { duration: 6500, variant: 'ok' });
   }
 }
 window.downloadOpsNaverKwCsv_ = downloadOpsNaverKwCsv_;
@@ -19204,13 +19863,22 @@ function setOpenDetailHash_(draftId, catId, tab){
   } catch(e){}
 }
 function closeSheetUiOnly_(){
+  if(typeof forceCloseProgramColorPreview_ === 'function' && isProgramColorPreviewOpen_()){
+    forceCloseProgramColorPreview_(true);
+  }
   releaseModalFocusTrap_();
-  resetBottomSheet_(document.getElementById('detail-sheet'));
-  document.getElementById('detail-sheet').classList.remove('open');
+  var sheetEl = document.getElementById('detail-sheet');
+  if(sheetEl){
+    resetBottomSheet_(sheetEl);
+    sheetEl.classList.remove('open');
+  }
   state.selectedId = null;
   state.selectedCatId = null;
+  var closeGen = ++_detailCloseGen_;
   setTimeout(function(){
-    document.getElementById('detail-overlay').classList.remove('open');
+    if(closeGen !== _detailCloseGen_) return;
+    var ov = document.getElementById('detail-overlay');
+    if(ov) ov.classList.remove('open');
     unlockBodyScroll_();
     scheduleAppToastLift_();
   }, 280);
@@ -19227,7 +19895,14 @@ function onPlannerHashChange_(){
   var draftId = decodeURIComponent(m[1]);
   var catId = parseInt(m[2], 10);
   var tab = normalizeSheetTabForCategory_(m[3], catId) || undefined;
-  if(state.selectedId === draftId && document.getElementById('detail-overlay').classList.contains('open')) return;
+  var detailOv = document.getElementById('detail-overlay');
+  if(state.selectedId === draftId && detailOv && detailOv.classList.contains('open')){
+    // 같은 초안이면 탭만 해시로 바뀐 경우 반영
+    if(tab && tab !== state.activeTab && typeof switchTab === 'function'){
+      switchTab(tab);
+    }
+    return;
+  }
   if(catId != null && state.currentCat !== catId){
     state.currentCat = catId;
     renderTabs();
@@ -19369,8 +20044,8 @@ function buildSheetTabsHTML(tab){
     <button type="button" class="sheet-tab${tab==='threads'?' active':''}" onclick="switchTab('threads')">쓰레드</button>
   </div></div>`;
 }
-function composeSheetTabLayout_(tab, titleHtml, restHtml){
-  return (titleHtml || '') + buildSheetTabsHTML(tab) + (restHtml || '');
+function composeSheetTabLayout_(tab, restHtml){
+  return buildSheetTabsHTML(tab) + (restHtml || '');
 }
 function scrollSheetBodyToStart_(){
   var body = document.getElementById('sheet-body');
@@ -20162,15 +20837,15 @@ const THUMB_BRAND_PRESETS = {
     defaultBody: '몸의 불편함과 기능 저하를 단계별로 평가해, 맞춤 도수·움직임으로 회복을 돕는 프로그램.'
   },
   1: {
-    hero: 'Re:Al Movement',
+    hero: '리얼무브먼트',
     tagline: '의학적 관점으로 다시 보는 움직임',
-    program: 'Re:Al Movement',
+    program: '리얼무브먼트',
     defaultBody: '몸의 불편함 & 기능 저하를 단계별로 평가해 이상 유무를 파악하고, 개별 차이가 큰 근육·관절 조정 능력을 안전하고 정밀한 맞춤 운동으로 회복시켜주는 트레이닝.'
   },
   2: {
-    hero: 'Re:Al Face',
+    hero: '리얼페이스',
     tagline: '구조로 다시 보는 얼굴',
-    program: 'Re:Al Face',
+    program: '리얼페이스',
     defaultBody: '습관·교합·경추와 연결된 얼굴 비대칭을 구조적으로 살펴, 표면이 아닌 원인부터 맞춰 가는 접근.'
   },
   3: {
@@ -22310,6 +22985,10 @@ function buildImageTabBody(content){
   }
 
   // 블로그·전문가: 망고보드 제품명·소개만
+  if(!content){
+    return '<p class="empty-note" style="padding:0;line-height:1.55;">초안이 없어요. 블로그 탭에서 먼저 초안을 만들어 주세요.</p>' +
+      renderThumbMakerCard_(null);
+  }
   if(!content.images) content.images = { gptVisuals: [], mangoBrief: null };
   ensureMangoBriefOnContent_(content);
   const brief = content.images.mangoBrief || null;
@@ -22720,10 +23399,16 @@ function openDetail(draftId, catId, tab, opts) {
     renderSheetContent(content);
   }
   else { renderSheetEmpty(draft, cat); }
-  document.getElementById('detail-overlay').classList.add('open');
-  lockBodyScroll_();
+  // 닫기 애니메이션 중 재오픈이면 예약된 unlock을 무효화
+  _detailCloseGen_ += 1;
+  var detailOv = document.getElementById('detail-overlay');
+  var sheetAlreadyOpen = !!(detailOv && detailOv.classList.contains('open'));
+  if(detailOv) detailOv.classList.add('open');
+  // 이미 열린 시트에서 초안·탭만 바꿀 때 lock을 또 올리면 닫힌 뒤 스크롤이 잠긴다
+  if(!sheetAlreadyOpen) lockBodyScroll_();
   setTimeout(function(){
     var sheetEl = document.getElementById('detail-sheet');
+    if(!sheetEl) return;
     sheetEl.classList.add('open');
     settleBottomSheet_(sheetEl);
     scheduleAppToastLift_();
@@ -22811,7 +23496,7 @@ function renderSheetContent(content) {
 
   let bodyHTML = '';
   if(tab==='images'){
-    bodyHTML = tabsHTML + addSourceHtml + buildImageTabBody(content);
+    bodyHTML = tabsHTML + buildProgramColorPreviewBarHtml_(sheetCatId) + addSourceHtml + buildImageTabBody(content);
   } else if(tab==='thread'){
     const th = normalizeThreadBlock(content.thread);
     if(!th || !th.summary){
@@ -22829,8 +23514,8 @@ function renderSheetContent(content) {
     const b = normalizeBlogBlock(content.blog, blogCatId) || content.blog || {};
     if(blogUsesStructuredGeneralFormat_(blogCatId, b)){
       bodyHTML = composeSheetTabLayout_(tab,
-        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }),
         addSourceHtml + sheetFullCopyBar_() +
+        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('문제 제기', 'sheet-blog-problem', getGeneralBlogProblemText_(b), { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지', regen: 'blog.problem', copy: true, paragraphs: true }) +
         sheetEditField_('셀프 케어', 'sheet-blog-selfcare', b.selfCare || '', { rows: 8, help: '👉 로 시작 · 동작·초·회·분을 앞쪽에 · 단계 사이 빈 줄', regen: 'blog.selfCare', copy: true, stepPreview: true }) +
         sheetEditField_('원리 설명', 'sheet-blog-explanation', b.explanation || '', { rows: 6, regen: 'blog.explanation', copy: true, paragraphs: true }) +
@@ -22839,12 +23524,9 @@ function renderSheetContent(content) {
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요. 인스타 캡션은 그동안 백그라운드에서 만들어져요.</p>'
       );
     } else if(isExpertCourseCategory(blogCatId)){
-      var expertDraft = sheetDraft;
-      var expertRefHtml = addSourceHtml;
       bodyHTML = composeSheetTabLayout_(tab,
-        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }),
-        sheetFullCopyBar_() +
-        expertRefHtml +
+        addSourceHtml + sheetFullCopyBar_() +
+        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('영상·사진 맥락', 'sheet-blog-hook', b.hook, { rows: 4, help: '이번 영상·사진에서 다룬 장면·상황', regen: 'blog.hook', copy: true, paragraphs: true }) +
         sheetEditField_('시연·핵심 포인트', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '손 위치·동작·주의사항 — 한 줄에 하나씩', regen: 'blog.outline', copy: true }) +
         sheetEditField_('원리 설명', 'sheet-blog-draft', b.draft, { rows: 12, help: '본문의 중심. 왜 이렇게 하는지·짧은 메커니즘', regen: 'blog.draft', copy: true, paragraphs: true }) +
@@ -22854,8 +23536,8 @@ function renderSheetContent(content) {
       );
     } else {
       bodyHTML = composeSheetTabLayout_(tab,
-        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }),
         addSourceHtml + sheetFullCopyBar_() +
+        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('후킹 오프닝', 'sheet-blog-hook', b.hook, { rows: 4, regen: 'blog.hook', copy: true, paragraphs: true }) +
         sheetEditField_('목차 구성', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '한 줄에 소제목 하나씩', regen: 'blog.outline', copy: true }) +
         sheetEditField_('본문 초안', 'sheet-blog-draft', b.draft, { rows: 14, regen: 'blog.draft', copy: true, paragraphs: true }) +
@@ -22875,8 +23557,8 @@ function renderSheetContent(content) {
     } else {
       var instaCaption = String(ig.caption || '').trim() || getInstaCaptionBodyMerged_(ig);
       bodyHTML = composeSheetTabLayout_(tab,
-        sheetEditField_('첫 줄 후킹', 'sheet-insta-hook', ig.hook, { rows: 2, title: true, regen: 'insta.hook', copy: true }),
         addSourceHtml + sheetFullCopyBar_() +
+        sheetEditField_('첫 줄 후킹', 'sheet-insta-hook', ig.hook, { rows: 2, title: true, regen: 'insta.hook', copy: true }) +
         sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10, regen: 'insta.caption', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).map(function(h){ return String(h).replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동해요.</p>'
@@ -22906,8 +23588,8 @@ function renderSheetContent(content) {
       const coNorm = normalizeCommunityBlock(co);
       const problemText = getCommunityProblemText_(coNorm);
       bodyHTML = composeSheetTabLayout_(tab,
-        sheetEditField_('제목', 'sheet-community-title', coNorm.title || '', { rows: 2, title: true, regen: 'community.title', copy: true }),
         addSourceHtml + sheetFullCopyBar_() +
+        sheetEditField_('제목', 'sheet-community-title', coNorm.title || '', { rows: 2, title: true, regen: 'community.title', copy: true }) +
         `<div class="cb"><div class="cb-label">인사말 (고정)</div>
           <div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">${escapeHtml(COMMUNITY_FIXED_GREETING)}</div></div>
         ${sheetEditField_('문제 제기', 'sheet-community-problem', problemText, { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지, 자연스러운 문장으로', regen: 'community.problem', copy: true, paragraphs: true })}
@@ -25187,7 +25869,8 @@ function setSheetActionsHtml_(inner){
   scheduleAppToastLift_();
 }
 function closeSheet(){
-  var wasOpen = document.getElementById('detail-overlay').classList.contains('open');
+  var ov = document.getElementById('detail-overlay');
+  var wasOpen = !!(ov && ov.classList.contains('open'));
   closeSheetUiOnly_();
   if(wasOpen) clearOpenDetailHash_();
 }
@@ -25721,6 +26404,8 @@ async function refineCategoryPromptsFromPublished_(catId){
     changed.push(key);
   });
 
+  if(changed.length) touchPromptsUpdatedAt_();
+
   if(!state.promptRefineMilestones) state.promptRefineMilestones = {};
   state.promptRefineMilestones[String(catId)] = countPublishedInCat_(catId);
   save({ driveImmediate: true, gasImmediate: true });
@@ -25743,10 +26428,14 @@ function openPromptModal(catId) {
   state.editingCatId = cid;
   state.promptTab = isThreadCategory(state.editingCatId) ? 'thread' : (isHeiljagyaeCategory(state.editingCatId) ? 'community' : 'blog');
   renderPromptModal();
-  document.getElementById('prompt-modal-overlay').classList.add('open');
-  lockBodyScroll_();
+  _promptCloseGen_ += 1;
+  var pov = document.getElementById('prompt-modal-overlay');
+  var alreadyOpen = !!(pov && pov.classList.contains('open'));
+  if(pov) pov.classList.add('open');
+  if(!alreadyOpen) lockBodyScroll_();
   setTimeout(function(){
     var pmEl = document.getElementById('prompt-modal');
+    if(!pmEl) return;
     pmEl.classList.add('open');
     settleBottomSheet_(pmEl);
     scheduleAppToastLift_();
@@ -25836,7 +26525,7 @@ function renderPromptModal() {
         블로그 작성 지침
         ${promptResetBtnHtml_(state.editingCatId, 'blog')}
       </div>
-      <textarea class="prompt-textarea" id="pt-blog" placeholder="블로그 글쓰기 스타일, 톤, 구조, 주의사항 등을 자유롭게 입력하세요...">${blogVal}</textarea>
+      <textarea class="prompt-textarea" id="pt-blog" placeholder="블로그 글쓰기 스타일, 톤, 구조, 주의사항 등을 자유롭게 입력하세요...">${escapeHtml(blogVal)}</textarea>
       <div class="prompt-hint">${isGeneralAudienceCategory(state.editingCatId) ? '일반인 블로그: <strong>문제 제기 → 셀프 케어(👉) → 원리 설명</strong> 순. 기본 말투는 <strong>존댓말(해요체)</strong>.' : '기본 말투는 <strong>존댓말(해요체)</strong>. 제목·본문 지침이 Claude에게 전달돼요.'}</div>
     </div>` : ''}
 
@@ -25846,7 +26535,7 @@ ${blogInstaCat && pt==='insta' ? `
     인스타 작성 지침
     ${promptResetBtnHtml_(state.editingCatId, 'insta')}
   </div>
-  <textarea class="prompt-textarea" id="pt-insta" placeholder="한 포스트 캡션 톤, 줄바꿈·불릿 스타일, 해시태그 전략 등을 입력하세요. (캐러셀 다장 구성은 사용하지 않습니다.)">${instaVal}</textarea>
+  <textarea class="prompt-textarea" id="pt-insta" placeholder="한 포스트 캡션 톤, 줄바꿈·불릿 스타일, 해시태그 전략 등을 입력하세요. (캐러셀 다장 구성은 사용하지 않습니다.)">${escapeHtml(instaVal)}</textarea>
   <div class="prompt-hint">기본 말투는 <strong>존댓말(해요체)</strong>. 캐러셀 없이 한 포스트 캡션으로.</div>
 </div>` : ''}
 
@@ -25900,7 +26589,7 @@ ${pt==='base' ? `
     공통 기본 설정 (모든 카테고리에 적용)
     ${promptResetBtnHtml_(state.editingCatId, 'base')}
   </div>
-  <textarea class="prompt-textarea" id="pt-base" style="min-height:320px;" placeholder="미카닥 박준규 소개, PSP 임상 프로토콜, 채널 정보 등...">${baseVal}</textarea>
+  <textarea class="prompt-textarea" id="pt-base" style="min-height:320px;" placeholder="미카닥 박준규 소개, PSP 임상 프로토콜, 채널 정보 등...">${escapeHtml(baseVal)}</textarea>
   <div class="prompt-hint">미카닥 박준규 프로필 PSP 건강 가이드·<a href="${PROFILE_BRAND_URL}" target="_blank" rel="noopener">drpark PSP</a>와 동기화된 임상 뼈대(PAR·Position 등)가 포함돼요. 「기본값으로」를 누르면 최신 요약이 다시 들어갑니다.</div>
 </div>` : ''}
 `;
@@ -25928,7 +26617,17 @@ function bindPromptIdentityAutosave_(){
 window.openProgramPlanWorkshopFromPrompt_ = function(){
   flushPromptCloudSave_();
   state.currentCat = state.editingCatId;
-  document.getElementById('prompt-modal-overlay').classList.remove('open');
+  var pm = document.getElementById('prompt-modal');
+  if(pm){
+    try { resetBottomSheet_(pm); } catch(eReset){}
+    pm.classList.remove('open');
+  }
+  var pov = document.getElementById('prompt-modal-overlay');
+  var promptWasOpen = !!(pov && pov.classList.contains('open'));
+  if(pov) pov.classList.remove('open');
+  releaseModalFocusTrap_();
+  // closePromptModal의 지연 unlock을 쓰지 않음 — 프롬프트 잠금을 바로 풀고 워크숍이 다시 잡음
+  if(promptWasOpen) unlockBodyScroll_();
   openProgramPlanWorkshop_();
 };
 window.regenerateProgramIdentityFromPrompt_ = async function(mode, ev){
@@ -25978,6 +26677,7 @@ function bindPromptTextareaAutosave_(){
     if(!el || el.__htPromptAutosave) return;
     el.__htPromptAutosave = true;
     el.addEventListener('input', function(){
+      if(hasAnyLivePromptModifications_(true)) touchPromptsUpdatedAt_();
       updatePromptResetButtons_();
       schedulePromptCloudSave_();
     });
@@ -26011,6 +26711,15 @@ const communityEl = document.getElementById('pt-community');
 const threadEl = document.getElementById('pt-thread');
 const imageEl = document.getElementById('pt-image');
 const baseEl = document.getElementById('pt-base');
+var beforeFp = syncValueFingerprint_({
+  blog: state.prompts.categories[state.editingCatId].blog,
+  insta: state.prompts.categories[state.editingCatId].insta,
+  threads: state.prompts.categories[state.editingCatId].threads,
+  community: state.prompts.categories[state.editingCatId].community,
+  thread: state.prompts.categories[state.editingCatId].thread,
+  image: state.prompts.categories[state.editingCatId].image,
+  base: state.prompts.base
+});
 if(blogEl) state.prompts.categories[state.editingCatId].blog = blogEl.value;
 if(instaEl) state.prompts.categories[state.editingCatId].insta = instaEl.value;
 if(threadsEl) state.prompts.categories[state.editingCatId].threads = threadsEl.value;
@@ -26018,6 +26727,16 @@ if(communityEl) state.prompts.categories[state.editingCatId].community = communi
 if(threadEl) state.prompts.categories[state.editingCatId].thread = threadEl.value;
 if(imageEl) state.prompts.categories[state.editingCatId].image = imageEl.value;
 if(baseEl) state.prompts.base = baseEl.value;
+var afterFp = syncValueFingerprint_({
+  blog: state.prompts.categories[state.editingCatId].blog,
+  insta: state.prompts.categories[state.editingCatId].insta,
+  threads: state.prompts.categories[state.editingCatId].threads,
+  community: state.prompts.categories[state.editingCatId].community,
+  thread: state.prompts.categories[state.editingCatId].thread,
+  image: state.prompts.categories[state.editingCatId].image,
+  base: state.prompts.base
+});
+if(beforeFp !== afterFp) touchPromptsUpdatedAt_();
 }
 
 window.resetPrompt = function(type) {
@@ -26040,6 +26759,7 @@ window.resetPrompt = function(type) {
     state.prompts.categories[state.editingCatId][type] = def;
     sanitizeCatPromptKeys_(state.editingCatId);
   }
+  touchPromptsUpdatedAt_();
   renderPromptModal();
   flushPromptCloudSave_();
 };
@@ -26064,11 +26784,150 @@ window.resetAllPromptsForCat = function(){
     else delete state.prompts.categories[catId][t];
   });
   sanitizeCatPromptKeys_(catId);
+  touchPromptsUpdatedAt_();
   renderPromptModal();
   flushPromptCloudSave_();
   if(typeof setAppToast === 'function'){
     setAppToast('「' + cat.name + '」프롬프트 ' + types.length + '개를 기본값으로 되돌렸어요.', { duration: 3800, variant: 'ok' });
   }
+};
+
+function buildLivePromptsExportPayload_(){
+  try { autoSaveCurrentEdit(); } catch(e){}
+  var prompts = getPrompts();
+  var cats = {};
+  getPromptModalCatIds_().forEach(function(catId){
+    var cat = CATEGORIES[catId];
+    if(!cat) return;
+    var types = getPromptTypesForCat_(catId);
+    var entry = {
+      id: catId,
+      name: cat.name,
+      audience: cat.audience || '',
+      channels: {}
+    };
+    types.forEach(function(type){
+      entry.channels[type] = getCatPrompt(catId, type);
+    });
+    entry.brandProfile = getProgramBrandProfile_(catId) || '';
+    entry.strategyGuide = getProgramStrategyGuide_(catId) || '';
+    cats[String(catId)] = entry;
+  });
+  return {
+    v: 1,
+    exportedAt: new Date().toISOString(),
+    note: '앱에 저장된 현재 프롬프트(자동 재수정·수동 수정 포함). Cursor가 DEFAULT_PROMPTS 대신 이 내용을 우선 참고하세요.',
+    base: prompts.base || '',
+    promptRefineMilestones: state.promptRefineMilestones || {},
+    categories: cats
+  };
+}
+
+function formatLivePromptsForCursorMarkdown_(payload){
+  payload = payload || buildLivePromptsExportPayload_();
+  var lines = [];
+  lines.push('# 플래너 현재 프롬프트 (live export)');
+  lines.push('내보낸 시각: ' + (payload.exportedAt || ''));
+  lines.push('');
+  lines.push('> ' + (payload.note || ''));
+  lines.push('');
+  if(payload.base){
+    lines.push('## 공통 기본 (base)');
+    lines.push('```');
+    lines.push(String(payload.base));
+    lines.push('```');
+    lines.push('');
+  }
+  Object.keys(payload.categories || {}).forEach(function(cid){
+    var c = payload.categories[cid];
+    if(!c) return;
+    lines.push('## [' + cid + '] ' + c.name + (c.audience ? ' · ' + c.audience : ''));
+    if(c.brandProfile){
+      lines.push('### 프로그램 정체성');
+      lines.push('```');
+      lines.push(String(c.brandProfile));
+      lines.push('```');
+    }
+    if(c.strategyGuide){
+      lines.push('### 생성 기준·기획 의도');
+      lines.push('```');
+      lines.push(String(c.strategyGuide));
+      lines.push('```');
+    }
+    Object.keys(c.channels || {}).forEach(function(type){
+      lines.push('### ' + (getPromptTypeLabelKr_(type) || type) + ' (`' + type + '`)');
+      lines.push('```');
+      lines.push(String(c.channels[type] || ''));
+      lines.push('```');
+      lines.push('');
+    });
+  });
+  if(payload.promptRefineMilestones && Object.keys(payload.promptRefineMilestones).length){
+    lines.push('## 자동 재수정 마일스톤');
+    lines.push('```json');
+    lines.push(JSON.stringify(payload.promptRefineMilestones, null, 2));
+    lines.push('```');
+  }
+  return lines.join('\n');
+}
+
+window.copyLivePromptsForCursor_ = function(){
+  try { autoSaveCurrentEdit(); } catch(e0){}
+  if(!hasAnyLivePromptModifications_(true)){
+    updatePromptDownloadButton_();
+    if(typeof setAppToast === 'function'){
+      setAppToast('기본값과 같아요. 수정된 프롬프트가 있을 때만 복사할 수 있어요.', { duration: 3800, variant: 'err' });
+    }
+    return;
+  }
+  var payload = buildLivePromptsExportPayload_();
+  var md = formatLivePromptsForCursorMarkdown_(payload);
+  if(typeof copyTextOnly_ === 'function'){
+    copyTextOnly_(md, function(){
+      setAppToast('현재 프롬프트를 복사했어요.\nCursor 채팅에 붙여넣으면 재수정본까지 반영됩니다.', { duration: 5200, variant: 'ok' });
+    });
+    return;
+  }
+  if(typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(md).then(function(){
+      setAppToast('현재 프롬프트를 복사했어요.\nCursor 채팅에 붙여넣으면 재수정본까지 반영됩니다.', { duration: 5200, variant: 'ok' });
+    }).catch(function(){
+      window.prompt('복사할 프롬프트 (전체 선택 후 Ctrl+C):', md.slice(0, 5000));
+    });
+    return;
+  }
+  window.prompt('복사할 프롬프트 (전체 선택 후 Ctrl+C):', md.slice(0, 5000));
+};
+
+window.downloadLivePromptsForCursor_ = function(){
+  try { autoSaveCurrentEdit(); } catch(e0){}
+  if(!hasAnyLivePromptModifications_(true)){
+    updatePromptDownloadButton_();
+    if(typeof setAppToast === 'function'){
+      setAppToast('기본값과 같아요. 수정된 프롬프트가 있을 때만 받을 수 있어요.', { duration: 3800, variant: 'err' });
+    }
+    return;
+  }
+  var payload = buildLivePromptsExportPayload_();
+  var focusCatId = state.editingCatId;
+  if(focusCatId != null && payload.categories && payload.categories[String(focusCatId)]){
+    payload.focusCatId = focusCatId;
+    payload.focusCatName = (CATEGORIES[focusCatId] && CATEGORIES[focusCatId].name) || '';
+  }
+  var json = JSON.stringify(payload, null, 2);
+  var blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'planner-prompts-live.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){
+    try { URL.revokeObjectURL(url); } catch(e){}
+    try { a.remove(); } catch(e2){}
+  }, 800);
+  var focusHint = payload.focusCatName ? ('「' + payload.focusCatName + '」 포함 · ') : '';
+  setAppToast(focusHint + 'planner-prompts-live.json 저장을 시작했어요.\n홈페이지 폴더에 두면 Cursor가 현재 프롬프트를 참고해 개선할 수 있어요.', { duration: 7000, variant: 'ok' });
 };
 
 function savePrompts() {
@@ -26085,11 +26944,17 @@ if(typeof setAppToast === 'function'){
 
 function closePromptModal(e) {
 if(e && e.target !== document.getElementById('prompt-modal-overlay')) return;
-resetBottomSheet_(document.getElementById('prompt-modal'));
-document.getElementById('prompt-modal').classList.remove('open');
+var pm = document.getElementById('prompt-modal');
+if(pm){
+  resetBottomSheet_(pm);
+  pm.classList.remove('open');
+}
 releaseModalFocusTrap_();
+var closeGen = ++_promptCloseGen_;
 setTimeout(function(){
-  document.getElementById('prompt-modal-overlay').classList.remove('open');
+  if(closeGen !== _promptCloseGen_) return;
+  var pov = document.getElementById('prompt-modal-overlay');
+  if(pov) pov.classList.remove('open');
   unlockBodyScroll_();
   scheduleAppToastLift_();
   restoreDetailFocusTrapIfOpen_();

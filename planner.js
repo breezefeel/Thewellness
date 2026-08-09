@@ -5204,11 +5204,11 @@ function getCategoryProgramLine_(catId){
   if(!cat) return '';
   return localizeProgramDisplayName_(cat.programLine || CAT_PROGRAM_LINE[catId] || cat.name);
 }
-/** 고객·초안 표기용: Re:Al Movement → 리얼무브먼트 */
+/** 고객·초안 표기용: Re:Al Movement → 리:얼 무브먼트 */
 function localizeProgramDisplayName_(text){
   return String(text || '')
-    .replace(/Re:\s*Al\s*Movement/gi, '리얼무브먼트')
-    .replace(/Re:\s*Al\s*Face/gi, '리얼페이스');
+    .replace(/Re:\s*Al\s*Movement/gi, '리:얼 무브먼트')
+    .replace(/Re:\s*Al\s*Face/gi, '리:얼 페이스');
 }
 function getDefaultSeriesForCat_(catId){
   return localizeProgramDisplayName_(CAT_DEFAULT_SERIES[catId] || (CATEGORIES[catId] ? CATEGORIES[catId].name : ''));
@@ -10639,8 +10639,8 @@ function getMangoModelGuideForCat_(catId){
 function buildMangoDesignToneLineFromPalette_(p){
   p = p || MANGO_PALETTES_BY_CAT[1];
   return '색: 배경 ' + p.bg + '·' + p.bg2 + '(' + p.desc + '). ' +
-    '글·헤드 ' + p.head + '. 카드·박스 ' + p.card + '·' + p.card2 + '. ' +
-    '포인트 ' + p.point + '. 구분선 ' + p.divider + '. ' +
+    '글·헤드·구분선 ' + p.head + '. 카드·박스 ' + p.card + '·' + p.card2 + '. ' +
+    '포인트 ' + p.point + '. ' +
     '지정 팔레트 외 색·흑백 모노톤·네온·만화·코믹 금지. ' +
     '로고·워터마크: 우하단 고정, 슬라이드 높이 약 6~8% 이하, 본문·얼굴과 겹치지 않게(생성 중 어려우면 후처리 동일 규칙).';
 }
@@ -10655,7 +10655,7 @@ function getMangoLayoutPasteBlock_(catId){
     '로고: 우하단 고정·높이 6~8% 이하·본문/얼굴과 겹침 금지(후처리 OK).\n' +
     '장별 역할 중복·블로그 원문·말줄임(…) 붙여넣기 금지. 쉬운 말만.\n' +
     m.pasteLine + '\n' +
-    '색: 배경 ' + p.bg + '·' + p.bg2 + ' · 헤드·구분선 ' + p.head + ' · 포인트 ' + p.point + ' · 카드 ' + p.card + '·' + p.card2 + '. 지정 외 색·흑백 모노 금지.\n' +
+    '색: 배경 ' + p.bg + '·' + p.bg2 + ' · 글·헤드·구분선 ' + p.head + ' · 포인트 ' + p.point + ' · 카드 ' + p.card + '·' + p.card2 + '. 지정 외 색·흑백 모노 금지.\n' +
     '참고사진: ' + m.photoTipShort + '.';
 }
 function getMangoLayoutCopyRule_(catId){
@@ -10679,7 +10679,7 @@ function getMangoLayoutCopyRule_(catId){
 - 전/후 비교는 환영. **추상 한발서기만 반복 금지**. **일상에서 있을 법한 동작**으로:
   앉았다 일어설 때 한쪽으로 기운다 / 스트레칭만 vs 버티며 움직이기 /
   방향 전환·계단·바닥에서 일어나기·삐끗하기 쉬운 한 발 딛기 등. **사진만 봐도 비교가 이해**되게.
-- 색은 배경 ${p.bg}·${p.bg2}, 헤드·구분선 ${p.head}, 포인트 ${p.point}, 카드 ${p.card}·${p.card2}. 지정 외 색·흑백 모노 금지.
+- 색은 배경 ${p.bg}·${p.bg2}, 글·헤드·구분선 ${p.head}, 포인트 ${p.point}, 카드 ${p.card}·${p.card2}. 지정 외 색·흑백 모노 금지.
 - 참고사진: ${m.photoTipShort} (잘린 제품샷·글자 캡처 금지).`;
 }
 function getMangoDetailBriefRule_(catId){
@@ -21182,7 +21182,7 @@ ${getMangoDetailBriefRule_(id)}
 mangoBrief (망고보드 상세페이지 UI에 맞춤 — **빈 칸 금지**):
 - productName: 「제품명 혹은 주제」 **최대 ${MANGO_DETAIL_TITLE_MAX}자**, blog.title 축약. **필수**
 - intro / mangoInputPaste: 「소개」 **최대 ${MANGO_DETAIL_INTRO_MAX}자**, **동일 한글**. 【1~7장】이미지용 헤드+불릿. **블로그 원문·말줄임(…) 금지**, 장별 역할 중복 금지. **필수**
-- intro **맨 끝**에 [디자인]+[레이아웃] (배경 ${p.bg}·${p.bg2}, 헤드·구분선 ${p.head}, 포인트 ${p.point}, 카드 ${p.card}·${p.card2}, 지정 외 색·흑백 모노 금지, 표 금지, 쉬운 말, ${getMangoModelGuideForCat_(id).briefHint}, 한발서기만 X·일상 전/후)
+- intro **맨 끝**에 [디자인]+[레이아웃] (배경 ${p.bg}·${p.bg2}, 글·헤드·구분선 ${p.head}, 포인트 ${p.point}, 카드 ${p.card}·${p.card2}, 지정 외 색·흑백 모노 금지, 표 금지, 쉬운 말, ${getMangoModelGuideForCat_(id).briefHint}, 한발서기만 X·일상 전/후)
 - photoTip: 실사·시연 (${getMangoModelGuideForCat_(id).label} 모델) 1~2문장
 - slidePlan: 정확히 7개 — 각 장은 한 메시지, 표 없음, copyHint는 짧은 헤드
 - designTone: ${tone}
@@ -21218,10 +21218,31 @@ function formatMangoTitlePaste_(brief){
 function mangoIntroMatchesPalette_(body, palette){
   if(!body || !palette) return false;
   if(!/\[디자인\]/.test(body) || !/\[레이아웃\]/.test(body)) return false;
-  var bg = String(palette.bg || '').replace(/^#/, '');
-  var point = String(palette.point || '').replace(/^#/, '');
-  if(!bg || !point) return false;
-  return new RegExp('#' + bg, 'i').test(body) && new RegExp('#' + point, 'i').test(body);
+  // bg·head·point·divider 가 모두 본문에 있어야 최신 팔레트로 간주 (예: head만 #333333로 남는 경우 방지)
+  var must = ['bg', 'head', 'point', 'divider'];
+  for(var i = 0; i < must.length; i++){
+    var hex = String(palette[must[i]] || '').replace(/^#/, '');
+    if(!hex) continue;
+    if(!new RegExp('#' + hex, 'i').test(body)) return false;
+  }
+  // 카드 색도 있으면 함께 확인 (잘린 intro 대비 optional)
+  var card = String(palette.card || '').replace(/^#/, '');
+  if(card && !new RegExp('#' + card, 'i').test(body)) return false;
+  return true;
+}
+
+/** 구버전 팔레트·하드코딩 색이 남아 있으면 디자인 블록 재작성 */
+function mangoIntroHasStalePaletteColors_(body, palette){
+  var t = String(body || '');
+  if(!t) return false;
+  var head = String(palette && palette.head || '').toLowerCase();
+  var point = String(palette && palette.point || '').toLowerCase();
+  // 리:얼 무브먼트 등에서 자주 남던 구형 헤드·주의 포인트
+  if(/#333333\b/i.test(t) && head && head !== '#333333') return true;
+  if(/#474747\b/i.test(t) && point && point !== '#474747') return true;
+  // 예전 크림·테라코타 잔재
+  if(/#eddcd2|#c4785a|#b07a62/i.test(t)) return true;
+  return false;
 }
 
 /** 소개 끝에 [디자인]·[레이아웃] 지침이 없으면 붙임 (카테고리 팔레트 기준, 디자인 블록은 잘리지 않게 본문만 줄임) */
@@ -21249,8 +21270,8 @@ function ensureMangoIntroHasDesignBlock_(intro, catId){
     : model.gender === 'male'
       ? /인물=남성|남성 실사|남성 모델/.test(layoutSec)
       : true;
-  var hasMatchingDesign = mangoIntroMatchesPalette_(body, palette);
-  if(hasMatchingDesign && hasFreshLayout && hasMatchingModel && !/#eddcd2|#c4785a|#b07a62/i.test(body)){
+  var hasMatchingDesign = mangoIntroMatchesPalette_(body, palette) && !mangoIntroHasStalePaletteColors_(body, palette);
+  if(hasMatchingDesign && hasFreshLayout && hasMatchingModel){
     if(body.length <= MANGO_DETAIL_INTRO_MAX) return body;
   }
   var stripped = body
@@ -21260,6 +21281,18 @@ function ensureMangoIntroHasDesignBlock_(intro, catId){
     .replace(/\n*색:\s*배경\s*#[0-9a-fA-F]{3,8}[^\n]*/gi, '')
     .trim();
   if(!stripped) stripped = body.replace(/\n*\[디자인\][\s\S]*$/i, '').trim();
+  // 본문 장 카피에 남은 구형 포인트·영문 프로그램명 정리
+  var pointHex = String(palette.point || '#576169');
+  var cardHex = String(palette.card || '#FAF6F0');
+  stripped = stripped
+    .replace(/주의 안내 카드\(#474747[^)]*\)/gi, '주의 안내 카드(포인트 ' + pointHex + ' · 카드 ' + cardHex + ')')
+    .replace(/주의 안내 카드\(#([0-9a-fA-F]{3,8})\s*포인트\)/gi, function(m, hx){
+      if(('#' + hx).toLowerCase() === pointHex.toLowerCase()) return m;
+      return '주의 안내 카드(포인트 ' + pointHex + ' · 카드 ' + cardHex + ')';
+    });
+  if(typeof localizeProgramDisplayName_ === 'function'){
+    stripped = localizeProgramDisplayName_(stripped);
+  }
   var room = MANGO_DETAIL_INTRO_MAX - designBlock.length - 2;
   // 디자인 블록이 잘리지 않도록: room이 너무 작아도 본문만 줄이고 블록은 끝까지 유지
   if(room < 200) room = 200;
@@ -21528,18 +21561,45 @@ function buildMangoBriefFromBlog_(content, topic, catId){
     '무리해서 늘리지 말고 병원 진료를 먼저'
   ];
 
-  var ctaSents = mangoPickSentences_(cta.replace(/https?:\/\/\S+/g, '').replace(/\?hub=\w+/g, ''), 2, 52);
+  var ctaClean = String(cta || '').replace(/https?:\/\/\S+/g, '').replace(/\?hub=\w+/g, '');
+  // 일반인 채널: Re:Al Movement 등 영문 프로그램명 → 한글 표기
+  if(typeof localizeProgramDisplayName_ === 'function'){
+    ctaClean = localizeProgramDisplayName_(ctaClean);
+  }
+  var ctaSents = mangoPickSentences_(ctaClean, 2, 52).map(function(s){
+    return typeof localizeProgramDisplayName_ === 'function' ? localizeProgramDisplayName_(s) : s;
+  }).filter(function(s){
+    // 잘린·어색한 영문 잔여·미완성 문장 제외
+    if(!s || /Re:\s*Al/i.test(s)) return false;
+    if(/이\s*$/.test(s) || /가\s*$/.test(s)) return false;
+    return true;
+  });
+  var programLabel = '';
+  try {
+    var catObj = CATEGORIES[catId];
+    programLabel = catObj && catObj.name ? String(catObj.name) : '';
+    if(typeof localizeProgramDisplayName_ === 'function') programLabel = localizeProgramDisplayName_(programLabel);
+  } catch(eLab){}
   var nextBullets = ctaSents.length
     ? ctaSents
-    : ['궁금하면 프로필·상담으로 문의해 주세요', '일반 정보이며 치료·진단이 아니에요'];
+    : (Number(catId) === 1 || Number(catId) === 5)
+      ? [
+          '원인과 결과를 구분하는 것부터 시작해요',
+          (programLabel || '리:얼 무브먼트') + '로, 다음 움직임이 달라져요'
+        ]
+      : [
+          '궁금하면 프로필·상담으로 문의해 주세요',
+          '일반 정보이며 치료·진단이 아니에요'
+        ];
 
+  var cautionVisual = '주의 안내 카드(포인트 ' + palette.point + ' · 카드 ' + palette.card + ')';
   var blocks = [
     mangoFormatSlideBlock_(1, '표지', coverHead, [], getMangoModelGuideForCat_(catId).visualCover),
     mangoFormatSlideBlock_(2, '공감', empathyHead, empathyBullets, '일상 장면(앉았다 일어서기·계단·방향 전환)'),
     mangoFormatSlideBlock_(3, '대상', audienceHead, audienceBullets, '주의·안내 카드형, 픽토그램 OK'),
     mangoFormatSlideBlock_(4, '따라하기', '지금 범위에서 이렇게', steps.map(function(s, i){ return 'STEP' + (i + 1) + ' ' + s; }), getMangoModelGuideForCat_(catId).visualStep),
     mangoFormatSlideBlock_(5, '원리', whyHead, whyBullets, '전/후 비교(스트레칭만 vs 버티며 움직이기)'),
-    mangoFormatSlideBlock_(6, '주의', '이땐 따라 하지 마세요', cautionBullets, '주의 안내 카드(' + palette.point + ' 포인트)'),
+    mangoFormatSlideBlock_(6, '주의', '이땐 따라 하지 마세요', cautionBullets, cautionVisual),
     mangoFormatSlideBlock_(7, '다음', '다음에 할 일', nextBullets, 'CTA 한 줄, 여백 넉넉히')
   ];
 

@@ -10,7 +10,7 @@ const CATEGORIES = [
       {id:"d0-3", topic:"연부조직 치료, 어디까지 해야 효과가 날까요?",         angle:"근막·인대·건 각각의 치료 접근과 적절한 치료 횟수 가이드"},
       {id:"d0-4", topic:"목·허리·어깨 중 가장 먼저 치료해야 할 곳은?",        angle:"연쇄 보상 패턴 설명으로 치료 순서의 중요성 강조"},
     ]},
-  { id:1, icon:"", name:"리:얼 무브먼트",   color:"#8B7355", audience:"일반인",
+  { id:1, icon:"", name:"리:얼 무브먼트",   color:"#777777", audience:"일반인",
     sub:"Re-Alignment Movement Center — 패시브 스트레칭 · 기능운동 · 자세교정",
     drafts:[
       {id:"d1-0", topic:"스트레칭을 매일 해도 왜 몸이 안 풀릴까요?",           angle:"패시브 스트레칭의 올바른 방법과 잘못된 습관 교정"},
@@ -2045,6 +2045,22 @@ function buildImageGptVisualsJsonExample_(catId, opts){
 }
 const SUBGOAL_MISC_ID = 'misc';
 const SUBGOAL_MISC_LABEL = '기타 주제';
+/** 단계당 주제: 기본 기획·AI는 5개, 이미 있는 주제는 최대 10개까지 유지 */
+const STEP_TOPIC_SLOTS_DEFAULT = 5;
+const STEP_TOPIC_SLOTS_MAX = 10;
+function stepTopicSlotTotalForCount_(n){
+  n = parseInt(n, 10) || 0;
+  if(n <= STEP_TOPIC_SLOTS_DEFAULT) return STEP_TOPIC_SLOTS_DEFAULT;
+  return Math.min(STEP_TOPIC_SLOTS_MAX, Math.max(STEP_TOPIC_SLOTS_DEFAULT, n));
+}
+/** 주제 고정: 기본값 ON. 명시적으로 false 인 경우만 해제 */
+function isDraftPinned_(draftId){
+  if(!draftId) return true;
+  if(!state.pinnedDraftIds || typeof state.pinnedDraftIds !== 'object') return true;
+  if(state.pinnedDraftIds[draftId] === false) return false;
+  if(state.pinnedDraftIds[draftId] === true) return true;
+  return true;
+}
 const PENDING_SUBGOAL_SS_KEY = 'ht_pending_subgoal_plan';
 const PENDING_YEAR_SS_KEY = 'ht_pending_year_plan';
 function sameCatId_(a, b){
@@ -2659,6 +2675,7 @@ function repairIncompleteSubGoalPlan_(catId){
     });
   }
   plan.steps = kept;
+  // step id 재매핑은 자리 재배정이 아니라 id 정합 — 잠금과 무관하게 수행
   if(Object.keys(idMap).length){
     remapDraftStepIdsForCat_({ draftBrandOverrides: state.draftBrandOverrides }, catId, idMap);
   }
@@ -2756,7 +2773,10 @@ function commitProgramIdentityFromPending_(catId){
   syncPendingProgramIdentityFromApplied_(catId);
   save({ driveImmediate: true, gasImmediate: true });
 }
-function applyInitialProgramTopicsToCat_(catId){
+function applyInitialProgramTopicsToCat_(catId, opts){
+  opts = opts || {};
+  // 접속·수리 중 빈 칸 시드 자동 채움 금지. 기획안 적용·재생성 등에서만 force/허용.
+  if(!opts.force && !canReassignDraftSteps_()) return 0;
   var seed = getInitialProgramPlanDraft_(catId);
   var cat = CATEGORIES[catId];
   var plan = getSubGoalPlan_(catId);
@@ -3049,6 +3069,8 @@ function remapDraftStepIdsForCat_(payload, catId, idMap){
     if(!belong[d.id]) return;
     var sid = String(d.roadmapStepId || '');
     if(idMap[sid]) d.roadmapStepId = idMap[sid];
+    var prev = String(d.previousRoadmapStepId || '');
+    if(prev && idMap[prev]) d.previousRoadmapStepId = idMap[prev];
   }
   var extras = payload.extraDraftsByCat && (payload.extraDraftsByCat[catKey] || payload.extraDraftsByCat[catId]);
   (extras || []).forEach(remapDraft_);
@@ -3065,6 +3087,8 @@ function remapDraftStepIdsForCat_(payload, catId, idMap){
       if(!ov) return;
       var sid = String(ov.roadmapStepId || '');
       if(idMap[sid]) ov.roadmapStepId = idMap[sid];
+      var prev = String(ov.previousRoadmapStepId || '');
+      if(prev && idMap[prev]) ov.previousRoadmapStepId = idMap[prev];
     });
   }
   remapOverrideMap_(payload.draftBrandOverrides);
@@ -3079,6 +3103,8 @@ function remapDraftStepIdsForCat_(payload, catId, idMap){
       if(!ov) return;
       var sid = String(ov.roadmapStepId || '');
       if(idMap[sid]) ov.roadmapStepId = idMap[sid];
+      var prev = String(ov.previousRoadmapStepId || '');
+      if(prev && idMap[prev]) ov.previousRoadmapStepId = idMap[prev];
     });
   }
 }
@@ -3940,7 +3966,7 @@ function getDraftForStepSlot_(catId, stepId, slotNum, opts){
   var cat = CATEGORIES[catId];
   if(!cat || !cat.drafts) return null;
   var slot = parseInt(slotNum, 10);
-  if(slot < 1 || slot > 5) return null;
+  if(slot < 1 || slot > STEP_TOPIC_SLOTS_MAX) return null;
   var sid = String(stepId);
   if(!opts.live && usePendingProgramPreview_(catId)){
     var found = null;
@@ -3974,6 +4000,10 @@ function ensurePendingAssignmentForDraft_(catId, stepId, slotNum, draftId){
   if(hit){
     hit.stepId = sid;
     hit.order = slot;
+    p.assignments = p.assignments.filter(function(a){
+      if(!a || a.draftId === draftId) return !!a;
+      return !(String(a.stepId || '') === sid && parseInt(a.order, 10) === slot);
+    });
   } else {
     p.assignments = p.assignments.filter(function(a){
       return !(a && String(a.stepId || '') === sid && parseInt(a.order, 10) === slot);
@@ -4016,13 +4046,24 @@ function draftStepAssignEquals_(draft, stepId, stepTitle, order, totalInStep){
   }
   return true;
 }
+/** 접속·동기화·렌더에서는 기존 주제의 단계/순서를 고정.
+ *  삭제·재생성·기획안 적용·명시적 정리일 때만 withDraftStepReassignAllowed_ 로 허용. */
+function canReassignDraftSteps_(){
+  return !!state._allowDraftStepReassign;
+}
+function withDraftStepReassignAllowed_(fn){
+  var prev = !!state._allowDraftStepReassign;
+  state._allowDraftStepReassign = true;
+  try { return typeof fn === 'function' ? fn() : undefined; }
+  finally { state._allowDraftStepReassign = prev; }
+}
 function sortDraftsForStepSlotNormalize_(drafts, catId){
   var cat = CATEGORIES[catId];
   return (drafts || []).slice().sort(function(a, b){
     var ia = cat && cat.drafts ? cat.drafts.indexOf(a) : -1;
     var ib = cat && cat.drafts ? cat.drafts.indexOf(b) : -1;
-    var aPin = !!(state.pinnedDraftIds && state.pinnedDraftIds[a.id]);
-    var bPin = !!(state.pinnedDraftIds && state.pinnedDraftIds[b.id]);
+    var aPin = isDraftPinned_(a.id);
+    var bPin = isDraftPinned_(b.id);
     if(aPin !== bPin) return aPin ? -1 : 1;
     var aPub = draftIsPublished_(a.id) ? 1 : 0;
     var bPub = draftIsPublished_(b.id) ? 1 : 0;
@@ -4032,18 +4073,44 @@ function sortDraftsForStepSlotNormalize_(drafts, catId){
     if(aHas !== bHas) return bHas - aHas;
     var pa = getDraftStepParts_(a, catId, ia).step;
     var pb = getDraftStepParts_(b, catId, ib).step;
-    var sa = (pa >= 1 && pa <= 5) ? pa : 99;
-    var sb = (pb >= 1 && pb <= 5) ? pb : 99;
+    var sa = (pa >= 1 && pa <= STEP_TOPIC_SLOTS_MAX) ? pa : 99;
+    var sb = (pb >= 1 && pb <= STEP_TOPIC_SLOTS_MAX) ? pb : 99;
     if(sa !== sb) return sa - sb;
     return ia - ib;
   });
 }
+/** ▲▼ 교환 후 — 현재 슬롯 순서 유지한 채 n/m 분모만 맞춘다 (pin 재정렬 없음). */
+function densifyStepSlotTotalsOnly_(catId, stepId){
+  var plan = getSubGoalPlan_(catId);
+  if(!plan) return false;
+  var sid = String(stepId);
+  if(sid === SUBGOAL_MISC_ID) return false;
+  var title = getSubGoalStepTitle_(plan, sid);
+  var map = buildStepSlotDraftMap_(catId, sid);
+  var filled = 0;
+  var i;
+  for(i = 0; i < map.length; i++) if(map[i]) filled++;
+  if(!filled) return false;
+  var total = stepTopicSlotTotalForCount_(filled);
+  var changed = false;
+  for(i = 0; i < map.length; i++){
+    var d = map[i];
+    if(!d) continue;
+    var order = i + 1;
+    if(draftStepAssignEquals_(d, sid, title, order, total)) continue;
+    applyDraftRoadmapAssignment_(d, catId, sid, title, order, total);
+    changed = true;
+  }
+  return changed;
+}
 /** 단계 안 주제 슬롯을 1/5…5/5로 고유 부여. 6번째부터는 기타로 이동.
- *  반환: { changed, movedToMisc } */
+ *  반환: { changed, movedToMisc }
+ *  자동 호출 시에는 canReassignDraftSteps_ 가 false 라 no-op (기존 자리 고정). */
 function normalizeStepDraftSlots_(catId, stepId){
+  var empty = { changed: false, movedToMisc: 0 };
+  if(!canReassignDraftSteps_()) return empty;
   var cat = CATEGORIES[catId];
   var plan = getSubGoalPlan_(catId);
-  var empty = { changed: false, movedToMisc: 0 };
   if(!cat || !plan) return empty;
   var sid = String(stepId);
   if(sid === SUBGOAL_MISC_ID) return empty;
@@ -4055,12 +4122,13 @@ function normalizeStepDraftSlots_(catId, stepId){
   if(!drafts.length) return empty;
   var changed = false;
   var movedToMisc = 0;
-  var keep = drafts.slice(0, 5);
-  var overflow = drafts.slice(5);
+  var keep = drafts.slice(0, STEP_TOPIC_SLOTS_MAX);
+  var overflow = drafts.slice(STEP_TOPIC_SLOTS_MAX);
+  var totalSlots = stepTopicSlotTotalForCount_(keep.length);
   keep.forEach(function(d, idx){
     var order = idx + 1;
-    if(draftStepAssignEquals_(d, sid, title, order, 5)) return;
-    applyDraftRoadmapAssignment_(d, catId, sid, title, order, 5);
+    if(draftStepAssignEquals_(d, sid, title, order, totalSlots)) return;
+    applyDraftRoadmapAssignment_(d, catId, sid, title, order, totalSlots);
     changed = true;
   });
   if(overflow.length){
@@ -4093,26 +4161,28 @@ function normalizeAllStepDraftSlots_(catId){
 }
 function buildStepSlotDraftMap_(catId, stepId, opts){
   opts = opts || {};
-  var slots = [null, null, null, null, null];
+  var maxSlots = opts.maxSlots != null ? opts.maxSlots : STEP_TOPIC_SLOTS_MAX;
+  var slots = [];
+  for(var si = 0; si < maxSlots; si++) slots.push(null);
   var cat = CATEGORIES[catId];
   var useLive = opts.live || !usePendingProgramPreview_(catId);
   getDraftsForSubGoalStep_(catId, stepId, { live: useLive }).forEach(function(d){
     var idx = cat.drafts.indexOf(d);
     var step = getDraftStepParts_(d, catId, idx).step;
-    if(step >= 1 && step <= 5 && !slots[step - 1]) slots[step - 1] = d;
+    if(step >= 1 && step <= maxSlots && !slots[step - 1]) slots[step - 1] = d;
   });
   return slots;
 }
 function countFilledTopicSlots_(catId, stepId){
   var map = buildStepSlotDraftMap_(catId, stepId);
   var n = 0;
-  for(var i = 0; i < 5; i++){
+  for(var i = 0; i < map.length; i++){
     if(map[i]) n++;
   }
   return n;
 }
 function stepNeedsMoreTopics_(catId, stepId){
-  return countFilledTopicSlots_(catId, stepId) < 5;
+  return countFilledTopicSlots_(catId, stepId) < STEP_TOPIC_SLOTS_DEFAULT;
 }
 function applyTopicToStepSlot_(catId, stepId, slotNum, topicData){
   if(!topicData || !topicData.topic) return false;
@@ -4120,18 +4190,22 @@ function applyTopicToStepSlot_(catId, stepId, slotNum, topicData){
   var cat = CATEGORIES[catId];
   if(!plan || !cat) return false;
   var slot = parseInt(slotNum, 10);
-  if(slot < 1 || slot > 5) return false;
+  if(slot < 1 || slot > STEP_TOPIC_SLOTS_MAX) return false;
   var existing = getDraftForStepSlot_(catId, stepId, slot);
-  if(existing && state.pinnedDraftIds && state.pinnedDraftIds[existing.id]) return false;
+  if(existing && isDraftPinned_(existing.id)) return false;
   if(existing && draftIsPublished_(existing.id)) return false;
   var title = getSubGoalStepTitle_(plan, stepId);
+  var filled = countFilledTopicSlots_(catId, stepId);
+  if(!existing) filled += 1;
+  var totalSlots = stepTopicSlotTotalForCount_(filled);
   if(existing){
     existing.topic = String(topicData.topic).trim();
     if(topicData.angle != null) existing.angle = String(topicData.angle).trim();
     if(topicData.rationale) existing.rationale = stripTopicRationaleStepPrefix_(String(topicData.rationale).trim());
     existing.updatedAt = new Date().toISOString();
-    applyDraftRoadmapAssignment_(existing, catId, stepId, title, slot, 5);
+    applyDraftRoadmapAssignment_(existing, catId, stepId, title, slot, totalSlots);
     ensurePendingAssignmentForDraft_(catId, stepId, slot, existing.id);
+    densifyStepSlotTotalsOnly_(catId, stepId);
     return true;
   }
   var id = makeExtraDraftId_(catId, slot * 1000 + String(stepId).charCodeAt(0));
@@ -4148,18 +4222,21 @@ function applyTopicToStepSlot_(catId, stepId, slotNum, topicData){
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
-  applyDraftRoadmapAssignment_(draft, catId, stepId, title, slot, 5);
+  applyDraftRoadmapAssignment_(draft, catId, stepId, title, slot, totalSlots);
   cat.drafts.push(draft);
+  if(!state.pinnedDraftIds) state.pinnedDraftIds = {};
+  if(state.pinnedDraftIds[id] !== false) state.pinnedDraftIds[id] = true;
   ensurePendingAssignmentForDraft_(catId, stepId, slot, draft.id);
+  densifyStepSlotTotalsOnly_(catId, stepId);
   return true;
 }
 function mergeAiTopicsToStepSlots_(catId, stepId, aiTopics){
-  var slotMap = buildStepSlotDraftMap_(catId, stepId);
+  var slotMap = buildStepSlotDraftMap_(catId, stepId, { maxSlots: STEP_TOPIC_SLOTS_DEFAULT });
   var merged = [];
   var aiIdx = 0;
-  for(var slot = 1; slot <= 5; slot++){
+  for(var slot = 1; slot <= STEP_TOPIC_SLOTS_DEFAULT; slot++){
     var d = slotMap[slot - 1];
-    if(d && state.pinnedDraftIds && state.pinnedDraftIds[d.id]) merged.push(null);
+    if(d && isDraftPinned_(d.id)) merged.push(null);
     else merged.push((aiTopics && aiTopics[aiIdx++]) || null);
   }
   return merged;
@@ -4189,16 +4266,27 @@ function rebuildPendingProgramAssignments_(payload, oldSteps){
     var newSid = String(newStep.id);
     var di = cat.drafts.indexOf(d);
     var slot = getDraftStepParts_(d, catId, di).step;
-    if(slot < 1 || slot > 5) slot = parseInt(a.order, 10) || 1;
+    if(slot < 1 || slot > STEP_TOPIC_SLOTS_MAX) slot = parseInt(a.order, 10) || 1;
     newAssignments.push({ draftId: a.draftId, stepId: newSid, order: slot });
-    applyDraftRoadmapAssignment_(d, catId, newSid, newStep.title || '', slot, 5);
+    applyDraftRoadmapAssignment_(d, catId, newSid, newStep.title || '', slot, stepTopicSlotTotalForCount_(slot));
   });
-  payload.assignments = newAssignments;
+  // 단계별 실제 채움 수로 분모 재맞춤
+  var densified = {};
+  newAssignments.forEach(function(a){
+    if(!a || !a.stepId || densified[a.stepId]) return;
+    densified[a.stepId] = true;
+    densifyStepSlotTotalsOnly_(catId, a.stepId);
+  });
+  // densify 후 order 재수집
+  payload.assignments = buildSubGoalAssignmentsFromDrafts_(catId).filter(function(a){
+    return newAssignments.some(function(na){ return na && na.draftId === a.draftId; });
+  });
+  if(!payload.assignments.length) payload.assignments = newAssignments;
 }
 function countMissingInSubGoalStep_(catId, stepId){
-  var slotMap = buildStepSlotDraftMap_(catId, stepId);
+  var slotMap = buildStepSlotDraftMap_(catId, stepId, { maxSlots: STEP_TOPIC_SLOTS_DEFAULT });
   var n = 0;
-  for(var i = 0; i < 5; i++){
+  for(var i = 0; i < STEP_TOPIC_SLOTS_DEFAULT; i++){
     var d = slotMap[i];
     if(d && !draftHasContent(d)) n++;
   }
@@ -4526,6 +4614,8 @@ function getDraftRoadmapStepId_(draft, catId, draftIndex, payloadCtx){
     stored = String(stored);
     if(stored === SUBGOAL_MISC_ID){
       if((ov && ov.miscLocked) || draft.miscLocked) return SUBGOAL_MISC_ID;
+      // 기본: 기타에 둔 자리는 접속·렌더만으로 단계에 되돌리지 않음
+      if(!canReassignDraftSteps_()) return SUBGOAL_MISC_ID;
       // misc 로 떨어진 뒤: previous*·단계 제목 힌트가 있을 때만 복구 (시드 주제 매칭은 overflow 되돌림 유발)
       var prevSid = (ov && ov.previousRoadmapStepId) || draft.previousRoadmapStepId || '';
       var prevSeries = (ov && ov.previousSeries) || draft.previousSeries || '';
@@ -4542,6 +4632,20 @@ function getDraftRoadmapStepId_(draft, catId, draftIndex, payloadCtx){
     }
     var normalized = normalizeStepIdAgainstPlan_(plan, stored);
     if(normalized && normalized !== SUBGOAL_MISC_ID) return normalized;
+    // 저장된 step id 가 현재 plan에 없으면, 자동 재배정 없이 기타로만 표시
+    if(!canReassignDraftSteps_()) return SUBGOAL_MISC_ID;
+  }
+  // 고정 모드: 배정 기록이 없으면 시드 fuzzy로 단계를 넘나들지 않음 (제목 정확 일치만)
+  if(!canReassignDraftSteps_()){
+    if(isUserAddedDraftId_(draft.id)){
+      var uaLocked = findPlanStepIdByTitle_(plan, draft.series);
+      return uaLocked || SUBGOAL_MISC_ID;
+    }
+    var metaLocked = getDraftBrandMeta_(draft, catId, draftIndex);
+    if(metaLocked.series === miscLabel) return SUBGOAL_MISC_ID;
+    var byTitleLocked = findPlanStepIdByTitle_(plan, metaLocked.series);
+    if(byTitleLocked) return byTitleLocked;
+    return SUBGOAL_MISC_ID;
   }
   if(isUserAddedDraftId_(draft.id)){
     var ua = findPlanStepIdByTitle_(plan, draft.series) || findPlanStepIdBySeedTopic_(catId, plan, draft.topic);
@@ -4650,7 +4754,9 @@ function resolveUserAddedDraftStepAssignment_(draft, catId){
   var m = String(draft.step || '').match(/^(\d+)\s*\/\s*(\d+)/);
   if(m) order = parseInt(m[1], 10) || 0;
   if(sid){
-    return { stepId: sid, order: (order >= 1 && order <= 5) ? order : 1, total: 5 };
+    var filled = countFilledTopicSlots_(catId, sid) || 0;
+    var total = stepTopicSlotTotalForCount_(Math.max(order, filled));
+    return { stepId: sid, order: (order >= 1 && order <= STEP_TOPIC_SLOTS_MAX) ? order : 1, total: total };
   }
   if(state.pendingSubGoalPlan && Number(state.pendingSubGoalPlan.catId) === Number(catId)){
     var pa = (state.pendingSubGoalPlan.assignments || []).find(function(a){
@@ -4659,15 +4765,32 @@ function resolveUserAddedDraftStepAssignment_(draft, catId){
     var psid = pa ? normalizeStepIdAgainstPlan_(plan, pa.stepId) : '';
     if(psid){
       var po = parseInt(pa.order, 10) || order || 1;
-      return { stepId: psid, order: (po >= 1 && po <= 5) ? po : 1, total: 5 };
+      if(po < 1 || po > STEP_TOPIC_SLOTS_MAX) po = 1;
+      var pfilled = countFilledTopicSlots_(catId, psid) || 0;
+      return { stepId: psid, order: po, total: stepTopicSlotTotalForCount_(Math.max(po, pfilled)) };
     }
   }
   return null;
 }
 function applyResolvedUserAddedStepOrMisc_(draft, catId){
+  if(!draft || !isUserAddedDraftId_(draft.id)) return false;
+  var plan = getSubGoalPlan_(catId);
+  if(!plan) return false;
+  // 고정 모드: 이미 유효한 단계/기타 배정이 있으면 로드·동기화 시 건드리지 않음
+  if(!canReassignDraftSteps_()){
+    var curSid = String(draft.roadmapStepId || '');
+    if(curSid === SUBGOAL_MISC_ID) return false;
+    if(curSid && normalizeStepIdAgainstPlan_(plan, curSid)) return false;
+    // 미배정만 기타로 조용히 붙임 (다른 기타 주제 재정렬 없음)
+    var miscLabel = getSubGoalMiscLabel_(plan);
+    var miscDrafts = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true })
+      .filter(function(d){ return d && d.id !== draft.id; });
+    var order = miscDrafts.length + 1;
+    applyDraftRoadmapAssignment_(draft, catId, SUBGOAL_MISC_ID, miscLabel, order, order);
+    return true;
+  }
   var resolved = resolveUserAddedDraftStepAssignment_(draft, catId);
   if(resolved){
-    var plan = getSubGoalPlan_(catId);
     applyDraftRoadmapAssignment_(
       draft, catId, resolved.stepId,
       getSubGoalStepTitle_(plan, resolved.stepId),
@@ -4719,6 +4842,14 @@ function ensureUserAddedDraftsInMisc_(catId){
   var toMigrate = [];
   (cat.drafts || []).forEach(function(d){
     if(!d || !isUserAddedDraftId_(d.id)) return;
+    // 고정 모드: 이미 단계/기타에 배정된 수동 주제는 건드리지 않음
+    if(!canReassignDraftSteps_()){
+      var curSid = String(d.roadmapStepId || '');
+      if(curSid === SUBGOAL_MISC_ID) return;
+      if(curSid && normalizeStepIdAgainstPlan_(plan, curSid)) return;
+      if(!curSid) toMigrate.push(d);
+      return;
+    }
     var resolved = resolveUserAddedDraftStepAssignment_(d, catId);
     if(resolved){
       if(String(d.roadmapStepId || '') !== resolved.stepId || String(d.series || '') !== getSubGoalStepTitle_(plan, resolved.stepId)){
@@ -4733,6 +4864,17 @@ function ensureUserAddedDraftsInMisc_(catId){
     if(String(d.roadmapStepId || '') !== SUBGOAL_MISC_ID) toMigrate.push(d);
   });
   toMigrate.sort(function(a, b){ return userAddedDraftTimestamp_(a.id) - userAddedDraftTimestamp_(b.id); });
+  if(!canReassignDraftSteps_()){
+    // 고정 모드: 미배정만 기타에  individually 붙이고 기존 기타 순서는 유지
+    toMigrate.forEach(function(d){
+      var miscLabel = getSubGoalMiscLabel_(plan);
+      var miscDrafts = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true })
+        .filter(function(x){ return x && x.id !== d.id; });
+      var order = miscDrafts.length + 1;
+      applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, order, order);
+    });
+    return;
+  }
   toMigrate.forEach(function(d){ assignUserAddedDraftToMisc_(d, catId); });
   normalizeMiscUserAddedOrder_(catId);
 }
@@ -4752,12 +4894,14 @@ function countOrphanDraftsForSubGoal_(catId){
 }
 function firstEmptyStepSlot_(catId, stepId){
   var map = buildStepSlotDraftMap_(catId, stepId);
-  for(var i = 0; i < 5; i++){
+  var lim = Math.min(map.length, STEP_TOPIC_SLOTS_MAX);
+  for(var i = 0; i < lim; i++){
     if(!map[i]) return i + 1;
   }
   return null;
 }
 function assignOrphanDraftsToSubGoalSteps_(catId){
+  if(!canReassignDraftSteps_()) return { assigned: 0, leftover: 0 };
   var cat = CATEGORIES[catId];
   var plan = getSubGoalPlan_(catId);
   if(!cat || !plan || !plan.steps.length) return { assigned: 0, leftover: 0 };
@@ -4774,10 +4918,11 @@ function assignOrphanDraftsToSubGoalSteps_(catId){
   orphans.forEach(function(d){
     for(var si = 0; si < plan.steps.length; si++){
       var sid = String(plan.steps[si].id);
-      if(countFilledTopicSlots_(catId, sid) >= 5) continue;
+      if(countFilledTopicSlots_(catId, sid) >= STEP_TOPIC_SLOTS_MAX) continue;
       var slot = firstEmptyStepSlot_(catId, sid);
       if(!slot) continue;
-      applyDraftRoadmapAssignment_(d, catId, sid, plan.steps[si].title, slot, 5);
+      var total = stepTopicSlotTotalForCount_(countFilledTopicSlots_(catId, sid) + 1);
+      applyDraftRoadmapAssignment_(d, catId, sid, plan.steps[si].title, slot, total);
       assigned++;
       return;
     }
@@ -5074,7 +5219,7 @@ function getDefaultPillarForCat_(catId){
 function applyTopicsArrayToStep_(catId, stepId, topics){
   if(!getSubGoalPlan_(catId) || !CATEGORIES[catId]) return 0;
   var applied = 0;
-  for(var slot = 1; slot <= 5; slot++){
+  for(var slot = 1; slot <= STEP_TOPIC_SLOTS_DEFAULT; slot++){
     var t = topics && topics[slot - 1];
     if(applyTopicToStepSlot_(catId, stepId, slot, t)) applied++;
   }
@@ -5197,36 +5342,53 @@ function getDraftBrandMeta_(draft, catId, draftIndex){
 }
 function formatDraftStepBadgeForDisplay_(draft, catId, draftIndex){
   var idx = typeof draftIndex === 'number' ? draftIndex : -1;
-  var cat = CATEGORIES[catId];
   var stepId = getDraftRoadmapStepId_(draft, catId, idx);
   if(String(stepId) === SUBGOAL_MISC_ID) return '기타';
   var parts = getDraftStepParts_(draft, catId, idx);
-  if(parts.step >= 1 && parts.step <= 5 && (!parts.total || parts.total <= 5)) return parts.step + '/5';
+  if(parts.step >= 1 && parts.step <= STEP_TOPIC_SLOTS_MAX && parts.total >= 1 && parts.total <= STEP_TOPIC_SLOTS_MAX && parts.step <= parts.total){
+    return parts.step + '/' + parts.total;
+  }
   var slotMap = buildStepSlotDraftMap_(catId, stepId, { live: true });
-  for(var si = 0; si < 5; si++){
-    if(slotMap[si] === draft) return (si + 1) + '/5';
+  for(var si = 0; si < slotMap.length; si++){
+    if(slotMap[si] === draft){
+      var filled = 0;
+      for(var fj = 0; fj < slotMap.length; fj++) if(slotMap[fj]) filled++;
+      return (si + 1) + '/' + stepTopicSlotTotalForCount_(filled);
+    }
   }
   var inStep = getDraftsForSubGoalStep_(catId, stepId, { live: true });
   var pos = inStep.indexOf(draft);
-  if(pos >= 0 && pos < 5) return (pos + 1) + '/5';
-  if(pos >= 5 || parts.step > 5 || parts.total > 5) return '기타';
-  if(parts.step >= 1 && parts.step <= 5) return parts.step + '/5';
+  if(pos >= 0 && pos < STEP_TOPIC_SLOTS_MAX){
+    return (pos + 1) + '/' + stepTopicSlotTotalForCount_(inStep.length);
+  }
+  if(pos >= STEP_TOPIC_SLOTS_MAX || parts.step > STEP_TOPIC_SLOTS_MAX || parts.total > STEP_TOPIC_SLOTS_MAX) return '기타';
+  if(parts.step >= 1 && parts.step <= STEP_TOPIC_SLOTS_MAX){
+    return parts.step + '/' + stepTopicSlotTotalForCount_(parts.total || parts.step);
+  }
   return '기타';
 }
-/** step 배지가 6/15·27/27 등으로 깨진 초안을 기타로 재배치 (슬롯 1~5 정규화는 normalizeAllStepDraftSlots_ 에서) */
+/** step 배지가 6/15·7/5·27/27 등으로 깨진 초안을 정리 (슬롯 정규화는 normalizeAllStepDraftSlots_ 에서) */
 function repairInvalidStepBadgeDrafts_(catId){
+  if(!canReassignDraftSteps_()) return false;
   var cat = CATEGORIES[catId];
   var plan = getSubGoalPlan_(catId);
   if(!cat || !plan || !plan.steps) return false;
   var changed = false;
   var miscLabel = getSubGoalMiscLabel_(plan);
+  var stepsNeedingDensify = {};
   (cat.drafts || []).forEach(function(d, di){
     if(!d || !d.id) return;
     var parts = getDraftStepParts_(d, catId, di);
-    if(parts.total <= 5 && parts.step <= 5) return;
+    var badRange = parts.total > STEP_TOPIC_SLOTS_MAX || parts.step > STEP_TOPIC_SLOTS_MAX;
+    var badDenom = parts.step >= 1 && parts.total >= 1 && parts.step > parts.total && parts.total <= STEP_TOPIC_SLOTS_MAX;
+    if(!badRange && !badDenom) return;
     var sid = getDraftRoadmapStepId_(d, catId, di);
+    if(badDenom && sid && String(sid) !== SUBGOAL_MISC_ID){
+      stepsNeedingDensify[sid] = true;
+      return;
+    }
     if(!sid || String(sid) === SUBGOAL_MISC_ID){
-      if((parts.total > 5 || parts.step > 5) && String(d.roadmapStepId || '') === SUBGOAL_MISC_ID){
+      if(badRange && String(d.roadmapStepId || '') === SUBGOAL_MISC_ID){
         var miscDrafts = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true });
         var order = Math.max(1, miscDrafts.indexOf(d) + 1);
         var total = Math.max(miscDrafts.length, order);
@@ -5238,10 +5400,13 @@ function repairInvalidStepBadgeDrafts_(catId){
       return;
     }
     var inStep = getDraftsForSubGoalStep_(catId, sid, { live: true });
-    if(inStep.indexOf(d) >= 5){
+    if(inStep.indexOf(d) >= STEP_TOPIC_SLOTS_MAX){
       applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, 1, 1, { dropRescueHints: true });
       changed = true;
     }
+  });
+  Object.keys(stepsNeedingDensify).forEach(function(sid){
+    if(densifyStepSlotTotalsOnly_(catId, sid)) changed = true;
   });
   if(normalizeMiscUserAddedOrder_(catId)) changed = true;
   return changed;
@@ -5457,7 +5622,7 @@ function buildSubGoalAssignmentsFromDrafts_(catId){
       if(!d || !d.id) return;
       var di = cat.drafts.indexOf(d);
       var slot = getDraftStepParts_(d, catId, di).step;
-      if(slot < 1 || slot > 5) slot = 1;
+      if(slot < 1 || slot > STEP_TOPIC_SLOTS_MAX) slot = 1;
       assignments.push({ draftId: d.id, stepId: sid, order: slot });
     });
   });
@@ -5490,19 +5655,41 @@ function subGoalStepsMatchForCompare_(pSteps, aSteps){
   return true;
 }
 function reconcileSubGoalDraftSteps_(catId){
+  if(!canReassignDraftSteps_()) return;
   var cat = CATEGORIES[catId];
   var plan = getSubGoalPlan_(catId);
   if(!cat || !plan) return;
   var miscLabel = getSubGoalMiscLabel_(plan);
-  var stepCount = {};
-  plan.steps.forEach(function(s){ stepCount[String(s.id)] = 0; });
+  var byStep = {};
+  plan.steps.forEach(function(s){ byStep[String(s.id)] = []; });
+  var miscKeep = [];
   (cat.drafts || []).forEach(function(d, di){
     if(!d || !d.id) return;
     var sid = getDraftRoadmapStepId_(d, catId, di);
-    if(sid && sid !== SUBGOAL_MISC_ID){
-      var title = getSubGoalStepTitle_(plan, sid);
-      var n = stepCount[sid] || 0;
-      if(n >= 5){
+    if(sid && sid !== SUBGOAL_MISC_ID && byStep[sid]){
+      var slot = getDraftStepParts_(d, catId, di).step;
+      byStep[sid].push({ d: d, di: di, slot: slot });
+      return;
+    }
+    // 단계 제목이 series에 남아 있으면 misc 라벨로 덮지 않음(복구 힌트 보존)
+    var series = String(d.series || '').trim();
+    if(series && series !== miscLabel && findPlanStepIdByTitle_(plan, series)) return;
+    miscKeep.push({ d: d, di: di });
+  });
+  Object.keys(byStep).forEach(function(sid){
+    var list = byStep[sid];
+    list.sort(function(a, b){
+      var sa = (a.slot >= 1 && a.slot <= STEP_TOPIC_SLOTS_MAX) ? a.slot : 99;
+      var sb = (b.slot >= 1 && b.slot <= STEP_TOPIC_SLOTS_MAX) ? b.slot : 99;
+      if(sa !== sb) return sa - sb;
+      return a.di - b.di;
+    });
+    var title = getSubGoalStepTitle_(plan, sid);
+    var keepN = Math.min(list.length, STEP_TOPIC_SLOTS_MAX);
+    var wantTotal = stepTopicSlotTotalForCount_(keepN);
+    list.forEach(function(item, idx){
+      var d = item.d;
+      if(idx >= STEP_TOPIC_SLOTS_MAX){
         var miscDrafts = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true });
         var alreadyMisc = miscDrafts.indexOf(d) >= 0;
         var miscOrder = alreadyMisc ? miscDrafts.indexOf(d) + 1 : miscDrafts.length + 1;
@@ -5510,26 +5697,25 @@ function reconcileSubGoalDraftSteps_(catId){
         applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, miscOrder, miscTotal, { dropRescueHints: true });
         return;
       }
-      stepCount[sid] = n + 1;
-      var order = stepCount[sid];
-      var wantStep = order + '/5';
+      var order = idx + 1;
+      var wantStep = order + '/' + wantTotal;
       if(String(d.roadmapStepId || '') !== sid || String(d.series || '') !== title || String(d.step || '') !== wantStep){
-        applyDraftRoadmapAssignment_(d, catId, sid, title, order, 5);
+        applyDraftRoadmapAssignment_(d, catId, sid, title, order, wantTotal);
       }
-      return;
-    }
-    // 단계 제목이 series에 남아 있으면 misc 라벨로 덮지 않음(복구 힌트 보존)
+    });
+  });
+  miscKeep.forEach(function(item){
+    var d = item.d;
     var series = String(d.series || '').trim();
-    if(series && series !== miscLabel && findPlanStepIdByTitle_(plan, series)) return;
-    if(series !== miscLabel){
-      var miscDrafts = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true });
-      var order = miscDrafts.indexOf(d) >= 0 ? miscDrafts.indexOf(d) + 1 : miscDrafts.length + 1;
-      applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, order, Math.max(miscDrafts.length, order));
-    }
+    if(series === miscLabel) return;
+    var miscDrafts = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true });
+    var order = miscDrafts.indexOf(d) >= 0 ? miscDrafts.indexOf(d) + 1 : miscDrafts.length + 1;
+    applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, order, Math.max(miscDrafts.length, order));
   });
 }
 /** misc 로 떨어진 주제를 시드 주제·제목·previous* 힌트로 단계에 재배치 */
 function rescueOrphanedStepDrafts_(catId){
+  if(!canReassignDraftSteps_()) return 0;
   catId = normalizePendingCatId_(catId);
   var cat = CATEGORIES[catId];
   var plan = peekSubGoalPlan_(catId) || getSubGoalPlan_(catId);
@@ -5562,12 +5748,12 @@ function rescueOrphanedStepDrafts_(catId){
       findPlanStepIdByTitle_(plan, (d.series && d.series !== miscLabel) ? d.series : '') ||
       findPlanStepIdBySeedTopic_(catId, plan, d.topic);
     if(!target || target === SUBGOAL_MISC_ID) return;
-    if((counts[target] || 0) >= 5) return;
+    if((counts[target] || 0) >= STEP_TOPIC_SLOTS_MAX) return;
     counts[target] = (counts[target] || 0) + 1;
     applyDraftRoadmapAssignment_(
       d, catId, target,
       getSubGoalStepTitle_(plan, target),
-      counts[target], 5
+      counts[target], stepTopicSlotTotalForCount_(counts[target])
     );
     rescued++;
   });
@@ -5654,6 +5840,7 @@ function repairMislabeledSubGoalSteps_(catId){
   return changed;
 }
 function repairSubGoalDraftAssignments_(catId){
+  if(!canReassignDraftSteps_()) return false;
   var changed = false;
   try {
     if(repairMislabeledSubGoalSteps_(catId)) changed = true;
@@ -6321,7 +6508,7 @@ function ensurePendingSubGoalPlanFromCurrent_(catId){
       if(!d || !d.id) return;
       var di = cat.drafts.indexOf(d);
       var slot = getDraftStepParts_(d, catId, di).step;
-      if(slot < 1 || slot > 5) slot = 1;
+      if(slot < 1 || slot > STEP_TOPIC_SLOTS_MAX) slot = 1;
       assignments.push({ draftId: d.id, stepId: sid, order: slot });
     });
   });
@@ -6361,14 +6548,15 @@ function renderTopicWorkshopStripHTML_(catId, step, idx, opts){
   var sid = String(step.id);
   var filled = countFilledTopicSlots_(catId, sid);
   var topicCount = getDraftsForSubGoalStep_(catId, sid).length;
-  var topicCountShown = Math.min(topicCount, 5);
+  var totalSlots = stepTopicSlotTotalForCount_(Math.max(filled, topicCount));
+  var topicCountShown = Math.min(topicCount, STEP_TOPIC_SLOTS_MAX);
   var compact = !!opts.compact;
   var active = !!opts.active;
-  // 헤더: 실제 주제 수 + 슬롯 채움(N/5). 카드 배지 1/5…5/5는 슬롯 순번.
+  var slotLabel = filled + '/' + totalSlots;
   var label = compact
     ? ((idx + 1) + '단계 · ' + (step.title || ''))
-    : ('주제 기획안' + (topicCountShown ? ' · ' + topicCountShown + '개 · ' + filled + '/5' : ''));
-  var cta = compact ? (filled + '/5') : '함께 검토 →';
+    : ('주제 기획안' + (topicCountShown ? ' · ' + topicCountShown + '개 · ' + slotLabel : ''));
+  var cta = compact ? slotLabel : '함께 검토 →';
   var cls = 'plan-workshop-strip ' + getPlanTierClass_('topic-plan') + (compact ? ' compact' : ' in-step') + (active ? ' active' : '');
   return '<button type="button" class="' + cls + '" data-plan-tier="3"' + plannerStepActionAttrs_('openTopicStepWorkshop_', sid) + '>' +
     '<span class="plan-workshop-strip-label">' + escapeHtml(label) + '</span>' +
@@ -6785,10 +6973,10 @@ function applySubGoalRoadmapPlan_(payload){
   Object.keys(buckets).forEach(function(sid){
     var list = buckets[sid];
     var title = getSubGoalStepTitle_(plan, sid);
-    var total = String(sid) === SUBGOAL_MISC_ID ? Math.max(list.length, 1) : 5;
+    var total = String(sid) === SUBGOAL_MISC_ID ? Math.max(list.length, 1) : stepTopicSlotTotalForCount_(list.length);
     list.forEach(function(entry, idx){
       var order = (entry.meta && entry.meta.order) ? entry.meta.order : (idx + 1);
-      if(String(sid) !== SUBGOAL_MISC_ID && (order < 1 || order > 5)) order = Math.min(Math.max(order, 1), 5);
+      if(String(sid) !== SUBGOAL_MISC_ID && (order < 1 || order > STEP_TOPIC_SLOTS_MAX)) order = Math.min(Math.max(order, 1), STEP_TOPIC_SLOTS_MAX);
       applyDraftRoadmapAssignment_(entry.draft, catId, sid, title, order, total);
       if(entry.meta && entry.meta.rationale) entry.draft.rationale = stripTopicRationaleStepPrefix_(String(entry.meta.rationale).trim());
       if(entry.meta && entry.meta.angle) entry.draft.angle = String(entry.meta.angle).trim();
@@ -6803,12 +6991,14 @@ function applySubGoalRoadmapPlan_(payload){
   if(state.syncRationalesOnBrandSave !== false){
     syncDraftRationalesFromRoadmap_([catId], true);
   }
-  (plan.steps || []).forEach(function(step){
-    normalizeStepDraftSlots_(catId, String(step.id));
+  withDraftStepReassignAllowed_(function(){
+    (plan.steps || []).forEach(function(step){
+      normalizeStepDraftSlots_(catId, String(step.id));
+    });
+    var seededTopics = applyInitialProgramTopicsToCat_(catId, { force: true });
+    if(seededTopics) added += seededTopics;
+    reconcileSubGoalDraftSteps_(catId);
   });
-  var seededTopics = applyInitialProgramTopicsToCat_(catId);
-  if(seededTopics) added += seededTopics;
-  reconcileSubGoalDraftSteps_(catId);
   resetSubGoalCollapseDefaults_(catId);
   return { moved: moved, added: added, deleted: deleted };
 }
@@ -7303,7 +7493,7 @@ function renderSubGoalStepBlockHTML_(catId, step, idx, activeId){
           '<span class="subgoal-step-title">' + escapeHtml(step.title) + '</span>' +
           (step.summary ? '<span class="subgoal-step-summary">' + escapeHtml(step.summary) + '</span>' : '') +
         '</span>' +
-        '<span class="subgoal-step-stats">발행 ' + pub + '/5</span>' +
+        '<span class="subgoal-step-stats">발행 ' + pub + '/' + Math.max(drafts.length, stepTopicSlotTotalForCount_(drafts.length)) + '</span>' +
       '</div>' +
       '<div class="subgoal-step-actions">' +
         '<button type="button" class="layer-btn subtle"' + plannerStepActionAttrs_('toggleSubGoalStep_', subGoalStepKey_(catId, sid)) + ' aria-expanded="' + (!collapsed) + '">' + (collapsed ? '펼치기' : '접기') + '</button>' +
@@ -7447,29 +7637,25 @@ function renderProgramRoadmapHTML_(catId){
   if(!cat) return '';
   try {
     // 렌더마다 복구·저장하면 한도/동기화 잔재가 다시 커짐 → 카테고리당 수초에 한 번만
+    // 기존 주제 단계/순서는 고정. 자동 repair·슬롯 정규화·시드 채움은 하지 않음.
     if(!state._roadmapRepairAt) state._roadmapRepairAt = {};
     var now = Date.now();
     var last = state._roadmapRepairAt[catId] || 0;
     if(now - last > 4000){
       state._roadmapRepairAt[catId] = now;
-      var repairedPlan = repairIncompleteSubGoalPlan_(catId);
-      var repairedAssign = repairSubGoalDraftAssignments_(catId);
-      var deduped = dedupeAllSubGoalPlanSteps_();
-      if(repairedPlan || repairedAssign || deduped){
-        save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
-      }
-    }
-    // 슬롯 배지 중복(전부 1/5·27/27 등)은 매 렌더에서 즉시 1/5…5/5로 맞춤 (dirty 저장해 동기화에 반영)
-    var badgeRepair = repairInvalidStepBadgeDrafts_(catId);
-    var slotNorm = normalizeAllStepDraftSlots_(catId);
-    if((badgeRepair || (slotNorm && slotNorm.changed))){
-      save({ skipDriveUpload: true, skipGasPush: true });
-      if(slotNorm && slotNorm.movedToMisc > 0 && typeof setAppToast === 'function'){
-        setAppToast(
-          '단계당 주제는 5개까지라, 넘치는 ' + slotNorm.movedToMisc + '개를 「기타」로 옮겼어요.',
-          { duration: 6000, variant: 'ok' }
-        );
-      }
+      // 로드맵 구조만 가벼운 중복 제거(초안 재배정 없음). 초안 remap 은 허용 플래그 있을 때만.
+      try {
+        var planLive = state.branding && state.branding.subGoalPlans && state.branding.subGoalPlans[String(catId)];
+        if(planLive){
+          var dedupeRes = dedupeSubGoalPlanStepsInPlace_(planLive, { collectIdMap: true });
+          if(dedupeRes && dedupeRes.changed){
+            if(canReassignDraftSteps_() && dedupeRes.idMap && Object.keys(dedupeRes.idMap).length){
+              try { remapDraftStepIdsForCat_({ draftBrandOverrides: state.draftBrandOverrides }, catId, dedupeRes.idMap); } catch(eMapR){}
+            }
+            save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+          }
+        }
+      } catch(eDedupeSoft){}
     }
   } catch(eRepMain){}
   var plan = getEffectiveSubGoalPlan_(catId);
@@ -7623,10 +7809,13 @@ window.saveDraftBrandFields_ = function(opts){
   if(!opts || !opts.skipRender) renderMain();
 };
 
-function renderTopicWorkshopCardHTML_(catId, stepId, slotIndex, draft){
+function renderTopicWorkshopCardHTML_(catId, stepId, slotIndex, draft, opts){
+  opts = opts || {};
   var i = slotIndex;
+  var canUp = !!opts.canUp;
+  var canDown = !!opts.canDown;
   if(draft){
-    var pinned = state.pinnedDraftIds && state.pinnedDraftIds[draft.id];
+    var pinned = isDraftPinned_(draft.id);
     return '<div class="ws-quarter-card ws-topic-card ' + getPlanTierClass_('topic') + '" data-plan-tier="4">' +
       '<div class="ws-quarter-top">' +
         '<div class="ws-quarter-meta">' +
@@ -7639,6 +7828,10 @@ function renderTopicWorkshopCardHTML_(catId, stepId, slotIndex, draft){
         '<div class="ws-quarter-tools">' +
           '<button type="button" class="ws-item-btn pin' + (pinned ? ' active' : '') + '" onclick="togglePinDraft_(\'' + draft.id + '\')">' + (pinned ? '고정됨' : '고정') + '</button>' +
           '<button type="button" class="ws-item-btn danger" onclick="deleteDraft(' + catId + ',\'' + draft.id + '\'); refreshTopicWorkshop_();">삭제</button>' +
+          '<span class="ws-topic-order-btns">' +
+            '<button type="button" class="ws-item-btn ws-order-btn"' + (canUp ? '' : ' disabled') + ' title="위로" onclick="moveTopicDraftOrder_(' + catId + ',\'' + String(stepId).replace(/'/g, '') + '\',' + i + ',-1)">▲</button>' +
+            '<button type="button" class="ws-item-btn ws-order-btn"' + (canDown ? '' : ' disabled') + ' title="아래로" onclick="moveTopicDraftOrder_(' + catId + ',\'' + String(stepId).replace(/'/g, '') + '\',' + i + ',1)">▼</button>' +
+          '</span>' +
         '</div>' +
       '</div>' +
       '<textarea class="ws-item-summary ws-grow-textarea ws-topic-angle" rows="2" placeholder="신뢰·오해해소·실천팁·메커니즘 등" oninput="updateTopicDraftField_(\'' + draft.id + '\',\'angle\',this.value);autoGrowTextarea_(this)">' + escapeHtml(draft.angle || '') + '</textarea>' +
@@ -7656,19 +7849,14 @@ function renderTopicWorkshopCardHTML_(catId, stepId, slotIndex, draft){
 }
 function renderTopicWorkshopBodyHTML_(catId, stepId){
   normalizeStepTopicRationales_(catId, stepId);
-  var slotNorm = normalizeStepDraftSlots_(catId, stepId);
-  if(slotNorm && slotNorm.changed) save({ skipDriveUpload: true, skipGasPush: true });
-  if(slotNorm && slotNorm.movedToMisc > 0 && typeof setAppToast === 'function'){
-    setAppToast(
-      '이 단계는 주제 5개까지예요. 넘는 ' + slotNorm.movedToMisc + '개는 「기타」로 옮겼어요.',
-      { duration: 5500, variant: 'ok' }
-    );
-  }
-  reconcileSubGoalDraftSteps_(catId);
+  // 워크숍을 열 때만으로 슬롯/기타 재배정하지 않음 (재생성·AI 채우기는 각자 허용 플래그 사용)
   var cat = CATEGORIES[catId];
   var plan = getEffectiveSubGoalPlan_(catId);
   var step = (plan && plan.steps) ? plan.steps.find(function(s){ return String(s.id) === String(stepId); }) : null;
   var slotDrafts = buildStepSlotDraftMap_(catId, stepId);
+  var filled = 0;
+  for(var fi = 0; fi < slotDrafts.length; fi++) if(slotDrafts[fi]) filled++;
+  var showN = Math.min(STEP_TOPIC_SLOTS_MAX, Math.max(STEP_TOPIC_SLOTS_DEFAULT, filled));
   var stepIdx = plan && plan.steps ? plan.steps.findIndex(function(s){ return String(s.id) === String(stepId); }) : 0;
   if(stepIdx < 0) stepIdx = 0;
   var html = '';
@@ -7679,7 +7867,7 @@ function renderTopicWorkshopBodyHTML_(catId, stepId){
     });
     html += '</div>';
   }
-  html += '<p class="ws-intro">이 <strong>하위 목표</strong>에 맞는 콘텐츠 주제 <strong>5개</strong>를 순서대로 잡아요. 수정은 바로 반영됩니다.</p>' +
+  html += '<p class="ws-intro">이 <strong>하위 목표</strong>에 맞는 콘텐츠 주제는 <strong>기본 5개</strong>로 기획하고, 이미 있는 주제는 <strong>최대 10개</strong>까지 유지해요. 수정은 바로 반영됩니다.</p>' +
     '<p class="ws-intro-ref">PSP·PAR·프로그램 구조: <a href="' + PROFILE_BRAND_URL + '" target="_blank" rel="noopener">미카닥 박준규 프로필 PSP 가이드</a></p>' +
     renderIntentRefBlockHTML_('분기별·프로그램·단계 의도 (주제 기획 시 참고)', buildMainGoalContextBlock_() + '\n\n' + buildProgramPlanContextBlock_(catId, stepId), { open: false });
   if(step){
@@ -7694,18 +7882,29 @@ function renderTopicWorkshopBodyHTML_(catId, stepId){
     html += '</div>';
   }
   html += '<div class="ws-items ws-items-full">';
-  for(var i = 0; i < 5; i++){
-    html += renderTopicWorkshopCardHTML_(catId, stepId, i, slotDrafts[i]);
+  for(var i = 0; i < showN; i++){
+    var d = slotDrafts[i];
+    var canUp = false;
+    var canDown = false;
+    if(d){
+      for(var uj = i - 1; uj >= 0; uj--){
+        if(slotDrafts[uj]){ canUp = true; break; }
+      }
+      for(var dj = i + 1; dj < showN; dj++){
+        if(slotDrafts[dj]){ canDown = true; break; }
+      }
+    }
+    html += renderTopicWorkshopCardHTML_(catId, stepId, i, d, { canUp: canUp, canDown: canDown });
   }
   html += '</div>';
   return html;
 }
 function renderTopicRegenBtnHTML_(catId, stepId){
-  var slotDrafts = buildStepSlotDraftMap_(catId, stepId);
+  var slotDrafts = buildStepSlotDraftMap_(catId, stepId, { maxSlots: STEP_TOPIC_SLOTS_DEFAULT });
   var unpinned = 0;
-  for(var i = 0; i < 5; i++){
+  for(var i = 0; i < STEP_TOPIC_SLOTS_DEFAULT; i++){
     var d = slotDrafts[i];
-    if(!d || !(state.pinnedDraftIds && state.pinnedDraftIds[d.id])) unpinned++;
+    if(!d || !isDraftPinned_(d.id)) unpinned++;
   }
   var hasAny = slotDrafts.some(function(d){ return !!d; });
   var allPinned = unpinned === 0 && hasAny;
@@ -7854,11 +8053,79 @@ window.openTopicSlotsModal_ = function(stepId){
   openPlanWorkshop_('topic', stepId);
 };
 window.togglePinDraft_ = function(draftId){
+  if(!draftId) return;
   if(!state.pinnedDraftIds) state.pinnedDraftIds = {};
-  if(state.pinnedDraftIds[draftId]) delete state.pinnedDraftIds[draftId];
+  if(isDraftPinned_(draftId)) state.pinnedDraftIds[draftId] = false;
   else state.pinnedDraftIds[draftId] = true;
   save({ driveImmediate: true });
   refreshTopicWorkshop_();
+};
+/** 같은 단계 안 주제 순서 위/아래 이동 (dir: -1 위, +1 아래) */
+window.moveTopicDraftOrder_ = function(catId, stepId, slotIndex, dir){
+  catId = parseInt(catId, 10);
+  stepId = String(stepId || '');
+  slotIndex = parseInt(slotIndex, 10);
+  dir = parseInt(dir, 10);
+  if(isNaN(catId) || !stepId || isNaN(slotIndex) || (dir !== 1 && dir !== -1)) return;
+  var plan = getSubGoalPlan_(catId);
+  if(!plan) return;
+  var map = buildStepSlotDraftMap_(catId, stepId);
+  var from = slotIndex;
+  if(!map[from]) return;
+  var to = -1;
+  if(dir < 0){
+    for(var u = from - 1; u >= 0; u--){
+      if(map[u]){ to = u; break; }
+    }
+  } else {
+    for(var d = from + 1; d < map.length; d++){
+      if(map[d]){ to = d; break; }
+    }
+  }
+  if(to < 0) return;
+  withDraftStepReassignAllowed_(function(){
+    var title = getSubGoalStepTitle_(plan, stepId);
+    var a = map[from];
+    var b = map[to];
+    var filled = 0;
+    for(var i = 0; i < map.length; i++) if(map[i]) filled++;
+    var total = stepTopicSlotTotalForCount_(filled);
+    applyDraftRoadmapAssignment_(a, catId, stepId, title, to + 1, total);
+    if(b) applyDraftRoadmapAssignment_(b, catId, stepId, title, from + 1, total);
+    // pin 우선 normalize 없이 슬롯 교환만 유지 + 분모(total)만 맞춤
+    densifyStepSlotTotalsOnly_(catId, stepId);
+    ensurePendingAssignmentForDraft_(catId, stepId, to + 1, a.id);
+    if(b) ensurePendingAssignmentForDraft_(catId, stepId, from + 1, b.id);
+  });
+  save({ driveImmediate: true });
+  if(state.planWorkshopMode === 'topic') refreshTopicWorkshop_();
+  try { renderMain(); } catch(eR){}
+};
+window.moveDraftCardOrder_ = function(catId, draftId, dir){
+  catId = parseInt(catId, 10);
+  dir = parseInt(dir, 10);
+  if(isNaN(catId) || !draftId || (dir !== 1 && dir !== -1)) return;
+  var cat = CATEGORIES[catId];
+  if(!cat) return;
+  var draft = (cat.drafts || []).find(function(x){ return x && x.id === draftId; });
+  if(!draft) return;
+  var di = cat.drafts.indexOf(draft);
+  var stepId = getDraftRoadmapStepId_(draft, catId, di);
+  if(!stepId || String(stepId) === SUBGOAL_MISC_ID){
+    if(typeof setAppToast === 'function') setAppToast('기타 주제는 단계 안에서만 순서를 바꿔요.', { duration: 2800, variant: 'err' });
+    return;
+  }
+  var map = buildStepSlotDraftMap_(catId, stepId);
+  var slotIndex = -1;
+  for(var i = 0; i < map.length; i++){
+    if(map[i] && map[i].id === draftId){ slotIndex = i; break; }
+  }
+  if(slotIndex < 0){
+    var parts = getDraftStepParts_(draft, catId, di);
+    if(parts.step >= 1 && parts.step <= STEP_TOPIC_SLOTS_MAX) slotIndex = parts.step - 1;
+  }
+  if(slotIndex < 0) return;
+  window.moveTopicDraftOrder_(catId, stepId, slotIndex, dir);
 };
 window.regenerateTopicWorkshop_ = async function(stepId){
   stepId = stepId != null ? String(stepId) : String(state.topicEditStepId);
@@ -7866,17 +8133,17 @@ window.regenerateTopicWorkshop_ = async function(stepId){
   if(!state.apiKey){ openApiModal(); return; }
   if(plannerAiBusy) return;
   var catId = state.currentCat;
-  var slotDrafts = buildStepSlotDraftMap_(catId, stepId);
+  var slotDrafts = buildStepSlotDraftMap_(catId, stepId, { maxSlots: STEP_TOPIC_SLOTS_DEFAULT });
   var unpinnedSlots = [];
-  for(var i = 0; i < 5; i++){
+  for(var i = 0; i < STEP_TOPIC_SLOTS_DEFAULT; i++){
     var d = slotDrafts[i];
-    if(!d || !(state.pinnedDraftIds && state.pinnedDraftIds[d.id])) unpinnedSlots.push(i);
+    if(!d || !isDraftPinned_(d.id)) unpinnedSlots.push(i);
   }
   if(!unpinnedSlots.length){
     if(typeof setAppToast === 'function') setAppToast('재생성할 주제의 고정을 해제해 주세요.', { duration: 4000, variant: 'err' });
     return;
   }
-  var pinnedCount = 5 - unpinnedSlots.length;
+  var pinnedCount = STEP_TOPIC_SLOTS_DEFAULT - unpinnedSlots.length;
   var confirmMsg = pinnedCount === 0
     ? '고정되지 않은 주제 ' + unpinnedSlots.length + '개를 재생성할까요?'
     : '고정되지 않은 주제 ' + unpinnedSlots.length + '개를 재생성할까요?\n(고정한 ' + pinnedCount + '개는 유지됩니다)';
@@ -7890,7 +8157,7 @@ window.regenerateTopicWorkshop_ = async function(stepId){
   });
   try {
     var pinnedBlock = slotDrafts.map(function(d, i){
-      if(!d || !(state.pinnedDraftIds && state.pinnedDraftIds[d.id])) return null;
+      if(!d || !isDraftPinned_(d.id)) return null;
       return '슬롯 ' + (i + 1) + '(고정): 「' + d.topic + '」' + (d.angle ? ' / ' + d.angle : '') + (d.rationale ? ' — ' + d.rationale : '');
     }).filter(Boolean).join('\n');
     var unpinnedBlock = unpinnedSlots.map(function(i){
@@ -7916,7 +8183,9 @@ buildTopicPlanPromptPrefix_(catId, stepId) + '\n\n' +
     var topics = Array.isArray(obj.topics) ? obj.topics : [];
     if(!topics.length) throw new Error('주제 배열이 비어 있어요. 다시 시도해 주세요.');
     var merged = mergeAiTopicsToStepSlots_(catId, stepId, topics);
-    var applied = applyTopicsArrayToStep_(catId, stepId, merged);
+    var applied = withDraftStepReassignAllowed_(function(){
+      return applyTopicsArrayToStep_(catId, stepId, merged);
+    });
     save({ driveImmediate: true });
     refreshTopicWorkshop_();
     renderMain();
@@ -7954,7 +8223,9 @@ buildTopicPlanPromptPrefix_(catId, stepId) + '\n' +
     var text = await callClaudePlanner_(prompt, { maxTokens: 2800 });
     var obj = parsePlannerAiJsonObject_(text);
     var merged = mergeAiTopicsToStepSlots_(catId, stepId, obj.topics || []);
-    var applied = applyTopicsArrayToStep_(catId, stepId, merged);
+    var applied = withDraftStepReassignAllowed_(function(){
+      return applyTopicsArrayToStep_(catId, stepId, merged);
+    });
     save({ driveImmediate: true });
     refreshTopicWorkshop_();
     renderMain();
@@ -8003,7 +8274,7 @@ window.genAllMissingForSubGoalStep_ = async function(stepId){
   var catId = state.currentCat;
   var slotMap = buildStepSlotDraftMap_(catId, stepId);
   var drafts = [];
-  for(var i = 0; i < 5; i++){
+  for(var i = 0; i < slotMap.length; i++){
     var d = slotMap[i];
     if(d && !draftHasContent(d)) drafts.push(d);
   }
@@ -8424,7 +8695,7 @@ window.restoreSyncHistoryEntry_ = async function(id){
     await pushSyncHistorySnapshot_('복원 직전');
     var data = JSON.parse(entry.payloadStr);
     applyPersistPayload(data, { replaceDeletedDraftIds: true });
-    repairAllSubGoalDraftAssignments_();
+    withDraftStepReassignAllowed_(function(){ repairAllSubGoalDraftAssignments_(); });
     state.syncDirty = true;
     state.syncNeedsSnapshot = true;
     save({ skipGasPush: true });
@@ -9585,7 +9856,7 @@ function shadeHexColor_(hex, amount){
 }
 
 /** 프로그램별 망고보드 7장 팔레트 — navy / gold / devon / green + 전문가 변형
- *  색상미리보기.html DATA.mango 와 동일. 변경 시 둘 다 맞출 것. */
+ * 망고보드 팔레트 — 색상 미리보기 모달·카테고리 상수와 동일 소스. */
 const MANGO_PALETTES_BY_CAT = {
   0: {
     key: 'navy',
@@ -9602,14 +9873,14 @@ const MANGO_PALETTES_BY_CAT = {
   1: {
     key: 'devon',
     label: '리:얼 무브먼트',
-    bg: '#F9EBD2',
-    bg2: '#F3E4C4',
+    bg: '#f0efeb',
+    bg2: '#eee9de',
     head: '#1A1A1A',
-    point: '#5C5346',
-    card: '#FBF6EC',
-    card2: '#F7F0E0',
+    point: '#576169',
+    card: '#FAF6F0',
+    card2: '#EDE8DF',
     divider: '#1A1A1A',
-    desc: '데본크림·블랙·웜 스톤'
+    desc: '아이보리·차콜·쿨 그레이'
   },
   2: {
     key: 'gold',
@@ -9700,7 +9971,7 @@ const MANGO_PALETTES_BY_CAT = {
 /** 썸네일 스크림 — 망고 팔레트와 같은 hue (전문가는 채도 약간↑ ) */
 const THUMB_SCRIM_BY_CAT = {
   0: { tint: '#1e2a44', tint2: '#3A5080', glow: '#3a5080' },
-  1: { tint: '#1A1A1A', tint2: '#8B7355', glow: '#5C5346' },
+  1: { tint: '#2a2827', tint2: '#777777', glow: '#373736' },
   2: { tint: '#3d2c27', tint2: '#D4A853', glow: '#6b493d' },
   3: { tint: '#0F172A', tint2: '#1E3A5F', glow: '#4F46E5' },
   4: { tint: '#5C3D2E', tint2: '#A67C52', glow: '#9E4B5A' },
@@ -9717,15 +9988,84 @@ function getMangoPaletteForCat_(catId){
 }
 
 /**
- * 색상미리보기.html 과 동일 구조 — 망고·썸네일·탭 브랜드를 한곳에.
+ * 색상 미리보기 모달용 엔트리 — 망고·썸네일·탭 브랜드를 한곳에.
  * 팔레트 숫자는 MANGO_PALETTES_BY_CAT / THUMB_SCRIM_BY_CAT / CATEGORIES.color 가 원본.
+ * 미리보기에서 수정한 값은 state.colorPreviewOverrides 에만 두고, 「저장」으로 JSON 내려받음.
  */
 function sanitizeCssHexColor_(hex, fallback){
   var s = String(hex || '').trim();
   if(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(s)) return s;
   return fallback || '#94A3B8';
 }
-function getProgramColorPreviewEntry_(catId){
+function expandCssHexToRgb6_(hex, fallback){
+  var h = sanitizeCssHexColor_(hex, fallback || '#000000');
+  if(h.length === 4){
+    return ('#' + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2) + h.charAt(3) + h.charAt(3)).toLowerCase();
+  }
+  if(h.length >= 7) return h.slice(0, 7).toLowerCase();
+  return (fallback || '#000000').toLowerCase();
+}
+function normalizeCssHexCompare_(hex){
+  return expandCssHexToRgb6_(hex, '#000000').toUpperCase();
+}
+function ensureColorPreviewOverrideStore_(){
+  if(!state.colorPreviewOverrides || typeof state.colorPreviewOverrides !== 'object'){
+    state.colorPreviewOverrides = {};
+  }
+  if(typeof state.colorPreviewShowCustom !== 'boolean'){
+    state.colorPreviewShowCustom = true;
+  }
+  return state.colorPreviewOverrides;
+}
+function cloneProgramColorPreviewPalette_(entry){
+  return {
+    brand: entry.brand,
+    mango: {
+      bg: entry.mango.bg,
+      bg2: entry.mango.bg2,
+      head: entry.mango.head,
+      point: entry.mango.point,
+      card: entry.mango.card,
+      card2: entry.mango.card2,
+      divider: entry.mango.divider
+    },
+    thumb: {
+      tint: entry.thumb.tint,
+      tint2: entry.thumb.tint2,
+      glow: entry.thumb.glow
+    }
+  };
+}
+function hasColorPreviewOverridesFor_(catId){
+  var store = ensureColorPreviewOverrideStore_();
+  var ov = store[String(catId)];
+  if(!ov) return false;
+  var base = getProgramColorPreviewEntry_(catId, { forceDefault: true });
+  if(ov.brand != null && normalizeCssHexCompare_(ov.brand) !== normalizeCssHexCompare_(base.brand)) return true;
+  var keys = ['bg','bg2','head','point','card','card2','divider'];
+  for(var i = 0; i < keys.length; i++){
+    var k = keys[i];
+    var mv = ov.mango && ov.mango[k];
+    if(mv != null && normalizeCssHexCompare_(mv) !== normalizeCssHexCompare_(base.mango[k])) return true;
+  }
+  var tkeys = ['tint','tint2','glow'];
+  for(var j = 0; j < tkeys.length; j++){
+    var tk = tkeys[j];
+    var tv = ov.thumb && ov.thumb[tk];
+    if(tv != null && normalizeCssHexCompare_(tv) !== normalizeCssHexCompare_(base.thumb[tk])) return true;
+  }
+  return false;
+}
+function ensureColorPreviewOverrideFor_(catId){
+  var store = ensureColorPreviewOverrideStore_();
+  var key = String(catId);
+  if(!store[key]){
+    store[key] = cloneProgramColorPreviewPalette_(getProgramColorPreviewEntry_(catId, { forceDefault: true }));
+  }
+  return store[key];
+}
+function getProgramColorPreviewEntry_(catId, opts){
+  opts = opts || {};
   var id = parseInt(catId, 10);
   if(isNaN(id) || !MANGO_PALETTES_BY_CAT[id]) id = 1;
   var cat = CATEGORIES[id] || CATEGORIES[1];
@@ -9735,7 +10075,7 @@ function getProgramColorPreviewEntry_(catId){
     ? getThumbBrandPreset_(id)
     : { hero: cat.name, tagline: '' };
   var brand = sanitizeCssHexColor_(cat.color || mango.point, '#8B7355');
-  return {
+  var entry = {
     id: id,
     name: cat.name,
     axis: mango.key || '',
@@ -9761,6 +10101,25 @@ function getProgramColorPreviewEntry_(catId){
     hero: brandPreset.hero || cat.name,
     tag: brandPreset.tagline || ''
   };
+  var forceDefault = !!opts.forceDefault;
+  var showCustom = forceDefault ? false : (state.colorPreviewShowCustom !== false);
+  if(showCustom){
+    var ov = ensureColorPreviewOverrideStore_()[String(id)];
+    if(ov){
+      if(ov.brand) entry.brand = sanitizeCssHexColor_(ov.brand, entry.brand);
+      if(ov.mango){
+        ['bg','bg2','head','point','card','card2','divider'].forEach(function(k){
+          if(ov.mango[k]) entry.mango[k] = sanitizeCssHexColor_(ov.mango[k], entry.mango[k]);
+        });
+      }
+      if(ov.thumb){
+        ['tint','tint2','glow'].forEach(function(k){
+          if(ov.thumb[k]) entry.thumb[k] = sanitizeCssHexColor_(ov.thumb[k], entry.thumb[k]);
+        });
+      }
+    }
+  }
+  return entry;
 }
 function getProgramColorPreviewCatIds_(){
   // 일반↔전문가 쌍: 무브먼트 / 페이스 / 도수 / 일상·커뮤니티 (+ 운영)
@@ -9789,7 +10148,8 @@ function isProgramColorPreviewOpen_(){
   return !!(ov && ov.classList.contains('open'));
 }
 function buildProgramColorPreviewBarHtml_(catId){
-  var entry = getProgramColorPreviewEntry_(catId);
+  // 이미지 탭 바는 상수(기본색)만 — 미리보기 세션 수정색과 혼동 방지
+  var entry = getProgramColorPreviewEntry_(catId, { forceDefault: true });
   return '<div class="img-color-preview-bar">' +
     '<button type="button" class="btn-color-preview" onclick="openProgramColorPreview_(' + entry.id + ')" title="망고보드·썸네일·탭 브랜드 색 확인">' +
     '<span class="btn-color-preview-dot" style="background:' + entry.brand + '"></span>' +
@@ -9797,27 +10157,78 @@ function buildProgramColorPreviewBarHtml_(catId){
     '<span class="btn-color-preview-name" style="color:' + entry.brand + '">' + escapeHtml(entry.name) + '</span>' +
     '</button></div>';
 }
-function colorPreviewSwatchHtml_(label, hex){
+function colorPreviewSwatchHtml_(label, hex, path, defaultHex){
   var h = sanitizeCssHexColor_(hex, '#CCCCCC');
-  return '<button type="button" class="cp-swatch" data-hex="' + h + '" onclick="copyProgramColorSwatch_(this)" title="클릭하면 hex 복사">' +
-    '<span class="cp-swatch-color" style="background:' + h + '"></span>' +
+  var def = sanitizeCssHexColor_(defaultHex != null ? defaultHex : hex, h);
+  var rgb6 = expandCssHexToRgb6_(h, '#cccccc');
+  var edited = normalizeCssHexCompare_(h) !== normalizeCssHexCompare_(def);
+  var pathAttr = escapeHtml(String(path || ''));
+  return '<div class="cp-swatch' + (edited ? ' edited' : '') + '" data-path="' + pathAttr + '" data-hex="' + escapeHtml(h) + '">' +
+    '<label class="cp-swatch-color" style="background:' + h + '" title="색 선택">' +
+      '<input type="color" class="cp-swatch-picker" value="' + escapeHtml(rgb6) + '" ' +
+        'onchange="onProgramColorSwatchPick_(this)" ' +
+        'aria-label="' + escapeHtml(label) + ' 색 선택">' +
+    '</label>' +
     '<span class="cp-swatch-label">' + escapeHtml(label) + '</span>' +
-    '<span class="cp-swatch-hex">' + escapeHtml(h.toUpperCase()) + '</span>' +
-    '</button>';
+    '<input type="text" class="cp-swatch-hex" value="' + escapeHtml(h.toUpperCase()) + '" ' +
+      'spellcheck="false" maxlength="9" inputmode="text" autocomplete="off" ' +
+      'aria-label="' + escapeHtml(label) + ' hex" ' +
+      'onchange="onProgramColorSwatchHex_(this)" onkeydown="onProgramColorSwatchHexKey_(event, this)" ' +
+      'onclick="event.stopPropagation()" title="hex 직접 수정">' +
+  '</div>';
 }
 function colorPreviewThumbGradient_(t){
   t = t || {};
-  var tint = sanitizeCssHexColor_(t.tint, '#111111');
-  var tint2 = sanitizeCssHexColor_(t.tint2, '#666666');
-  return 'linear-gradient(180deg, transparent 0%, ' + tint + '88 35%, ' +
-    tint2 + 'cc 70%, ' + tint + 'ee 100%)';
+  var tint = expandCssHexToRgb6_(t.tint, '#111111');
+  var tint2 = expandCssHexToRgb6_(t.tint2, '#666666');
+  var glow = expandCssHexToRgb6_(t.glow, tint2);
+  return 'linear-gradient(180deg, transparent 0%, ' + glow + '55 18%, ' + tint + '88 42%, ' +
+    tint2 + 'cc 72%, ' + tint + 'ee 100%)';
+}
+function updateProgramColorPreviewToolbar_(){
+  var toggleBtn = document.getElementById('cp-toggle-btn');
+  var downloadBtn = document.getElementById('cp-download-btn');
+  var catId = state.colorPreviewCatId;
+  var hasEdits = hasColorPreviewOverridesFor_(catId);
+  var showCustom = state.colorPreviewShowCustom !== false;
+  if(toggleBtn){
+    toggleBtn.disabled = !hasEdits;
+    if(!hasEdits){
+      toggleBtn.textContent = '기본색';
+      toggleBtn.setAttribute('aria-pressed', 'false');
+      toggleBtn.title = '색을 수정하면 기본색과 비교할 수 있어요';
+      toggleBtn.classList.remove('is-custom');
+    } else if(showCustom){
+      toggleBtn.textContent = '수정색';
+      toggleBtn.setAttribute('aria-pressed', 'true');
+      toggleBtn.title = '클릭하면 기본 색상으로 전환';
+      toggleBtn.classList.add('is-custom');
+    } else {
+      toggleBtn.textContent = '기본색';
+      toggleBtn.setAttribute('aria-pressed', 'false');
+      toggleBtn.title = '클릭하면 수정한 색상으로 전환';
+      toggleBtn.classList.remove('is-custom');
+    }
+  }
+  if(downloadBtn){
+    downloadBtn.disabled = false;
+    downloadBtn.title = hasEdits
+      ? '현재(수정 반영) 색상 코드를 JSON으로 저장 — Cursor에 넣어 반영'
+      : '현재 색상 코드를 JSON으로 저장 — Cursor에 넣어 반영';
+  }
 }
 function renderProgramColorPreviewBody_(catId){
   var p = getProgramColorPreviewEntry_(catId);
+  var base = getProgramColorPreviewEntry_(catId, { forceDefault: true });
   var m = p.mango;
   var t = p.thumb;
   var body = document.getElementById('color-preview-body');
   if(!body) return;
+  var hasEdits = hasColorPreviewOverridesFor_(catId);
+  var showCustom = state.colorPreviewShowCustom !== false;
+  var modeNote = hasEdits
+    ? (showCustom ? '지금 보는 색: 수정본' : '지금 보는 색: 기본값 (토글로 수정본 전환)')
+    : '색 칸·hex를 눌러 수정할 수 있어요';
   body.innerHTML =
     '<div class="cp-head">' +
       '<div class="cp-brand-dot" style="background:' + p.brand + '"></div>' +
@@ -9825,19 +10236,20 @@ function renderProgramColorPreviewBody_(catId){
         '<div class="cp-title">' + escapeHtml(p.name) + '</div>' +
         '<div class="cp-meta">' + escapeHtml(p.axis) + ' · ' + escapeHtml(p.audience) +
           ' · 탭 브랜드 ' + escapeHtml(String(p.brand).toUpperCase()) + '</div>' +
+        '<div class="cp-mode-note">' + escapeHtml(modeNote) + '</div>' +
       '</div>' +
     '</div>' +
     '<div class="cp-section">' +
       '<h3>망고보드 팔레트 · ' + escapeHtml(m.desc || '') + '</h3>' +
       '<div class="cp-swatches">' +
-        colorPreviewSwatchHtml_('배경 bg', m.bg) +
-        colorPreviewSwatchHtml_('배경2 bg2', m.bg2) +
-        colorPreviewSwatchHtml_('헤드 head', m.head) +
-        colorPreviewSwatchHtml_('포인트 point', m.point) +
-        colorPreviewSwatchHtml_('카드 card', m.card) +
-        colorPreviewSwatchHtml_('카드2 card2', m.card2) +
-        colorPreviewSwatchHtml_('구분선 divider', m.divider) +
-        colorPreviewSwatchHtml_('탭 brand', p.brand) +
+        colorPreviewSwatchHtml_('배경 bg', m.bg, 'mango.bg', base.mango.bg) +
+        colorPreviewSwatchHtml_('배경2 bg2', m.bg2, 'mango.bg2', base.mango.bg2) +
+        colorPreviewSwatchHtml_('헤드 head', m.head, 'mango.head', base.mango.head) +
+        colorPreviewSwatchHtml_('포인트 point', m.point, 'mango.point', base.mango.point) +
+        colorPreviewSwatchHtml_('카드 card', m.card, 'mango.card', base.mango.card) +
+        colorPreviewSwatchHtml_('카드2 card2', m.card2, 'mango.card2', base.mango.card2) +
+        colorPreviewSwatchHtml_('구분선 divider', m.divider, 'mango.divider', base.mango.divider) +
+        colorPreviewSwatchHtml_('탭 brand', p.brand, 'brand', base.brand) +
       '</div>' +
       '<div class="cp-mock-row">' +
         '<div>' +
@@ -9852,9 +10264,9 @@ function renderProgramColorPreviewBody_(catId){
         '<div>' +
           '<div class="cp-mock-label">썸네일 스크림 · tint / tint2 / glow</div>' +
           '<div class="cp-swatches" style="margin-bottom:10px">' +
-            colorPreviewSwatchHtml_('tint', t.tint) +
-            colorPreviewSwatchHtml_('tint2', t.tint2) +
-            colorPreviewSwatchHtml_('glow', t.glow) +
+            colorPreviewSwatchHtml_('tint', t.tint, 'thumb.tint', base.thumb.tint) +
+            colorPreviewSwatchHtml_('tint2', t.tint2, 'thumb.tint2', base.thumb.tint2) +
+            colorPreviewSwatchHtml_('glow', t.glow, 'thumb.glow', base.thumb.glow) +
           '</div>' +
           '<div class="cp-thumb-mock">' +
             '<div class="cp-thumb-photo"></div>' +
@@ -9866,7 +10278,8 @@ function renderProgramColorPreviewBody_(catId){
         '</div>' +
       '</div>' +
     '</div>' +
-    '<p class="cp-footnote">색을 누르면 hex가 복사됩니다. 원본: MANGO_PALETTES_BY_CAT · THUMB_SCRIM_BY_CAT · CATEGORIES.color</p>';
+    '<p class="cp-footnote">색 칸을 누르면 선택, hex는 직접 수정. 수정 후 상단 「수정색/기본색」으로 비교 · 「저장」으로 planner-colors-live.json 다운로드 (Cursor 반영용). 새로고침 전 저장하세요. 원본 상수: MANGO_PALETTES_BY_CAT · THUMB_SCRIM_BY_CAT · CATEGORIES.color</p>';
+  updateProgramColorPreviewToolbar_();
 }
 function renderProgramColorPreviewTabs_(activeId){
   var tabsEl = document.getElementById('color-preview-tabs');
@@ -9898,6 +10311,7 @@ window.openProgramColorPreview_ = function(catId){
   var id = parseInt(catId, 10);
   if(isNaN(id)) id = state.selectedCatId != null ? state.selectedCatId : 1;
   if(!MANGO_PALETTES_BY_CAT[id]) id = 1;
+  ensureColorPreviewOverrideStore_();
   state.colorPreviewCatId = id;
   var ov = document.getElementById('color-preview-overlay');
   var box = document.getElementById('color-preview-box');
@@ -9957,6 +10371,210 @@ window.forceCloseProgramColorPreview_ = function(skipRestore){
   unlockBodyScroll_();
   scheduleAppToastLift_();
   if(!skipRestore) restoreDetailFocusTrapIfOpen_();
+};
+function getProgramColorPreviewEntryMerged_(catId){
+  var entry = getProgramColorPreviewEntry_(catId, { forceDefault: true });
+  var ov = ensureColorPreviewOverrideStore_()[String(catId)];
+  if(!ov) return entry;
+  if(ov.brand) entry.brand = sanitizeCssHexColor_(ov.brand, entry.brand);
+  if(ov.mango){
+    ['bg','bg2','head','point','card','card2','divider'].forEach(function(k){
+      if(ov.mango[k]) entry.mango[k] = sanitizeCssHexColor_(ov.mango[k], entry.mango[k]);
+    });
+  }
+  if(ov.thumb){
+    ['tint','tint2','glow'].forEach(function(k){
+      if(ov.thumb[k]) entry.thumb[k] = sanitizeCssHexColor_(ov.thumb[k], entry.thumb[k]);
+    });
+  }
+  return entry;
+}
+function applyProgramColorPreviewPath_(catId, path, hex){
+  var clean = sanitizeCssHexColor_(hex, '');
+  if(!clean || !path) return false;
+  var ov = ensureColorPreviewOverrideFor_(catId);
+  if(path === 'brand'){
+    ov.brand = clean;
+  } else if(path.indexOf('mango.') === 0){
+    var mk = path.slice(6);
+    if(!ov.mango) ov.mango = {};
+    ov.mango[mk] = clean;
+  } else if(path.indexOf('thumb.') === 0){
+    var tk = path.slice(6);
+    if(!ov.thumb) ov.thumb = {};
+    ov.thumb[tk] = clean;
+  } else {
+    return false;
+  }
+  // 기본값과 동일해지면 override 슬롯 정리
+  if(!hasColorPreviewOverridesFor_(catId)){
+    delete ensureColorPreviewOverrideStore_()[String(catId)];
+  }
+  state.colorPreviewShowCustom = true;
+  return true;
+}
+function refreshProgramColorPreviewAfterEdit_(){
+  var id = state.colorPreviewCatId;
+  if(id == null) return;
+  renderProgramColorPreviewTabs_(id);
+  renderProgramColorPreviewBody_(id);
+}
+window.onProgramColorSwatchPick_ = function(input){
+  if(!input) return;
+  var swatch = input.closest ? input.closest('.cp-swatch') : null;
+  if(!swatch) return;
+  var path = swatch.getAttribute('data-path');
+  var hex = sanitizeCssHexColor_(input.value, '');
+  if(!hex || !path) return;
+  var catId = state.colorPreviewCatId;
+  if(catId == null) return;
+  if(!applyProgramColorPreviewPath_(catId, path, hex)) return;
+  refreshProgramColorPreviewAfterEdit_();
+};
+window.onProgramColorSwatchHex_ = function(input){
+  if(!input) return;
+  var swatch = input.closest ? input.closest('.cp-swatch') : null;
+  if(!swatch) return;
+  var path = swatch.getAttribute('data-path');
+  var raw = String(input.value || '').trim();
+  if(raw && raw.charAt(0) !== '#') raw = '#' + raw;
+  var hex = sanitizeCssHexColor_(raw, '');
+  var catId = state.colorPreviewCatId;
+  if(!hex || !path || catId == null){
+    // 잘못된 입력이면 현재 표시값으로 되돌림
+    var cur = getProgramColorPreviewEntry_(catId);
+    var fallback = swatch.getAttribute('data-hex') || '#CCCCCC';
+    if(path === 'brand') fallback = cur.brand;
+    else if(path && path.indexOf('mango.') === 0) fallback = cur.mango[path.slice(6)] || fallback;
+    else if(path && path.indexOf('thumb.') === 0) fallback = cur.thumb[path.slice(6)] || fallback;
+    input.value = String(fallback).toUpperCase();
+    if(typeof setAppToast === 'function'){
+      setAppToast('올바른 hex만 입력해 주세요 (예: #3A5080)', { duration: 2200, variant: 'err' });
+    }
+    return;
+  }
+  if(!applyProgramColorPreviewPath_(catId, path, hex)) return;
+  refreshProgramColorPreviewAfterEdit_();
+};
+window.onProgramColorSwatchHexKey_ = function(e, input){
+  if(!e) return;
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    if(input) input.blur();
+  } else if(e.key === 'Escape'){
+    e.preventDefault();
+    var swatch = input && input.closest ? input.closest('.cp-swatch') : null;
+    if(swatch) input.value = String(swatch.getAttribute('data-hex') || '').toUpperCase();
+    if(input) input.blur();
+  }
+};
+window.toggleProgramColorPreviewCustom_ = function(){
+  var catId = state.colorPreviewCatId;
+  if(catId == null || !hasColorPreviewOverridesFor_(catId)){
+    if(typeof setAppToast === 'function'){
+      setAppToast('먼저 색을 수정해야 기본색과 비교할 수 있어요', { duration: 2200, variant: 'err' });
+    }
+    return;
+  }
+  state.colorPreviewShowCustom = !(state.colorPreviewShowCustom !== false);
+  renderProgramColorPreviewTabs_(catId);
+  renderProgramColorPreviewBody_(catId);
+};
+function buildProgramColorsLiveExportPayload_(){
+  ensureColorPreviewOverrideStore_();
+  var focusCatId = state.colorPreviewCatId;
+  var categories = {};
+  getProgramColorPreviewCatIds_().forEach(function(id){
+    var effective = getProgramColorPreviewEntryMerged_(id);
+    categories[String(id)] = {
+      name: effective.name,
+      axis: effective.axis,
+      audience: effective.audience,
+      modified: hasColorPreviewOverridesFor_(id),
+      brand: effective.brand,
+      mango: {
+        key: effective.mango.key,
+        label: effective.mango.label,
+        desc: effective.mango.desc,
+        bg: effective.mango.bg,
+        bg2: effective.mango.bg2,
+        head: effective.mango.head,
+        point: effective.mango.point,
+        card: effective.mango.card,
+        card2: effective.mango.card2,
+        divider: effective.mango.divider
+      },
+      thumb: {
+        tint: effective.thumb.tint,
+        tint2: effective.thumb.tint2,
+        glow: effective.thumb.glow
+      }
+    };
+  });
+  var focusEntry = getProgramColorPreviewEntry_(focusCatId);
+  return {
+    version: 1,
+    kind: 'planner-colors-live',
+    exportedAt: new Date().toISOString(),
+    focusCatId: focusCatId,
+    focusCatName: focusEntry.name,
+    viewingCustom: state.colorPreviewShowCustom !== false,
+    note: 'Cursor에 이 파일을 넣고 MANGO_PALETTES_BY_CAT / THUMB_SCRIM_BY_CAT / CATEGORIES.color 반영을 요청하세요. modified:true 항목이 수정본입니다.',
+    categories: categories,
+    mangoPalettesByCat: (function(){
+      var out = {};
+      Object.keys(categories).forEach(function(k){
+        var c = categories[k];
+        out[k] = {
+          key: c.mango.key,
+          label: c.mango.label,
+          bg: c.mango.bg,
+          bg2: c.mango.bg2,
+          head: c.mango.head,
+          point: c.mango.point,
+          card: c.mango.card,
+          card2: c.mango.card2,
+          divider: c.mango.divider,
+          desc: c.mango.desc
+        };
+      });
+      return out;
+    })(),
+    thumbScrimByCat: (function(){
+      var out = {};
+      Object.keys(categories).forEach(function(k){
+        var c = categories[k];
+        out[k] = { tint: c.thumb.tint, tint2: c.thumb.tint2, glow: c.thumb.glow };
+      });
+      return out;
+    })(),
+    categoryBrandColors: (function(){
+      var out = {};
+      Object.keys(categories).forEach(function(k){
+        out[k] = categories[k].brand;
+      });
+      return out;
+    })()
+  };
+}
+window.downloadProgramColorPreviewLive_ = function(){
+  var payload = buildProgramColorsLiveExportPayload_();
+  var json = JSON.stringify(payload, null, 2);
+  var blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'planner-colors-live.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){
+    try { URL.revokeObjectURL(url); } catch(e){}
+    try { a.remove(); } catch(e2){}
+  }, 800);
+  var focusHint = payload.focusCatName ? ('「' + payload.focusCatName + '」 포함 · ') : '';
+  if(typeof setAppToast === 'function'){
+    setAppToast(focusHint + 'planner-colors-live.json 저장을 시작했어요.\n홈페이지 폴더에 두면 Cursor가 현재 색상을 참고해 반영할 수 있어요.', { duration: 7000, variant: 'ok' });
+  }
 };
 window.copyProgramColorSwatch_ = function(btn){
   if(!btn) return;
@@ -14746,7 +15364,7 @@ window.restorePreSyncBackup_ = function(){
       cur.branding.subGoalPlans = Object.assign({}, cur.branding.subGoalPlans || {}, meta.branding.subGoalPlans);
     }
     applyPersistPayload(cur);
-    repairAllSubGoalDraftAssignments_();
+    withDraftStepReassignAllowed_(function(){ repairAllSubGoalDraftAssignments_(); });
     state.syncDirty = true;
     state.syncNeedsSnapshot = true;
     save({ skipGasPush: false });
@@ -14762,11 +15380,15 @@ window.restorePreSyncBackup_ = function(){
 };
 window.repairSubGoalAssignmentsFromSync_ = function(){
   var n = 0;
-  CATEGORIES.forEach(function(cat, i){
-    if(!getSubGoalPlan_(i)) return;
-    n += rescueOrphanedStepDrafts_(i);
+  var changed = false;
+  withDraftStepReassignAllowed_(function(){
+    CATEGORIES.forEach(function(cat, i){
+      if(!getSubGoalPlan_(i)) return;
+      n += rescueOrphanedStepDrafts_(i);
+      if(repairSubGoalDraftAssignments_(i)) changed = true;
+    });
   });
-  if(repairAllSubGoalDraftAssignments_()){
+  if(changed || n){
     state.syncDirty = true;
     save({ skipGasPush: false });
   }
@@ -15139,8 +15761,7 @@ function applyPersistPayload(s, opts){
   }
   var deferHeavy = !!(opts && opts.deferHeavyRepair);
   if(!deferHeavy){
-    if(repairAllIncompleteSubGoalPlans_()) migrated = true;
-    if(repairAllSubGoalDraftAssignments_()) migrated = true;
+    // 로드·동기화 adopt 시에도 기존 주제 단계/순서는 고정 (재배정 패스 생략)
     CATEGORIES.forEach(function(cat, i){ ensureUserAddedDraftsInMisc_(i); });
   } else {
     state._pendingHeavyRepair = true;
@@ -15176,10 +15797,21 @@ function runPlannerStepIntegrityPass_(opts){
     if(typeof setAppToast === 'function' && opts.toast){
       setAppToast('단계 배치를 정리하는 중…', { duration: 3200, variant: 'ok' });
     }
-    if(dedupeAllSubGoalPlanSteps_()) changed = true;
-    if(repairAllIncompleteSubGoalPlans_()) changed = true;
-    // repairAll 내부에서 rescueOrphanedStepDrafts_ + reconcile 수행
-    if(repairAllSubGoalDraftAssignments_()) changed = true;
+    // 기본: 기존 주제 자리 고정. 강제 정리(opts.allowReassign) 또는 허용 플래그일 때만 재배정.
+    if(opts.allowReassign || canReassignDraftSteps_()){
+      withDraftStepReassignAllowed_(function(){
+        if(dedupeAllSubGoalPlanSteps_()) changed = true;
+        if(repairAllIncompleteSubGoalPlans_()) changed = true;
+        if(repairAllSubGoalDraftAssignments_()) changed = true;
+        CATEGORIES.forEach(function(cat, i){
+          try {
+            var slotNorm = normalizeAllStepDraftSlots_(i);
+            if(slotNorm && slotNorm.changed) changed = true;
+            if(repairInvalidStepBadgeDrafts_(i)) changed = true;
+          } catch(eNorm){}
+        });
+      });
+    }
     CATEGORIES.forEach(function(cat, i){
       try { ensureUserAddedDraftsInMisc_(i); } catch(eCat){}
     });
@@ -17542,7 +18174,7 @@ function pruneTopicsWithoutDraftCore_(catId, opts){
     });
     try { persistPendingSubGoalPlan_(); } catch(ePend){}
   }
-  try { reconcileSubGoalDraftSteps_(catId); } catch(eRec){}
+  try { withDraftStepReassignAllowed_(function(){ reconcileSubGoalDraftSteps_(catId); }); } catch(eRec){}
   try { purgeDeletedDraftsFromCatalog_(); } catch(ePurge){}
 
   var saveOk = true;
@@ -17672,9 +18304,13 @@ window.forceDedupeSubGoalSteps_ = function(catId){
   } catch(e0){}
   var changed = false;
   try {
-    changed = !!dedupeAllSubGoalPlanSteps_();
-    if(repairMislabeledSubGoalSteps_(catId)) changed = true;
-    reconcileSubGoalDraftSteps_(catId);
+    changed = !!withDraftStepReassignAllowed_(function(){
+      var c = !!dedupeAllSubGoalPlanSteps_();
+      if(repairMislabeledSubGoalSteps_(catId)) c = true;
+      reconcileSubGoalDraftSteps_(catId);
+      normalizeAllStepDraftSlots_(catId);
+      return c;
+    });
   } catch(e1){}
   try {
     save({ skipDriveUpload: true, skipGasPush: false, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
@@ -18536,10 +19172,37 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
   const brandLine = compactInSeries
     ? (brandMeta.pillar ? '<div class="card-brand-line compact">' + escapeHtml(brandMeta.pillar) + '</div>' : '')
     : '<div class="card-brand-line">' + escapeHtml(brandMeta.series) + (stepBadge ? ' · ' + escapeHtml(stepBadge) : '') + (brandMeta.pillar ? ' · ' + escapeHtml(brandMeta.pillar) : '') + '</div>';
+  var orderBtns = '';
+  try {
+    var stepIdForOrder = getDraftRoadmapStepId_(d, cat.id, draftIndex);
+    if(stepIdForOrder && String(stepIdForOrder) !== SUBGOAL_MISC_ID){
+      var slotMapOrd = buildStepSlotDraftMap_(cat.id, stepIdForOrder, { live: true });
+      var ordIdx = -1;
+      for(var oi = 0; oi < slotMapOrd.length; oi++){
+        if(slotMapOrd[oi] && slotMapOrd[oi].id === d.id){ ordIdx = oi; break; }
+      }
+      if(ordIdx < 0){
+        var op = getDraftStepParts_(d, cat.id, draftIndex);
+        if(op.step >= 1 && op.step <= STEP_TOPIC_SLOTS_MAX) ordIdx = op.step - 1;
+      }
+      if(ordIdx >= 0){
+        var canUpCard = false;
+        var canDownCard = false;
+        for(var uo = ordIdx - 1; uo >= 0; uo--){ if(slotMapOrd[uo]){ canUpCard = true; break; } }
+        for(var do_ = ordIdx + 1; do_ < slotMapOrd.length; do_++){ if(slotMapOrd[do_]){ canDownCard = true; break; } }
+        orderBtns =
+          '<span class="draft-card-order-btns">' +
+            '<button type="button" class="draft-card-order-mini"' + (canUpCard ? '' : ' disabled') + ' title="위로" onclick="event.stopPropagation();moveDraftCardOrder_(' + cat.id + ',\'' + d.id + '\',-1)">▲</button>' +
+            '<button type="button" class="draft-card-order-mini"' + (canDownCard ? '' : ' disabled') + ' title="아래로" onclick="event.stopPropagation();moveDraftCardOrder_(' + cat.id + ',\'' + d.id + '\',1)">▼</button>' +
+          '</span>';
+      }
+    }
+  } catch(eOrd){}
   return `<div class="draft-card plan-tier-topic${isPub?' published':''}${isPartialPub?' partial-published':''}${isRec?' recommended':''}" data-plan-tier="4" style="--cc:${color}" tabindex="0" role="button" aria-label="${escapeHtml(d.topic)}" onclick="openDetail('${d.id}',${cat.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetail('${d.id}',${cat.id});}">
     <div class="draft-card-actions">
       <button type="button" class="draft-card-delete-mini" title="이 주제 카드 삭제" onclick="event.stopPropagation();deleteDraft(${cat.id},'${d.id}')">삭제</button>
       <button type="button" class="draft-card-refresh-mini" data-regen-draft="${d.id}" title="이 주제의 제목·각도만 다시 받기" onclick="event.stopPropagation();refreshTopicsForDraft(${cat.id},'${d.id}')">주제 변경</button>
+      ${orderBtns}
     </div>
     <div class="card-badges">${badges}</div>
     ${brandLine}
@@ -21006,15 +21669,15 @@ const THUMB_BRAND_PRESETS = {
     defaultBody: '몸의 불편함과 기능 저하를 단계별로 평가해, 맞춤 도수·움직임으로 회복을 돕는 프로그램.'
   },
   1: {
-    hero: '리얼무브먼트',
+    hero: '리:얼 무브먼트',
     tagline: '의학적 관점으로 다시 보는 움직임',
-    program: '리얼무브먼트',
+    program: '리:얼 무브먼트',
     defaultBody: '몸의 불편함 & 기능 저하를 단계별로 평가해 이상 유무를 파악하고, 개별 차이가 큰 근육·관절 조정 능력을 안전하고 정밀한 맞춤 운동으로 회복시켜주는 트레이닝.'
   },
   2: {
-    hero: '리얼페이스',
+    hero: '리:얼 페이스',
     tagline: '구조로 다시 보는 얼굴',
-    program: '리얼페이스',
+    program: '리:얼 페이스',
     defaultBody: '습관·교합·경추와 연결된 얼굴 비대칭을 구조적으로 살펴, 표면이 아닌 원인부터 맞춰 가는 접근.'
   },
   3: {

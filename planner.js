@@ -50,7 +50,7 @@ const CATEGORIES = [
     sub:"Re:Al 움직임 과정 · 전문가 교육",
     drafts:[
       {id:"d5-0", topic:"패시브 스트레칭을 언제, 어떻게 써야 하는가?",          angle:"억제-이완 테크닉의 원리와 임상 적용 타이밍"},
-      {id:"d5-1", topic:"기능운동, 치료의 끝이 아닌 연결이다",                  angle:"도수치료 후 기능운동으로의 전환 — 리:얼 무브먼트 접근 철학"},
+      {id:"d5-1", topic:"기능운동, 치료의 끝이 아닌 연결이다",                  angle:"도수치료 후 기능운동으로의 전환 — 리얼 무브먼트 접근 철학"},
       {id:"d5-2", topic:"자세 교정에서 '좋은 자세'가 없는 이유",                angle:"동적 안정성 개념과 자세 교정의 새로운 패러다임"},
       {id:"d5-3", topic:"고관절 가동성 vs 안정성, 무엇이 먼저인가?",            angle:"기능 사슬(kinetic chain) 관점의 운동 처방 우선순위"},
       {id:"d5-4", topic:"운동 처방 시 환자 순응도를 높이는 커뮤니케이션 전략",  angle:"행동변화 이론 + 동기부여 인터뷰를 운동 지도에 적용"},
@@ -2289,7 +2289,7 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
     ]
   },
   '1': {
-    brandProfile: '리:얼 무브먼트는 PAR·Position을 통해 "좋은 자세를 고정"이 아니라 "움직임을 조절"하도록 돕는 프로그램입니다. 일반인이 일상 동작(앉기·걷기·업무)에서 즉시 써먹을 수 있는 표현이 중요합니다. 강한 교정보다 가벼운 감각 회복과 반복 가능한 루틴을 우선합니다.',
+    brandProfile: '리얼 무브먼트는 PAR·Position을 통해 "좋은 자세를 고정"이 아니라 "움직임을 조절"하도록 돕는 프로그램입니다. 일반인이 일상 동작(앉기·걷기·업무)에서 즉시 써먹을 수 있는 표현이 중요합니다. 강한 교정보다 가벼운 감각 회복과 반복 가능한 루틴을 우선합니다. 블로그·이미지 표기는 「리얼」(리:얼 금지), 영문 Re:Al은 유지.',
     strategyGuide: '기준:\n- 단계는 감각 깨우기 → 동작 패턴 교정 → 일상 적용 → 유지 습관 순으로 구성한다.\n- 각 단계는 3~5분 내 가능한 마이크로 루틴을 포함한다.\n- "정답 자세"보다 상황별 조절 원칙을 제시한다.\n\n의도:\n- 독자가 자세 교정을 부담이 아닌 생활 기술로 인식하게 한다.\n- 통증 예방과 피로 감소를 일상 동작에서 체감하게 만든다.\n- 센터 방문 전후 모두 유지 가능한 자기조절 프레임을 만든다.',
     steps: [
       { id: '1', title: '1단계 · 감각 깨우기', summary: '호흡·기준선 회복으로 몸 상태를 먼저 인식하기', rationale: '몸 상태를 모르면 교정 신호를 받아들이기 어렵습니다. 가장 쉬운 감각 입력부터 시작해 "지금 내 몸"을 파악하도록 돕습니다.' },
@@ -5209,11 +5209,13 @@ function getCategoryProgramLine_(catId){
   if(!cat) return '';
   return localizeProgramDisplayName_(cat.programLine || CAT_PROGRAM_LINE[catId] || cat.name);
 }
-/** 고객·초안 표기용: Re:Al Movement → 리:얼 무브먼트 */
+/** 고객·초안 표기용: Re:Al Movement → 리얼 무브먼트 (블로그·이미지). Re:Al 영문은 유지 */
 function localizeProgramDisplayName_(text){
   return String(text || '')
-    .replace(/Re:\s*Al\s*Movement/gi, '리:얼 무브먼트')
-    .replace(/Re:\s*Al\s*Face/gi, '리:얼 페이스');
+    .replace(/Re:\s*Al\s*Movement/gi, '리얼 무브먼트')
+    .replace(/Re:\s*Al\s*Face/gi, '리:얼 페이스')
+    .replace(/리:얼\s*무브먼트/g, '리얼 무브먼트')
+    .replace(/리:얼\s*움직임/g, '리얼 움직임');
 }
 function getDefaultSeriesForCat_(catId){
   return localizeProgramDisplayName_(CAT_DEFAULT_SERIES[catId] || (CATEGORIES[catId] ? CATEGORIES[catId].name : ''));
@@ -5474,6 +5476,9 @@ function buildBrandContextForPrompt_(catId, draft){
   lines.push('', '위 메시지·시리즈와 모순되지 않게, 미카닥 박준규·리얼무브먼트 브랜드 톤을 유지하세요.');
   if(isGeneralAudienceCategory(catId)){
     lines.push('일반인 채널에서는 프로그램명을 「리얼무브먼트」「리얼페이스」로 표기하세요. (영문 Re:Al Movement / Re:Al Face 남발 금지)');
+  }
+  if(Number(catId) === 1 || Number(catId) === 5){
+    lines.push('무브먼트·움직임 채널 블로그·이미지·캡션에서는 「리:얼」 대신 「리얼」로 표기하세요. (예: 리얼 무브먼트, 리얼 움직임). 영문 Re:Al은 그대로 둡니다.');
   }
   return lines.join('\n');
 }
@@ -8998,7 +9003,7 @@ History Taking · Inspection · Movement Test · Palpation
 
 ■ 콘텐츠에 녹이는 방법
 - 일반 독자: 공감 → 왜 아픈지(평가·원인, 쉬운 비유) → 센터에서 무엇을 하는지(도수 F→M→J → 움직임 P→AA→A→생활습관→기능) → 집 셀프(동작·초·회·분, 무리·재통증 주의).
-- Movement·리:얼 카테고리: P-ROM·PAR·Position 1→2→3 순서를 환자 언어로. '왜 이 동작인지'·편안한 호흡·긴장 자각을 강조.
+- Movement·리얼 카테고리: P-ROM·PAR·Position 1→2→3 순서를 환자 언어로. '왜 이 동작인지'·편안한 호흡·긴장 자각을 강조. 표기 「리얼」(「리:얼」 금지, Re:Al 유지).
 - 전문가 독자: 평가-치료 연결, PSP·PAR 순서 존중. 과장·즉효 약속·타 기관 비방 금지.
 - 얼굴·웰니스: 구조→기능, 호흡·자세·긴장 조절 맥락 유지.`;
 
@@ -9877,7 +9882,7 @@ const MANGO_PALETTES_BY_CAT = {
   },
   1: {
     key: 'devon',
-    label: '리:얼 무브먼트',
+    label: '리얼 무브먼트',
     bg: '#f0efeb',
     bg2: '#eee9de',
     head: '#333333',
@@ -10916,7 +10921,8 @@ const DEFAULT_REAL_MOVEMENT_EXPERT_BLOG_PROMPT = buildExpertCourseBlogPrompt_({
   programBlock: '[Re:Al Movement 맥락]\n' +
     '- 치료실→기능운동 연결. PAR·Position·progression을 **참고·영상에서 다룬 내용** 안에서만 연결\n' +
     '- 참고에 없는 평가·운동 처방·다른 부위로 확장 금지\n' +
-    '- 안전한 progression·환자 순응도·코칭 언어가 드러나게'
+    '- 안전한 progression·환자 순응도·코칭 언어가 드러나게\n' +
+    '- 한글 프로그램명 쓸 때 「리얼 무브먼트」「리얼 움직임」(「리:얼」 금지). 영문 Re:Al은 유지'
 });
 const DEFAULT_CMT_EXPERT_INSTA_PROMPT = buildExpertCourseInstaPrompt_({
   roleReaders: 'CMT 수강·복습 중인 도수·물리치료 동료',
@@ -10953,7 +10959,8 @@ const DEFAULT_PROMPTS = {
 프로필·약력: https://breezefeel.github.io/drpark · https://blog.naver.com/allenjoy/120205433765
 ${BLOG_CONTENT_VOICE_RULE}
 ${MEDICAL_COMPLIANCE_RULE}
-인스타(프로그램별): 도수·CMT @dr.park_dc.pt · 리:얼 페이스·IFC @dr.face_ifc · 리:얼 무브먼트·움직임 @re.al_movement_official` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
+인스타(프로그램별): 도수·CMT @dr.park_dc.pt · 리:얼 페이스·IFC @dr.face_ifc · 리얼 무브먼트·움직임 @re.al_movement_official
+※ 무브먼트·움직임 채널 블로그·이미지·캡션: 「리:얼」 대신 「리얼」 표기 (리얼 무브먼트·리얼 움직임). 영문 Re:Al은 유지.` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
   categories: {
     0: { // 도수치료
       blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[도수치료 맥락] PSP·PAR 순서를 환자 언어로: 평가(증상·통증 질)→연부·관절 이해→Passive(P-ROM)→생활습관. problem에 공감·왜 아픈지 가볍게, selfCare는 집에서 할 수 있는 동작.`,
@@ -10961,9 +10968,9 @@ ${MEDICAL_COMPLIANCE_RULE}
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
-    1: { // 리:얼 무브먼트
-      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[Movement 맥락] P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지.`,
-      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n캐러셀 없이 **한 포스트 캡션**에 동작·포인트·주의사항을 단계적으로 적습니다. 마지막에 저장·팔로우 유도 문장을 캡션 끝에 자연스럽게 넣으세요.`,
+    1: { // 리얼 무브먼트
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[Movement 맥락] P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지. 프로그램명 표기: 「리얼 무브먼트」(「리:얼」 금지, 영문 Re:Al 유지).`,
+      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n캐러셀 없이 **한 포스트 캡션**에 동작·포인트·주의사항을 단계적으로 적습니다. 마지막에 저장·팔로우 유도 문장을 캡션 끝에 자연스럽게 넣으세요. 표기: 「리얼 무브먼트」(「리:얼」 금지).`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
@@ -21790,9 +21797,9 @@ const THUMB_BRAND_PRESETS = {
     defaultBody: '몸의 불편함과 기능 저하를 단계별로 평가해, 맞춤 도수·움직임으로 회복을 돕는 프로그램.'
   },
   1: {
-    hero: '리:얼 무브먼트',
+    hero: '리얼 무브먼트',
     tagline: '의학적 관점으로 다시 보는 움직임',
-    program: '리:얼 무브먼트',
+    program: '리얼 무브먼트',
     defaultBody: '몸의 불편함 & 기능 저하를 단계별로 평가해 이상 유무를 파악하고, 개별 차이가 큰 근육·관절 조정 능력을 안전하고 정밀한 맞춤 운동으로 회복시켜주는 트레이닝.'
   },
   2: {
@@ -21835,7 +21842,7 @@ const THUMB_BRAND_PRESETS = {
     hero: 'REAL MOVEMENT',
     tagline: '진짜 움직임, 몸의 재정렬',
     program: '리얼무브먼트 · 지점 브랜딩',
-    defaultBody: '근골격·움직임 전문가의 1:1 리:얼 움직임 프로그램. 지점 운영·브랜딩 콘텐츠용.'
+    defaultBody: '근골격·움직임 전문가의 1:1 리얼 움직임 프로그램. 지점 운영·브랜딩 콘텐츠용.'
   }
 };
 

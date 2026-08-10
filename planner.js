@@ -10,7 +10,7 @@ const CATEGORIES = [
       {id:"d0-3", topic:"연부조직 치료, 어디까지 해야 효과가 날까요?",         angle:"근막·인대·건 각각의 치료 접근과 적절한 치료 횟수 가이드"},
       {id:"d0-4", topic:"목·허리·어깨 중 가장 먼저 치료해야 할 곳은?",        angle:"연쇄 보상 패턴 설명으로 치료 순서의 중요성 강조"},
     ]},
-  { id:1, icon:"", name:"리:얼 무브먼트",   color:"#777777", audience:"일반인",
+  { id:1, icon:"", name:"리:얼 무브먼트",   color:"#dc143c", audience:"일반인",
     sub:"Re-Alignment Movement Center — 패시브 스트레칭 · 기능운동 · 자세교정",
     drafts:[
       {id:"d1-0", topic:"스트레칭을 매일 해도 왜 몸이 안 풀릴까요?",           angle:"패시브 스트레칭의 올바른 방법과 잘못된 습관 교정"},
@@ -447,6 +447,10 @@ function parseOpsNaverKwAdGroupIds_(raw){
   });
   return out;
 }
+/** 광고그룹ID 입력 정규화: 여러 개를 줄바꿈으로 저장(쉼표·공백 입력도 흡수) */
+function normalizeOpsNaverKwAdGroupIdInput_(raw){
+  return parseOpsNaverKwAdGroupIds_(raw).join('\n');
+}
 function getOpsNaverKwState_(itemId){
   var om = getOpsManualState_();
   if(!om.keywordAds || typeof om.keywordAds !== 'object') om.keywordAds = {};
@@ -585,7 +589,8 @@ function syncOpsNaverKwPanelFromDom_(itemId){
   ['adGroupId', 'bid', 'pcUrl', 'mobileUrl'].forEach(function(key){
     var el = panel.querySelector('[data-ops-kw-meta="' + key + '"]');
     if(!el) return;
-    st[key] = String(el.value || '').trim();
+    var raw = String(el.value || '');
+    st[key] = key === 'adGroupId' ? normalizeOpsNaverKwAdGroupIdInput_(raw) : raw.trim();
   });
   if(st.bid) st.bid = normalizeOpsNaverKwBid_(st.bid);
   // PC·모바일 중 하나만 있으면 서로 맞춤
@@ -1920,7 +1925,7 @@ const CAT_IMAGE_THUMBNAIL_FIXED = {
 /** 썸네일 여백 밴드 색 (영문 프롬프트용) */
 const CAT_IMAGE_BAND_COLOR_EN = {
   0: 'deep charcoal top and bottom bands with subtle teal accent',
-  1: 'off-white and mint green top and bottom bands',
+  1: 'warm ivory bands with crimson accent',
   2: 'warm rose and soft cream top and bottom bands',
   3: 'deep navy and muted purple top and bottom bands',
   4: 'burgundy rose and soft gray top and bottom bands',
@@ -9875,12 +9880,12 @@ const MANGO_PALETTES_BY_CAT = {
     label: '리:얼 무브먼트',
     bg: '#f0efeb',
     bg2: '#eee9de',
-    head: '#1A1A1A',
-    point: '#576169',
+    head: '#333333',
+    point: '#dc143c',
     card: '#FAF6F0',
     card2: '#EDE8DF',
-    divider: '#1A1A1A',
-    desc: '아이보리·차콜·쿨 그레이'
+    divider: '#333333',
+    desc: '아이보리·크림슨'
   },
   2: {
     key: 'gold',
@@ -9971,7 +9976,7 @@ const MANGO_PALETTES_BY_CAT = {
 /** 썸네일 스크림 — 망고 팔레트와 같은 hue (전문가는 채도 약간↑ ) */
 const THUMB_SCRIM_BY_CAT = {
   0: { tint: '#1e2a44', tint2: '#3A5080', glow: '#3a5080' },
-  1: { tint: '#2a2827', tint2: '#777777', glow: '#373736' },
+  1: { tint: '#333333', tint2: '#dc143c', glow: '#b01030' },
   2: { tint: '#3d2c27', tint2: '#D4A853', glow: '#6b493d' },
   3: { tint: '#0F172A', tint2: '#1E3A5F', glow: '#4F46E5' },
   4: { tint: '#5C3D2E', tint2: '#A67C52', glow: '#9E4B5A' },
@@ -10638,9 +10643,10 @@ function getMangoModelGuideForCat_(catId){
 }
 function buildMangoDesignToneLineFromPalette_(p){
   p = p || MANGO_PALETTES_BY_CAT[1];
-  return '색: 배경 ' + p.bg + '·' + p.bg2 + '(' + p.desc + '). ' +
-    '글·헤드·구분선 ' + p.head + '. 카드·박스 ' + p.card + '·' + p.card2 + '. ' +
-    '포인트 ' + p.point + '. ' +
+  var div = p.divider || p.head;
+  return '색: 배경 ' + p.bg + '·' + p.bg2 + '. ' +
+    '글·헤드 ' + p.head + '. 카드·박스 ' + p.card + '·' + p.card2 + '. ' +
+    '포인트 ' + p.point + '. 구분선 ' + div + '. ' +
     '지정 팔레트 외 색·흑백 모노톤·네온·만화·코믹 금지. ' +
     '로고·워터마크: 우하단 고정, 슬라이드 높이 약 6~8% 이하, 본문·얼굴과 겹치지 않게(생성 중 어려우면 후처리 동일 규칙).';
 }
@@ -10655,7 +10661,7 @@ function getMangoLayoutPasteBlock_(catId){
     '로고: 우하단 고정·높이 6~8% 이하·본문/얼굴과 겹침 금지(후처리 OK).\n' +
     '장별 역할 중복·블로그 원문·말줄임(…) 붙여넣기 금지. 쉬운 말만.\n' +
     m.pasteLine + '\n' +
-    '색: 배경 ' + p.bg + '·' + p.bg2 + ' · 글·헤드·구분선 ' + p.head + ' · 포인트 ' + p.point + ' · 카드 ' + p.card + '·' + p.card2 + '. 지정 외 색·흑백 모노 금지.\n' +
+    '색: 배경 ' + p.bg + '·' + p.bg2 + ' · 글·헤드 ' + p.head + ' · 포인트 ' + p.point + ' · 카드 ' + p.card + '·' + p.card2 + '. 지정 외 색·흑백 모노 금지.\n' +
     '참고사진: ' + m.photoTipShort + '.';
 }
 function getMangoLayoutCopyRule_(catId){
@@ -10679,7 +10685,7 @@ function getMangoLayoutCopyRule_(catId){
 - 전/후 비교는 환영. **추상 한발서기만 반복 금지**. **일상에서 있을 법한 동작**으로:
   앉았다 일어설 때 한쪽으로 기운다 / 스트레칭만 vs 버티며 움직이기 /
   방향 전환·계단·바닥에서 일어나기·삐끗하기 쉬운 한 발 딛기 등. **사진만 봐도 비교가 이해**되게.
-- 색은 배경 ${p.bg}·${p.bg2}, 글·헤드·구분선 ${p.head}, 포인트 ${p.point}, 카드 ${p.card}·${p.card2}. 지정 외 색·흑백 모노 금지.
+- 색은 배경 ${p.bg}·${p.bg2}, 글·헤드 ${p.head}, 포인트 ${p.point}, 카드 ${p.card}·${p.card2}, 구분선 ${p.divider || p.head}. 지정 외 색·흑백 모노 금지.
 - 참고사진: ${m.photoTipShort} (잘린 제품샷·글자 캡처 금지).`;
 }
 function getMangoDetailBriefRule_(catId){
@@ -18549,24 +18555,53 @@ function renderOpsNaverKwPanelHTML_(itemId){
   '</div>';
 }
 function setOpsNaverKwList_(itemId, field, text){
+  // 다른 입력(광고그룹ID 등)이 리렌더로 날아가지 않게 DOM을 먼저 반영
+  syncOpsNaverKwPanelFromDom_(itemId);
   var st = getOpsNaverKwState_(itemId);
   st[field] = parseOpsNaverKwLines_(text);
   var om = getOpsManualState_();
   om.updatedAt = new Date().toISOString();
   save({ skipDriveUpload: true, skipGasPush: true });
-  refreshOpsNaverKwPanel_(itemId);
+  refreshOpsNaverKwPanel_(itemId, { skipDomSync: true });
 }
 window.setOpsNaverKwList_ = setOpsNaverKwList_;
-function setOpsNaverKwMeta_(itemId, field, value){
+function updateOpsNaverKwAdGroupHint_(itemId){
   var st = getOpsNaverKwState_(itemId);
-  var v = String(value || '').trim();
+  var panel = document.querySelector('.ops-kw-panel[data-ops-kw="' + itemId + '"]');
+  if(!panel) return;
+  var hint = panel.querySelector('.ops-kw-adgroup-hint');
+  if(!hint) return;
+  var bothCount = buildOpsNaverKwCsvRows_(st, 'both').length;
+  var groupsNeeded = Math.max(1, Math.ceil(bothCount / OPS_NAVER_KW_PER_ADGROUP));
+  var adGroupIds = parseOpsNaverKwAdGroupIds_(st.adGroupId);
+  hint.textContent = adGroupIds.length
+    ? ('광고그룹 ' + adGroupIds.length + '개 입력됨 · 합산 ' + bothCount.toLocaleString() + '개 → 약 ' + groupsNeeded + '개 그룹 필요')
+    : ('합산 ' + bothCount.toLocaleString() + '개 → 광고그룹 약 ' + groupsNeeded + '개 필요 (그룹당 ' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개)');
+}
+function setOpsNaverKwMeta_(itemId, field, value){
+  // 형제 필드(광고그룹ID 여러 줄 등) 보존
+  syncOpsNaverKwPanelFromDom_(itemId);
+  var st = getOpsNaverKwState_(itemId);
+  var v = String(value == null ? '' : value);
+  if(field === 'adGroupId') v = normalizeOpsNaverKwAdGroupIdInput_(v);
+  else v = v.trim();
   if(field === 'bid') v = normalizeOpsNaverKwBid_(v);
   if(field === 'pcUrl' || field === 'mobileUrl') v = normalizeOpsNaverKwUrl_(v);
   st[field] = v;
   var om = getOpsManualState_();
   om.updatedAt = new Date().toISOString();
   save({ skipDriveUpload: true, skipGasPush: true });
-  if(field === 'joinMode' || field === 'adGroupId' || field === 'bid') refreshOpsNaverKwPanel_(itemId);
+  // 광고그룹ID·입찰가는 전체 패널을 갈아엎지 않음(여러 ID 입력 중 초기화 방지)
+  if(field === 'adGroupId' || field === 'bid'){
+    var panel = document.querySelector('.ops-kw-panel[data-ops-kw="' + itemId + '"]');
+    if(panel){
+      var el = panel.querySelector('[data-ops-kw-meta="' + field + '"]');
+      if(el && el.value !== v) el.value = v;
+    }
+    updateOpsNaverKwAdGroupHint_(itemId);
+    return;
+  }
+  if(field === 'joinMode') refreshOpsNaverKwPanel_(itemId, { skipDomSync: true });
 }
 window.setOpsNaverKwMeta_ = setOpsNaverKwMeta_;
 function focusOpsNaverKwField_(itemId, field){
@@ -18585,6 +18620,7 @@ function addOpsNaverKwLine_(itemId, field){
   if(raw == null) return;
   var parts = parseOpsNaverKwLines_(raw, { allowCommaSplit: true });
   if(!parts.length) return;
+  syncOpsNaverKwPanelFromDom_(itemId);
   var st = getOpsNaverKwState_(itemId);
   var list = Array.isArray(st[field]) ? st[field].slice() : [];
   var seen = {};
@@ -18597,10 +18633,11 @@ function addOpsNaverKwLine_(itemId, field){
   st[field] = list;
   getOpsManualState_().updatedAt = new Date().toISOString();
   save({ skipDriveUpload: true, skipGasPush: true });
-  refreshOpsNaverKwPanel_(itemId);
+  refreshOpsNaverKwPanel_(itemId, { skipDomSync: true });
 }
 window.addOpsNaverKwLine_ = addOpsNaverKwLine_;
 function regenOpsNaverKwList_(itemId, field){
+  syncOpsNaverKwPanelFromDom_(itemId);
   var st = getOpsNaverKwState_(itemId);
   var branchKey = opsPlaceBranchKey_(itemId);
   if(field === 'neighborhoods'){
@@ -18615,18 +18652,24 @@ function regenOpsNaverKwList_(itemId, field){
     if(!window.confirm('일반 키워드를 정리본 시드(' + seed.length + '개)로 다시 불러올까요? 현재 목록은 덮어씁니다.')) return;
     st.keywords = seed;
     var meta = opsNaverKwSeedMeta_();
-    if(!st.adGroupId) st.adGroupId = meta.adGroupId;
+    // 이미 입력한 광고그룹ID(여러 개 포함)는 재생성 시에도 유지
+    if(!String(st.adGroupId || '').trim()) st.adGroupId = meta.adGroupId;
     if(!st.bid) st.bid = meta.bid;
     if(!st.pcUrl || /htcenter\.co\.kr/i.test(st.pcUrl)) st.pcUrl = meta.pcUrl;
     if(!st.mobileUrl || /htcenter\.co\.kr/i.test(st.mobileUrl)) st.mobileUrl = meta.mobileUrl;
   }
   getOpsManualState_().updatedAt = new Date().toISOString();
   save({ skipDriveUpload: false, gasImmediate: true, driveImmediate: true });
-  refreshOpsNaverKwPanel_(itemId);
+  refreshOpsNaverKwPanel_(itemId, { skipDomSync: true });
   if(typeof setAppToast === 'function') setAppToast(field === 'neighborhoods' ? '동네 목록을 재생성했습니다.' : '일반 키워드를 재생성했습니다.', { duration: 2500 });
 }
 window.regenOpsNaverKwList_ = regenOpsNaverKwList_;
-function refreshOpsNaverKwPanel_(itemId){
+function refreshOpsNaverKwPanel_(itemId, opts){
+  opts = opts || {};
+  // 기본: 리렌더 전 DOM 입력을 state에 반영 → 광고그룹ID 여러 줄 등이 초기화되지 않음
+  if(!opts.skipDomSync){
+    try { syncOpsNaverKwPanelFromDom_(itemId); } catch(eSync){}
+  }
   var panel = document.querySelector('.ops-review-panel[data-item-id="' + itemId + '"]');
   if(!panel){ renderMain(); return; }
   var old = panel.querySelector('.ops-kw-panel');
@@ -21182,7 +21225,7 @@ ${getMangoDetailBriefRule_(id)}
 mangoBrief (망고보드 상세페이지 UI에 맞춤 — **빈 칸 금지**):
 - productName: 「제품명 혹은 주제」 **최대 ${MANGO_DETAIL_TITLE_MAX}자**, blog.title 축약. **필수**
 - intro / mangoInputPaste: 「소개」 **최대 ${MANGO_DETAIL_INTRO_MAX}자**, **동일 한글**. 【1~7장】이미지용 헤드+불릿. **블로그 원문·말줄임(…) 금지**, 장별 역할 중복 금지. **필수**
-- intro **맨 끝**에 [디자인]+[레이아웃] (배경 ${p.bg}·${p.bg2}, 글·헤드·구분선 ${p.head}, 포인트 ${p.point}, 카드 ${p.card}·${p.card2}, 지정 외 색·흑백 모노 금지, 표 금지, 쉬운 말, ${getMangoModelGuideForCat_(id).briefHint}, 한발서기만 X·일상 전/후)
+- intro **맨 끝**에 [디자인]+[레이아웃] (배경 ${p.bg}·${p.bg2}, 글·헤드 ${p.head}, 포인트 ${p.point}, 카드 ${p.card}·${p.card2}, 구분선 ${p.divider || p.head}, 지정 외 색·흑백 모노 금지, 표 금지, 쉬운 말, ${getMangoModelGuideForCat_(id).briefHint}, 한발서기만 X·일상 전/후)
 - photoTip: 실사·시연 (${getMangoModelGuideForCat_(id).label} 모델) 1~2문장
 - slidePlan: 정확히 7개 — 각 장은 한 메시지, 표 없음, copyHint는 짧은 헤드
 - designTone: ${tone}
@@ -21240,20 +21283,39 @@ function mangoIntroHasStalePaletteColors_(body, palette){
   // 리:얼 무브먼트 등에서 자주 남던 구형 헤드·주의 포인트
   if(/#333333\b/i.test(t) && head && head !== '#333333') return true;
   if(/#474747\b/i.test(t) && point && point !== '#474747') return true;
+  // 구형 무브먼트 팔레트(차콜·쿨그레이) → 크림슨 팔레트로 교체
+  if(/#576169\b/i.test(t) && point && point !== '#576169') return true;
+  if(/#1a1a1a\b/i.test(t) && head && head !== '#1a1a1a') return true;
   // 예전 크림·테라코타 잔재
   if(/#eddcd2|#c4785a|#b07a62/i.test(t)) return true;
   return false;
 }
 
+/** 리:얼 무브먼트 7장(다음) — 잘린·영문 잔여 카피를 고정 문구로 교체 */
+function repairMangoMovementNextSlide_(body, catId){
+  if(Number(catId) !== 1 && Number(catId) !== 5) return body;
+  var t = String(body || '');
+  if(!/【\s*7\.\s*다음】/.test(t)) return t;
+  var nextBlock = mangoFormatSlideBlock_(7, '다음', '다음에 할 일', [
+    '오늘 글처럼, 뭉침의 원인과 결과를 구분하는 것부터 시작해요',
+    '\'왜 안 풀리는지\'를 먼저 이해하고 나면, 그다음 움직임이 달라져요'
+  ], 'CTA 한 줄, 여백 넉넉히');
+  return t.replace(
+    /【\s*7\.\s*다음】[\s\S]*?(?=\n*【|\n*\[디자인\]|\n*\[레이아웃\]|$)/i,
+    nextBlock + '\n\n'
+  );
+}
+
 /** 소개 끝에 [디자인]·[레이아웃] 지침이 없으면 붙임 (카테고리 팔레트 기준, 디자인 블록은 잘리지 않게 본문만 줄임) */
 function ensureMangoIntroHasDesignBlock_(intro, catId){
-  var palette = getMangoPaletteForCat_(catId != null ? catId : state.selectedCatId);
+  var resolvedCatId = catId != null ? catId : state.selectedCatId;
+  var palette = getMangoPaletteForCat_(resolvedCatId);
   var tone = buildMangoDesignToneLineFromPalette_(palette);
-  var layoutPaste = getMangoLayoutPasteBlock_(catId != null ? catId : state.selectedCatId);
+  var layoutPaste = getMangoLayoutPasteBlock_(resolvedCatId);
   var designBlock =
     '[디자인]\n' + tone +
     '\n\n[레이아웃]\n' + layoutPaste;
-  var body = String(intro || '').trim();
+  var body = repairMangoMovementNextSlide_(String(intro || '').trim(), resolvedCatId);
   if(!body){
     return clampMangoIntro_(designBlock);
   }
@@ -21264,7 +21326,7 @@ function ensureMangoIntroHasDesignBlock_(intro, catId){
   var hasFreshLayout = /\[레이아웃\]/i.test(body) &&
     /로고:\s*우하단/.test(layoutSec) &&
     /타이포/.test(layoutSec);
-  var model = getMangoModelGuideForCat_(catId != null ? catId : state.selectedCatId);
+  var model = getMangoModelGuideForCat_(resolvedCatId);
   var hasMatchingModel = model.gender === 'female'
     ? /인물=여성|여성 실사|여성 모델/.test(layoutSec)
     : model.gender === 'male'
@@ -21282,7 +21344,7 @@ function ensureMangoIntroHasDesignBlock_(intro, catId){
     .trim();
   if(!stripped) stripped = body.replace(/\n*\[디자인\][\s\S]*$/i, '').trim();
   // 본문 장 카피에 남은 구형 포인트·영문 프로그램명 정리
-  var pointHex = String(palette.point || '#576169');
+  var pointHex = String(palette.point || '#dc143c');
   var cardHex = String(palette.card || '#FAF6F0');
   stripped = stripped
     .replace(/주의 안내 카드\(#474747[^)]*\)/gi, '주의 안내 카드(포인트 ' + pointHex + ' · 카드 ' + cardHex + ')')
@@ -21571,26 +21633,25 @@ function buildMangoBriefFromBlog_(content, topic, catId){
   }).filter(function(s){
     // 잘린·어색한 영문 잔여·미완성 문장 제외
     if(!s || /Re:\s*Al/i.test(s)) return false;
-    if(/이\s*$/.test(s) || /가\s*$/.test(s)) return false;
+    if(/[은는이가을를의]\s*$/.test(s)) return false;
+    if(s.length < 12) return false;
     return true;
   });
-  var programLabel = '';
-  try {
-    var catObj = CATEGORIES[catId];
-    programLabel = catObj && catObj.name ? String(catObj.name) : '';
-    if(typeof localizeProgramDisplayName_ === 'function') programLabel = localizeProgramDisplayName_(programLabel);
-  } catch(eLab){}
-  var nextBullets = ctaSents.length
-    ? ctaSents
-    : (Number(catId) === 1 || Number(catId) === 5)
-      ? [
-          '원인과 결과를 구분하는 것부터 시작해요',
-          (programLabel || '리:얼 무브먼트') + '로, 다음 움직임이 달라져요'
-        ]
-      : [
-          '궁금하면 프로필·상담으로 문의해 주세요',
-          '일반 정보이며 치료·진단이 아니에요'
-        ];
+  var nextBullets;
+  if(Number(catId) === 1 || Number(catId) === 5){
+    // 리:얼 무브먼트 — 7장 CTA는 고정 카피(블로그 CTA 잘림·영문 잔여 방지)
+    nextBullets = [
+      '오늘 글처럼, 뭉침의 원인과 결과를 구분하는 것부터 시작해요',
+      '\'왜 안 풀리는지\'를 먼저 이해하고 나면, 그다음 움직임이 달라져요'
+    ];
+  } else if(ctaSents.length){
+    nextBullets = ctaSents;
+  } else {
+    nextBullets = [
+      '궁금하면 프로필·상담으로 문의해 주세요',
+      '일반 정보이며 치료·진단이 아니에요'
+    ];
+  }
 
   var cautionVisual = '주의 안내 카드(포인트 ' + palette.point + ' · 카드 ' + palette.card + ')';
   var blocks = [
@@ -21700,7 +21761,7 @@ function renderMangoDetailInputCard_(brief){
   var introVal = formatMangoBriefPaste_(brief, catId);
   var html = '';
   html += '<div class="img-section-title">망고보드 AI 상세페이지 입력</div>';
-  html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">주황 버튼으로 <strong>제목+소개</strong> 복사 → 망고보드 소개란에 붙여넣고 첫 줄만 제품명으로. 소개는 <strong>장별 헤드+짧은 불릿</strong>(블로그 원문·… 붙여넣기 X). 결과물: <strong>' + escapeHtml(p.label) + '</strong> · 배경 <strong>' + escapeHtml(p.bg + '·' + p.bg2) + '</strong>·헤드·구분선 <strong>' + escapeHtml(p.head) + '</strong>·포인트 <strong>' + escapeHtml(p.point) + '</strong>·카드 <strong>' + escapeHtml(p.card + '·' + p.card2) + '</strong>(지정 외 색·흑백 모노 X), 주의·안내형, ' + escapeHtml(getMangoModelGuideForCat_(catId).uiHint) + ', 픽토그램 OK.</p>';
+  html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">주황 버튼으로 <strong>제목+소개</strong> 복사 → 망고보드 소개란에 붙여넣고 첫 줄만 제품명으로. 소개는 <strong>장별 헤드+짧은 불릿</strong>(블로그 원문·… 붙여넣기 X). 결과물: <strong>' + escapeHtml(p.label) + '</strong> · 배경 <strong>' + escapeHtml(p.bg + '·' + p.bg2) + '</strong>·헤드 <strong>' + escapeHtml(p.head) + '</strong>·포인트 <strong>' + escapeHtml(p.point) + '</strong>·카드 <strong>' + escapeHtml(p.card + '·' + p.card2) + '</strong>·구분선 <strong>' + escapeHtml(p.divider || p.head) + '</strong>(지정 외 색·흑백 모노 X), 주의·안내형, ' + escapeHtml(getMangoModelGuideForCat_(catId).uiHint) + ', 픽토그램 OK.</p>';
   html += '<div class="img-tool-card">';
   html += '<label style="display:block;font-size:11px;color:#374151;margin:0 0 4px;">제품명 혹은 주제 <span id="sheet-mango-title-count" style="color:#9CA3AF;">' + titleVal.length + '/' + MANGO_DETAIL_TITLE_MAX + '</span></label>';
   html += '<input type="text" class="sheet-edit" id="sheet-mango-title" maxlength="' + MANGO_DETAIL_TITLE_MAX + '" value="' + escapeHtml(titleVal) + '" oninput="updateMangoFieldCounts_()" style="width:100%;margin-bottom:12px;padding:8px 10px;font-size:13px;border:1px solid #E5E7EB;border-radius:8px;box-sizing:border-box;">';

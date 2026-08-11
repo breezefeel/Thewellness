@@ -19,8 +19,8 @@ const CATEGORIES = [
       {id:"d1-3", topic:"앉아서 일하는 당신을 위한 3분 루틴",                  angle:"재택·사무직을 위한 척추-고관절 기능운동 시퀀스"},
       {id:"d1-4", topic:"걷기만 해도 자세가 교정된다, 가능한 이야기일까요?",   angle:"보행 패턴과 자세 교정의 연관성, 올바른 걷기 방법"},
     ]},
-  { id:2, icon:"", name:"리:얼 페이스",    color:"#D4A853", audience:"일반인",
-    sub:"리:얼 페이스 · 얼굴 교정 · 작은얼굴",
+  { id:2, icon:"", name:"리얼 페이스",    color:"#D4A853", audience:"일반인",
+    sub:"리얼 페이스 · 얼굴 교정 · 작은얼굴",
     drafts:[
       {id:"d2-0", topic:"셀카에서 한쪽 얼굴만 작아 보이는 진짜 이유",          angle:"안면비대칭의 원인 — 습관, 교합, 경추 연관성 설명"},
       {id:"d2-1", topic:"얼굴 살이 빠지지 않는 이유, 다이어트 문제 아닙니다",  angle:"림프 순환 + 골격 구조로 설명하는 얼굴 윤곽 개선"},
@@ -88,7 +88,7 @@ const CAT_TAB_NAV_ROWS = [[0, 1, 2, 7], [3, 5, 4, 6]];
 const CAT_TAB_SHORT = {
   0: '도수치료',
   1: '리:얼 무브먼트',
-  2: '리:얼 페이스',
+  2: '리얼 페이스',
   7: '힐자계',
   3: 'CMT 과정',
   5: 'Re:Al 움직임 과정',
@@ -1883,7 +1883,7 @@ const OPS_MANUAL_SECTIONS = [
 const CAT_PROGRAM_LINE = {
   0: '미카닥 박준규 · 도수치료',
   1: '리얼무브먼트',
-  2: '리얼페이스',
+  2: '리얼 페이스',
   3: '미카닥 박준규 · CMT 전문가',
   4: '미카닥 박준규 · IFC 전문가',
   5: '리얼무브먼트 · 전문가',
@@ -1903,7 +1903,7 @@ const CAT_DEFAULT_SERIES = {
 const CAT_DEFAULT_PILLAR = {
   0: 'PSP · 구조→기능',
   1: '리얼무브먼트 · PAR',
-  2: '리얼페이스 · 구조 교정',
+  2: '리얼 페이스 · 구조 교정',
   3: '전문가 · 평가-치료',
   4: '전문가 · 구조 접근',
   5: '리얼무브먼트 · PAR',
@@ -1915,7 +1915,7 @@ const CAT_DEFAULT_PILLAR = {
 const CAT_IMAGE_THUMBNAIL_FIXED = {
   0: { brand: '리얼무브먼트', program: '도수치료 · PSP' },
   1: { brand: '리얼무브먼트', program: '리얼무브먼트 · PAR' },
-  2: { brand: '리얼무브먼트', program: '리얼페이스 · 구조 교정' },
+  2: { brand: '리얼무브먼트', program: '리얼 페이스 · 구조 교정' },
   3: { brand: '미카닥 박준규', program: 'CMT · 임상 노트' },
   4: { brand: '미카닥 박준규', program: 'IFC · 얼굴 구조' },
   5: { brand: '미카닥 박준규', program: '리얼무브먼트 · 전문가' },
@@ -2299,7 +2299,7 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
     ]
   },
   '2': {
-    brandProfile: '리:얼 페이스는 얼굴만 따로 보지 않고 경추·호흡·생활습관까지 함께 보는 구조 접근이 핵심입니다. "작은 얼굴" 기대는 과장 없이 현실적인 변화 범위로 안내해야 신뢰가 유지됩니다. 미용 표현보다 균형·순환·긴장 완화 관점으로 설명합니다.',
+    brandProfile: '리얼 페이스는 얼굴만 따로 보지 않고 경추·호흡·생활습관까지 함께 보는 구조 접근이 핵심입니다. "작은 얼굴" 기대는 과장 없이 현실적인 변화 범위로 안내해야 신뢰가 유지됩니다. 미용 표현보다 균형·순환·긴장 완화 관점으로 설명합니다. 한글 표기는 「리얼 페이스」(「리:얼」 금지), 영문 Re:Al Face는 유지.',
     strategyGuide: '기준:\n- 단계는 관찰(비대칭 인식) → 원인 분해(습관·구조) → 교정 루틴 → 유지 관리 순으로 구성한다.\n- 전/후 기대치는 기간·개인차를 반드시 함께 안내한다.\n- 얼굴 문제를 경추·호흡·저작 패턴과 연결해 설명한다.\n\n의도:\n- 단기 외형 집착을 줄이고 구조 기반 관리 관점을 심는다.\n- 스스로 악화 습관을 파악·교정할 수 있게 만든다.\n- 상담 시 현실적인 목표 설정으로 이탈을 줄인다.',
     steps: [
       { id: '1', title: '1단계 · 비대칭 관찰', summary: '내 얼굴 패턴을 객관적으로 확인하는 법 익히기', rationale: '문제를 정확히 보지 못하면 잘못된 관리가 반복됩니다. 먼저 관찰 기준을 제공해 자기 인식을 높입니다.' },
@@ -5209,13 +5209,14 @@ function getCategoryProgramLine_(catId){
   if(!cat) return '';
   return localizeProgramDisplayName_(cat.programLine || CAT_PROGRAM_LINE[catId] || cat.name);
 }
-/** 고객·초안 표기용: Re:Al Movement → 리얼무브먼트 (블로그·이미지). Re:Al 영문은 유지 */
+/** 고객·초안 표기용: Re:Al Movement/Face → 한글(리얼…). Re:Al 영문은 유지 */
 function localizeProgramDisplayName_(text){
   return String(text || '')
     .replace(/Re:\s*Al\s*Movement/gi, '리얼무브먼트')
-    .replace(/Re:\s*Al\s*Face/gi, '리:얼 페이스')
+    .replace(/Re:\s*Al\s*Face/gi, '리얼 페이스')
     .replace(/리:얼\s*무브먼트/g, '리얼무브먼트')
     .replace(/리얼\s+무브먼트/g, '리얼무브먼트')
+    .replace(/리:얼\s*페이스/g, '리얼 페이스')
     .replace(/리:얼\s*움직임/g, '리얼 움직임');
 }
 function getDefaultSeriesForCat_(catId){
@@ -5476,10 +5477,13 @@ function buildBrandContextForPrompt_(catId, draft){
   }
   lines.push('', '위 메시지·시리즈와 모순되지 않게, 미카닥 박준규·리얼무브먼트 브랜드 톤을 유지하세요.');
   if(isGeneralAudienceCategory(catId)){
-    lines.push('일반인 채널에서는 프로그램명을 「리얼무브먼트」「리얼페이스」로 표기하세요. (영문 Re:Al Movement / Re:Al Face 남발 금지)');
+    lines.push('일반인 채널에서는 프로그램명을 「리얼무브먼트」「리얼 페이스」로 표기하세요. (영문 Re:Al Movement / Re:Al Face는 필요 시에만, 남발 금지)');
   }
   if(Number(catId) === 1 || Number(catId) === 5){
     lines.push('무브먼트·움직임 채널 블로그·이미지·캡션에서는 「리:얼」 대신 「리얼」로 표기하세요. (예: 리얼무브먼트, 리얼 움직임). 「리얼무브먼트」는 붙여 쓰고 줄바꿈하지 마세요. 영문 Re:Al은 그대로 둡니다.');
+  }
+  if(Number(catId) === 2 || Number(catId) === 4){
+    lines.push('페이스·IFC 채널 한글 표기는 「리얼 페이스」로 하세요. (「리:얼」 금지). 영문 Re:Al / Re:Al Face는 그대로 둡니다.');
   }
   return lines.join('\n');
 }
@@ -9895,7 +9899,7 @@ const MANGO_PALETTES_BY_CAT = {
   },
   2: {
     key: 'gold',
-    label: '리:얼 페이스',
+    label: '리얼 페이스',
     bg: '#f0efeb',
     bg2: '#eee9de',
     head: '#3d2c27',
@@ -10977,12 +10981,13 @@ const DEFAULT_PROMPTS = {
 브랜드 주체: 미카닥 박준규 (미국 DC·한국 PT, 20년+ 근골격계·움직임 전문가)
 현재 소속: 리얼무브먼트 서울 약수점 · 인천 계양(작전)점 대표 원장
 ※ 목동·병원 임상 근무는 종료. 현재 병원에서 근무하지 않음. 치료 필요 시 병원 연계·병행 안내.
-프로그램: Re:Al Movement(P-스트레칭·기능운동·자세교정), 리:얼 페이스(얼굴 교정·작은얼굴), CMT/IFC/Re:Al 전문가 교육
+프로그램: Re:Al Movement(P-스트레칭·기능운동·자세교정), 리얼 페이스(얼굴 교정·작은얼굴), CMT/IFC/Re:Al 전문가 교육
 프로필·약력: https://breezefeel.github.io/drpark · https://blog.naver.com/allenjoy/120205433765
 ${BLOG_CONTENT_VOICE_RULE}
 ${MEDICAL_COMPLIANCE_RULE}
-인스타(프로그램별): 도수·CMT @dr.park_dc.pt · 리:얼 페이스·IFC @dr.face_ifc · 리얼무브먼트·움직임 @re.al_movement_official
-※ 무브먼트·움직임 채널 블로그·이미지·캡션: 「리:얼」 대신 「리얼」 표기 (리얼무브먼트·리얼 움직임). 「리얼무브먼트」붙여 쓰기·한 줄 고정. 영문 Re:Al은 유지.` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
+인스타(프로그램별): 도수·CMT @dr.park_dc.pt · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트·움직임 @re.al_movement_official
+※ 무브먼트·움직임 채널 블로그·이미지·캡션: 「리:얼」 대신 「리얼」 표기 (리얼무브먼트·리얼 움직임). 「리얼무브먼트」붙여 쓰기·한 줄 고정. 영문 Re:Al은 유지.
+※ 페이스 채널 한글 표기: 「리얼 페이스」(「리:얼」 금지). 영문 Re:Al Face는 유지.` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
   categories: {
     0: { // 도수치료
       blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[도수치료 맥락] PSP·PAR 순서를 환자 언어로: 평가(증상·통증 질)→연부·관절 이해→Passive(P-ROM)→생활습관. problem에 공감·왜 아픈지 가볍게, selfCare는 집에서 할 수 있는 동작.`,
@@ -10996,9 +11001,9 @@ ${MEDICAL_COMPLIANCE_RULE}
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
-    2: { // 리:얼 페이스
-      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[얼굴·뷰티 맥락] 20~40대 여성 독자. 과학적 근거는 가볍게, 공감과 희망. selfCare는 부담 없는 가벼운 동작·습관.`,
-      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n캐러셀 없이 **한 포스트 캡션**으로 스토리텔링하세요. "이런 고민 있으신가요?"에 이어 문제→원인→해결→CTA를 캡션 안에서 줄바꿈으로 구분해 읽기 쉽게.`,
+    2: { // 리얼 페이스
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[얼굴·뷰티 맥락] 20~40대 여성 독자. 과학적 근거는 가볍게, 공감과 희망. selfCare는 부담 없는 가벼운 동작·습관. 프로그램명 표기: 「리얼 페이스」(「리:얼」 금지, 영문 Re:Al Face 유지).`,
+      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n캐러셀 없이 **한 포스트 캡션**으로 스토리텔링하세요. "이런 고민 있으신가요?"에 이어 문제→원인→해결→CTA를 캡션 안에서 줄바꿈으로 구분해 읽기 쉽게. 표기: 「리얼 페이스」(「리:얼」 금지).`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
@@ -21831,9 +21836,9 @@ const THUMB_BRAND_PRESETS = {
     defaultBody: '몸의 불편함 & 기능 저하를 단계별로 평가해 이상 유무를 파악하고, 개별 차이가 큰 근육·관절 조정 능력을 안전하고 정밀한 맞춤 운동으로 회복시켜주는 트레이닝.'
   },
   2: {
-    hero: '리:얼 페이스',
+    hero: '리얼 페이스',
     tagline: '구조로 다시 보는 얼굴',
-    program: '리:얼 페이스',
+    program: '리얼 페이스',
     defaultBody: '습관·교합·경추와 연결된 얼굴 비대칭을 구조적으로 살펴, 표면이 아닌 원인부터 맞춰 가는 접근.'
   },
   3: {
@@ -22520,14 +22525,14 @@ function fitHeroFontSize_(ctx, lines, maxWidth, startPx, minPx){
 /** 썸네일 브랜드명: 리얼무브먼트 등 한 줄 유지용 */
 function isThumbBrandKeepOneLine_(text){
   var t = String(text || '').replace(/\s+/g, '');
-  return /^리:?얼무브먼트/i.test(t) || /^리:?얼페이스/i.test(t) || /^리얼무브먼트/.test(t);
+  return /^리:?얼무브먼트/i.test(t) || /^리:?얼페이스/i.test(t) || /^리얼무브먼트/.test(t) || /^리얼페이스/.test(t);
 }
 function normalizeThumbBrandOneLine_(text){
   var raw = String(text || '').trim();
   if(!raw) return '';
   var compact = raw.replace(/\s+/g, '');
   if(/^리:?얼무브먼트$/i.test(compact) || /^리:?얼\s*무브먼트$/i.test(raw)) return '리얼무브먼트';
-  if(/^리:?얼페이스$/i.test(compact) || /^리:?얼\s*페이스$/i.test(raw)) return compact.indexOf(':') >= 0 ? '리:얼페이스' : '리얼페이스';
+  if(/^리:?얼페이스$/i.test(compact) || /^리:?얼\s*페이스$/i.test(raw) || /^리얼\s*페이스$/i.test(raw)) return '리얼 페이스';
   return raw.replace(/\s+/g, ' ');
 }
 
@@ -22539,6 +22544,10 @@ function splitThumbHeroLines_(heroRaw){
   var compact = raw.replace(/\s+/g, '');
   if(/^리:?얼무브먼트$/i.test(compact) || /^리:?얼\s*무브먼트$/i.test(raw)){
     return ['리얼무브먼트'];
+  }
+  // 리얼 페이스: 한글은 공백 유지, 한 줄 고정
+  if(/^리:?얼페이스$/i.test(compact) || /^리:?얼\s*페이스$/i.test(raw) || /^리얼\s*페이스$/i.test(raw)){
+    return ['리얼 페이스'];
   }
 
   // 기타 한글 히어로: 공백으로 강제 2줄 분리하지 않음(큰 타이틀 한 줄)

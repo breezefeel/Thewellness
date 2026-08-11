@@ -19740,19 +19740,48 @@ async function ensureDraftYoutubeAnalysis_(draft, catId){
   return analysis;
 }
 
-async function analyzeRefImagesForMemo_(images, catId){
-  var list = normalizeRefImages_(images);
+function koreanPhotoOrdinalLabel_(n){
+  var map = {
+    1: '첫 번째 사진',
+    2: '두 번째 사진',
+    3: '세 번째 사진',
+    4: '네 번째 사진',
+    5: '다섯 번째 사진',
+    6: '여섯 번째 사진',
+    7: '일곱 번째 사진',
+    8: '여덟 번째 사진',
+    9: '아홉 번째 사진',
+    10: '열 번째 사진'
+  };
+  return map[n] || (n + '번째 사진');
+}
+
+async function analyzeSingleRefImageForMemo_(image, catId){
+  var list = normalizeRefImages_(image);
   if(!list.length) return '';
   var isDaily = isDailyShareCategory(catId);
   var isExpert = isExpertCourseCategory(catId);
-  var countNote = list.length > 1 ? ('첨부 사진 ' + list.length + '장을 순서대로 보고 ') : '첨부 사진을 보고 ';
   var prompt = isDaily
-    ? (countNote + '장면·분위기·몸감각·핵심 포인트를 한국어로 분석하세요. 아래 형식을 지켜 짧고 읽기 쉽게 쓰고, 보이지 않는 사실은 추측하지 마세요.\n\n[사진에서 보이는 장면]\n- 1~3개\n\n[눈에 띄는 요소]\n- 1~3개\n\n[글에 활용할 포인트]\n- 담백한 관찰·느낌 중심 1~3개\n\n과장·진단 단정·감성 수사는 금지합니다. 분석 내용만 출력하세요.')
+    ? '첨부 사진 1장을 보고 장면·분위기·몸감각·핵심 포인트를 한국어로 분석하세요. 아래 형식을 지켜 짧고 읽기 쉽게 쓰고, 보이지 않는 사실은 추측하지 마세요.\n\n[사진에서 보이는 장면]\n- 1~3개\n\n[눈에 띄는 요소]\n- 1~3개\n\n[글에 활용할 포인트]\n- 담백한 관찰·느낌 중심 1~3개\n\n과장·진단 단정·감성 수사는 금지합니다. 분석 내용만 출력하세요.'
     : (isExpert
-      ? (countNote + '강의·실습 캡처 내용을 한국어로 분석하세요. 아래 형식을 지켜 짧고 읽기 쉽게 쓰고, 사진에 없는 내용을 추측하지 마세요.\n\n[사진에서 보이는 장면]\n- 1~3개\n\n[테크닉·손 위치]\n- 1~4개\n\n[핵심 포인트·주의사항]\n- 1~4개\n\n분석 내용만 출력하세요.')
-      : (countNote + '참고 영상/사진 캡처를 한국어로 분석하세요. 아래 형식을 지켜 짧고 읽기 쉽게 쓰고, 사진에 없는 내용을 추측하지 마세요.\n\n[사진에서 보이는 장면]\n- 1~3개\n\n[자세·부위·동작]\n- 1~4개\n\n[글에 활용할 핵심 포인트]\n- 1~4개\n\n진단을 단정하지 말고 분석 내용만 출력하세요.'));
-  var text = await callClaudePlanner_(prompt, { image: list, maxTokens: 1200 });
+      ? '첨부 사진 1장을 보고 강의·실습 캡처 내용을 한국어로 분석하세요. 아래 형식을 지켜 짧고 읽기 쉽게 쓰고, 사진에 없는 내용을 추측하지 마세요.\n\n[사진에서 보이는 장면]\n- 1~3개\n\n[테크닉·손 위치]\n- 1~4개\n\n[핵심 포인트·주의사항]\n- 1~4개\n\n분석 내용만 출력하세요.'
+      : '첨부 사진 1장을 보고 참고 영상/사진 캡처를 한국어로 분석하세요. 아래 형식을 지켜 짧고 읽기 쉽게 쓰고, 사진에 없는 내용을 추측하지 마세요.\n\n[사진에서 보이는 장면]\n- 1~3개\n\n[자세·부위·동작]\n- 1~4개\n\n[글에 활용할 핵심 포인트]\n- 1~4개\n\n진단을 단정하지 말고 분석 내용만 출력하세요.');
+  var text = await callClaudePlanner_(prompt, { image: list, maxTokens: 900 });
   return String(text || '').trim();
+}
+
+async function analyzeRefImagesForMemo_(images, catId, startIndex){
+  var list = normalizeRefImages_(images);
+  if(!list.length) return '';
+  var start = parseInt(startIndex, 10);
+  if(isNaN(start) || start < 0) start = 0;
+  var parts = [];
+  for(var i = 0; i < list.length; i++){
+    var label = koreanPhotoOrdinalLabel_(start + i + 1);
+    var body = await analyzeSingleRefImageForMemo_(list[i], catId);
+    if(body) parts.push(label + '\n' + body);
+  }
+  return parts.join('\n\n');
 }
 async function generateTopicFromKeywords_(catId, keywords, imagePayload, sourceNote, youtubeAnalysis){
   var cat = CATEGORIES[catId];
@@ -20095,54 +20124,64 @@ async function prepareRefImageFromFile_(file){
 window.onNewItemImage = async function(input){
   var files = input && input.files ? Array.from(input.files) : [];
   if(!files.length){
-    state.newItem.refImages = [];
-    state.newItem.refImage = null;
-    state.newItem.imageAnalyzing = false;
-    resetNewItemFlowProposals_();
-    renderMain();
+    // 파일 선택 취소 시 기존 첨부·분석은 유지
     return;
   }
   var maxFiles = 10;
-  if(files.length > maxFiles){
-    alert('사진은 최대 ' + maxFiles + '장까지 선택할 수 있어요.');
-    input.value = '';
+  var existingImages = normalizeRefImages_(state.newItem.refImages);
+  var room = maxFiles - existingImages.length;
+  if(room <= 0){
+    alert('사진은 최대 ' + maxFiles + '장까지 첨부할 수 있어요.');
+    if(input) input.value = '';
     return;
   }
+  if(files.length > room){
+    alert('사진은 최대 ' + maxFiles + '장까지예요. 이번엔 ' + room + '장만 추가합니다.');
+    files = files.slice(0, room);
+  }
+  var startIndex = existingImages.length;
+  var analysisOk = false;
   state.newItem.imageAnalyzing = true;
   resetNewItemFlowProposals_();
+  renderMain();
   try {
-    var images = [];
+    var newImages = [];
     for(var i = 0; i < files.length; i++){
-      images.push(await prepareRefImageFromFile_(files[i]));
+      newImages.push(await prepareRefImageFromFile_(files[i]));
     }
+    var images = existingImages.concat(newImages);
     state.newItem.refImages = images;
     state.newItem.refImage = images[0] || null;
     renderMain();
     if(isPlannerAiAvailable_()){
-      if(typeof setAppToast === 'function') setAppToast('사진 ' + images.length + '장 분석 중…', { duration: 3200, variant: 'ok' });
-      var analysis = await analyzeRefImagesForMemo_(images, state.newItem.catId);
-      var prevMemo = String(state.newItem.refNote || '').trim();
-      // 기존 손글씨 메모는 유지하고, 분석 결과를 이어 붙임
-      if(prevMemo && !/\[사진에서 보이는 장면\]/.test(prevMemo)){
-        state.newItem.refNote = prevMemo + '\n\n' + analysis;
-      } else {
-        state.newItem.refNote = analysis;
+      if(typeof setAppToast === 'function'){
+        setAppToast(
+          (startIndex > 0 ? '추가 사진 ' : '사진 ') + newImages.length + '장 분석 중…',
+          { duration: 3200, variant: 'ok' }
+        );
       }
+      var analysis = await analyzeRefImagesForMemo_(newImages, state.newItem.catId, startIndex);
+      var prevMemo = String(state.newItem.refNote || '').trim();
+      if(analysis){
+        state.newItem.refNote = prevMemo ? (prevMemo + '\n\n' + analysis) : analysis;
+      }
+      analysisOk = true;
     } else {
       if(typeof setAppToast === 'function') setAppToast('사진은 저장됐어요. AI 메모 자동 작성은 API 키 설정 후 다시 선택해 주세요.', { duration: 5200, variant: 'err' });
       else openApiModal();
     }
   } catch(e){
     var msg = (e && e.message) ? e.message : String(e);
-    state.newItem.refImages = [];
-    state.newItem.refImage = null;
+    // 새로 붙이려다 실패한 장만 되돌리고, 기존 첨부는 유지
+    state.newItem.refImages = existingImages;
+    state.newItem.refImage = existingImages[0] || null;
     if(typeof setAppToast === 'function') setAppToast('사진 처리 실패\n' + msg, { duration: 6500, variant: 'err' });
     else alert(msg);
-    if(input) input.value = '';
   } finally {
     state.newItem.imageAnalyzing = false;
+    if(input) input.value = '';
     renderMain();
-    if(isPlannerAiAvailable_() && state.newItem.refImages && state.newItem.refImages.length && typeof setAppToast === 'function'){
+    if(analysisOk && typeof setAppToast === 'function'){
       setAppToast('사진 분석을 정리했어요. 내용을 확인한 뒤 「글의 흐름 만들기」를 눌러 주세요.', { duration: 5200, variant: 'ok' });
     }
   }
@@ -20229,12 +20268,12 @@ function renderAddForm(){
     .join('');
   const imgNames = (state.newItem.refImages || []).map(function(img){ return img && img.name ? img.name : ''; }).filter(Boolean);
   const imgHint = analyzing
-    ? '<span style="font-size:11px;color:#D97706;">사진 ' + imgNames.length + '장 분석 중… 참고 메모에 자동으로 채워집니다.</span>'
+    ? '<span style="font-size:11px;color:#D97706;">사진 ' + imgNames.length + '장 분석 중… 참고 메모에 순서대로 채워집니다.</span>'
     : (hasPhoto
-      ? '<span style="font-size:11px;color:#0F766E;">참고 사진 ' + imgNames.length + '장: ' + escapeHtml(imgNames.join(', ')) + (isDaily ? ' — 담백·관찰 톤으로 글을 씁니다' : '') + '</span>'
+      ? '<span style="font-size:11px;color:#0F766E;">참고 사진 ' + imgNames.length + '장: ' + escapeHtml(imgNames.join(', ')) + ' — 추가로 고르면 기존 분석 아래에 이어 붙여요' + (isDaily ? ' · 담백·관찰 톤' : '') + '</span>'
       : (isDaily
-        ? '<span style="font-size:11px;color:#9CA3AF;">여러 장 선택 가능. 올리면 AI가 참고 메모를 채워 드려요.</span>'
-        : '<span style="font-size:11px;color:#9CA3AF;">여러 장 선택 가능 · 최대 12MB(자동 압축). 올리면 AI가 참고영상 메모를 채워요.</span>'));
+        ? '<span style="font-size:11px;color:#9CA3AF;">여러 장·추가 첨부 가능. 장마다 「첫 번째 사진」… 순으로 메모에 쌓여요.</span>'
+        : '<span style="font-size:11px;color:#9CA3AF;">여러 장·추가 첨부 가능 · 최대 12MB(자동 압축). 장마다 순서대로 메모에 쌓여요.</span>'));
   const addIntro = isDaily
     ? '「일상 공유」에 올릴 <strong>생활 일기·느낌</strong> 주제를 만듭니다. 사진만 올려도 되고, 키워드와 함께 써도 돼요.'
     : (isExpert
@@ -20287,7 +20326,7 @@ function renderAddForm(){
     <div class="form-field">
       <label class="form-label">${refNoteLabel}</label>
       <textarea id="new-item-ref-note-input" class="form-input form-textarea${hasPhoto ? ' image-analysis-textarea' : ''}" rows="${hasPhoto ? '9' : '5'}" oninput="onNewItemRefNoteInput_(this)" placeholder="${refNotePlaceholder}" ${analyzing ? 'disabled' : ''}>${escapeHtml(state.newItem.refNote || '')}</textarea>
-      <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">${refNoteHint} 사진 선택 시 AI 분석 결과가 여기에 들어가며 직접 수정할 수 있어요.</div>
+      <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">${refNoteHint} 사진 선택 시 AI 분석이 「첫 번째 사진」… 순으로 쌓이며, 직접 수정할 수 있어요.</div>
     </div>
     <div class="form-field">
       <label class="form-label">참고 사진${isDaily ? ' (일상 공유에 추천)' : ' (선택)'}</label>

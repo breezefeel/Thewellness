@@ -46,7 +46,7 @@ const CATEGORIES = [
       {id:"d4-3", topic:"INDIBA와 IFC를 함께 사용할 때의 프로토콜",            angle:"기기와 도수 접근의 시너지 — 순서, 타이밍, 포인트"},
       {id:"d4-4", topic:"얼굴 비대칭 케이스에서 놓치기 쉬운 평가 포인트",      angle:"교합·턱관절·경추 복합 평가 체크리스트 공유"},
     ]},
-  { id:5, icon:"", name:"Re:Al 움직임 과정", color:"#1f1f1f", audience:"전문가",
+  { id:5, icon:"", name:"Re:Al 움직임 과정", color:"#8B1E3D", audience:"전문가",
     sub:"Re:Al 움직임 과정 · 전문가 교육",
     drafts:[
       {id:"d5-0", topic:"패시브 스트레칭을 언제, 어떻게 써야 하는가?",          angle:"억제-이완 테크닉의 원리와 임상 적용 타이밍"},
@@ -1934,7 +1934,7 @@ const CAT_IMAGE_BAND_COLOR_EN = {
   2: 'warm rose and soft cream top and bottom bands',
   3: 'deep navy and muted purple top and bottom bands',
   4: 'burgundy rose and soft gray top and bottom bands',
-  5: 'deep ivory and charcoal bands with crimson accent',
+  5: 'deep ivory and charcoal bands with wine crimson accent',
   6: 'soft sage green and warm cream top and bottom bands',
   7: 'soft emerald green and light mint top and bottom bands'
 };
@@ -9974,14 +9974,14 @@ const MANGO_PALETTES_BY_CAT = {
   5: {
     key: 'devon-expert',
     label: 'Re:Al 움직임 과정',
-    bg: '#EDE8DF',
-    bg2: '#E2DDD4',
-    head: '#333333',
-    point: '#dc143c',
-    card: '#FAF6F0',
-    card2: '#E8E2D8',
-    divider: '#333333',
-    desc: '아이보리·차콜·크림슨(전문가)'
+    bg: '#E8E4DC',
+    bg2: '#DDD8CE',
+    head: '#1A1A1A',
+    point: '#9F1239',
+    card: '#F3EFE8',
+    card2: '#E5E0D6',
+    divider: '#1A1A1A',
+    desc: '딥 아이보리·와인·교육'
   },
   6: {
     key: 'green',
@@ -10022,14 +10022,15 @@ const MANGO_PALETTES_BY_CAT = {
 };
 
 /** 썸네일 스크림 — 망고 팔레트와 같은 hue (전문가는 채도 약간↑ )
- * 리얼 무브먼트(1): 차콜만 — 크림슨 하단 워시 금지(표지는 어두운 스크림 + 흰 타이포) */
+ * 리얼 무브먼트(1): 차콜만 — 크림슨 하단 워시 금지(표지는 어두운 스크림 + 흰 타이포)
+ * Re:Al 움직임 과정(5): 딥 차콜 + 와인 glow (일반 크림슨과 구분) */
 const THUMB_SCRIM_BY_CAT = {
   0: { tint: '#1e2a44', tint2: '#3A5080', glow: '#3a5080' },
   1: { tint: '#333333', tint2: '#2a2a2a', glow: '#1f1f1f' },
   2: { tint: '#3d2c27', tint2: '#D4A853', glow: '#6b493d' },
   3: { tint: '#0F172A', tint2: '#1E3A5F', glow: '#4F46E5' },
   4: { tint: '#5C3D2E', tint2: '#A67C52', glow: '#9E4B5A' },
-  5: { tint: '#333333', tint2: '#2a2a2a', glow: '#1f1f1f' },
+  5: { tint: '#1A1A1A', tint2: '#3D1520', glow: '#9F1239' },
   6: { tint: '#1f3d32', tint2: '#3D8B6A', glow: '#3d8b6a' },
   7: { tint: '#14532D', tint2: '#34D399', glow: '#059669' },
   8: { tint: '#312E81', tint2: '#6366F1', glow: '#6366F1' }

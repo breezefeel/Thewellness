@@ -10,7 +10,7 @@ const CATEGORIES = [
       {id:"d0-3", topic:"연부조직 치료, 어디까지 해야 효과가 날까요?",         angle:"근막·인대·건 각각의 치료 접근과 적절한 치료 횟수 가이드"},
       {id:"d0-4", topic:"목·허리·어깨 중 가장 먼저 치료해야 할 곳은?",        angle:"연쇄 보상 패턴 설명으로 치료 순서의 중요성 강조"},
     ]},
-  { id:1, icon:"", name:"리:얼 무브먼트",   color:"#dc143c", audience:"일반인",
+  { id:1, icon:"", name:"리:얼 무브먼트",   color:"#1f1f1f", audience:"일반인",
     sub:"Re-Alignment Movement Center — 패시브 스트레칭 · 기능운동 · 자세교정",
     drafts:[
       {id:"d1-0", topic:"스트레칭을 매일 해도 왜 몸이 안 풀릴까요?",           angle:"패시브 스트레칭의 올바른 방법과 잘못된 습관 교정"},
@@ -46,11 +46,11 @@ const CATEGORIES = [
       {id:"d4-3", topic:"INDIBA와 IFC를 함께 사용할 때의 프로토콜",            angle:"기기와 도수 접근의 시너지 — 순서, 타이밍, 포인트"},
       {id:"d4-4", topic:"얼굴 비대칭 케이스에서 놓치기 쉬운 평가 포인트",      angle:"교합·턱관절·경추 복합 평가 체크리스트 공유"},
     ]},
-  { id:5, icon:"", name:"Re:Al 움직임 과정", color:"#64748B", audience:"전문가",
+  { id:5, icon:"", name:"Re:Al 움직임 과정", color:"#1f1f1f", audience:"전문가",
     sub:"Re:Al 움직임 과정 · 전문가 교육",
     drafts:[
       {id:"d5-0", topic:"패시브 스트레칭을 언제, 어떻게 써야 하는가?",          angle:"억제-이완 테크닉의 원리와 임상 적용 타이밍"},
-      {id:"d5-1", topic:"기능운동, 치료의 끝이 아닌 연결이다",                  angle:"도수치료 후 기능운동으로의 전환 — 리얼무브먼트 접근 철학"},
+      {id:"d5-1", topic:"기능운동, 치료의 끝이 아닌 연결이다",                  angle:"기능재활·움직임 지도로의 연결 — 리얼무브먼트 접근 철학"},
       {id:"d5-2", topic:"자세 교정에서 '좋은 자세'가 없는 이유",                angle:"동적 안정성 개념과 자세 교정의 새로운 패러다임"},
       {id:"d5-3", topic:"고관절 가동성 vs 안정성, 무엇이 먼저인가?",            angle:"기능 사슬(kinetic chain) 관점의 운동 처방 우선순위"},
       {id:"d5-4", topic:"운동 처방 시 환자 순응도를 높이는 커뮤니케이션 전략",  angle:"행동변화 이론 + 동기부여 인터뷰를 운동 지도에 적용"},
@@ -314,10 +314,15 @@ function buildOpsMedicalProfileHubDisclaimer_(){
   return '※ 일반 정보 안내이며 진단·처방이 아닙니다. 미카닥 박준규는 현재 병원에서 근무하지 않습니다. 통증이 심하거나 적신호가 있으면 병원 진료를 먼저 받으세요.';
 }
 function buildOpsMedicalForbiddenList_(){
-  return '금지: 치료, 진단, 완치, 처방, 수술 대신, 재활병원, 그룹 PT, Doctor·닥터·원장님(제목·서명)\n권장: 1:1 맞춤, Re Alignment(얼라이먼트), 기능운동, 자세, 프로그램 안내, 병원 진료 먼저 권고';
+  return '금지(도수·CMT 외 채널): 치료한 결과, 치료했어요, 치료해 드린, 시술 후(우리 행위 암시), 완치, 진단 확정, 처방, 수술 대신, Doctor·닥터·원장님(제목·서명)\n' +
+    '줄일 것(도수·CMT 외): 도수치료·카이로프랙틱을 주인공처럼 부각\n' +
+    '강조(도수·CMT 외): 보건의료 배경 임상가가 지도하는 기능재활·움직임 센터\n' +
+    '허용 예: 「치료를 해도 반복되는 건 자세·움직임 문제다」\n' +
+    '권장: 1:1 맞춤, Re Alignment, 기능운동, 자세, 프로그램 안내, 병원 진료 먼저 권고\n' +
+    '예외: 도수치료·CMT Academy 채널은 치료·시술·임상 행위 서술 가능';
 }
 function buildOpsMedicalPlannerRuleShort_(){
-  return '미카닥 박준규는 현재 병원 근무하지 않음. 진단·처방·치료행위 암시 금지. 운동·재활·웰니스 프로그램 안내. 병원 치료 필요 시 먼저 권고. 완치·즉효·처방 연상 표현 금지.';
+  return '미카닥 박준규는 현재 병원 근무 없음. 도수·CMT 외: 치료행위 수행 암시 금지 + 도수/카이로 주인공 부각 금지. **기능재활·움직임 센터·임상가 지도** 컬러. 「치료를 해도 반복=자세/움직임」은 허용. 완치·즉효 금지.';
 }
 function buildOpsMedicalBlogFooter_(){
   return '통증이 심하거나 저림·마비가 있으면 먼저 병원 진료를 받으시고, 안정되면 운동·재활 프로그램을 병행하는 흐름이 안전합니다. ' + OPS_BRAND_COPY.disclaimer;
@@ -1929,7 +1934,7 @@ const CAT_IMAGE_BAND_COLOR_EN = {
   2: 'warm rose and soft cream top and bottom bands',
   3: 'deep navy and muted purple top and bottom bands',
   4: 'burgundy rose and soft gray top and bottom bands',
-  5: 'sky blue and charcoal top and bottom bands',
+  5: 'deep ivory and charcoal bands with crimson accent',
   6: 'soft sage green and warm cream top and bottom bands',
   7: 'soft emerald green and light mint top and bottom bands'
 };
@@ -2289,7 +2294,7 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
     ]
   },
   '1': {
-    brandProfile: '리얼무브먼트는 PAR·Position을 통해 "좋은 자세를 고정"이 아니라 "움직임을 조절"하도록 돕는 프로그램입니다. 일반인이 일상 동작(앉기·걷기·업무)에서 즉시 써먹을 수 있는 표현이 중요합니다. 강한 교정보다 가벼운 감각 회복과 반복 가능한 루틴을 우선합니다. 블로그·이미지 표기는 「리얼무브먼트」붙여 쓰기·한 줄(리:얼 금지), 영문 Re:Al은 유지.',
+    brandProfile: '리얼무브먼트는 **보건의료 배경의 임상가**가 인체를 바탕으로 지도하는 **기능재활·움직임 센터** 컬러가 핵심입니다. PAR·Position으로 "좋은 자세를 고정"이 아니라 "움직임을 조절"하도록 돕습니다. 일상 동작(앉기·걷기·업무)에서 바로 써먹을 표현을 우선하고, 도수치료·카이로프랙틱·시술 장면을 주인공처럼 부각하지 마세요(마이너스). 표기 「리얼무브먼트」붙여 쓰기·한 줄(리:얼 금지), Re:Al 유지. 치료행위 수행 암시 금지 — 「치료를 해도 반복=자세/움직임」 맥락은 허용.',
     strategyGuide: '기준:\n- 단계는 감각 깨우기 → 동작 패턴 교정 → 일상 적용 → 유지 습관 순으로 구성한다.\n- 각 단계는 3~5분 내 가능한 마이크로 루틴을 포함한다.\n- "정답 자세"보다 상황별 조절 원칙을 제시한다.\n\n의도:\n- 독자가 자세 교정을 부담이 아닌 생활 기술로 인식하게 한다.\n- 통증 예방과 피로 감소를 일상 동작에서 체감하게 만든다.\n- 센터 방문 전후 모두 유지 가능한 자기조절 프레임을 만든다.',
     steps: [
       { id: '1', title: '1단계 · 감각 깨우기', summary: '호흡·기준선 회복으로 몸 상태를 먼저 인식하기', rationale: '몸 상태를 모르면 교정 신호를 받아들이기 어렵습니다. 가장 쉬운 감각 입력부터 시작해 "지금 내 몸"을 파악하도록 돕습니다.' },
@@ -2299,7 +2304,7 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
     ]
   },
   '2': {
-    brandProfile: '리얼 페이스는 얼굴만 따로 보지 않고 경추·호흡·생활습관까지 함께 보는 구조 접근이 핵심입니다. "작은 얼굴" 기대는 과장 없이 현실적인 변화 범위로 안내해야 신뢰가 유지됩니다. 미용 표현보다 균형·순환·긴장 완화 관점으로 설명합니다. 한글 표기는 「리얼 페이스」(「리:얼」 금지), 영문 Re:Al Face는 유지.',
+    brandProfile: '리얼 페이스는 **임상가가 구조를 아는 기능·웰니스 접근**으로, 얼굴만 따로 보지 않고 경추·호흡·생활습관까지 함께 봅니다. "작은 얼굴" 기대는 과장 없이. 미용·시술·도수/카이로 장면을 주인공처럼 부각하지 말고, 균형·순환·긴장 완화·습관 조절을 강조하세요. 표기 「리얼 페이스」(리:얼 금지), Re:Al Face 유지. 치료행위 수행 암시 금지.',
     strategyGuide: '기준:\n- 단계는 관찰(비대칭 인식) → 원인 분해(습관·구조) → 교정 루틴 → 유지 관리 순으로 구성한다.\n- 전/후 기대치는 기간·개인차를 반드시 함께 안내한다.\n- 얼굴 문제를 경추·호흡·저작 패턴과 연결해 설명한다.\n\n의도:\n- 단기 외형 집착을 줄이고 구조 기반 관리 관점을 심는다.\n- 스스로 악화 습관을 파악·교정할 수 있게 만든다.\n- 상담 시 현실적인 목표 설정으로 이탈을 줄인다.',
     steps: [
       { id: '1', title: '1단계 · 비대칭 관찰', summary: '내 얼굴 패턴을 객관적으로 확인하는 법 익히기', rationale: '문제를 정확히 보지 못하면 잘못된 관리가 반복됩니다. 먼저 관찰 기준을 제공해 자기 인식을 높입니다.' },
@@ -2319,7 +2324,7 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
     ]
   },
   '4': {
-    brandProfile: 'IFC 얼굴교육은 표면 자극이 아닌 구조·경축·기능 연결을 설명하는 전문가 과정입니다. 경추·턱관절·교합 관점을 함께 보며, 미용 기대와 구조적 필요를 조율하는 상담력이 중요합니다. 기기 사용과 도수 접근의 순서를 명확히 제시해야 합니다.',
+    brandProfile: 'IFC 얼굴교육은 표면 자극이 아닌 구조·경축·기능 연결을 설명하는 전문가 과정입니다. 경추·턱관절·교합 관점을 함께 보며 기대치를 조율합니다. 카이로·도수치료 기법 나열보다 **구조 이해·기능 연결·교육 현장**을 중심에 두세요.',
     strategyGuide: '기준:\n- 단계는 구조 평가 → 핵심 경축 완화 → 기기·도수 통합 프로토콜 → 케이스 피드백 순으로 구성한다.\n- 각 단계는 상담 문구(기대치 조율)를 포함한다.\n- 단순 before/after보다 기능·편안함 지표를 함께 본다.\n\n의도:\n- 수강생이 "미용 중심"에서 "구조 기반" 설명으로 전환하게 한다.\n- 상담 단계에서 과도한 기대를 안전하게 조율하게 한다.\n- 프로토콜의 재현성과 안전성을 높인다.',
     steps: [
       { id: '1', title: '1단계 · 구조 평가 정렬', summary: '안면·경추·턱관절 평가 순서 표준화', rationale: '평가 기준이 없으면 기법 적용이 흔들립니다. 공통 평가 루틴으로 케이스 판단의 정확도를 확보합니다.' },
@@ -2329,7 +2334,7 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
     ]
   },
   '5': {
-    brandProfile: 'Re:Al 움직임 과정은 치료 이후 기능 회복을 실제 동작으로 연결하는 전문가 교육입니다. PAR·Position 철학을 임상 처방 언어로 번역하는 능력이 핵심입니다. 안전한 progression과 환자 순응도를 동시에 고려한 설계가 필요합니다.',
+    brandProfile: 'Re:Al 움직임 과정은 **임상가가 기능·움직임으로 연결하는** 전문가 교육입니다. PAR·Position을 현장 코칭 언어로 번역하는 능력이 핵심입니다. 도수·카이로 시술 장면을 주인공처럼 부각하지 말고, 안전한 progression·환자 순응도·기능재활 지도 언어를 강조하세요.',
     strategyGuide: '기준:\n- 단계는 상태 분류 → 기본 패턴 재학습 → 기능 과제 확장 → 지도·코칭 고도화 순으로 구성한다.\n- 각 단계는 "중단 기준/진행 기준"을 함께 제시한다.\n- 운동 처방은 통증 감소보다 기능 회복 지표를 우선한다.\n\n의도:\n- 치료실에서 운동실로 이어지는 단절을 줄인다.\n- 수강생이 환자 상태별 progression을 설명·적용하게 만든다.\n- 교육 후 실제 지도 자신감을 높인다.',
     steps: [
       { id: '1', title: '1단계 · 상태 분류', summary: 'PAR 관점으로 현재 기능 수준을 분류하기', rationale: '현재 수준을 정확히 구분해야 과부하를 피할 수 있습니다. 상태 분류는 안전한 처방의 출발점입니다.' },
@@ -2349,7 +2354,7 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
     ]
   },
   '7': {
-    brandProfile: '힐자계는 입주민이 집 근처에서 부담 없이 따라할 수 있는 생활형 케어가 핵심입니다. 전문 용어를 줄이고, 엘리베이터 앞·거실·출근 전처럼 실제 동선을 기준으로 안내해야 합니다. 즉시 가능한 짧은 루틴과 안전한 표현을 우선합니다.',
+    brandProfile: '힐자계는 입주민이 집 근처에서 부담 없이 따라할 수 있는 생활형 케어가 핵심입니다. **기능재활·움직임 센터**의 쉬운 버전으로, 엘리베이터 앞·거실·출근 전 동선을 기준으로 안내하세요. 도수·카이로·시술 톤은 쓰지 말고, 짧은 루틴·안전한 표현을 우선합니다.',
     strategyGuide: '기준:\n- 단계는 불편 공감 → 쉬운 이완 → 자세·움직임 연결 → 생활 고정 순으로 구성한다.\n- 한 콘텐츠당 동작은 1~2개로 제한한다.\n- 통증 악화·저림 등 경고 신호 시 병원 진료 권유 문구를 포함한다.\n\n의도:\n- 입주민이 "어렵지 않다"는 경험을 반복하게 만든다.\n- 과한 운동 대신 꾸준한 생활형 루틴을 정착시킨다.\n- 지역 커뮤니티 신뢰를 높여 상담 접점을 자연스럽게 만든다.',
     steps: [
       { id: '1', title: '1단계 · 불편 공감 시작', summary: '입주민 일상에서 자주 겪는 불편을 정확히 짚기', rationale: '내 이야기라고 느껴야 행동이 시작됩니다. 생활 맥락의 불편을 먼저 공감해 참여를 유도합니다.' },
@@ -2851,6 +2856,7 @@ const PERSONAL_BRAND_PROFILE = `
 - 힐링트리·특정 병원명을 브랜드 기획·분기 주제의 주어로 사용
 - 의료인=의사 프레임으로만 포지셔닝
 - **현재 병원 근무·직접 진료·처방** 암시 (병원 진료 **권유**는 가능)
+- 리얼무브먼트·페이스·일상·힐자계 등 **도수·CMT 외 채널**에서 도수치료·카이로프랙틱을 주인공처럼 부각 (마이너스). 그 채널은 **기능재활·움직임 센터·임상가 지도** 컬러
 `.trim();
 const YEAR_BRAND_WRITING_RULE = '[출력 규칙] intent·topic·goal·rationale에 클리닉·병원·기관명을 쓰지 마세요. 브랜드 주어는 오직 「미카닥 박준규」 개인 브랜드입니다. Doctor·닥터·원장님을 헤드라인·브랜드 슬로gan 주어로 쓰지 마세요.';
 
@@ -3288,6 +3294,7 @@ const DEFAULT_BRAND_FOUNDATION = `
 ■ 치료·웰니스 로드맵 순서 (참고)
 침습(필요 시 병원) → 비침습 도수(병원) → Passive Stretching → Assisted Active → Active(생활습관·자세) → Resistive(기능운동)
 ※ 미카닥 박준규는 **현재 병원 근무 없음**. 콘텐츠·상담은 **병원 진료·치료 권유** + **운동·재활 프로그램 병행** 포지셔닝. 진단·처방·치료행위 표현 금지.
+※ 도수치료·CMT 채널만 도수·카이로·임상 치료 서술이 자연스럽다. **그 외 채널**은 도수/카이로를 주인공처럼 부각하지 말고, **보건의료 배경 임상가가 지도하는 기능재활·움직임 센터** 컬러를 쓴다.
 `.trim();
 
 function getCategoryThreeMonthOutcome_(catId){
@@ -5484,6 +5491,10 @@ function buildBrandContextForPrompt_(catId, draft){
   }
   if(Number(catId) === 2 || Number(catId) === 4){
     lines.push('페이스·IFC 채널 한글 표기는 「리얼 페이스」로 하세요. (「리:얼」 금지). 영문 Re:Al / Re:Al Face는 그대로 둡니다.');
+  }
+  if(!allowsTreatmentActLanguage_(catId)){
+    lines.push(getNonClinicalTreatmentCopyRule_());
+    lines.push(FUNCTIONAL_REHAB_CENTER_POSITIONING_RULE);
   }
   return lines.join('\n');
 }
@@ -9007,9 +9018,10 @@ History Taking · Inspection · Movement Test · Palpation
 - **Position 3** Standing(서기): 완전 하중·기능적 패턴. 일상 동작에 가까운 훈련.
 
 ■ 콘텐츠에 녹이는 방법
-- 일반 독자: 공감 → 왜 아픈지(평가·원인, 쉬운 비유) → 센터에서 무엇을 하는지(도수 F→M→J → 움직임 P→AA→A→생활습관→기능) → 집 셀프(동작·초·회·분, 무리·재통증 주의).
-- Movement·리얼 카테고리: P-ROM·PAR·Position 1→2→3 순서를 환자 언어로. '왜 이 동작인지'·편안한 호흡·긴장 자각을 강조. 표기 「리얼」(「리:얼」 금지, Re:Al 유지).
-- 전문가 독자: 평가-치료 연결, PSP·PAR 순서 존중. 과장·즉효 약속·타 기관 비방 금지.
+- 일반 독자(도수·CMT 채널): 공감 → 왜 아픈지 → 센터에서 무엇을 하는지(도수 F→M→J → 움직임) → 집 셀프.
+- 일반 독자(리얼무브먼트·페이스 등): 공감 → 왜 반복되는지(자세·움직임) → **기능재활·움직임 지도** → 집 셀프. 도수·카이로를 주인공처럼 부각하지 말 것.
+- Movement·리얼 카테고리: P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 자각. 표기 「리얼」(「리:얼」 금지, Re:Al 유지). **기능재활·움직임 센터** 컬러.
+- 전문가 독자: CMT·도수는 평가-치료 연결. 움직임·IFC는 기능·구조 지도 언어. 과장·즉효·타 기관 비방 금지.
 - 얼굴·웰니스: 구조→기능, 호흡·자세·긴장 조절 맥락 유지.`;
 
 const DEFAULT_BLOG_TITLE_HOOK_RULE = `제목은 **독자의 호기심·궁금증**을 자극하는 후킹 요소를 넣으세요. (예: "왜 ~일까?", "사실 ○○이 원인?", "○○ 안 하면 생기는 일", 숫자·흔한 오해·반전 한 줄). 네이버 SEO(검색 키워드 자연스럽게)도 고려하되, 과장·즉효 약속·낚시는 금지.
@@ -9403,6 +9415,32 @@ function isOpsManualCategory(catId){ return catId === 8; }
 function isThreadCategory(catId){ return isDailyShareCategory(catId); }
 function isHeiljagyaeCategory(catId){ return catId === 7; }
 function isGeneralAudienceCategory(catId){ return catId === 0 || catId === 1 || catId === 2; }
+/** 도수치료·CMT Academy만 치료·시술 행위 서술 허용 */
+function allowsTreatmentActLanguage_(catId){
+  var id = Number(catId);
+  return id === 0 || id === 3;
+}
+/** 도수·CMT 외: 치료행위 수행 암시 카피 완화(이미지·썸네일·망고) */
+function scrubNonClinicalTreatmentCopy_(text, catId){
+  if(allowsTreatmentActLanguage_(catId)) return String(text || '');
+  var t = String(text || '');
+  if(!t) return t;
+  return t
+    .replace(/원인과\s*결과를\s*바꿔\s*치료한\s*결과/g, '원인과 결과를 구분해 움직임으로 접근한 결과')
+    .replace(/바꿔\s*치료한\s*결과/g, '바꿔 바라본 결과')
+    .replace(/치료한\s*결과/g, '움직임으로 접근한 결과')
+    .replace(/치료해\s*드렸/g, '프로그램으로 안내해 드렸')
+    .replace(/치료해\s*드린/g, '프로그램으로 안내한')
+    .replace(/치료했어요/g, '움직임으로 접근했어요')
+    .replace(/치료했습니다/g, '움직임으로 접근했습니다')
+    .replace(/치료했죠/g, '움직임으로 접근했죠')
+    .replace(/시술\s*후/g, '관리 후')
+    .replace(/시술하고\s*나니/g, '관리하고 나니');
+}
+function getNonClinicalTreatmentCopyRule_(){
+  return '도수·CMT 외 채널: 치료행위 수행 암시 금지(치료한 결과·치료했어요 등). 「치료를 해도 반복=자세/움직임」 맥락은 허용. ' +
+    '도수치료·카이로프랙틱을 주인공처럼 부각하지 말고, **보건의료 배경 임상가가 지도하는 기능재활·움직임 센터** 컬러를 강조. 영문 Re:Al은 유지.';
+}
 /** CMT·IFC·Re:Al 움직임 과정 — 강연·영상 공유 톤 */
 function isExpertCourseCategory(catId){ return catId === 3 || catId === 4 || catId === 5; }
 function getExpertCourseTopicAudienceLine_(catId){
@@ -9416,9 +9454,9 @@ function getProgramAudienceLine_(catId){
   var id = parseInt(catId, 10);
   if(id === 3) return 'CMT 임상도수 과정 수강·복습 중인 물리치료사·도수 치료사 (평가·촉진 중심)';
   if(id === 4) return 'IFC 얼굴·구조 교육 수강·복습 중인 얼굴·구조 교육 전문가 (미용·도수·물리치료)';
-  if(id === 5) return 'Re:Al 움직임 과정 수강·복습 중인 물리치료사·트레이너 (치료→기능 연결)';
+  if(id === 5) return 'Re:Al 움직임 과정 수강·복습 중인 물리치료사·트레이너 (기능재활·움직임 지도 연결)';
   if(id === 0) return '통증·구조 치료에 관심 있는 일반인';
-  if(id === 1) return '일상 움직임·자세 개선에 관심 있는 일반인';
+  if(id === 1) return '일상 움직임·자세·기능재활에 관심 있는 일반인';
   if(id === 2) return '얼굴·비대칭 관리에 관심 있는 일반인 (20~40대)';
   var cat = CATEGORIES[id];
   return cat ? (cat.audience || '') : '';
@@ -9938,12 +9976,12 @@ const MANGO_PALETTES_BY_CAT = {
     label: 'Re:Al 움직임 과정',
     bg: '#EDE8DF',
     bg2: '#E2DDD4',
-    head: '#1E293B',
-    point: '#475569',
-    card: '#F5F2EC',
-    card2: '#EBE6DD',
-    divider: '#1E293B',
-    desc: '쿨 데본·슬레이트·과정'
+    head: '#333333',
+    point: '#dc143c',
+    card: '#FAF6F0',
+    card2: '#E8E2D8',
+    divider: '#333333',
+    desc: '아이보리·차콜·크림슨(전문가)'
   },
   6: {
     key: 'green',
@@ -9991,7 +10029,7 @@ const THUMB_SCRIM_BY_CAT = {
   2: { tint: '#3d2c27', tint2: '#D4A853', glow: '#6b493d' },
   3: { tint: '#0F172A', tint2: '#1E3A5F', glow: '#4F46E5' },
   4: { tint: '#5C3D2E', tint2: '#A67C52', glow: '#9E4B5A' },
-  5: { tint: '#1E293B', tint2: '#334155', glow: '#1E293B' },
+  5: { tint: '#333333', tint2: '#2a2a2a', glow: '#1f1f1f' },
   6: { tint: '#1f3d32', tint2: '#3D8B6A', glow: '#3d8b6a' },
   7: { tint: '#14532D', tint2: '#34D399', glow: '#059669' },
   8: { tint: '#312E81', tint2: '#6366F1', glow: '#6366F1' }
@@ -10789,7 +10827,9 @@ const MANGO_SLIDE_VISUAL_COPY_RULE = `[이미지용 카피 — 소개란 본문 
 6. 주의 — 병원 신호·무리 금지. 안내·주의 카드 톤.
 7. 다음 — FAQ 1개 또는 CTA 한 줄. 새 정보만.
 
-쉬운 말만. 표·3열 표·긴 산문 금지.`;
+쉬운 말만. 표·3열 표·긴 산문 금지.
+도수·CMT 외: 「치료한 결과」「치료했어요」 등 치료행위 수행 암시 금지. 「치료를 해도 반복=자세/움직임」 맥락은 허용.
+도수·CMT 외: 도수치료·카이로프랙틱을 주인공처럼 부각하지 말고, **보건의료 배경 임상가가 지도하는 기능재활·움직임 센터** 컬러.`;
 
 const MANGO_DETAIL_BRIEF_RULE = getMangoDetailBriefRule_(2);
 
@@ -10838,11 +10878,25 @@ const DEFAULT_EXPERT_COURSE_SCOPE_RULE = `[범위·집중 — 최우선]
 
 const BLOG_CONTENT_VOICE_RULE = '미카닥 박준규 톤 — 따뜻하고 신뢰감 있는 **설명하는 전문가**. **존댓말(해요체)**로 씀(~해요/~이에요/~습니다). 한다체·반말(~한다/~이다) 금지. 제목·서명·헤드라인에 Doctor·닥터·원장님을 쓰지 않음. 과장·즉효 약속 금지.';
 const MEDICAL_COMPLIANCE_RULE = `[의료법·포지셔닝 — 필수]
-- 작성자(미카닥 박준규)는 **현재 병원에서 근무하지 않습니다**. 진단·처방·치료행위를 하거나 암시하지 마세요.
+- 작성자(미카닥 박준규)는 **현재 병원에서 근무하지 않습니다**. 진단·처방·치료행위를 하거나 암시하지 마세요(아래 채널 예외 참고).
 - 제공 범위는 **운동·재활·웰니스 프로그램**(리얼무브먼트, P-스트레칭, 기능운동 등)이며, 의료행위가 아님을 전제로 씁니다.
-- "완치""치료한다""진단 확정""처방""수술 대신" 등 **의료행위 연상** 표현 금지. "이해를 돕기 위한 일반 정보"·"생활·운동 관리 참고" 톤.
+- "완치""진단 확정""처방""수술 대신" 등 **의료행위 연상** 표현 금지. "이해를 돕기 위한 일반 정보"·"생활·운동 관리 참고" 톤.
+- **치료행위 표현(채널별·필수)**
+  - **예외(서술 가능)**: 도수치료 · CMT Academy — 임상·치료·시술 맥락 서술 OK.
+  - **그 외 채널**(리얼무브먼트·리얼 페이스·Re:Al 움직임·IFC·일상·힐자계 등): **우리가 치료했다 / 치료한 결과 / 치료해 드린 / 시술 후(우리 행위)**처럼 **치료행위를 했다는 내용 금지**.
+  - **허용 예**: 「치료를 해도 반복되는 건 자세·움직임 문제다」— 치료해도 남는 문제를 자세/움직임으로 설명하는 일반 맥락.
+  - **금지 예**: 「치료한 결과」「원인과 결과를 바꿔 치료한」「치료했어요」「시술하고 나니」— 치료·시술 수행 암시.
+- **도수·CMT 외 채널 컬러(필수)**: **보건의료 배경의 임상가**가 인체(근골격·움직임)를 바탕으로 지도하는 **기능재활·움직임 센터** 톤. 도수치료·카이로프랙틱·관절음·시술·병원 임상 장면을 **이 채널의 주인공처럼 부각하지 말 것**(마이너스). DC·PT·임상 경험은 「인체를 아는 임상가·지도자」로만 짧게 연결.
 - **병원 진료 안내는 셀프 케어(selfCare)에 한 문장만** 넣으세요. problem·explanation·cta·FAQ에는 병원·진료·병원 상담을 반복하지 마세요.
 - 적신호(마비, 대소변 장애, 발열·체중감소 동반, 사고 직후 급격한 악화 등)도 **그 한 문장**에만 녹이세요.`;
+
+/** 도수·CMT 외 — 기능재활운동센터 컬러 */
+const FUNCTIONAL_REHAB_CENTER_POSITIONING_RULE = `[기능재활운동센터 컬러 — 도수치료·CMT Academy 제외 채널]
+- 중심 메시지: **보건의료인이자 인체를 잘 아는 임상가**가 지도하는 **기능재활·움직임 센터**.
+- 강조할 것: 1:1 기능운동·자세·PAR·Position·생활 적용, "왜 이렇게 움직이는지", 안전한 범위·조절, 반복되는 불편의 움직임 원인.
+- 줄일 것(마이너스): 도수치료·카이로프랙틱·관절 소리(딱)·시술·병원 도수 임상 장면을 **글·이미지의 주인공처럼** 부각하지 말 것. 기법 나열·치료실 스토리로 끌지 말 것.
+- 배경으로만 허용: 「치료를 받아도 반복되면 자세·움직임」처럼 **짧게**. 도수/카이로를 이 채널의 차별점으로 내세우지 말 것.
+- 신뢰 연결: DC·PT·20년 임상은 「인체를 아는 지도자」로. Doctor/닥터·치료원·병원 근무 톤 금지.`;
 
 const GEO_CONTENT_STRUCTURE_RULE = `[GEO · AI 인용 가능 구조 — explanation 필드에 자연스럽게 녹이기]
 **explanation 맨 앞 2~3문장은 TL;DR(핵심 결론 요약)**으로 시작할 것. AI가 먼저 발췌할 수 있게 결론을 선제시한 뒤, 아래 요소를 번호·"N단계" 표기 없이 문단으로 이어 연결:
@@ -10939,16 +10993,18 @@ const DEFAULT_IFC_EXPERT_BLOG_PROMPT = buildExpertCourseBlogPrompt_({
   programBlock: '[IFC 얼굴교육 맥락]\n' +
     '- 표면 자극·미용 마사지가 아닌 **구조·경축·기능 연결** 관점. 경추·턱관절·교합을 함께 설명\n' +
     '- 구조적 접근은 **참고·영상에서 다룬 범위** 안에서만. 무관한 전신·다른 부위 이야기로 확장 금지\n' +
-    '- 기기(IFC)와 도수 접근 **순서**·상담(기대치 조율) 포인트 중심. before/after 과장 금지'
+    '- 기기(IFC)와 도수 접근 **순서**·상담(기대치 조율) 포인트 중심. before/after 과장 금지\n' +
+    '- 교육·구조 설명 중심. 「우리가 치료한 결과」류 치료행위 수행 암시는 금지'
 });
 const DEFAULT_REAL_MOVEMENT_EXPERT_BLOG_PROMPT = buildExpertCourseBlogPrompt_({
   audienceIntro: '**Re:Al 움직임 전문가 과정** 수강·복습 중인 물리치료사·트레이너를 독자로 하는',
-  roleReaders: '치료 후 기능 회복·PAR·Position을 임상에 연결하는 움직임·재활 전문가',
+  roleReaders: '기능 회복·PAR·Position을 임상에 연결하는 움직임·재활 전문가',
   programBlock: '[Re:Al Movement 맥락]\n' +
-    '- 치료실→기능운동 연결. PAR·Position·progression을 **참고·영상에서 다룬 내용** 안에서만 연결\n' +
+    '- 기능재활·움직임 지도 연결. PAR·Position·progression을 **참고·영상에서 다룬 내용** 안에서만 연결\n' +
     '- 참고에 없는 평가·운동 처방·다른 부위로 확장 금지\n' +
     '- 안전한 progression·환자 순응도·코칭 언어가 드러나게\n' +
-    '- 한글 프로그램명 쓸 때 「리얼무브먼트」「리얼 움직임」(「리:얼」 금지, 리얼무브먼트는 붙여 쓰기·한 줄). 영문 Re:Al은 유지'
+    '- 한글 프로그램명 쓸 때 「리얼무브먼트」「리얼 움직임」(「리:얼」 금지, 리얼무브먼트는 붙여 쓰기·한 줄). 영문 Re:Al은 유지\n' +
+    '- 도수·카이로 시술 장면을 주인공처럼 부각하지 말 것. 중심은 기능재활·움직임 지도 언어'
 });
 const DEFAULT_CMT_EXPERT_INSTA_PROMPT = buildExpertCourseInstaPrompt_({
   roleReaders: 'CMT 수강·복습 중인 도수·물리치료 동료',
@@ -10956,11 +11012,11 @@ const DEFAULT_CMT_EXPERT_INSTA_PROMPT = buildExpertCourseInstaPrompt_({
 });
 const DEFAULT_IFC_EXPERT_INSTA_PROMPT = buildExpertCourseInstaPrompt_({
   roleReaders: 'IFC 얼굴·구조 교육을 배우는 미용·도수·물리치료 동료',
-  programBlock: '[IFC] 얼굴·경축·구조 관점. 이번 강의·영상의 테크닉·평가 포인트만. 표면 미용 톤 금지.'
+  programBlock: '[IFC] 얼굴·경축·구조 관점. 이번 강의·영상의 테크닉·평가 포인트만. 표면 미용·도수/카이로 주인공 부각 금지.'
 });
 const DEFAULT_REAL_MOVEMENT_EXPERT_INSTA_PROMPT = buildExpertCourseInstaPrompt_({
   roleReaders: 'Re:Al 움직임 과정 수강·복습 중인 재활·트레이닝 동료',
-  programBlock: '[Re:Al] 치료→기능 연결. 이번 강의·영상의 테크닉·포인트만.'
+  programBlock: '[Re:Al] 기능재활·움직임 지도 연결. 이번 강의·영상의 테크닉·포인트만. 도수·카이로 시술 주인공 부각 금지.'
 });
 const DEFAULT_CMT_EXPERT_THREADS_PROMPT = buildExpertCourseThreadsPrompt_({
   roleReaders: 'CMT 수강·복습 중인 도수·물리치료 동료',
@@ -10972,7 +11028,7 @@ const DEFAULT_IFC_EXPERT_THREADS_PROMPT = buildExpertCourseThreadsPrompt_({
 });
 const DEFAULT_REAL_MOVEMENT_EXPERT_THREADS_PROMPT = buildExpertCourseThreadsPrompt_({
   roleReaders: 'Re:Al 움직임 과정 수강·복습 중인 재활·트레이닝 동료',
-  programBlock: '[Re:Al] 치료→기능·PAR·Position 연결. 이번 강의·영상 테크닉만.'
+  programBlock: '[Re:Al] 기능재활·움직임·PAR·Position 연결. 이번 강의·영상 테크닉만.'
 });
 
 // ── 기본 프롬프트 (카테고리별 블로그/인스타/쓰레드 등) ──
@@ -10987,7 +11043,9 @@ ${BLOG_CONTENT_VOICE_RULE}
 ${MEDICAL_COMPLIANCE_RULE}
 인스타(프로그램별): 도수·CMT @dr.park_dc.pt · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트·움직임 @re.al_movement_official
 ※ 무브먼트·움직임 채널 블로그·이미지·캡션: 「리:얼」 대신 「리얼」 표기 (리얼무브먼트·리얼 움직임). 「리얼무브먼트」붙여 쓰기·한 줄 고정. 영문 Re:Al은 유지.
-※ 페이스 채널 한글 표기: 「리얼 페이스」(「리:얼」 금지). 영문 Re:Al Face는 유지.` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
+※ 페이스 채널 한글 표기: 「리얼 페이스」(「리:얼」 금지). 영문 Re:Al Face는 유지.
+※ 도수·CMT 외 채널: 치료행위 수행 암시 금지(치료한 결과·치료했어요 등). 「치료를 해도 반복=자세/움직임」 맥락은 허용.
+※ 도수·CMT 외 채널 컬러: 보건의료 배경 임상가가 지도하는 **기능재활·움직임 센터**. 도수치료·카이로프랙틱을 주인공처럼 부각하지 말 것.` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
   categories: {
     0: { // 도수치료
       blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[도수치료 맥락] PSP·PAR 순서를 환자 언어로: 평가(증상·통증 질)→연부·관절 이해→Passive(P-ROM)→생활습관. problem에 공감·왜 아픈지 가볍게, selfCare는 집에서 할 수 있는 동작.`,
@@ -10996,14 +11054,14 @@ ${MEDICAL_COMPLIANCE_RULE}
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     1: { // 리얼무브먼트
-      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[Movement 맥락] P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지. 프로그램명 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지, 영문 Re:Al 유지).`,
-      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n캐러셀 없이 **한 포스트 캡션**에 동작·포인트·주의사항을 단계적으로 적습니다. 마지막에 저장·팔로우 유도 문장을 캡션 끝에 자연스럽게 넣으세요. 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지).`,
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[Movement 맥락] P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지. 프로그램명 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지, 영문 Re:Al 유지).\n[컬러] 보건의료 배경 임상가가 지도하는 **기능재활·움직임 센터**. 도수·카이로·시술 장면을 주인공처럼 부각하지 말 것.\n[치료행위] 우리가 치료했다는 내용 금지(치료한 결과·치료했어요 등). 「치료를 해도 반복=자세/움직임」 맥락은 허용.`,
+      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n캐러셀 없이 **한 포스트 캡션**에 동작·포인트·주의사항을 단계적으로 적습니다. 마지막에 저장·팔로우 유도 문장을 캡션 끝에 자연스럽게 넣으세요. 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지). 기능재활·움직임 센터 톤. 도수·카이로 부각·치료행위 수행 암시 금지.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     2: { // 리얼 페이스
-      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[얼굴·뷰티 맥락] 20~40대 여성 독자. 과학적 근거는 가볍게, 공감과 희망. selfCare는 부담 없는 가벼운 동작·습관. 프로그램명 표기: 「리얼 페이스」(「리:얼」 금지, 영문 Re:Al Face 유지).`,
-      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n캐러셀 없이 **한 포스트 캡션**으로 스토리텔링하세요. "이런 고민 있으신가요?"에 이어 문제→원인→해결→CTA를 캡션 안에서 줄바꿈으로 구분해 읽기 쉽게. 표기: 「리얼 페이스」(「리:얼」 금지).`,
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[얼굴·뷰티 맥락] 20~40대 여성 독자. 과학적 근거는 가볍게, 공감과 희망. selfCare는 부담 없는 가벼운 동작·습관. 프로그램명 표기: 「리얼 페이스」(「리:얼」 금지, 영문 Re:Al Face 유지).\n[컬러] 임상가가 구조를 아는 **기능·웰니스** 톤. 도수·카이로·시술 장면을 주인공처럼 부각하지 말 것.\n[치료행위] 우리가 치료했다는 내용 금지.`,
+      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n캐러셀 없이 **한 포스트 캡션**으로 스토리텔링하세요. "이런 고민 있으신가요?"에 이어 문제→원인→해결→CTA를 캡션 안에서 줄바꿈으로 구분해 읽기 쉽게. 표기: 「리얼 페이스」(「리:얼」 금지). 도수·카이로 부각·치료행위 수행 암시 금지.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
@@ -21393,6 +21451,9 @@ function ensureMangoIntroHasDesignBlock_(intro, catId){
   if(typeof localizeProgramDisplayName_ === 'function'){
     stripped = localizeProgramDisplayName_(stripped);
   }
+  if(typeof scrubNonClinicalTreatmentCopy_ === 'function'){
+    stripped = scrubNonClinicalTreatmentCopy_(stripped, resolvedCatId);
+  }
   var room = MANGO_DETAIL_INTRO_MAX - designBlock.length - 2;
   // 디자인 블록이 잘리지 않도록: room이 너무 작아도 본문만 줄이고 블록은 끝까지 유지
   if(room < 200) room = 200;
@@ -21560,9 +21621,12 @@ function mangoExtractSteps_(selfCare, maxSteps){
 
 function mangoFormatSlideBlock_(num, role, head, bullets, visual){
   var lines = ['【' + num + '. ' + role + '】'];
-  if(head) lines.push('헤드: ' + head);
+  var catId = (typeof state !== 'undefined' && state) ? state.selectedCatId : null;
+  var h = scrubNonClinicalTreatmentCopy_(head, catId);
+  if(h) lines.push('헤드: ' + h);
   (bullets || []).forEach(function(b){
-    if(b) lines.push('• ' + b);
+    var line = scrubNonClinicalTreatmentCopy_(b, catId);
+    if(line) lines.push('• ' + line);
   });
   if(visual) lines.push('비주얼: ' + visual);
   return lines.join('\n');
@@ -21666,8 +21730,12 @@ function buildMangoBriefFromBlog_(content, topic, catId){
   if(typeof localizeProgramDisplayName_ === 'function'){
     ctaClean = localizeProgramDisplayName_(ctaClean);
   }
+  if(typeof scrubNonClinicalTreatmentCopy_ === 'function'){
+    ctaClean = scrubNonClinicalTreatmentCopy_(ctaClean, catId);
+  }
   var ctaSents = mangoPickSentences_(ctaClean, 2, 52).map(function(s){
-    return typeof localizeProgramDisplayName_ === 'function' ? localizeProgramDisplayName_(s) : s;
+    var line = typeof localizeProgramDisplayName_ === 'function' ? localizeProgramDisplayName_(s) : s;
+    return typeof scrubNonClinicalTreatmentCopy_ === 'function' ? scrubNonClinicalTreatmentCopy_(line, catId) : line;
   }).filter(function(s){
     // 잘린·어색한 영문 잔여·미완성 문장 제외
     if(!s || /Re:\s*Al/i.test(s)) return false;
@@ -21857,7 +21925,7 @@ const THUMB_BRAND_PRESETS = {
     hero: 'Re:Al 움직임 과정',
     tagline: '교육 현장에서 다시 보는 움직임',
     program: 'Re:Al 움직임 과정',
-    defaultBody: '도수치료 후 기능운동으로의 전환, 동적 안정성과 운동 처방 우선순위를 현장 기준으로 정리합니다.'
+    defaultBody: '기능재활·움직임 지도로 이어지는 연결, 동적 안정성과 운동 처방 우선순위를 현장 기준으로 정리합니다.'
   },
   6: {
     hero: 'REAL LIFE',
@@ -21973,6 +22041,8 @@ function buildThumbMakerCopy_(content, catId, opts){
   if(!bodySrc) bodySrc = preset.defaultBody;
   // 핵심 문장 앞 `: ` 접두어 제거 (가독성·중복 브랜드명 방지)
   var body = bodySrc.replace(/^[:：]\s*/, '');
+  body = scrubNonClinicalTreatmentCopy_(body, catId);
+  if(!body) body = scrubNonClinicalTreatmentCopy_(preset.defaultBody, catId) || preset.defaultBody;
 
   return {
     hero: normalizeThumbBrandOneLine_(preset.hero) || preset.hero,
@@ -22376,7 +22446,7 @@ function readThumbMakerFields_(){
       hero: normalizeThumbBrandOneLine_(heroEl ? String(heroEl.value || '').trim() : '') || (heroEl ? String(heroEl.value || '').trim() : ''),
       tagline: tagEl ? String(tagEl.value || '').trim() : '',
       program: normalizeThumbBrandOneLine_(progEl ? String(progEl.value || '').trim() : '') || (progEl ? String(progEl.value || '').trim() : ''),
-      body: bodyEl ? String(bodyEl.value || '').trim() : ''
+      body: scrubNonClinicalTreatmentCopy_(bodyEl ? String(bodyEl.value || '').trim() : '', st.catId != null ? st.catId : state.selectedCatId)
     };
   }
   return st.fields || st.lastCopy || buildThumbMakerCopy_(null, state.selectedCatId);

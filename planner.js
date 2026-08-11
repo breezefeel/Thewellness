@@ -50,7 +50,7 @@ const CATEGORIES = [
     sub:"Re:Al 움직임 과정 · 전문가 교육",
     drafts:[
       {id:"d5-0", topic:"패시브 스트레칭을 언제, 어떻게 써야 하는가?",          angle:"억제-이완 테크닉의 원리와 임상 적용 타이밍"},
-      {id:"d5-1", topic:"기능운동, 치료의 끝이 아닌 연결이다",                  angle:"도수치료 후 기능운동으로의 전환 — 리얼 무브먼트 접근 철학"},
+      {id:"d5-1", topic:"기능운동, 치료의 끝이 아닌 연결이다",                  angle:"도수치료 후 기능운동으로의 전환 — 리얼무브먼트 접근 철학"},
       {id:"d5-2", topic:"자세 교정에서 '좋은 자세'가 없는 이유",                angle:"동적 안정성 개념과 자세 교정의 새로운 패러다임"},
       {id:"d5-3", topic:"고관절 가동성 vs 안정성, 무엇이 먼저인가?",            angle:"기능 사슬(kinetic chain) 관점의 운동 처방 우선순위"},
       {id:"d5-4", topic:"운동 처방 시 환자 순응도를 높이는 커뮤니케이션 전략",  angle:"행동변화 이론 + 동기부여 인터뷰를 운동 지도에 적용"},
@@ -2289,7 +2289,7 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
     ]
   },
   '1': {
-    brandProfile: '리얼 무브먼트는 PAR·Position을 통해 "좋은 자세를 고정"이 아니라 "움직임을 조절"하도록 돕는 프로그램입니다. 일반인이 일상 동작(앉기·걷기·업무)에서 즉시 써먹을 수 있는 표현이 중요합니다. 강한 교정보다 가벼운 감각 회복과 반복 가능한 루틴을 우선합니다. 블로그·이미지 표기는 「리얼」(리:얼 금지), 영문 Re:Al은 유지.',
+    brandProfile: '리얼무브먼트는 PAR·Position을 통해 "좋은 자세를 고정"이 아니라 "움직임을 조절"하도록 돕는 프로그램입니다. 일반인이 일상 동작(앉기·걷기·업무)에서 즉시 써먹을 수 있는 표현이 중요합니다. 강한 교정보다 가벼운 감각 회복과 반복 가능한 루틴을 우선합니다. 블로그·이미지 표기는 「리얼무브먼트」붙여 쓰기·한 줄(리:얼 금지), 영문 Re:Al은 유지.',
     strategyGuide: '기준:\n- 단계는 감각 깨우기 → 동작 패턴 교정 → 일상 적용 → 유지 습관 순으로 구성한다.\n- 각 단계는 3~5분 내 가능한 마이크로 루틴을 포함한다.\n- "정답 자세"보다 상황별 조절 원칙을 제시한다.\n\n의도:\n- 독자가 자세 교정을 부담이 아닌 생활 기술로 인식하게 한다.\n- 통증 예방과 피로 감소를 일상 동작에서 체감하게 만든다.\n- 센터 방문 전후 모두 유지 가능한 자기조절 프레임을 만든다.',
     steps: [
       { id: '1', title: '1단계 · 감각 깨우기', summary: '호흡·기준선 회복으로 몸 상태를 먼저 인식하기', rationale: '몸 상태를 모르면 교정 신호를 받아들이기 어렵습니다. 가장 쉬운 감각 입력부터 시작해 "지금 내 몸"을 파악하도록 돕습니다.' },
@@ -5209,12 +5209,13 @@ function getCategoryProgramLine_(catId){
   if(!cat) return '';
   return localizeProgramDisplayName_(cat.programLine || CAT_PROGRAM_LINE[catId] || cat.name);
 }
-/** 고객·초안 표기용: Re:Al Movement → 리얼 무브먼트 (블로그·이미지). Re:Al 영문은 유지 */
+/** 고객·초안 표기용: Re:Al Movement → 리얼무브먼트 (블로그·이미지). Re:Al 영문은 유지 */
 function localizeProgramDisplayName_(text){
   return String(text || '')
-    .replace(/Re:\s*Al\s*Movement/gi, '리얼 무브먼트')
+    .replace(/Re:\s*Al\s*Movement/gi, '리얼무브먼트')
     .replace(/Re:\s*Al\s*Face/gi, '리:얼 페이스')
-    .replace(/리:얼\s*무브먼트/g, '리얼 무브먼트')
+    .replace(/리:얼\s*무브먼트/g, '리얼무브먼트')
+    .replace(/리얼\s+무브먼트/g, '리얼무브먼트')
     .replace(/리:얼\s*움직임/g, '리얼 움직임');
 }
 function getDefaultSeriesForCat_(catId){
@@ -5478,7 +5479,7 @@ function buildBrandContextForPrompt_(catId, draft){
     lines.push('일반인 채널에서는 프로그램명을 「리얼무브먼트」「리얼페이스」로 표기하세요. (영문 Re:Al Movement / Re:Al Face 남발 금지)');
   }
   if(Number(catId) === 1 || Number(catId) === 5){
-    lines.push('무브먼트·움직임 채널 블로그·이미지·캡션에서는 「리:얼」 대신 「리얼」로 표기하세요. (예: 리얼 무브먼트, 리얼 움직임). 영문 Re:Al은 그대로 둡니다.');
+    lines.push('무브먼트·움직임 채널 블로그·이미지·캡션에서는 「리:얼」 대신 「리얼」로 표기하세요. (예: 리얼무브먼트, 리얼 움직임). 「리얼무브먼트」는 붙여 쓰고 줄바꿈하지 마세요. 영문 Re:Al은 그대로 둡니다.');
   }
   return lines.join('\n');
 }
@@ -9882,7 +9883,7 @@ const MANGO_PALETTES_BY_CAT = {
   },
   1: {
     key: 'devon',
-    label: '리얼 무브먼트',
+    label: '리얼무브먼트',
     bg: '#f0efeb',
     bg2: '#eee9de',
     head: '#333333',
@@ -10659,7 +10660,8 @@ function getMangoSparseAccentRule_(catId){
   return '포인트(' + pointLabel + ')는 **체크·기호·작은 아이콘·핵심 키워드 1~2단어만**. ' +
     '제목·헤드·부제 전체·넓은 면·배경·카드 채움·하단 스크림·그라데이션에 포인트색 **금지**. ' +
     '헤드·본문·표지 큰 타이포는 글·헤드 ' + p.head + '만. ' +
-    '표지 사진 하단은 차콜·다크 스크림만(포인트색 워시·레드 밴드 금지).';
+    '표지 사진 하단은 차콜·다크 스크림만(포인트색 워시·레드 밴드 금지). ' +
+    '「리얼무브먼트」는 붙여 쓰고 **한 줄 고정**(리얼/무브먼트 줄바꿈 금지). 표지 큰 타이틀도 **한 줄**.';
 }
 function buildMangoDesignToneLineFromPalette_(p){
   p = p || MANGO_PALETTES_BY_CAT[1];
@@ -10680,7 +10682,7 @@ function getMangoLayoutPasteBlock_(catId){
   var m = getMangoModelGuideForCat_(catId);
   var sparse = getMangoSparseAccentRule_(catId);
   return '표·긴 설명표 금지. 주의·안내형·짧은 STEP·픽토그램 OK.\n' +
-    '타이포: 표지=한 줄 큰 헤드만(불릿 최소). 2~7장=헤드 1줄+불릿 1~3(본문 헤드보다 작게).\n' +
+    '타이포: 표지=큰 타이틀·브랜드명 반드시 한 줄(줄바꿈 금지). 「리얼무브먼트」는 붙여 쓰고 절대 줄바꿈하지 않음. 2~7장=헤드 1줄+불릿 1~3(본문 헤드보다 작게).\n' +
     '로고: 우하단 고정·높이 6~8% 이하·본문/얼굴과 겹침 금지(후처리 OK).\n' +
     '장별 역할 중복·블로그 원문·말줄임(…) 붙여넣기 금지. 쉬운 말만.\n' +
     m.pasteLine + '\n' +
@@ -10697,7 +10699,7 @@ function getMangoLayoutCopyRule_(catId){
 - **블로그 원문 붙여넣기·말줄임(…) 금지.** 장마다 헤드+짧은 불릿으로 **이미지용 핵심만**.
 - 장별 역할·메시지가 겹치지 않게 (표지≠공감≠원리≠따라하기).
 - **타이포(필수)**
-  - 표지(1장): **한 줄 큰 헤드만**. 부제·불릿·긴 설명 최소. 화면에서 가장 큰 글씨.
+  - 표지(1장): **큰 타이틀 한 줄만**(줄바꿈 금지). 「리얼무브먼트」는 **붙여 쓰기·한 줄 고정**. 부제·불릿·긴 설명 최소. 화면에서 가장 큰 글씨.
   - 본문(2~7장): **헤드 1줄(표지보다 작게)** + 불릿 1~3개 또는 STEP. 헤드와 불릿 위계 유지.
   - 불릿·STEP은 헤드보다 한 단계 작게. 한 장에 문단형 산문 금지.
 - **로고·서명(필수)**
@@ -10771,7 +10773,7 @@ const MANGO_SLIDE_VISUAL_COPY_RULE = `[이미지용 카피 — 소개란 본문 
 - intro 전체는 **최대 ${MANGO_DETAIL_INTRO_MAX}자**. 여유 있으면 일부러 더 짧게 자를 필요 없음.
 
 타이포 위계:
-- 1장 표지: **한 줄 큰 헤드만** (가장 큰 글씨). 설명·불릿 거의 없음.
+- 1장 표지: **큰 타이틀 한 줄만**(줄바꿈 금지). 「리얼무브먼트」붙여 쓰기·한 줄 고정. 설명·불릿 거의 없음.
 - 2~7장: 헤드(표지보다 작게) + 불릿/STEP(헤드보다 작게). 산문 문단 금지.
 
 7장 역할 고정 (순서·특성이 도드라지게):
@@ -10942,7 +10944,7 @@ const DEFAULT_REAL_MOVEMENT_EXPERT_BLOG_PROMPT = buildExpertCourseBlogPrompt_({
     '- 치료실→기능운동 연결. PAR·Position·progression을 **참고·영상에서 다룬 내용** 안에서만 연결\n' +
     '- 참고에 없는 평가·운동 처방·다른 부위로 확장 금지\n' +
     '- 안전한 progression·환자 순응도·코칭 언어가 드러나게\n' +
-    '- 한글 프로그램명 쓸 때 「리얼 무브먼트」「리얼 움직임」(「리:얼」 금지). 영문 Re:Al은 유지'
+    '- 한글 프로그램명 쓸 때 「리얼무브먼트」「리얼 움직임」(「리:얼」 금지, 리얼무브먼트는 붙여 쓰기·한 줄). 영문 Re:Al은 유지'
 });
 const DEFAULT_CMT_EXPERT_INSTA_PROMPT = buildExpertCourseInstaPrompt_({
   roleReaders: 'CMT 수강·복습 중인 도수·물리치료 동료',
@@ -10979,8 +10981,8 @@ const DEFAULT_PROMPTS = {
 프로필·약력: https://breezefeel.github.io/drpark · https://blog.naver.com/allenjoy/120205433765
 ${BLOG_CONTENT_VOICE_RULE}
 ${MEDICAL_COMPLIANCE_RULE}
-인스타(프로그램별): 도수·CMT @dr.park_dc.pt · 리:얼 페이스·IFC @dr.face_ifc · 리얼 무브먼트·움직임 @re.al_movement_official
-※ 무브먼트·움직임 채널 블로그·이미지·캡션: 「리:얼」 대신 「리얼」 표기 (리얼 무브먼트·리얼 움직임). 영문 Re:Al은 유지.` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
+인스타(프로그램별): 도수·CMT @dr.park_dc.pt · 리:얼 페이스·IFC @dr.face_ifc · 리얼무브먼트·움직임 @re.al_movement_official
+※ 무브먼트·움직임 채널 블로그·이미지·캡션: 「리:얼」 대신 「리얼」 표기 (리얼무브먼트·리얼 움직임). 「리얼무브먼트」붙여 쓰기·한 줄 고정. 영문 Re:Al은 유지.` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
   categories: {
     0: { // 도수치료
       blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[도수치료 맥락] PSP·PAR 순서를 환자 언어로: 평가(증상·통증 질)→연부·관절 이해→Passive(P-ROM)→생활습관. problem에 공감·왜 아픈지 가볍게, selfCare는 집에서 할 수 있는 동작.`,
@@ -10988,9 +10990,9 @@ ${MEDICAL_COMPLIANCE_RULE}
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
-    1: { // 리얼 무브먼트
-      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[Movement 맥락] P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지. 프로그램명 표기: 「리얼 무브먼트」(「리:얼」 금지, 영문 Re:Al 유지).`,
-      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n캐러셀 없이 **한 포스트 캡션**에 동작·포인트·주의사항을 단계적으로 적습니다. 마지막에 저장·팔로우 유도 문장을 캡션 끝에 자연스럽게 넣으세요. 표기: 「리얼 무브먼트」(「리:얼」 금지).`,
+    1: { // 리얼무브먼트
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[Movement 맥락] P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지. 프로그램명 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지, 영문 Re:Al 유지).`,
+      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n캐러셀 없이 **한 포스트 캡션**에 동작·포인트·주의사항을 단계적으로 적습니다. 마지막에 저장·팔로우 유도 문장을 캡션 끝에 자연스럽게 넣으세요. 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지).`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
@@ -21823,9 +21825,9 @@ const THUMB_BRAND_PRESETS = {
     defaultBody: '몸의 불편함과 기능 저하를 단계별로 평가해, 맞춤 도수·움직임으로 회복을 돕는 프로그램.'
   },
   1: {
-    hero: '리얼 무브먼트',
+    hero: '리얼무브먼트',
     tagline: '의학적 관점으로 다시 보는 움직임',
-    program: '리얼 무브먼트',
+    program: '리얼무브먼트',
     defaultBody: '몸의 불편함 & 기능 저하를 단계별로 평가해 이상 유무를 파악하고, 개별 차이가 큰 근육·관절 조정 능력을 안전하고 정밀한 맞춤 운동으로 회복시켜주는 트레이닝.'
   },
   2: {
@@ -21951,6 +21953,7 @@ function buildThumbMakerCopy_(content, catId, opts){
     topicProgram = clampThumbLine_(topicProgram, 26);
     if(topicProgram.length >= 4) program = topicProgram;
   }
+  program = normalizeThumbBrandOneLine_(program) || program;
 
   // preferTopic(「주제 다시 반영」): 훅보다 주제·각도·제목을 우선해 체감 변화를 만듦
   var bodySrc = opts.preferTopic
@@ -21967,12 +21970,12 @@ function buildThumbMakerCopy_(content, catId, opts){
   var body = bodySrc.replace(/^[:：]\s*/, '');
 
   return {
-    hero: preset.hero,
+    hero: normalizeThumbBrandOneLine_(preset.hero) || preset.hero,
     tagline: preset.tagline,
     program: program,
     body: body,
     keywords: keywords.slice(0, 4),
-    brandProgram: preset.program
+    brandProgram: normalizeThumbBrandOneLine_(preset.program) || preset.program
   };
 }
 
@@ -22365,9 +22368,9 @@ function readThumbMakerFields_(){
   if(sizeEl && sizeEl.value) st.sizeKey = sizeEl.value;
   if(heroEl || tagEl || progEl || bodyEl){
     return {
-      hero: heroEl ? String(heroEl.value || '').trim() : '',
+      hero: normalizeThumbBrandOneLine_(heroEl ? String(heroEl.value || '').trim() : '') || (heroEl ? String(heroEl.value || '').trim() : ''),
       tagline: tagEl ? String(tagEl.value || '').trim() : '',
-      program: progEl ? String(progEl.value || '').trim() : '',
+      program: normalizeThumbBrandOneLine_(progEl ? String(progEl.value || '').trim() : '') || (progEl ? String(progEl.value || '').trim() : ''),
       body: bodyEl ? String(bodyEl.value || '').trim() : ''
     };
   }
@@ -22514,13 +22517,41 @@ function fitHeroFontSize_(ctx, lines, maxWidth, startPx, minPx){
   return minPx;
 }
 
+/** 썸네일 브랜드명: 리얼무브먼트 등 한 줄 유지용 */
+function isThumbBrandKeepOneLine_(text){
+  var t = String(text || '').replace(/\s+/g, '');
+  return /^리:?얼무브먼트/i.test(t) || /^리:?얼페이스/i.test(t) || /^리얼무브먼트/.test(t);
+}
+function normalizeThumbBrandOneLine_(text){
+  var raw = String(text || '').trim();
+  if(!raw) return '';
+  var compact = raw.replace(/\s+/g, '');
+  if(/^리:?얼무브먼트$/i.test(compact) || /^리:?얼\s*무브먼트$/i.test(raw)) return '리얼무브먼트';
+  if(/^리:?얼페이스$/i.test(compact) || /^리:?얼\s*페이스$/i.test(raw)) return compact.indexOf(':') >= 0 ? '리:얼페이스' : '리얼페이스';
+  return raw.replace(/\s+/g, ' ');
+}
+
 function splitThumbHeroLines_(heroRaw){
-  var raw = String(heroRaw || 'REAL MOVEMENT').trim().toUpperCase();
-  var lines = raw.split(/\s+/).filter(Boolean);
-  if(lines.length === 1 && raw.length > 10 && /^(REAL|IFC|CMT)/.test(raw)){
-    // 알려진 브랜드만 안전하게 분리, 임의 mid-split 금지
-    if(/^REAL\s*/.test(raw) && raw.length > 4){
-      var rest = raw.replace(/^REAL\s*/, '');
+  var raw = String(heroRaw || '').trim();
+  if(!raw) return ['REAL', 'MOVEMENT'];
+
+  // 리얼무브먼트: 공백·콜론 변형을 붙여 쓰고 반드시 한 줄
+  var compact = raw.replace(/\s+/g, '');
+  if(/^리:?얼무브먼트$/i.test(compact) || /^리:?얼\s*무브먼트$/i.test(raw)){
+    return ['리얼무브먼트'];
+  }
+
+  // 기타 한글 히어로: 공백으로 강제 2줄 분리하지 않음(큰 타이틀 한 줄)
+  if(/[가-힣]/.test(raw)){
+    return [raw.replace(/\s+/g, ' ')];
+  }
+
+  var upper = raw.toUpperCase();
+  var lines = upper.split(/\s+/).filter(Boolean);
+  if(lines.length === 1 && upper.length > 10 && /^(REAL|IFC|CMT)/.test(upper)){
+    // 알려진 영문 브랜드만 안전하게 분리, 임의 mid-split 금지
+    if(/^REAL\s*/.test(upper) && upper.length > 4){
+      var rest = upper.replace(/^REAL\s*/, '');
       if(rest) lines = ['REAL', rest];
     }
   }
@@ -22610,11 +22641,13 @@ function layoutThumbPosterText_(ctx, W, H, copy, scale){
     Math.max(11, Math.round(W * 0.018)),
     '500', 2
   );
+  var progText = normalizeThumbBrandOneLine_(copy.program);
+  var progMaxLines = isThumbBrandKeepOneLine_(progText) ? 1 : 2;
   var progFit = fitThumbTextBlock_(
-    ctx, String(copy.program || ''), textMax,
+    ctx, progText, textMax,
     Math.max(16, Math.round(W * 0.034 * scale)),
-    Math.max(13, Math.round(W * 0.022)),
-    '800', 2
+    Math.max(12, Math.round(W * 0.02)),
+    '800', progMaxLines
   );
   var bodyMaxLines = scale < 0.85 ? 2 : 3;
   var bodyFit = fitThumbTextBlock_(
@@ -22938,7 +22971,7 @@ function renderThumbMakerCard_(content){
     html += '<option value="' + k + '"' + (k === sizeKey ? ' selected' : '') + '>' + escapeHtml(THUMB_SIZE_PRESETS[k].label) + '</option>';
   });
   html += '</select>';
-  html += '<label for="thumb-hero">큰 타이틀 (영문) · 미리보기에서 클릭</label>';
+  html += '<label for="thumb-hero">큰 타이틀 · 한 줄 고정 · 미리보기에서 클릭</label>';
   html += '<input type="text" id="thumb-hero" value="' + escapeHtml(copy.hero) + '" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'hero\')" onblur="onThumbMakerFieldBlur_()">';
   html += '<label for="thumb-tagline">슬로건</label>';
   html += '<input type="text" id="thumb-tagline" value="' + escapeHtml(copy.tagline) + '" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'tagline\')" onblur="onThumbMakerFieldBlur_()">';

@@ -24653,7 +24653,7 @@ function renderSheetContent(content) {
     if(blogUsesStructuredGeneralFormat_(blogCatId, b)){
       bodyHTML = composeSheetTabLayout_(tab,
         addSourceHtml + sheetFullCopyBar_() +
-        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }) +
+        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, syncTopic: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('문제 제기', 'sheet-blog-problem', getGeneralBlogProblemText_(b), { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지', regen: 'blog.problem', copy: true, paragraphs: true }) +
         sheetEditField_('셀프 케어', 'sheet-blog-selfcare', b.selfCare || '', { rows: 8, help: '👉 로 시작 · 동작·초·회·분을 앞쪽에 · 단계 사이 빈 줄', regen: 'blog.selfCare', copy: true, stepPreview: true }) +
         sheetEditField_('원리 설명', 'sheet-blog-explanation', b.explanation || '', { rows: 6, regen: 'blog.explanation', copy: true, paragraphs: true }) +
@@ -24664,7 +24664,7 @@ function renderSheetContent(content) {
     } else if(isExpertCourseCategory(blogCatId)){
       bodyHTML = composeSheetTabLayout_(tab,
         addSourceHtml + sheetFullCopyBar_() +
-        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }) +
+        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, syncTopic: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('영상·사진 맥락', 'sheet-blog-hook', b.hook, { rows: 4, help: '이번 영상·사진에서 다룬 장면·상황', regen: 'blog.hook', copy: true, paragraphs: true }) +
         sheetEditField_('시연·핵심 포인트', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '손 위치·동작·주의사항 — 한 줄에 하나씩', regen: 'blog.outline', copy: true }) +
         sheetEditField_('원리 설명', 'sheet-blog-draft', b.draft, { rows: 12, help: '본문의 중심. 왜 이렇게 하는지·짧은 메커니즘', regen: 'blog.draft', copy: true, paragraphs: true }) +
@@ -24675,7 +24675,7 @@ function renderSheetContent(content) {
     } else {
       bodyHTML = composeSheetTabLayout_(tab,
         addSourceHtml + sheetFullCopyBar_() +
-        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, regen: 'blog.title', copy: true }) +
+        sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, syncTopic: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('후킹 오프닝', 'sheet-blog-hook', b.hook, { rows: 4, regen: 'blog.hook', copy: true, paragraphs: true }) +
         sheetEditField_('목차 구성', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '한 줄에 소제목 하나씩', regen: 'blog.outline', copy: true }) +
         sheetEditField_('본문 초안', 'sheet-blog-draft', b.draft, { rows: 14, regen: 'blog.draft', copy: true, paragraphs: true }) +
@@ -24727,7 +24727,7 @@ function renderSheetContent(content) {
       const problemText = getCommunityProblemText_(coNorm);
       bodyHTML = composeSheetTabLayout_(tab,
         addSourceHtml + sheetFullCopyBar_() +
-        sheetEditField_('제목', 'sheet-community-title', coNorm.title || '', { rows: 2, title: true, regen: 'community.title', copy: true }) +
+        sheetEditField_('제목', 'sheet-community-title', coNorm.title || '', { rows: 2, title: true, syncTopic: true, regen: 'community.title', copy: true }) +
         `<div class="cb"><div class="cb-label">인사말 (고정)</div>
           <div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">${escapeHtml(COMMUNITY_FIXED_GREETING)}</div></div>
         ${sheetEditField_('문제 제기', 'sheet-community-problem', problemText, { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지, 자연스러운 문장으로', regen: 'community.problem', copy: true, paragraphs: true })}
@@ -25895,7 +25895,9 @@ function sheetEditField_(label, id, value, opts){
     }
     tools += '</span>';
   }
-  var oninput = 'autoGrowTextarea_(this)' + (opts.stepPreview ? ';renderSelfCareStepsPreview_(this)' : '');
+  var oninput = 'autoGrowTextarea_(this)' +
+    (opts.stepPreview ? ';renderSelfCareStepsPreview_(this)' : '') +
+    (opts.syncTopic ? ';onSheetTitleSyncTopic_(this)' : '');
   var previewAttr = opts.stepPreview ? ' data-selfcare-preview="1"' : '';
   var previewHost = opts.stepPreview ? '<div class="selfcare-steps" data-steps-for="' + id + '"></div>' : '';
   var displayValue = opts.paragraphs ? ensureProseParagraphBreaks_(value) : (value || '');
@@ -26134,6 +26136,7 @@ window.regenSheetField_ = async function(key, btn){
     if(meta.threadNorm){ content.thread = normalizeThreadBlock(block) || block; }
     if(key === 'blog.title' || key === 'community.title'){
       syncThumbnailOverlayHook_(content, catId);
+      syncDraftTopicFromTitle_(block[meta.__field], { draftId: draftId, save: false });
     }
     persistDraftContent_(draftId, content);
     renderSheetContent(content);
@@ -26281,6 +26284,52 @@ function persistDraftContent_(draftId, content){
   save({ driveImmediate: true, gasImmediate: true });
 }
 
+/** 시트 「제목」변경 → 카드·상단 주제(draft.topic) 동기화 */
+function findDraftByIdAnywhere_(draftId){
+  if(!draftId) return null;
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  var cat = CATEGORIES[catId];
+  if(cat && cat.drafts){
+    var found = cat.drafts.find(function(d){ return d && d.id === draftId; });
+    if(found) return found;
+  }
+  for(var i = 0; i < CATEGORIES.length; i++){
+    var c = CATEGORIES[i];
+    if(!c || !c.drafts) continue;
+    var d = c.drafts.find(function(x){ return x && x.id === draftId; });
+    if(d) return d;
+  }
+  return null;
+}
+function syncDraftTopicFromTitle_(title, opts){
+  opts = opts || {};
+  var draftId = opts.draftId || state.selectedId;
+  if(!draftId) return false;
+  var next = String(title || '').trim();
+  if(!next) return false;
+  var draft = findDraftByIdAnywhere_(draftId);
+  if(!draft) return false;
+  var prev = String(draft.topic || '').trim();
+  var titleEl = document.getElementById('sheet-title');
+  if(titleEl) titleEl.textContent = next;
+  if(prev === next) return false;
+  draft.topic = next;
+  draft.updatedAt = new Date().toISOString();
+  if(state.published[draftId]) state.published[draftId].topic = next;
+  if(!isUserAddedDraftId_(draftId)){
+    stampDraftBrandOverride_(draftId, {
+      topic: draft.topic || '',
+      angle: draft.angle || '',
+      rationale: draft.rationale || ''
+    });
+  }
+  if(opts.save !== false) save({ driveImmediate: true, gasImmediate: true });
+  return true;
+}
+window.onSheetTitleSyncTopic_ = function(el){
+  syncDraftTopicFromTitle_(el ? el.value : '', { save: true });
+};
+
 function readSheetBlogEdits_(){
   function v(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
   if(!document.getElementById('sheet-blog-title')) return null;
@@ -26316,6 +26365,7 @@ function applySheetBlogEdits_(content){
   if(nextTitle && nextTitle !== prevTitle){
     var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
     syncThumbnailOverlayHook_(content, catId);
+    syncDraftTopicFromTitle_(nextTitle, { save: false });
   }
   return content;
 }
@@ -26432,6 +26482,7 @@ function applySheetCommunityEdits_(content){
   if(nextTitle && nextTitle !== prevTitle){
     var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
     syncThumbnailOverlayHook_(content, catId);
+    syncDraftTopicFromTitle_(nextTitle, { save: false });
   }
   return content;
 }

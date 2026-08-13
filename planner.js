@@ -187,7 +187,7 @@ const OPS_BRAND_COPY = {
   branch: {
     yaksu: {
       phone: '010-5967-4596',
-      tagline90: 'Re:Al Movement | Real Alignment 1:1 Program',
+      tagline90: 'Real Movement | Real Alignment 1:1 Program',
       naverKeywords: ['약수1대1운동', '약수체형교정', '약수자세교정', '약수역피티', '기능성운동'],
       address: '서울특별시 중구 동호로7길 32, 4층',
       addressShort: '중구 동호로7길 32, 4층',
@@ -200,7 +200,7 @@ const OPS_BRAND_COPY = {
     },
     jakjeon: {
       phone: '010-2468-4596',
-      tagline90: 'Re:Al Movement | Real Alignment 1:1 Program',
+      tagline90: 'Real Movement | Real Alignment 1:1 Program',
       naverKeywords: ['작전1대1운동', '작전체형교정', '작전자세교정', '인천피티', '기능성운동'],
       address: '인천광역시 계양구 봉오대로651번길 9, 힐스테이트자이계양 1층',
       addressShort: '계양구 봉오대로651번길 9, 1층 (커뮤니티 · 도서관 옆)',
@@ -241,12 +241,12 @@ function buildOpsNaverSmartPlaceDetail_(branchKey){
   var meta = opsBranchMeta_(branchKey);
   return sn + ' — ' + OPS_BRAND_COPY.master + '\n\n' +
     OPS_BRAND_COPY.realDualShort + '\n\n' +
-    'Re:Al Movement 기반으로 앉기·서기·걷기부터, 내 몸에 맞는 움직임을 단계적으로 익힙니다. 1:1 맞춤만 운영합니다.\n\n' +
+    'Real Movement 기반으로 앉기·서기·걷기부터, 내 몸에 맞는 움직임을 단계적으로 익힙니다. 1:1 맞춤만 운영합니다.\n\n' +
     '■ 이런 분께\n' +
     '· 운동은 하지만 몸이 편해지지 않는 분\n' +
     '· 자세·유연성·균형을 단계적으로 배우고 싶은 분\n' +
     '· 1:1로 제대로 봐주는 움직임 프로그램을 찾는 분\n\n' +
-    '■ 프로그램 (Re:Al Movement)\n' +
+    '■ 프로그램 (Real Movement)\n' +
     '1) Passive Stretching — 관절·근막 이완, 체력 부담 없이 시작\n' +
     '2) 생활습관·자세 — 앉기·서기·걷기 패턴 점검\n' +
     '3) 기능 운동(PAR) — 일상에서 쓰는 움직임의 질을 높임\n\n' +
@@ -272,7 +272,7 @@ function buildOpsPhotoShotList_(){
     '4. 상담·평가 장면 (경청·설명하는 분위기)\n' +
     '5. 1:1 Passive Stretching 장면\n' +
     '6. 1:1 기능운동·자세 지도 장면\n' +
-    '7. Re:Al Movement 단계별 움직임 (일상 동작 연결)\n' +
+    '7. Real Movement 단계별 움직임 (일상 동작 연결)\n' +
     '8. 프로그램 설명·자료 (체계가 보이는 컷)\n' +
     '9. 편안한 휴식·대기 공간\n' +
     '10. 원장·전문가 신뢰 컷 (지도·설명 장면, 과한 포즈 지양)';
@@ -292,18 +292,18 @@ function buildOpsShortIntro_(branchKey){
   var sn = OPS_BRAND_COPY.storeName[branchKey] || OPS_BRAND_COPY.storeName.yaksu;
   return sn + '은 근골격·움직임 전문가가 진행하는 1:1 리:얼 움직임 프로그램입니다.\n' +
     OPS_BRAND_COPY.realDualShort + '\n' +
-    'Re:Al Movement 기반으로 앉기·서기·걷기부터, 내 몸에 맞는 단계를 1:1로 안내합니다.';
+    'Real Movement 기반으로 앉기·서기·걷기부터, 내 몸에 맞는 단계를 1:1로 안내합니다.';
 }
 function buildOpsDetailIntro_(branchKey){
   var sn = OPS_BRAND_COPY.storeName[branchKey] || OPS_BRAND_COPY.storeName.yaksu;
   var meta = opsBranchMeta_(branchKey);
   return '■ ' + sn + '\n\n' + OPS_BRAND_COPY.master + '\n\n' +
     OPS_BRAND_COPY.realLine1 + '\n' + OPS_BRAND_COPY.realLine2 + '\n\n' +
-    '리얼무브먼트는 Re:Al Movement 기반의 기능운동·스트레칭 1:1 프로그램입니다.\n' +
+    '리얼무브먼트는 Real Movement 기반의 기능운동·스트레칭 1:1 프로그램입니다.\n' +
     '앉기·서기·걷기 같은 일상 동작부터, 내 몸에 맞는 움직임을 단계적으로 익힙니다.\n\n' +
     '■ 이런 분께\n· 운동은 하지만 몸이 편해지지 않는 분\n· 자세·유연성·균형을 단계적으로 배우고 싶은 분\n· 1:1로 제대로 봐주는 움직임 프로그램을 찾는 분\n· 무엇부터 시작할지 방향을 함께 정하고 싶은 분\n\n' +
-    '■ 리얼무브먼트의 특징\n· Re:Al Movement 5단계 — 스트레칭부터 기능운동까지 체계\n· 1:1 맞춤 — 평가·상담 후 개인에게 맞는 단계 안내\n· 근골격·움직임 20년+ 경험 — 원장 직접 지도\n· Re:Al Movement · Re:Al Face 등 목적별 프로그램\n\n' +
-    '■ 프로그램\nRe:Al Movement — PAR 운동 · 자세 · 기능운동\nRe:Al Face — 작은얼굴 · 안면·체형 프로그램\n\n' +
+    '■ 리얼무브먼트의 특징\n· Real Movement 5단계 — 스트레칭부터 기능운동까지 체계\n· 1:1 맞춤 — 평가·상담 후 개인에게 맞는 단계 안내\n· 근골격·움직임 20년+ 경험 — 원장 직접 지도\n· Real Movement · Re:Al Face 등 목적별 프로그램\n\n' +
+    '■ 프로그램\nReal Movement — PAR 운동 · 자세 · 기능운동\nRe:Al Face — 작은얼굴 · 안면·체형 프로그램\n\n' +
     '■ 위치·운영\n· ' + meta.addressShort + '\n· ' + meta.directions + '\n· 1:1 프로그램만 운영 (그룹·단체 수업 없음)\n· 상담·예약 문의 환영\n\n' +
     OPS_BRAND_COPY.disclaimer;
 }
@@ -332,7 +332,7 @@ function buildOpsMedicalConsultResult_(){
 }
 function buildOpsFaqFiveSummary_(){
   return 'Q1. 병원 진료하나요? → 현재 병원 근무 안 함. 치료 필요 시 병원 먼저 권고.\n' +
-    'Q2. Re:Al Movement란? → P-스트레칭·기능운동·자세 중심 운동·웰니스 프로그램(의료행위 아님).\n' +
+    'Q2. Real Movement란? → P-스트레칭·기능운동·자세 중심 운동·웰니스 프로그램(의료행위 아님).\n' +
     'Q3. 이용 장소? → 서울 약수점·인천 작전점. 블로그 지점 안내 참고.\n' +
     'Q4. 통증 심할 때? → 적신호 시 병원 먼저. 안정 후 Passive Stretching·기능운동 단계적 진행.\n' +
     'Q5. 허리 통증 때 병원 vs 운동? → 심한 통증·저림·마비면 병원 먼저. 안정 후 프로그램 병행.';
@@ -343,7 +343,7 @@ function buildOpsJsonLdCheckNote_(){
 }
 function buildOpsBlogCategories_(){
   return '1. 통증·재활 — 허리·목·어깨 등 증상별 셀프 케어·원리\n' +
-    '2. 움직임·자세 — Re:Al Movement, 앉기·서기·걷기, Passive Stretching\n' +
+    '2. 움직임·자세 — Real Movement, 앉기·서기·걷기, Passive Stretching\n' +
     '3. 지점 안내 — 약수·작전 오시는 길, 주차, 운영 안내';
 }
 function buildOpsBlogPostStructure_(){
@@ -655,7 +655,7 @@ function buildOpsGbpIntro_(branchKey){
 function buildOpsSoomgoServices_(branchKey){
   var meta = opsBranchMeta_(branchKey);
   return '활동 지역: ' + (meta.addressShort || OPS_BRAND_COPY.location[branchKey] || '') + '\n' +
-    '서비스:\n· 1:1 체형·자세 교정 프로그램\n· 1:1 기능운동 (Re:Al Movement)\n· 1:1 Passive Stretching\n\n' +
+    '서비스:\n· 1:1 체형·자세 교정 프로그램\n· 1:1 기능운동 (Real Movement)\n· 1:1 Passive Stretching\n\n' +
     '한 줄: ' + OPS_BRAND_COPY.master + '\n' +
     '견적 답변: ' + OPS_BRAND_COPY.cta + '\n' + OPS_BRAND_COPY.disclaimer;
 }
@@ -687,7 +687,7 @@ function buildOpsKakaoMapProfile_(branchKey){
 function buildOpsUnifiedInstagramBio_(){
   return '리얼무브먼트 · 1:1 리:얼 움직임\n' +
     OPS_BRAND_COPY.realDualShort + '\n' +
-    'Re:Al Movement · Passive Stretching · 기능운동\n' +
+    'Real Movement · Passive Stretching · 기능운동\n' +
     '📍 약수점 · 작전점\n' +
     '약수 ' + OPS_BRAND_COPY.branch.yaksu.phone + ' · 작전 ' + OPS_BRAND_COPY.branch.jakjeon.phone + '\n' +
     '🔗 ' + OPS_BRAND_COPY.profileUrl + '\n' +
@@ -787,11 +787,11 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
         brief: opsPurposeIntent_('Real(진짜) + Re Alignment(재정렬) 브랜드 스토리를 정의합니다.', '리얼무브먼트만의 차별점이 짧은 소개·상세에서 반복되게 합니다.'),
         text: opsProposalWithReason_(OPS_BRAND_COPY.realLine1 + '\n' + OPS_BRAND_COPY.realLine2, '리:얼의 이중 의미가 브랜드 기억점이 됩니다.') },
       { id:'profile', title:'프로필용 문장',
-        brief: opsPurposeIntent_('프로필·FAQ·증상 허브에 쓸 고객-facing 문장을 만듭니다.', '1:1 리:얼 움직임 · Re:Al Movement가 자연스럽게 드러나게 합니다.'),
-        text: opsProposalWithReason_('리얼무브먼트는 Re:Al Movement 기반 1:1 리:얼 움직임 프로그램을 안내합니다. ' + OPS_BRAND_COPY.disclaimer, '프로필·FAQ는 고객이 가장 먼저 읽는 구간입니다.') },
+        brief: opsPurposeIntent_('프로필·FAQ·증상 허브에 쓸 고객-facing 문장을 만듭니다.', '1:1 리:얼 움직임 · Real Movement가 자연스럽게 드러나게 합니다.'),
+        text: opsProposalWithReason_('리얼무브먼트는 Real Movement 기반 1:1 리:얼 움직임 프로그램을 안내합니다. ' + OPS_BRAND_COPY.disclaimer, '프로필·FAQ는 고객이 가장 먼저 읽는 구간입니다.') },
       { id:'blog', title:'블로그용 문장',
         brief: opsPurposeIntent_('블로그 본문·말미 CTA에 쓸 문장을 만듭니다.', '정보 제공 톤을 유지하면서 리:얼 · 1:1 맞춤으로 연결합니다.'),
-        text: opsProposalWithReason_(OPS_BRAND_COPY.realDualShort + ' Re:Al Movement 기반 움직임·자세 프로그램을 안내합니다.', '일반 정보 톤을 유지하면서 상담 연결로 자연스럽게 이어져야 합니다.') },
+        text: opsProposalWithReason_(OPS_BRAND_COPY.realDualShort + ' Real Movement 기반 움직임·자세 프로그램을 안내합니다.', '일반 정보 톤을 유지하면서 상담 연결로 자연스럽게 이어져야 합니다.') },
       { id:'cta', title:'상담 결과/CTA 문장',
         brief: opsPurposeIntent_('상담 결과 카드·문진 후·플레이스 예약에 쓸 전환 문장을 만듭니다.', '평가·상담 후 다음 행동(프로그램 시작)으로 이어지게 합니다.'),
         text: opsProposalWithReason_(OPS_BRAND_COPY.cta, '상담·플레이스 직후 다음 행동을 명확히 안내해 전환률을 높입니다.') },
@@ -905,10 +905,10 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
         brief: opsPurposeIntent_('네이버 플레이스 업체명을 확정합니다.', '지점명이 검색·지도에 그대로 노출됩니다.'),
         text: opsProposalWithReason_(OPS_BRAND_COPY.storeName[pk], '현재 등록명과 동일하게 유지합니다.') },
       { id:'tagline90', title:'영문 업체명 (90자, 영문만)',
-        brief: opsPurposeIntent_('업체명 아래 영문 필드 — 한글 불가.', '영문·숫자·특수문자만. 브랜드명 Re:Al Movement 노출용.'),
+        brief: opsPurposeIntent_('업체명 아래 영문 필드 — 한글 불가.', '영문·숫자·특수문자만. 브랜드명 Real Movement 노출용.'),
         text: opsProposalWithReason_(buildOpsNaverTagline90_(pk), '한글 포지셔닝 문장은 상세설명에 넣습니다.') },
       { id:'detail', title:'상세설명 (2000자)',
-        brief: opsPurposeIntent_('기존 의료·재활 톤 상세설명을 교체합니다.', '리:얼 · 1:1 · Re:Al Movement · 면책으로 통일합니다.'),
+        brief: opsPurposeIntent_('기존 의료·재활 톤 상세설명을 교체합니다.', '리:얼 · 1:1 · Real Movement · 면책으로 통일합니다.'),
         text: opsProposalWithReason_(buildOpsNaverSmartPlaceDetail_(pk), '기존 DC·PT·재활 중심 문구는 전면 교체하세요.') },
       { id:'keywords', title:'대표키워드 5개 (각 15자)',
         brief: opsPurposeIntent_('지역+프로그램 검색어 5개를 등록합니다.', '「재활」 대신 1:1·체형·자세·피티 조합을 씁니다.'),
@@ -1025,7 +1025,7 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
         text: opsProposalWithReason_(buildOpsUnifiedInstagramBio_(), '하이라이트: 프로그램 · 약수점 · 작전점 · 1:1 공간 · 후기') },
       { id:'threads', title:'Threads (인스타 연동)',
         brief: opsPurposeIntent_('Threads에 브랜드 소개·움직임 팁을 올립니다.', '인스타와 동일 통합 계정.'),
-        text: opsProposalWithReason_('리얼무브먼트 — 1:1 Re:Al Movement · 체형·자세\n' + OPS_BRAND_COPY.realDualShort + '\n' + OPS_BRAND_COPY.profileUrl, '지점별 전화는 프로필·플레이스로 안내.') },
+        text: opsProposalWithReason_('리얼무브먼트 — 1:1 Real Movement · 체형·자세\n' + OPS_BRAND_COPY.realDualShort + '\n' + OPS_BRAND_COPY.profileUrl, '지점별 전화는 프로필·플레이스로 안내.') },
       { id:'youtube', title:'유튜브 (통합 채널)',
         brief: opsPurposeIntent_('유튜브 통합 채널·Shorts 주제를 정합니다.', '약수·작전 오시는 길을 Shorts로 분리.'),
         text: opsProposalWithReason_(buildOpsUnifiedYoutubeGuide_(), '설명란·고정 댓글에 프로필·면책 링크.') }
@@ -1090,7 +1090,7 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
         text: opsProposalWithReason_('소중한 후기 감사합니다. 일상에서 편해지신 부분을 잘 케어해 가시면 좋겠습니다. 다음 단계에서는 (구체 포인트)를 함께 보겠습니다.', '고객이 쓴 키워드를 1개 인용하세요.') },
       { id:'reply-wellness', title:'답변 템플릿 — 웰니스형',
         brief: opsPurposeIntent_('자세·유연성 개선 리뷰 답변을 준비합니다.', '전문형·친근형 중 톤 선택.'),
-        text: opsProposalWithReason_('후기 남겨 주셔서 감사합니다. Re:Al Movement 단계에 맞게 꾸준히 이어가시면 일상 동작에서도 차이를 느끼실 수 있습니다.', '지점 톤에 맞게 다듬으세요.') }
+        text: opsProposalWithReason_('후기 남겨 주셔서 감사합니다. Real Movement 단계에 맞게 꾸준히 이어가시면 일상 동작에서도 차이를 느끼실 수 있습니다.', '지점 톤에 맞게 다듬으세요.') }
     ];
   }
   if(byId === 'ops-y-11' || byId === 'ops-j-11'){
@@ -1284,7 +1284,7 @@ function buildOpsGuideForItem_(item, branchId){
       '무엇을 하나요: 네이버 스마트플레이스 기본 정보·소개글·키워드·사진을 지점 톤에 맞춰 정비합니다.',
       '어떻게 하나요:',
       '1) 업체명·업종·전화·주소·지도핀 확인',
-      '2) 상세설명(리:얼 · 1:1 · Re:Al Movement) 반영',
+      '2) 상세설명(리:얼 · 1:1 · Real Movement) 반영',
       '3) 대표키워드 5개 등록',
       '4) 대표 사진 10컷 이상(외관·내부·1:1 장면)',
       '5) 모바일/PC 노출 화면 캡처 저장',
@@ -1352,7 +1352,7 @@ function buildOpsGuideForItem_(item, branchId){
       '무엇을 하나요: 당근마켓 동네생활·비즈프로필로 지역 고객에게 노출합니다.',
       '어떻게 하나요:',
       '1) 비즈프로필 개설·지역 인증',
-      '2) 간단 소개 — 1:1 Re:Al Movement · 체형·자세',
+      '2) 간단 소개 — 1:1 Real Movement · 체형·자세',
       '3) 대표 사진 3~5장 · 연락처·영업시간',
       '4) 동네생활 홍보 글 1편(오시는 길·프로그램 소개)',
       '5) 작전 지점은 입주민·단지 커뮤니티 톤으로 작성',
@@ -2853,7 +2853,7 @@ const PERSONAL_BRAND_PROFILE = `
 [임상·경력 — 신뢰의 숫자]
 - **20년+** 근골격계 임상(미국 LA·Bridgeport 수련 ~ 국내 센터·교육)
 - **3,400+** 전문 블로그(통증·구조·운동·교육 — 「왜」 설명 축적)
-- CMT 임상도수 아카데미 · IFC 국제 얼굴교정 학회 · Re:Al Movement — **치료+교육+프로그램** 운영
+- CMT 임상도수 아카데미 · IFC 국제 얼굴교정 학회 · Real Movement — **치료+교육+프로그램** 운영
 - 번역: The Pelvic Girdle, Clinical Guide to Musculoskeletal Palpation, Palpation and Assessment
 - 논문·특허(요추·골반 교정 의자 등) — **과학·실무** 근거
 
@@ -2886,17 +2886,17 @@ const DEFAULT_BRANDING = {
   message: '근골격계 문제를 과학으로 찾고, 임상으로 해결한다 — 먼저 구조, 기능 회복',
   pillars: [
     'PSP · Philosophy→Science→Practice',
-    'Re:Al Movement · PAR · Position',
+    'Real Movement · PAR · Position',
     'Re:Al Face · IFC · 구조→기능',
     '신뢰 · 과장 없는 설명'
   ],
   categoryGoals: {
     '0': '도수치료(PSP) — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['0'],
-    '1': 'Re:Al Movement(PAR) — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['1'],
+    '1': 'Real Movement(PAR) — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['1'],
     '2': 'Re:Al Face — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['2'],
     '3': 'CMT 전문가 — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['3'],
     '4': 'IFC 전문가 — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['4'],
-    '5': 'Re:Al Movement 교육 — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['5'],
+    '5': 'Real Movement 교육 — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['5'],
     '6': '일상 공유 — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['6'],
     '7': '힐자계 — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['7']
   }
@@ -3300,7 +3300,7 @@ const DEFAULT_BRAND_FOUNDATION = `
 
 ■ 프로그램·브랜드 라인
 - 미카닥 박준규 · 도수치료: PSP STEP01 평가 → STEP02 Manual(Fascia→Muscle→Joint) → STEP03 Movement
-- Re:Al Movement: PAR(Passive=P-ROM → Assisted Active → Active → Resistive), Position 1(누움)→2(앉음)→3(서기) → 생활습관·기능운동
+- Real Movement: PAR(Passive=P-ROM → Assisted Active → Active → Resistive), Position 1(누움)→2(앉음)→3(서기) → 생활습관·기능운동
 - Re:Al Face / IFC: 두개골·안면·경추 구조, 비수술 비침습, 구조→기능
 - CMT: 카이로프랙틱·도수 전문가 실무 교육
 - 힐자계: 입주민 — PAR·P-스트레칭·자세·가벼운 기능운동(전문 강의·과장 금지)
@@ -5237,10 +5237,11 @@ function getCategoryProgramLine_(catId){
   if(!cat) return '';
   return localizeProgramDisplayName_(cat.programLine || CAT_PROGRAM_LINE[catId] || cat.name);
 }
-/** 고객·초안 표기용: Re:Al Movement/Face → 한글(리얼…). Re:Al 영문은 유지 */
+/** 고객·초안 표기용: Real Movement / Re:Al Face → 한글(리얼…). Face 영문은 유지 */
 function localizeProgramDisplayName_(text){
   return String(text || '')
     .replace(/Re:\s*Al\s*Movement/gi, '리얼무브먼트')
+    .replace(/Real\s+Movement/gi, '리얼무브먼트')
     .replace(/Re:\s*Al\s*Face/gi, '리얼 페이스')
     .replace(/리:얼\s*무브먼트/g, '리얼무브먼트')
     .replace(/리얼\s+무브먼트/g, '리얼무브먼트')
@@ -5505,7 +5506,7 @@ function buildBrandContextForPrompt_(catId, draft){
   }
   lines.push('', '위 메시지·시리즈와 모순되지 않게, 미카닥 박준규·리얼무브먼트 브랜드 톤을 유지하세요.');
   if(isGeneralAudienceCategory(catId)){
-    lines.push('일반인 채널에서는 프로그램명을 「리얼무브먼트」「리얼 페이스」로 표기하세요. (영문 Re:Al Movement / Re:Al Face는 필요 시에만, 남발 금지)');
+    lines.push('일반인 채널에서는 프로그램명을 「리얼무브먼트」「리얼 페이스」로 표기하세요. (영문 Real Movement / Re:Al Face는 필요 시에만, 남발 금지)');
   }
   if(Number(catId) === 1 || Number(catId) === 5){
     lines.push('무브먼트·움직임 채널 블로그·이미지·캡션에서는 「리:얼」 대신 「리얼」로 표기하세요. (예: 리얼무브먼트, 리얼 움직임). 「리얼무브먼트」는 붙여 쓰고 줄바꿈하지 마세요. 영문 Re:Al은 그대로 둡니다.');
@@ -11161,7 +11162,7 @@ const DEFAULT_IFC_EXPERT_BLOG_PROMPT = buildExpertCourseBlogPrompt_({
 const DEFAULT_REAL_MOVEMENT_EXPERT_BLOG_PROMPT = buildExpertCourseBlogPrompt_({
   audienceIntro: '**Re:Al 움직임 전문가 과정** 수강·복습 중인 물리치료사·트레이너를 독자로 하는',
   roleReaders: '기능 회복·PAR·Position을 임상에 연결하는 움직임·재활 전문가',
-  programBlock: '[Re:Al Movement 맥락]\n' +
+  programBlock: '[Real Movement 맥락]\n' +
     '- 기능재활·움직임 지도 연결. PAR·Position·progression을 **참고·영상에서 다룬 내용** 안에서만 연결\n' +
     '- 참고에 없는 평가·운동 처방·다른 부위로 확장 금지\n' +
     '- 안전한 progression·환자 순응도·코칭 언어가 드러나게\n' +
@@ -11199,7 +11200,7 @@ const DEFAULT_PROMPTS = {
 브랜드 주체: 미카닥 박준규 (미국 DC·한국 PT, 20년+ 근골격계·움직임 전문가)
 현재 소속: 리얼무브먼트 서울 약수점 · 인천 계양(작전)점 대표 원장
 ※ 목동·병원 임상 근무는 종료. 현재 병원에서 근무하지 않음. 치료 필요 시 병원 연계·병행 안내.
-프로그램: Re:Al Movement(P-스트레칭·기능운동·자세교정), 리얼 페이스(얼굴 교정·작은얼굴), CMT/IFC/Re:Al 전문가 교육
+프로그램: Real Movement(P-스트레칭·기능운동·자세교정), 리얼 페이스(얼굴 교정·작은얼굴), CMT/IFC/Re:Al 전문가 교육
 프로필·약력: https://breezefeel.github.io/drpark · https://blog.naver.com/allenjoy/120205433765
 ${BLOG_CONTENT_VOICE_RULE}
 ${MEDICAL_COMPLIANCE_RULE}
@@ -11284,7 +11285,7 @@ const LEGACY_EXPERT_COURSE_PROMPTS = {
     blog: buildExpertCourseBlogPrompt_({
       audienceIntro: '물리치료사·트레이너 등 **움직임 전문가**를 독자로 하는',
       roleReaders: 'PT, 트레이너, 움직임에 관심 있는 현장 전문가',
-      programBlock: '[Re:Al Movement 맥락]\n- Movement·P-A-R 등은 **참고·영상에서 다룬 내용** 안에서만 연결\n- 참고에 없는 평가·운동 처방·다른 부위로 확장 금지'
+      programBlock: '[Real Movement 맥락]\n- Movement·P-A-R 등은 **참고·영상에서 다룬 내용** 안에서만 연결\n- 참고에 없는 평가·운동 처방·다른 부위로 확장 금지'
     }),
     insta: buildExpertCourseInstaPrompt_({
       roleReaders: 'PT, 트레이너, 움직임 전문가 동료',
@@ -19164,7 +19165,7 @@ function renderOpsManualMainHTML_(){
     var meta = om.newBranchMeta || {};
     newMeta = '<div class="ops-new-meta">' +
       '<div class="ops-new-meta-title">신규 지점 메모</div>' +
-      '<label class="ops-new-field"><span>후보명</span><input type="text" value="' + escapeHtml(meta.name || '') + '" placeholder="예: ○○ Re:Al Movement" onchange="setOpsNewMeta_(\'name\', this.value)" /></label>' +
+      '<label class="ops-new-field"><span>후보명</span><input type="text" value="' + escapeHtml(meta.name || '') + '" placeholder="예: ○○ Real Movement" onchange="setOpsNewMeta_(\'name\', this.value)" /></label>' +
       '<label class="ops-new-field"><span>지역·상권</span><input type="text" value="' + escapeHtml(meta.area || '') + '" placeholder="예: 성수·역삼·계양" onchange="setOpsNewMeta_(\'area\', this.value)" /></label>' +
       '<label class="ops-new-field"><span>메모</span><textarea rows="2" placeholder="차별점·타깃·일정" onchange="setOpsNewMeta_(\'note\', this.value)">' + escapeHtml(meta.note || '') + '</textarea></label>' +
     '</div>';
@@ -22073,7 +22074,7 @@ function buildMangoBriefFromBlog_(content, topic, catId){
   ];
 
   var ctaClean = String(cta || '').replace(/https?:\/\/\S+/g, '').replace(/\?hub=\w+/g, '');
-  // 일반인 채널: Re:Al Movement 등 영문 프로그램명 → 한글 표기
+  // 일반인 채널: Real Movement 등 영문 프로그램명 → 한글 표기
   if(typeof localizeProgramDisplayName_ === 'function'){
     ctaClean = localizeProgramDisplayName_(ctaClean);
   }

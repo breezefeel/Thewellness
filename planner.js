@@ -18729,9 +18729,10 @@ function renderMiscTopicFilterBarHTML_(catId, drafts){
   items.forEach(function(it){
     var on = !!f[it.key];
     html += '<button type="button" class="misc-topic-filter-btn' + (on ? ' on' : '') + '"' +
+      ' data-status="' + it.key + '"' +
       ' aria-pressed="' + (on ? 'true' : 'false') + '"' +
       ' onclick="event.stopPropagation();toggleMiscTopicFilter_(\'' + it.key + '\')">' +
-      escapeHtml(it.label) +
+      '<span class="misc-topic-filter-label">' + escapeHtml(it.label) + '</span>' +
       '<span class="misc-topic-filter-count">' + (counts[it.key] || 0) + '</span>' +
       '</button>';
   });

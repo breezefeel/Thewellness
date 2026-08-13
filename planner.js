@@ -2093,6 +2093,9 @@ const FLOW_PROPOSAL_ESTIMATE_SEC = 42;
 const SHEET_FIELD_REGEN_ESTIMATE_SEC = 18;
 const ADD_DRAFT_TOPIC_ESTIMATE_SEC = 38;
 const ADD_DRAFT_FULL_ESTIMATE_SEC = 95;
+/** 추가 폼 참고 사진 1장당 분석 예상(초) — 비전 호출 순차 처리 */
+const REF_IMAGE_ANALYSIS_ESTIMATE_SEC_PER = 18;
+const REF_IMAGE_ANALYSIS_PREP_SEC = 4;
 var plannerWaitUiTimer_ = null;
 var activeButtonCountdowns_ = [];
 
@@ -2162,7 +2165,8 @@ function tickButtonCountdowns_(){
   });
 }
 function isAnyPlannerWaitActive_(){
-  return !!(state.yearPlanGenerating || state.subGoalPlanGenerating || state.plannerAiWait || activeButtonCountdowns_.length);
+  return !!(state.yearPlanGenerating || state.subGoalPlanGenerating || state.plannerAiWait || activeButtonCountdowns_.length ||
+    (state.newItem && state.newItem.imageAnalyzing && state.newItem.imageAnalysisWait));
 }
 function ensurePlannerWaitTimer_(){
   if(plannerWaitUiTimer_) return;
@@ -2262,6 +2266,23 @@ function tickPlannerWaitUi_(){
       if(rb2){ rb2.disabled = true; rb2.textContent = cdBtn; rb2.classList.add('generating'); }
       var mini2 = document.querySelector('.draft-card-refresh-mini[data-regen-draft="' + w.regenDraftId + '"]');
       if(mini2){ mini2.disabled = true; mini2.textContent = cdBtn; }
+    }
+  }
+  if(state.newItem && state.newItem.imageAnalyzing && state.newItem.imageAnalysisWait){
+    var imgW = state.newItem.imageAnalysisWait;
+    var leftImg = getCountdownSec_(imgW.startedAt, imgW.estimateSec);
+    var imgCdEl = document.getElementById('new-item-img-analysis-cd');
+    if(imgCdEl) imgCdEl.textContent = formatCountdownLong_(leftImg);
+    var imgHintEl = document.getElementById('new-item-img-analysis-hint');
+    if(imgHintEl){
+      var nImg = imgW.count || 0;
+      imgHintEl.innerHTML = '사진 ' + nImg + '장 분석 중… <strong id="new-item-img-analysis-cd">' +
+        escapeHtml(formatCountdownLong_(leftImg)) + '</strong> · 참고 메모에 순서대로 채워집니다.';
+    }
+    var imgBtn = document.getElementById('btn-add-draft-submit');
+    if(imgBtn){
+      imgBtn.disabled = true;
+      imgBtn.textContent = '사진 분석 중 · ' + formatCountdownShort_(leftImg);
     }
   }
   tickButtonCountdowns_();
@@ -3966,9 +3987,9 @@ function getDraftsForSubGoalStep_(catId, stepId, opts){
     var pb = getDraftStepParts_(b, catId, ib);
     if(pa.step !== pb.step) return pa.step - pb.step;
     if(String(stepId) === SUBGOAL_MISC_ID){
-      var ta = userAddedDraftTimestamp_(a.id);
-      var tb = userAddedDraftTimestamp_(b.id);
-      if(ta !== tb) return tb - ta;
+      var ta = getDraftCreatedAtMs_(a) || userAddedDraftTimestamp_(a.id) || 0;
+      var tb = getDraftCreatedAtMs_(b) || userAddedDraftTimestamp_(b.id) || 0;
+      if(ta !== tb) return tb - ta; // 생성 시간 최신순
     }
     return ia - ib;
   });
@@ -7757,19 +7778,24 @@ function renderProgramRoadmapHTML_(catId){
   var misc = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID);
   if(misc.length){
     var miscCollapsed = isSubGoalStepCollapsed_(catId, SUBGOAL_MISC_ID);
+    var miscFiltered = filterMiscDraftsByStatus_(misc, catId);
+    var miscShown = miscFiltered.length;
     html += '<div class="subgoal-step-block misc step-tone-misc' + (miscCollapsed ? ' collapsed' : '') + '">' +
       '<button type="button" class="subgoal-step-head"' + plannerStepActionAttrs_('toggleSubGoalStep_', subGoalStepKey_(catId, SUBGOAL_MISC_ID)) + '>' +
         '<span class="subgoal-step-num">·</span>' +
         '<span class="subgoal-step-main"><span class="subgoal-step-title">' + escapeHtml(getSubGoalMiscLabel_(plan)) + '</span></span>' +
-        '<span class="subgoal-step-stats">' + misc.length + '건</span>' +
+        '<span class="subgoal-step-stats">' + (miscShown === misc.length ? misc.length + '건' : miscShown + '/' + misc.length + '건') + '</span>' +
         '<span class="subgoal-step-chevron">' + (miscCollapsed ? '▸' : '▾') + '</span>' +
       '</button>';
     if(!miscCollapsed){
-      html += '<div class="subgoal-step-cards">' + misc.map(function(d){
-        return draftCardHTML(d, cat, false, cat.drafts.indexOf(d), true);
-      }).join('') + '</div>';
-    } else {
-      html += renderSubGoalStepCardsHTML_(catId, misc, true);
+      html += renderMiscTopicFilterBarHTML_(catId, misc);
+      if(miscFiltered.length){
+        html += '<div class="subgoal-step-cards">' + miscFiltered.map(function(d){
+          return draftCardHTML(d, cat, false, cat.drafts.indexOf(d), true);
+        }).join('') + '</div>';
+      } else {
+        html += '<div class="subgoal-step-topics empty">선택한 상태 필터에 맞는 주제가 없어요. 필터를 바꿔 보세요.</div>';
+      }
     }
     html += '</div>';
   }
@@ -7944,7 +7970,7 @@ function renderTopicWorkshopFooterHTML_(catId, stepId){
     '<button type="button" class="modal-btn-ghost" onclick="requestClosePlanWorkshop_()">닫기</button>' +
   '</div>';
 }
-/** AI 주제 JSON 파싱 — 앞뒤 설명·코드펜스·잘린 배열·트레일링 콤마·미종료 문자열 등 복구 시도 */
+/** AI 주제 JSON 파싱 — 앞뒤 설명·코드펜스·잘린 배열·트레일링 콤마·미종료 문자열·문자열 내 따옴표 등 복구 시도 */
 function closeTruncatedJsonSlice_(slice){
   var s = String(slice || '');
   s = s.replace(/\\$/, ''); // 끝의 미완성 이스케이프
@@ -7964,71 +7990,171 @@ function closeTruncatedJsonSlice_(slice){
   while(openBraces-- > 0) s += '}';
   return s;
 }
+function normalizePlannerAiJsonRaw_(text){
+  var raw = String(text || '').replace(/^\uFEFF/, '').trim();
+  var fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if(fence && fence[1]) raw = String(fence[1]).trim();
+  else raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/g, '').trim();
+  // 앞뒤 잡담 제거 전용: JSON이 본문 중간에 있으면 슬라이스 단계에서 처리
+  return raw;
+}
+/** 문자열 값 안의 bare " · 실제 줄바꿈을 이스케이프 */
+function escapeBareQuotesInJsonStrings_(s){
+  s = String(s || '');
+  var out = '';
+  var inString = false;
+  var esc = false;
+  for(var i = 0; i < s.length; i++){
+    var c = s.charAt(i);
+    if(!inString){
+      out += c;
+      if(c === '"') inString = true;
+      continue;
+    }
+    if(esc){
+      out += c;
+      esc = false;
+      continue;
+    }
+    if(c === '\\'){
+      out += c;
+      esc = true;
+      continue;
+    }
+    if(c === '\n'){ out += '\\n'; continue; }
+    if(c === '\r'){ out += '\\r'; continue; }
+    if(c === '\t'){ out += '\\t'; continue; }
+    if(c === '"'){
+      var j = i + 1;
+      while(j < s.length && /\s/.test(s.charAt(j))) j++;
+      var next = j < s.length ? s.charAt(j) : '';
+      // 값/키 종료 뒤에 올 수 있는 문자만 진짜 닫는 따옴표로 봄
+      if(next === '' || next === ',' || next === '}' || next === ']' || next === ':'){
+        out += '"';
+        inString = false;
+      } else {
+        out += '\\"';
+      }
+      continue;
+    }
+    out += c;
+  }
+  return out;
+}
+/** 값과 값 사이 누락된 콤마 삽입 (문자열 밖만) */
+function insertMissingCommasInJson_(s){
+  s = String(s || '');
+  var out = '';
+  var inString = false;
+  var esc = false;
+  function prevNonWsIndex_(str){
+    var k = str.length - 1;
+    while(k >= 0 && /\s/.test(str.charAt(k))) k--;
+    return k;
+  }
+  function needsCommaBeforeValue_(str){
+    var k = prevNonWsIndex_(str);
+    if(k < 0) return false;
+    var ch = str.charAt(k);
+    if(ch === '"' || ch === '}' || ch === ']') return true;
+    if(/[0-9]/.test(ch)) return true;
+    var tail = str.slice(Math.max(0, k - 5), k + 1);
+    return /(?:\btrue|\bfalse|\bnull)$/.test(tail);
+  }
+  for(var i = 0; i < s.length; i++){
+    var c = s.charAt(i);
+    if(inString){
+      out += c;
+      if(esc){ esc = false; continue; }
+      if(c === '\\'){ esc = true; continue; }
+      if(c === '"') inString = false;
+      continue;
+    }
+    if(c === '"'){
+      if(needsCommaBeforeValue_(out)) out += ',';
+      out += c;
+      inString = true;
+      continue;
+    }
+    if(c === '{' || c === '['){
+      if(needsCommaBeforeValue_(out)) out += ',';
+    }
+    out += c;
+  }
+  return out;
+}
+function softRepairPlannerAiJsonSlice_(slice){
+  var repaired = String(slice || '')
+    .replace(/[\u201c\u201d\uFF02]/g, '"')
+    .replace(/[\u2018\u2019\uFF07]/g, "'")
+    .replace(/\u00A0/g, ' ')
+    .replace(/,\s*([}\]])/g, '$1');
+  // 잘린 마지막 불완전 항목 제거 시도
+  repaired = repaired.replace(/,\s*\{[^]*$/, '');
+  repaired = repaired.replace(/,\s*"[^"]*$/, '');
+  repaired = repaired.replace(/,\s*$/, '');
+  repaired = escapeBareQuotesInJsonStrings_(repaired);
+  repaired = insertMissingCommasInJson_(repaired);
+  repaired = repaired.replace(/,\s*([}\]])/g, '$1');
+  repaired = closeTruncatedJsonSlice_(repaired);
+  return repaired;
+}
+function tryParseJsonWithRepairs_(slice, asArray){
+  var candidates = [slice, softRepairPlannerAiJsonSlice_(slice), closeTruncatedJsonSlice_(slice)];
+  // 이중 복구
+  candidates.push(softRepairPlannerAiJsonSlice_(closeTruncatedJsonSlice_(slice)));
+  candidates.push(closeTruncatedJsonSlice_(softRepairPlannerAiJsonSlice_(slice)));
+  var lastErr = null;
+  for(var i = 0; i < candidates.length; i++){
+    var cand = candidates[i];
+    if(!cand) continue;
+    try {
+      var parsed = JSON.parse(cand);
+      if(asArray){
+        if(Array.isArray(parsed)) return { _array: parsed };
+        throw new Error('배열이 아님');
+      }
+      return parsed;
+    } catch(e){
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('JSON 파싱 실패');
+}
 function parsePlannerAiJsonObject_(text){
-  var raw = String(text || '').replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/g, '').trim();
+  var raw = normalizePlannerAiJsonRaw_(text);
   // 배열이 최상위면 객체 경로({ 안쪽 슬라이스)로 가면 깨짐 — 배열 우선
   if(raw.charAt(0) === '['){
     var a1 = raw.lastIndexOf(']');
     var arrSlice = a1 > 0 ? raw.slice(0, a1 + 1) : raw;
     try {
-      return { _array: JSON.parse(arrSlice) };
+      return tryParseJsonWithRepairs_(arrSlice, true);
     } catch(eArr0){
-      try {
-        return { _array: JSON.parse(closeTruncatedJsonSlice_(arrSlice)) };
-      } catch(eArr1){
-        throw new Error((eArr0 && eArr0.message) ? String(eArr0.message) : 'JSON 배열 파싱 실패');
-      }
+      throw new Error((eArr0 && eArr0.message) ? String(eArr0.message) : 'JSON 배열 파싱 실패');
     }
   }
-  // 모델이 한국어 설명 뒤에 JSON을 붙이는 경우 — 첫 { … 마지막 } 만 사용
+  // 모델이 한국어 설명 뒤에 JSON을 붙이는 경우 — 첫 { … 균형 맞는 } 또는 마지막 }
   var start = raw.indexOf('{');
   if(start < 0){
     var a0 = raw.indexOf('[');
     if(a0 >= 0){
       var a2 = raw.lastIndexOf(']');
       var arrSlice2 = a2 > a0 ? raw.slice(a0, a2 + 1) : raw.slice(a0);
-      try { return { _array: JSON.parse(arrSlice2) }; }
-      catch(eArr){
-        try { return { _array: JSON.parse(closeTruncatedJsonSlice_(arrSlice2)) }; }
-        catch(eArr2){}
-      }
+      try { return tryParseJsonWithRepairs_(arrSlice2, true); }
+      catch(eArr2){}
     }
     throw new Error('JSON을 찾지 못했어요 (설명이 먼저 나온 응답일 수 있어요)');
   }
   var end = raw.lastIndexOf('}');
   var slice = end > start ? raw.slice(start, end + 1) : raw.slice(start);
   try {
-    return JSON.parse(slice);
+    return tryParseJsonWithRepairs_(slice, false);
   } catch(e1){
-    var repaired = slice
-      .replace(/[\u201c\u201d]/g, '"')
-      .replace(/[\u2018\u2019]/g, "'")
-      .replace(/,\s*([}\]])/g, '$1');
-    repaired = repaired.replace(/,\s*\{[^]*$/,'');
-    repaired = repaired.replace(/,\s*"[^"]*$/,'');
-    repaired = repaired.replace(/,\s*$/,'');
-    var openBrackets = (repaired.match(/\[/g) || []).length - (repaired.match(/\]/g) || []).length;
-    var openBraces = (repaired.match(/\{/g) || []).length - (repaired.match(/\}/g) || []).length;
-    while(openBrackets-- > 0) repaired += ']';
-    while(openBraces-- > 0) repaired += '}';
-    try {
-      return JSON.parse(repaired);
-    } catch(e2){
-      // 토큰 한도로 mid-string 잘림 → 문자열·괄호 닫기 재시도
-      try {
-        return JSON.parse(closeTruncatedJsonSlice_(slice));
-      } catch(e3){
-        try {
-          return JSON.parse(closeTruncatedJsonSlice_(repaired));
-        } catch(e4){
-          var hint = (e1 && e1.message) ? String(e1.message) : 'JSON 파싱 실패';
-          if(/^[\uac00-\ud7a3]/.test(raw) || hint.indexOf('Unrecognized token') >= 0){
-            throw new Error('AI가 JSON 대신 설명을 먼저 보냈어요. 다시 시도해 주세요.');
-          }
-          throw new Error(hint);
-        }
-      }
+    var hint = (e1 && e1.message) ? String(e1.message) : 'JSON 파싱 실패';
+    if(/^[\uac00-\ud7a3]/.test(raw) || hint.indexOf('Unrecognized token') >= 0){
+      throw new Error('AI가 JSON 대신 설명을 먼저 보냈어요. 다시 시도해 주세요.');
     }
+    throw new Error(hint);
   }
 }
 /** 객체 또는 배열 AI JSON — 배열이면 배열 그대로 반환 */
@@ -8037,23 +8163,56 @@ function parsePlannerAiJsonValue_(text){
   if(obj && Array.isArray(obj._array)) return obj._array;
   return obj;
 }
+function buildDraftJsonRepairPrompt_(brokenText, parseErr, strict){
+  var errMsg = (parseErr && parseErr.message) ? String(parseErr.message) : 'JSON parse error';
+  var head = strict
+    ? '이전 출력이 JSON 파싱에 실패했습니다. **유효한 JSON 객체 하나만** 다시 작성하세요.\n'
+    : '아래 응답을 **유효한 JSON 객체 하나**로만 다시 출력하세요.\n';
+  var rules =
+    '- 설명·서문·마크다운 코드펜스·주석 금지. 첫 글자는 { , 마지막 글자는 } .\n' +
+    '- 문자열 안의 따옴표는 반드시 \\" 로 이스케이프.\n' +
+    '- 속성 사이 콤마 필수. 마지막 속성 뒤 트레일링 콤마 금지.\n' +
+    '- 원본의 blog / images / thread / community 등 필드를 최대한 유지.\n' +
+    '- 파싱 오류 참고: ' + errMsg + '\n';
+  if(strict){
+    rules +=
+      '- 제목·본문에 따옴표가 필요하면 ‘ ’ 또는 「 」 를 쓰고 ASCII " 는 쓰지 마세요.\n' +
+      '- 줄바꿈이 필요하면 실제 개행 대신 \\n 이스케이프를 쓰세요.\n';
+  }
+  return head + rules + '\n--- 원본 응답 ---\n' + String(brokenText || '').slice(0, 12000);
+}
 async function callClaudePlannerForDraftJson_(prompt, options){
   options = options || {};
+  var maxTok = Math.min(options.maxTokens || 4000, 4800);
   var text = await callClaudePlanner_(prompt, options);
+  var lastErr = null;
   try {
     return parsePlannerAiJsonObject_(text);
   } catch(e1){
-    // 1회만: JSON만 다시 달라고 요청
-    var retryPrompt =
-      '아래 응답을 **유효한 JSON 객체 하나**로만 다시 출력하세요.\n' +
-      '- 설명·서문·마크다운 코드펜스 금지. 첫 글자는 { 이어야 합니다.\n' +
-      '- 원본에 있던 blog/images/thread/community 필드를 최대한 유지하세요.\n\n' +
-      '--- 원본 응답 ---\n' + String(text || '').slice(0, 12000);
-    var text2 = await callClaudePlanner_(retryPrompt, {
-      maxTokens: Math.min(options.maxTokens || 4000, 4000),
+    lastErr = e1;
+  }
+  // 재시도 1: 원본을 유효 JSON으로 재작성
+  var text2 = '';
+  try {
+    text2 = await callClaudePlanner_(buildDraftJsonRepairPrompt_(text, lastErr, false), {
+      maxTokens: maxTok,
       image: null
     });
     return parsePlannerAiJsonObject_(text2);
+  } catch(e2){
+    lastErr = e2;
+  }
+  // 재시도 2: 더 엄격한 이스케이프·따옴표 규칙
+  try {
+    var sourceForStrict = text2 || text;
+    var text3 = await callClaudePlanner_(buildDraftJsonRepairPrompt_(sourceForStrict, lastErr, true), {
+      maxTokens: maxTok,
+      image: null
+    });
+    return parsePlannerAiJsonObject_(text3);
+  } catch(e3){
+    var hint = (e3 && e3.message) ? String(e3.message) : ((lastErr && lastErr.message) ? String(lastErr.message) : 'JSON 파싱 실패');
+    throw new Error('초안 JSON을 읽지 못했어요. (' + hint + ')');
   }
 }
 window.updateTopicDraftField_ = function(draftId, field, value){
@@ -9034,7 +9193,7 @@ let state = {
   generatedOnly: {},
   localSavedAt: '',
   showAdd: false,
-  newItem: { date:'', topic:'', catId:0, refImages:[], refImage:null, refNote:'', imageAnalyzing:false, flowProposals:[], selectedFlowIdx:0, flowProposalsLoading:false, flowProposalsReady:false, cachedYoutubeAnalysis:'', _cachedFlowYoutubeUrl:'' },
+  newItem: { date:'', topic:'', catId:0, refImages:[], refImage:null, refNote:'', imageAnalyzing:false, imageAnalysisWait:null, flowProposals:[], selectedFlowIdx:0, flowProposalsLoading:false, flowProposalsReady:false, cachedYoutubeAnalysis:'', _cachedFlowYoutubeUrl:'' },
   apiKey: '',
   plannerClaudeEnabled: false,
   geminiYoutubeEnabled: false,
@@ -9052,6 +9211,8 @@ let state = {
   promptRefineMilestones: {}, // catId → 마지막 반영한 발행 N건 (3, 6, …)
   branding: null,
   collapsedSubGoalSteps: {},
+  /** 기타 주제 상태 필터(멀티): published | partial | hasDraft | noDraft */
+  miscTopicFilters: {},
   pendingSubGoalPlan: null,
   pendingYearPlan: null,
   planWorkshopMode: null,
@@ -9852,12 +10013,12 @@ const THREADS_BANMAL_SPEECH_RULE = `[말투 — 쓰레드 반말]
 - "~임·~거임"을 기계적으로 반복하지 말고, 실제 사람이 짧게 말하는 리듬으로 쓰세요.
 - 학교·기관·교사 대상임이 입력에 명확할 때만 예외로 간결한 정중체를 사용하세요.`;
 
-const DEFAULT_THREADS_SNS_PROMPT = `당신은 **블로그 글**을 Threads **2단 포스트**(본문 훅 + 댓글 해설)로 만드는 전문가입니다.
+const DEFAULT_THREADS_SNS_PROMPT = `당신은 **확정·수정된 인스타 캡션**을 Threads **2단 포스트**(본문 훅 + 댓글 해설)로 만드는 전문가입니다.
 
 [인스타와 다른 각도 — 중요]
-- **인스타** = "오늘 현장에서 ○○ 했더니 △△" (결과·시연·변화)
+- **인스타** = "오늘 현장에서 ○○ 했더니 △△" (결과·시연·변화) — 이미 확정된 원문
 - **쓰레드** = **통념 뒤집기 훅(본문)** + **과정·철학·근거(댓글)**
-- 블로그를 다시 요약하지 말고, 위 각도로 **새로** 쓰세요.
+- 인스타 문장을 그대로 옮기지 말고, 인스타에 담긴 메시지를 위 각도로 **새로** 쓰세요.
 
 ${THREADS_BANMAL_SPEECH_RULE}
 
@@ -9872,11 +10033,11 @@ function buildExpertCourseThreadsPrompt_(opts){
   var programBlock = opts.programBlock ? String(opts.programBlock).trim() : '';
   return DEFAULT_THREADS_SNS_PROMPT + '\n\n' +
     '[전문가 과정 맥락]\n' +
-    '- 변환 대상: **블로그(강의·시연 글)** → Threads 본문+댓글\n' +
+    '- 변환 대상: **인스타 최종본(강의·시연 캡션)** → Threads 본문+댓글\n' +
     '- 독자: ' + roleReaders + '\n' +
     '- 본문: 현장에서 흔히 틀리는 테크닉·전제 하나를 **한 줄**로 뒤집기\n' +
-    '- 댓글: 영상·글에 있는 테크닉 원리·손 느낌·주의를 풀어 설명. 수강·등록 유도 금지\n' +
-    '- 블로그·참고·영상 범위 밖 내용 추가 금지' +
+    '- 댓글: 인스타·영상 범위의 테크닉 원리·손 느낌·주의를 풀어 설명. 수강·등록 유도 금지\n' +
+    '- 인스타에 없는 내용 추가 금지' +
     (programBlock ? '\n' + programBlock : '');
 }
 
@@ -15343,6 +15504,7 @@ function buildManualSyncPreview_(localPayload, remotePayload, remoteRevision){
   };
 }
 function renderManualSyncPreview_(preview){
+  stopSyncPreviewCompareCountdown_();
   var body = document.getElementById('sync-preview-body');
   if(!body || !preview) return;
   var revMeta = '이 기기 rev <strong>' + preview.localRev + '</strong> · 서버 rev <strong>' + preview.remoteRev + '</strong>';
@@ -15377,11 +15539,35 @@ async function fetchRemotePayloadForSyncPreview_(){
   }
   return null;
 }
+var _syncPreviewCompareCountdownTimer_ = null;
+function stopSyncPreviewCompareCountdown_(){
+  if(_syncPreviewCompareCountdownTimer_){
+    clearInterval(_syncPreviewCompareCountdownTimer_);
+    _syncPreviewCompareCountdownTimer_ = null;
+  }
+}
+function startSyncPreviewCompareCountdown_(previewBody, totalSec){
+  stopSyncPreviewCompareCountdown_();
+  if(!previewBody) return;
+  var est = Math.max(1, Math.ceil(totalSec || (PLANNER_SYNC_PULL_TIMEOUT_MS / 1000) || 60));
+  var startedAt = Date.now();
+  function paint_(){
+    var left = getCountdownSec_(startedAt, est);
+    var cd = formatCountdownLong_(left);
+    previewBody.innerHTML =
+      '<div class="sync-preview-summary warn">단계 배치 정리 후 서버와 비교하는 중…</div>' +
+      '<div class="sync-preview-estimate" id="sync-preview-compare-cd">' + escapeHtml(cd) + '</div>' +
+      '<div class="sync-preview-meta">데이터가 크거나 네트워크가 느리면 예상보다 더 걸릴 수 있어요.</div>';
+  }
+  paint_();
+  _syncPreviewCompareCountdownTimer_ = setInterval(paint_, 1000);
+}
 window.closeSyncPreviewModal_ = function(ev){
   if(ev && ev.target && ev.currentTarget && ev.target !== ev.currentTarget) return;
   var ov = document.getElementById('sync-preview-overlay');
   var wasOpen = !!(ov && ov.classList.contains('open'));
   if(ov) ov.classList.remove('open');
+  stopSyncPreviewCompareCountdown_();
   _manualSyncPreviewCache_ = null;
   if(wasOpen) unlockBodyScroll_();
 };
@@ -15391,11 +15577,16 @@ window.startManualSyncPreview_ = async function(){
   var previewOv = document.getElementById('sync-preview-overlay');
   var previewBody = document.getElementById('sync-preview-body');
   if(!previewOv || !previewBody) return runManualFullSync_();
-  previewBody.textContent = '단계 배치 정리 후 서버와 비교하는 중… (최대 약 60초)';
+  var confirmBtn = document.getElementById('sync-preview-confirm');
+  if(confirmBtn){
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = '비교 중…';
+  }
   var alreadyOpen = previewOv.classList.contains('open');
   previewOv.classList.add('open');
   if(!alreadyOpen) lockBodyScroll_();
   _manualSyncPreviewCache_ = null;
+  startSyncPreviewCompareCountdown_(previewBody, PLANNER_SYNC_PULL_TIMEOUT_MS / 1000);
   try {
     if(!isServerSyncConfigured_()){
       throw new Error('https 웹 주소에서만 서버와 비교할 수 있어요.');
@@ -15409,13 +15600,19 @@ window.startManualSyncPreview_ = async function(){
     var localPayload = getPersistPayload();
     var preview = buildManualSyncPreview_(localPayload, remoteOut.payload, remoteOut.serverRevision);
     _manualSyncPreviewCache_ = preview;
+    stopSyncPreviewCompareCountdown_();
     renderManualSyncPreview_(preview);
   } catch(ePrev){
+    stopSyncPreviewCompareCountdown_();
     var msg = (ePrev && ePrev.message) ? ePrev.message : String(ePrev);
     previewBody.innerHTML =
       '<div class="sync-preview-summary warn">' + escapeHtml(msg) + '</div>' +
       '<div class="sync-preview-meta" style="margin-top:10px;">네트워크가 느리거나 서버(Apps Script) 데이터가 크면 시간이 더 걸릴 수 있어요.</div>' +
       '<div style="margin-top:12px;"><button type="button" class="sync-preview-confirm" onclick="startManualSyncPreview_()">다시 시도</button></div>';
+    if(confirmBtn){
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = '선택 확인 후 동기화 시작';
+    }
     if(err) err.textContent = msg;
   }
 };
@@ -18477,6 +18674,86 @@ function getDraftCreatedDateLabel_(d) {
   }
 }
 
+/** 기타 주제 상태 키 — 서로 배타적으로 분류 */
+function getDraftMiscStatusKey_(d, catId){
+  if(!d || !d.id) return 'noDraft';
+  if(catId == null) catId = getCatIdFromDraftId_(d.id);
+  if(draftIsFullyPublished_(d.id, catId)) return 'published';
+  if(draftHasPartialPublish_(d.id, catId)) return 'partial';
+  if(draftHasContent(d) || draftIsPendingPublish_(d)) return 'hasDraft';
+  return 'noDraft';
+}
+function getMiscTopicFilters_(){
+  if(!state.miscTopicFilters || typeof state.miscTopicFilters !== 'object'){
+    state.miscTopicFilters = {};
+  }
+  return state.miscTopicFilters;
+}
+function hasActiveMiscTopicFilters_(){
+  var f = getMiscTopicFilters_();
+  return !!(f.published || f.partial || f.hasDraft || f.noDraft);
+}
+function filterMiscDraftsByStatus_(drafts, catId){
+  var list = (drafts || []).slice();
+  list.sort(function(a, b){
+    var ta = getDraftCreatedAtMs_(a) || userAddedDraftTimestamp_(a && a.id) || 0;
+    var tb = getDraftCreatedAtMs_(b) || userAddedDraftTimestamp_(b && b.id) || 0;
+    if(ta !== tb) return tb - ta;
+    return 0;
+  });
+  if(!hasActiveMiscTopicFilters_()) return list;
+  var f = getMiscTopicFilters_();
+  return list.filter(function(d){
+    var key = getDraftMiscStatusKey_(d, catId);
+    return !!f[key];
+  });
+}
+function countMiscDraftsByStatus_(drafts, catId){
+  var counts = { published: 0, partial: 0, hasDraft: 0, noDraft: 0 };
+  (drafts || []).forEach(function(d){
+    var k = getDraftMiscStatusKey_(d, catId);
+    if(counts[k] != null) counts[k]++;
+  });
+  return counts;
+}
+function renderMiscTopicFilterBarHTML_(catId, drafts){
+  var f = getMiscTopicFilters_();
+  var counts = countMiscDraftsByStatus_(drafts, catId);
+  var items = [
+    { key: 'published', label: '발행완료' },
+    { key: 'partial', label: '일부발행' },
+    { key: 'hasDraft', label: '초안있음' },
+    { key: 'noDraft', label: '초안 없음' }
+  ];
+  var html = '<div class="misc-topic-filters" role="group" aria-label="기타 주제 상태 필터" onclick="event.stopPropagation()">';
+  items.forEach(function(it){
+    var on = !!f[it.key];
+    html += '<button type="button" class="misc-topic-filter-btn' + (on ? ' on' : '') + '"' +
+      ' aria-pressed="' + (on ? 'true' : 'false') + '"' +
+      ' onclick="event.stopPropagation();toggleMiscTopicFilter_(\'' + it.key + '\')">' +
+      escapeHtml(it.label) +
+      '<span class="misc-topic-filter-count">' + (counts[it.key] || 0) + '</span>' +
+      '</button>';
+  });
+  if(hasActiveMiscTopicFilters_()){
+    html += '<button type="button" class="misc-topic-filter-clear" onclick="event.stopPropagation();clearMiscTopicFilters_()">전체</button>';
+  }
+  html += '</div>';
+  return html;
+}
+window.toggleMiscTopicFilter_ = function(key){
+  var f = getMiscTopicFilters_();
+  var k = String(key || '');
+  if(!k) return;
+  f[k] = !f[k];
+  state.miscTopicFilters = f;
+  renderMain();
+};
+window.clearMiscTopicFilters_ = function(){
+  state.miscTopicFilters = {};
+  renderMain();
+};
+
 function sortDraftsForDisplay(drafts) {
   return (drafts || []).slice().sort(function (a, b) {
     const ap = draftIsPublished_(a.id) ? 1 : 0;
@@ -19408,7 +19685,7 @@ function newItemHasRefImages_(){
 function createEmptyNewItem_(catId){
   return {
     date: '', topic: '', catId: typeof catId === 'number' ? catId : 0,
-    refImages: [], refImage: null, refNote: '', imageAnalyzing: false,
+    refImages: [], refImage: null, refNote: '', imageAnalyzing: false, imageAnalysisWait: null,
     flowProposals: [], selectedFlowIdx: 0, flowProposalsLoading: false,
     flowProposalsReady: false, cachedYoutubeAnalysis: '', _cachedFlowYoutubeUrl: ''
   };
@@ -20141,9 +20418,17 @@ window.onNewItemImage = async function(input){
   }
   var startIndex = existingImages.length;
   var analysisOk = false;
+  var imgEstSec = REF_IMAGE_ANALYSIS_PREP_SEC + (files.length * REF_IMAGE_ANALYSIS_ESTIMATE_SEC_PER);
+  state.newItem.imageAnalysisWait = {
+    startedAt: Date.now(),
+    estimateSec: imgEstSec,
+    count: files.length
+  };
   state.newItem.imageAnalyzing = true;
   resetNewItemFlowProposals_();
+  ensurePlannerWaitTimer_();
   renderMain();
+  tickPlannerWaitUi_();
   try {
     var newImages = [];
     for(var i = 0; i < files.length; i++){
@@ -20152,11 +20437,24 @@ window.onNewItemImage = async function(input){
     var images = existingImages.concat(newImages);
     state.newItem.refImages = images;
     state.newItem.refImage = images[0] || null;
+    // 압축 후 남은 예산은 분석 장수 기준으로 다시 맞춤
+    if(state.newItem.imageAnalysisWait){
+      state.newItem.imageAnalysisWait.count = newImages.length;
+      state.newItem.imageAnalysisWait.estimateSec = Math.max(
+        REF_IMAGE_ANALYSIS_ESTIMATE_SEC_PER,
+        newImages.length * REF_IMAGE_ANALYSIS_ESTIMATE_SEC_PER
+      );
+      state.newItem.imageAnalysisWait.startedAt = Date.now();
+    }
     renderMain();
+    tickPlannerWaitUi_();
     if(isPlannerAiAvailable_()){
+      var leftNow = state.newItem.imageAnalysisWait
+        ? getCountdownSec_(state.newItem.imageAnalysisWait.startedAt, state.newItem.imageAnalysisWait.estimateSec)
+        : imgEstSec;
       if(typeof setAppToast === 'function'){
         setAppToast(
-          (startIndex > 0 ? '추가 사진 ' : '사진 ') + newImages.length + '장 분석 중…',
+          (startIndex > 0 ? '추가 사진 ' : '사진 ') + newImages.length + '장 분석 중… ' + formatCountdownLong_(leftNow),
           { duration: 3200, variant: 'ok' }
         );
       }
@@ -20179,6 +20477,8 @@ window.onNewItemImage = async function(input){
     else alert(msg);
   } finally {
     state.newItem.imageAnalyzing = false;
+    state.newItem.imageAnalysisWait = null;
+    stopPlannerWaitTimerIfIdle_();
     if(input) input.value = '';
     renderMain();
     if(analysisOk && typeof setAppToast === 'function'){
@@ -20267,8 +20567,12 @@ function renderAddForm(){
     .filter(Boolean)
     .join('');
   const imgNames = (state.newItem.refImages || []).map(function(img){ return img && img.name ? img.name : ''; }).filter(Boolean);
+  const imgWait = analyzing && state.newItem.imageAnalysisWait ? state.newItem.imageAnalysisWait : null;
+  const imgLeftSec = imgWait ? getCountdownSec_(imgWait.startedAt, imgWait.estimateSec) : 0;
+  const imgAnalyzingCount = (imgWait && imgWait.count) ? imgWait.count : (imgNames.length || 1);
   const imgHint = analyzing
-    ? '<span style="font-size:11px;color:#D97706;">사진 ' + imgNames.length + '장 분석 중… 참고 메모에 순서대로 채워집니다.</span>'
+    ? '<span id="new-item-img-analysis-hint" style="font-size:11px;color:#D97706;">사진 ' + imgAnalyzingCount + '장 분석 중… <strong id="new-item-img-analysis-cd">' +
+      escapeHtml(formatCountdownLong_(imgLeftSec)) + '</strong> · 참고 메모에 순서대로 채워집니다.</span>'
     : (hasPhoto
       ? '<span style="font-size:11px;color:#0F766E;">참고 사진 ' + imgNames.length + '장: ' + escapeHtml(imgNames.join(', ')) + ' — 추가로 고르면 기존 분석 아래에 이어 붙여요' + (isDaily ? ' · 담백·관찰 톤' : '') + '</span>'
       : (isDaily
@@ -20303,7 +20607,9 @@ function renderAddForm(){
       : '공개 유튜브 URL → 서버(Gemini) 분석. 그 외는 <strong>링크·메모</strong>가 초안까지 전달돼요.');
   const flowsReady = !!state.newItem.flowProposalsReady && (state.newItem.flowProposals || []).length > 0;
   const flowLoading = !!state.newItem.flowProposalsLoading;
-  const btnLabel = analyzing ? '사진 분석 중…' : (flowLoading ? '글 흐름 만드는 중…' : (flowsReady ? '선택한 흐름으로 초안 만들기' : '글의 흐름 만들기'));
+  const btnLabel = analyzing
+    ? ('사진 분석 중 · ' + formatCountdownShort_(imgLeftSec))
+    : (flowLoading ? '글 흐름 만드는 중…' : (flowsReady ? '선택한 흐름으로 초안 만들기' : '글의 흐름 만들기'));
   const submitDisabled = analyzing || flowLoading;
   const flowSectionHtml = renderAddFormFlowSectionHTML_();
   const regenBtnHtml = flowsReady
@@ -24595,10 +24901,10 @@ function renderSheetEmpty(draft, cat) {
     : isHeiljagyaeCategory(cat.id)
     ? 'AI가 <strong>아파트너 게시판 글</strong>을 만들어드려요'
     : isGeneralAudienceCategory(cat.id)
-    ? 'AI가 <strong>블로그(문제 제기·셀프 케어·원리)</strong>와 <strong>망고보드용 제품명·소개</strong>를 만들어드려요.<br>블로그 <strong>발행완료</strong> 후 인스타·쓰레드 초안이 <strong>동시에</strong> 만들어져요'
+    ? 'AI가 <strong>블로그(문제 제기·셀프 케어·원리)</strong>와 <strong>망고보드용 제품명·소개</strong>를 만들어드려요.<br>블로그 <strong>발행완료</strong> → 인스타 초안, 인스타 <strong>발행완료</strong> → 쓰레드 초안 순으로 만들어져요'
     : isExpertCourseCategory(cat.id)
-    ? '교육·강의 <strong>영상 링크</strong> 또는 <strong>실습 사진</strong>을 먼저 올리면, AI가 그에 맞춰<br><strong>영상·사진 맥락 → 시연 포인트 → 원리 설명</strong> 글과 <strong>망고보드용 제품명·소개</strong>를 만들어요.<br>블로그 <strong>발행완료</strong> 후 인스타·쓰레드 초안이 <strong>동시에</strong> 만들어져요'
-    : 'AI가 <strong>블로그</strong>와 <strong>망고보드용 제품명·소개</strong>를 만들어드려요.<br>블로그 <strong>발행완료</strong> 후 인스타·쓰레드 초안이 <strong>동시에</strong> 만들어져요';
+    ? '교육·강의 <strong>영상 링크</strong> 또는 <strong>실습 사진</strong>을 먼저 올리면, AI가 그에 맞춰<br><strong>영상·사진 맥락 → 시연 포인트 → 원리 설명</strong> 글과 <strong>망고보드용 제품명·소개</strong>를 만들어요.<br>블로그 <strong>발행완료</strong> → 인스타, 인스타 <strong>발행완료</strong> → 쓰레드 순으로 만들어져요'
+    : 'AI가 <strong>블로그</strong>와 <strong>망고보드용 제품명·소개</strong>를 만들어드려요.<br>블로그 <strong>발행완료</strong> → 인스타 초안, 인스타 <strong>발행완료</strong> → 쓰레드 초안 순으로 만들어져요';
   const sourceNoteHtml = buildDraftReferencePreviewHTML_(draft, { catId: cat.id });
   const ytAnalysisHtml = draft.youtubeAnalysis
     ? `<div style="margin-bottom:16px;padding:12px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;">
@@ -24659,7 +24965,7 @@ function renderSheetContent(content) {
         sheetEditField_('원리 설명', 'sheet-blog-explanation', b.explanation || '', { rows: 6, regen: 'blog.explanation', copy: true, paragraphs: true }) +
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요. 인스타 캡션은 그동안 백그라운드에서 만들어져요.</p>'
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요. <strong>수정된 블로그 최종본</strong>으로 인스타 캡션이 백그라운드에서 만들어져요.</p>'
       );
     } else if(isExpertCourseCategory(blogCatId)){
       bodyHTML = composeSheetTabLayout_(tab,
@@ -24699,7 +25005,7 @@ function renderSheetContent(content) {
         sheetEditField_('첫 줄 후킹', 'sheet-insta-hook', ig.hook, { rows: 2, title: true, regen: 'insta.hook', copy: true }) +
         sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10, regen: 'insta.caption', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).map(function(h){ return String(h).replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동해요.</p>'
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동하고, <strong>수정된 인스타 최종본</strong>으로 쓰레드 초안이 만들어져요.</p>'
       );
     }
   } else if(tab==='threads'){
@@ -24708,7 +25014,7 @@ function renderSheetContent(content) {
       bodyHTML = tabsHTML + buildThreadsPendingBox_(content, state.selectedId);
     } else if(!ths || !getThreadsBodyText_(ths)){
       bodyHTML = tabsHTML +
-        '<div class="sheet-insta-pending"><strong>쓰레드 글은 아직 없어요.</strong><br>블로그 탭에서 <strong>발행완료</strong>를 누르면 인스타·쓰레드 초안이 함께 만들어져요. 또는 블로그 글이 있으면 아래에서 만들 수 있어요.</div>' +
+        '<div class="sheet-insta-pending"><strong>쓰레드 글은 아직 없어요.</strong><br>인스타 탭에서 캡션을 다듬은 뒤 <strong>발행완료</strong>를 누르면, 그 최종본으로 쓰레드 초안이 만들어져요. 인스타 초안이 있으면 아래에서도 만들 수 있어요.</div>' +
         '<button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin-top:12px;">쓰레드 글 만들기</button>';
     } else {
       bodyHTML = tabsHTML + addSourceHtml +
@@ -25398,7 +25704,7 @@ function buildThreadsPendingBox_(content, draftId){
     '<span class="sheet-insta-pending-countdown" id="threads-pending-countdown" data-end-ms="' + endMs + '">' +
     escapeHtml(getThreadsPendingCountdownText_(content, draftId)) +
     '</span><br>' +
-    '블로그 발행 후 인스타·쓰레드 초안을 동시에 만들고 있어요. 완료되면 이 글의 쓰레드 탭으로 바로 보여드려요.</div>';
+    '인스타 발행 후 수정된 최종 캡션으로 쓰레드 초안을 만들고 있어요. 완료되면 이 글의 쓰레드 탭으로 바로 보여드려요.</div>';
 }
 function updateThreadsPendingCountdown_(){
   var el = document.getElementById('threads-pending-countdown');
@@ -25492,40 +25798,54 @@ function tryNotifyThreadsReady_(topic, draftId, catId, ok, errMsg){
     n.onclick = function(){ n.close(); onClick(); };
   } catch(e){}
 }
-async function generateThreadsFromBlog_(catId, blog, topic){
+async function generateThreadsFromInsta_(catId, insta, topic){
   var threadsGuide = getCatPromptForGeneration_(catId, 'threads') || DEFAULT_THREADS_SNS_PROMPT;
   var baseInfo = getBasePrompt();
   var expertScope = isExpertCourseCategory(catId)
-    ? '\n- 전문가 과정: 블로그·참고·영상 범위 **밖** 내용 추가 금지. 본문 훅·댓글 해설 모두 블로그 근거 안에서.\n'
+    ? '\n- 전문가 과정: 인스타 캡션 범위 **밖** 내용 추가 금지. 본문 훅·댓글 해설 모두 인스타 근거 안에서.\n'
     : '';
   var generalHint = isGeneralAudienceCategory(catId)
-    ? '\n- 일반인 글: 블로그 **문제 제기→원리 설명**에서 통념 하나를 골라 본문 훅으로, 원리·셀프케어 맥락은 댓글에서.\n'
+    ? '\n- 일반인 글: 인스타의 현장·셀프케어 메시지에서 통념 하나를 골라 본문 훅으로, 과정·근거는 댓글에서.\n'
     : '';
   var prompt = baseInfo + '\n\n' +
     '카테고리: ' + (CATEGORIES[catId] ? CATEGORIES[catId].name : '') + '\n' +
     '주제: "' + (topic || '') + '"\n\n' +
     '[쓰레드 작성 지침]\n' + threadsGuide + expertScope + generalHint + '\n' +
-    '아래 **블로그 글**을 인스타처럼 요약하지 말고, **본문(훅)+댓글(해설)** 2단으로 **새로** 작성하세요.\n\n' +
+    '아래는 **확정·수정된 인스타 최종본**입니다. 인스타 문장을 그대로 옮기지 말고, **본문(훅)+댓글(해설)** 2단으로 **새로** 작성하세요.\n\n' +
     'JSON만:\n{"threads":{"body":"본문(게시글 — 궁금증·통념 뒤집기 한 줄)","comment":"댓글(재게시용 — 해설·근거·과정·철학)"}}\n\n' +
-    '[블로그 원문]\n' + buildBlogSourceText_(blog, catId);
+    '[인스타 최종본]\n' + buildInstaSourceText_(insta);
 
   var text = await callClaudePlanner_(prompt, { maxTokens: 2800, timeoutMs: THREADS_BG_TIMEOUT_MS });
   var parsed = parsePlannerAiJsonObject_(text);
   var block = parsed.threads || parsed;
   return normalizeThreadsSnsBlock_(block);
 }
-function enqueueThreadsFromBlog_(draftId, catId, topic, blog, opts){
+async function generateThreadsFromBlog_(catId, blog, topic){
+  var fakeInsta = {
+    hook: (blog && (blog.title || blog.hook)) || topic || '',
+    caption: buildBlogSourceText_(blog, catId),
+    hashtags: (blog && blog.hashtags) || []
+  };
+  return generateThreadsFromInsta_(catId, fakeInsta, topic);
+}
+function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
   opts = opts || {};
   var retryCount = opts.retryCount || 0;
   if(threadsBgByDraft[draftId]) return;
   var existing = getDraftContent_(draftId);
   if(hasThreadsDraftText_(existing, draftId) && !opts.force) return;
   if(!state.apiKey) return;
+  if(!insta || (!insta.hook && !insta.caption && !(insta.hashtags && insta.hashtags.length))){
+    if(typeof setAppToast === 'function' && !opts.resume){
+      setAppToast('인스타 최종본이 없어요.\n인스타 탭에서 발행완료를 먼저 눌러 주세요.', { duration: 4500, variant: 'err' });
+    }
+    return;
+  }
   var startedMs = Date.now();
   var endMs = startedMs + THREADS_BG_ESTIMATE_MS;
   threadsBgByDraft[draftId] = { startedMs: startedMs, endMs: endMs, topic: topic || '', catId: catId };
   beginGenIndicator();
-  var blogSnapshot = JSON.parse(JSON.stringify(blog || {}));
+  var instaSnapshot = JSON.parse(JSON.stringify(insta || {}));
   var label = String(topic || '쓰레드');
   if(label.length > 34) label = label.slice(0, 34) + '…';
   genActiveJob = { topic: label, endMs: endMs, kind: 'threads', draftId: draftId, catId: catId };
@@ -25544,7 +25864,7 @@ function enqueueThreadsFromBlog_(draftId, catId, topic, blog, opts){
 
   (async function(){
     try {
-      var threads = await generateThreadsFromBlog_(catId, blogSnapshot, topic);
+      var threads = await generateThreadsFromInsta_(catId, instaSnapshot, topic);
       var content = getDraftContent_(draftId);
       if(content){
         content.threads = threads;
@@ -25588,7 +25908,7 @@ function enqueueThreadsFromBlog_(draftId, catId, topic, blog, opts){
       }
       if(shouldRetry){
         setTimeout(function(){
-          enqueueThreadsFromBlog_(draftId, catId, topic, blogSnapshot, { resume: true, retryCount: retryCount + 1 });
+          enqueueThreadsFromInsta_(draftId, catId, topic, instaSnapshot, { resume: true, retryCount: retryCount + 1, force: !!opts.force });
         }, 1200);
         if(!document.hidden){
           setAppToast('쓰레드 글 생성이 끊겨 다시 시도하고 있어요.', { duration: 5000, variant: 'ok' });
@@ -25603,6 +25923,19 @@ function enqueueThreadsFromBlog_(draftId, catId, topic, blog, opts){
     }
   })();
 }
+function enqueueThreadsFromBlog_(draftId, catId, topic, blog, opts){
+  var content = getDraftContent_(draftId);
+  if(content && instaContentReady_(content)){
+    return enqueueThreadsFromInsta_(draftId, catId, topic, content.insta, opts);
+  }
+  if(!blog) return;
+  var fakeInsta = {
+    hook: (blog && (blog.title || blog.hook)) || topic || '',
+    caption: buildBlogSourceText_(blog, catId),
+    hashtags: (blog && blog.hashtags) || []
+  };
+  return enqueueThreadsFromInsta_(draftId, catId, topic, fakeInsta, opts);
+}
 function reconcileThreadsPendingJobs_(reason){
   if(!state.apiKey || genActiveJob || genPendingCount > 0) return false;
   var now = Date.now();
@@ -25611,7 +25944,7 @@ function reconcileThreadsPendingJobs_(reason){
     if(!isBlogInstaCategory(cat.id)) return;
     (cat.drafts || []).forEach(function(d){
       var content = getDraftContent_(d.id);
-      if(!content || !content.threadsPending || hasThreadsDraftText_(content, d.id) || !content.blog || threadsBgByDraft[d.id]) return;
+      if(!content || !content.threadsPending || hasThreadsDraftText_(content, d.id) || !instaContentReady_(content) || threadsBgByDraft[d.id]) return;
       var startedMs = parseInt(content.threadsPendingStartedAt, 10) || 0;
       if(startedMs && now - startedMs > THREADS_PENDING_RESTART_WINDOW_MS){
         clearThreadsPendingMeta_(content);
@@ -25622,7 +25955,7 @@ function reconcileThreadsPendingJobs_(reason){
         draftId: d.id,
         catId: cat.id,
         topic: d.topic || content.threadsPendingTopic || '',
-        blog: content.blog,
+        insta: content.insta,
         startedMs: startedMs
       });
     });
@@ -25634,7 +25967,7 @@ function reconcileThreadsPendingJobs_(reason){
     return (b.startedMs || 0) - (a.startedMs || 0);
   });
   var job = candidates[0];
-  enqueueThreadsFromBlog_(job.draftId, job.catId, job.topic, job.blog, { resume: true });
+  enqueueThreadsFromInsta_(job.draftId, job.catId, job.topic, job.insta, { resume: true });
   if(state.selectedId === job.draftId){
     state.selectedCatId = job.catId;
     state.activeTab = 'threads';
@@ -25906,27 +26239,47 @@ function sheetEditField_(label, id, value, opts){
 }
 
 /**
- * 긴 산문 가독성: 문단(문장) 사이에 빈 줄.
- * 이미 문단 구분·목록·셀프케어(👉)가 있으면 손대지 않음.
+ * 긴 산문 가독성: 문단(문장) 사이에 빈 줄 + 문단 첫 줄 한 칸 들여쓰기.
+ * 이미 문단 구분·목록·셀프케어(👉)가 있으면 문단 구분만 정리.
  */
 function ensureProseParagraphBreaks_(text){
   var t = String(text || '').replace(/\r\n/g, '\n').trim();
   if(!t) return '';
-  if(/(^|\n)\s*👉/.test(t)) return t.replace(/\n{3,}/g, '\n\n');
-  if(/(^|\n)\s*(?:[-•*]|\d+[.)])\s/.test(t)) return t.replace(/\n{3,}/g, '\n\n');
-  if(/\n[ \t]*\n/.test(t)) return t.replace(/\n{3,}/g, '\n\n');
+  if(/(^|\n)\s*👉/.test(t)) return indentProseParagraphStarts_(t.replace(/\n{3,}/g, '\n\n'));
+  if(/(^|\n)\s*(?:[-•*]|\d+[.)])\s/.test(t)) return indentProseParagraphStarts_(t.replace(/\n{3,}/g, '\n\n'));
+  if(/\n[ \t]*\n/.test(t)) return indentProseParagraphStarts_(t.replace(/\n{3,}/g, '\n\n'));
   if(t.indexOf('\n') !== -1){
     var lines = t.split(/\n+/).map(function(l){ return l.trim(); }).filter(Boolean);
     if(lines.length >= 2){
       var avg = lines.reduce(function(s, l){ return s + l.length; }, 0) / lines.length;
-      if(avg >= 24) return lines.join('\n\n');
+      if(avg >= 24) return indentProseParagraphStarts_(lines.join('\n\n'));
     }
-    return t;
+    return indentProseParagraphStarts_(t);
   }
-  if(t.length < 72) return t;
+  if(t.length < 72) return indentProseParagraphStarts_(t);
   var sentences = splitProseSentences_(t);
-  if(sentences.length < 2) return t;
-  return sentences.join('\n\n');
+  if(sentences.length < 2) return indentProseParagraphStarts_(t);
+  return indentProseParagraphStarts_(sentences.join('\n\n'));
+}
+/** 문단 시작 첫 글자 앞에 한 칸(공백) — 목록·셀프케어·해시태그는 제외 */
+function indentProseParagraphStarts_(text){
+  var t = String(text || '').replace(/\r\n/g, '\n');
+  if(!t.trim()) return '';
+  return t.split(/\n\s*\n/).map(function(para){
+    var lines = String(para || '').split('\n');
+    var first = lines[0] || '';
+    var trimmed = first.replace(/^[ \t\u00A0\u3000]+/, '');
+    if(!trimmed) return para;
+    if(/^👉/.test(trimmed)){
+      lines[0] = trimmed;
+      return lines.join('\n');
+    }
+    if(/^(?:[-•*]|\d+[.)])\s/.test(trimmed)) return para;
+    if(/^#/.test(trimmed)) return para;
+    if(/^[ \t\u00A0\u3000]/.test(first)) return para;
+    lines[0] = ' ' + trimmed;
+    return lines.join('\n');
+  }).join('\n\n');
 }
 function splitProseSentences_(text){
   var t = String(text || '').trim();
@@ -26033,7 +26386,7 @@ var SHEET_FIELD_META_ = {
   'insta.caption':  { block: 'insta', label: '캡션', instr: '인스타 톤의 짧은 캡션 본문. 문단은 짧게, 이모지는 절제. **존댓말(해요체)**. 한다체·반말 금지.' },
   'insta.hashtags': { block: 'insta', label: '해시태그', array: true, instr: '증상·지역·브랜드와 관련된 해시태그 8~12개.' },
   'threads.body':    { block: 'threads', label: '본문 (게시글)', instr: '통념 뒤집기·궁금증 훅 한 줄(1~3문장). **반말(구어체)** 기본. 해설·근거는 쓰지 마세요.' },
-  'threads.comment': { block: 'threads', label: '댓글 (재게시)', instr: '본문의 물음·반전에 대한 해설·근거·과정·철학. **반말(구어체)**. 본문과 같은 문장 반복 금지.' },
+  'threads.comment': { block: 'threads', label: '댓글 (재게시)', instr: '**바로 위 수정된 본문**의 물음·반전에 대한 해설·근거·과정·철학. **반말(구어체)**. 본문과 같은 문장 반복 금지. 본문에 없는 새 주제로 바꾸지 말 것.' },
   'thread.topicTitle': { block: 'thread', label: '오늘의 한 줄', threadNorm: true, instr: '담백한 관찰·장면 한 줄. 짧은 감탄 가능. 따뜻한 위로·과한 감성 금지.' },
   'thread.summary':    { block: 'thread', label: '본문 (일상 나눔)', threadNorm: true, instr: '관찰 → 핵심 한 가지 → (선택) 짧은 감탄·철학 1문장. 담백·구어체. 과한 감성·설교 금지.' }
 };
@@ -26057,11 +26410,16 @@ function buildSheetFieldReference_(meta, block){
     if(m.block !== meta.block) return;
     var field = k.split('.')[1];
     if(field === meta.__field) return;
-    var v = block[field];
-    if(m.array) v = (v || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
-    else if(m.arrayLines) v = (v || []).join('\n');
-    else v = String(v || '');
-    v = String(v).trim();
+    var v;
+    if(meta.block === 'threads' && field === 'body') v = getThreadsBodyText_(block);
+    else if(meta.block === 'threads' && field === 'comment') v = getThreadsCommentText_(block);
+    else {
+      v = block[field];
+      if(m.array) v = (v || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
+      else if(m.arrayLines) v = (v || []).join('\n');
+      else v = String(v || '');
+    }
+    v = String(v || '').trim();
     if(v) lines.push('■ ' + m.label + ':\n' + v);
   });
   return lines.join('\n\n') || '(없음)';
@@ -26089,16 +26447,31 @@ window.regenSheetField_ = async function(key, btn){
   var sourceRef = '';
   if(meta.block === 'insta' && content.blog){
     var blogSrc = buildBlogPasteTextForPublish_(content.blog, catId);
-    if(blogSrc) sourceRef = '[원본 블로그 글 — 이 내용을 인스타 톤으로 옮기는 것이 목적]\n' + blogSrc;
+    if(blogSrc) sourceRef = '[원본 블로그 최종본 — 이 내용을 인스타 톤으로 옮기는 것이 목적]\n' + blogSrc;
+  } else if(meta.block === 'threads' && meta.__field === 'comment'){
+    // 댓글 재생성: 화면의 수정된 본문을 1순위 기준으로 사용
+    var bodyNow = getThreadsBodyText_(block);
+    if(bodyNow){
+      sourceRef = '[확정·수정된 본문(게시글) — 이 훅에 대한 해설·근거·과정·철학로 댓글만 다시 쓰세요. 본문 문장 반복 금지]\n' + bodyNow;
+    } else if(content.insta){
+      var instaSrc0 = buildInstaSourceText_(content.insta);
+      if(instaSrc0) sourceRef = '[참고 인스타 최종본 — 본문이 비어 있어 임시 참고]\n' + instaSrc0;
+    }
+  } else if(meta.block === 'threads' && content.insta){
+    var instaSrc = buildInstaSourceText_(content.insta);
+    if(instaSrc) sourceRef = '[원본 인스타 최종본 — 본문 훅+댓글 해설로 새로 쓰는 것이 목적. 인스타 문장 그대로 복사 금지]\n' + instaSrc;
   } else if(meta.block === 'threads' && content.blog){
-    var blogSrc = buildBlogSourceText_(content.blog, catId);
-    if(blogSrc) sourceRef = '[원본 블로그 글 — 본문 훅+댓글 해설로 새로 쓰는 것이 목적. 인스타 요약 금지]\n' + blogSrc;
+    var blogSrc2 = buildBlogSourceText_(content.blog, catId);
+    if(blogSrc2) sourceRef = '[참고 블로그 글 — 인스타 최종본이 없어 임시 참고]\n' + blogSrc2;
   }
   var outputGuide = meta.array
     ? 'JSON만 출력하세요: {"value": ["태그1", "태그2", ...]}  (# 없이 단어만)'
     : meta.arrayLines
       ? 'JSON만 출력하세요: {"value": ["줄1", "줄2", ...]}'
       : 'JSON만 출력하세요: {"value": "다시 쓴 내용"}';
+  var rewriteHint = (meta.block === 'threads' && meta.__field === 'comment')
+    ? '위 **수정된 본문**의 물음·반전에 맞춰 「댓글 (재게시)」만 다시 써 주세요. 본문에 없는 새 주제로 바꾸지 말고, 해설·근거·과정·철학을 본문과 자연스럽게 이어 주세요. 다른 부분은 절대 출력하지 마세요.'
+    : '위 참고 내용·주제·글 작성 핵심과 자연스럽게 이어지도록 「' + meta.label + '」만 다시 써 주세요. 사용자가 이미 적어 둔 방향·정보·표현은 최대한 살려 다듬는 방향으로 개선하세요. 다른 부분은 절대 출력하지 마세요.';
   var prompt = [
     brand, '',
     draft ? '주제: ' + draft.topic : '',
@@ -26110,7 +26483,7 @@ window.regenSheetField_ = async function(key, btn){
     '작성 지침: ' + meta.instr,
     '사용자가 방금 수정한 현재 「' + meta.label + '」 내용:',
     (currentValue || '(비어 있음)'), '',
-    '위 참고 내용·주제·글 작성 핵심과 자연스럽게 이어지도록 「' + meta.label + '」만 다시 써 주세요. 사용자가 이미 적어 둔 방향·정보·표현은 최대한 살려 다듬는 방향으로 개선하세요. 다른 부분은 절대 출력하지 마세요.',
+    rewriteHint,
     outputGuide
   ].filter(function(l){ return l != null; }).join('\n');
 
@@ -26210,9 +26583,11 @@ function proseHtmlBlock_(text){
   var t = ensureProseParagraphBreaks_(text);
   if(!t) return '';
   return String(t).split(/\n\s*\n/).map(function(p){
-    return '<p style="margin:0 0 12px;line-height:1.7;font-size:14px;color:#1F2937;word-break:keep-all;">' +
-      escapeHtml(p.trim()).replace(/\n/g, '<br/>') + '</p>';
-  }).join('');
+    var body = String(p || '').replace(/^[ \t\u00A0\u3000]+/, '');
+    if(!body.trim()) return '';
+    return '<p style="margin:0 0 12px;line-height:1.7;font-size:14px;color:#1F2937;word-break:keep-all;text-indent:1em;">' +
+      escapeHtml(body).replace(/\n/g, '<br/>') + '</p>';
+  }).filter(Boolean).join('');
 }
 
 function formatCommunityPostHtmlForCopy_(c){
@@ -26836,13 +27211,12 @@ window.onSheetPublishComplete = async function(){
       state.activeTab = 'insta';
       setOpenDetailHash_(draftId, catId, 'insta');
       enqueueInstaFromBlog_(draftId, catId, draft ? draft.topic : '', content.blog);
-      enqueueThreadsFromBlog_(draftId, catId, draft ? draft.topic : '', content.blog);
       renderSheetContent(getDraftContent_(draftId) || content);
       renderTabs();
       renderMain();
       copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId));
       afterTabPublishSaved_(saveResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
-      setAppToast('블로그 저장 · 복사 · 앱 이동\n돌아오면 인스타·쓰레드 탭을 확인해 주세요.', { duration: 5500, variant: 'ok' });
+      setAppToast('블로그 저장 · 복사 · 앱 이동\n수정본으로 인스타 캡션을 만들고 있어요.', { duration: 5500, variant: 'ok' });
     } catch(err){
       console.warn('[블로그 발행]', err);
       setAppToast(((err && err.message) || String(err)), { duration: 9000, variant: 'err' });
@@ -26879,12 +27253,21 @@ window.onSheetPublishComplete = async function(){
     if(pubBtn){ pubBtn.disabled = true; pubBtn.textContent = '저장 중…'; }
     try {
       var instaResult = commitSheetTabPublish_(draftId, catId, 'insta');
+      var catIg = CATEGORIES[catId];
+      var draftIg = catIg && catIg.drafts.find(function(d){ return d.id === draftId; });
+      igContent = getDraftContent_(draftId) || igContent;
+      ensureNotifyForInstaBg_();
+      state.activeTab = 'threads';
+      setOpenDetailHash_(draftId, catId, 'threads');
+      if(igContent && igContent.insta){
+        enqueueThreadsFromInsta_(draftId, catId, draftIg ? draftIg.topic : '', igContent.insta, { force: true });
+      }
       renderSheetContent(getDraftContent_(draftId) || igContent);
       renderTabs();
       renderMain();
       copyAndOpenInstagram_(igContent && igContent.insta ? getInstaFullPasteText_(igContent.insta) : '');
       afterTabPublishSaved_(instaResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
-      setAppToast('인스타 저장 · 복사 · @' + getInstagramUsernameForCat_(catId) + ' 이동', { duration: 4500, variant: 'ok' });
+      setAppToast('인스타 저장 · 복사 · @' + getInstagramUsernameForCat_(catId) + ' 이동\n수정본으로 쓰레드 초안을 만들고 있어요.', { duration: 5200, variant: 'ok' });
     } catch(err){
       setAppToast(((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
     } finally {
@@ -26902,11 +27285,11 @@ window.onSheetPublishComplete = async function(){
       persistDraftContent_(draftId, thContent);
     }
     if(shouldShowThreadsPending_(thContent, draftId)){
-      setAppToast('쓰레드 글을 만들고 있어요.\n블로그 발행 후 잠시 뒤 쓰레드 탭을 확인해 주세요.', { duration: 5000, variant: 'ok' });
+      setAppToast('쓰레드 글을 만들고 있어요.\n인스타 발행 후 잠시 뒤 쓰레드 탭을 확인해 주세요.', { duration: 5000, variant: 'ok' });
       return;
     }
     if(!thContent || !getThreadsBodyText_(thContent.threads)){
-      setAppToast('쓰레드 글이 없어요.\n블로그 탭에서 발행완료를 먼저 눌러 주세요.', { duration: 4500, variant: 'err' });
+      setAppToast('쓰레드 글이 없어요.\n인스타 탭에서 발행완료를 먼저 눌러 주세요.', { duration: 4500, variant: 'err' });
       return;
     }
     applySheetThreadsEdits_(thContent);
@@ -28715,11 +29098,13 @@ window.genContent = async function(ev){
       setAppToast('블로그 초안이 없어요.\n블로그·이미지 탭에서 먼저 초안을 생성해 주세요.', { duration: 5000, variant: 'err' });
       return;
     }
+    applySheetBlogEdits_(igContent);
+    persistDraftContent_(draftId, igContent);
     var cat = CATEGORIES[catId];
     var draft = cat && cat.drafts.find(function(d){ return d.id === draftId; });
     if(clickBtn) startButtonCountdown_(clickBtn, { estimateSec: Math.ceil(INSTA_BG_ESTIMATE_MS / 1000), busyLabel: '인스타 재생성 중', idleText: clickBtn.textContent });
     enqueueInstaFromBlog_(draftId, catId, draft ? draft.topic : '', igContent.blog);
-    setAppToast('인스타 캡션을 다시 만들고 있어요…', { duration: 5000, variant: 'ok' });
+    setAppToast('수정된 블로그 기준으로 인스타 캡션을 만들고 있어요…', { duration: 5000, variant: 'ok' });
     return;
   }
 
@@ -28733,15 +29118,17 @@ window.genContent = async function(ev){
       return;
     }
     var thBlogContent = getDraftContent_(draftId);
-    if(!thBlogContent || !thBlogContent.blog){
-      setAppToast('블로그 글이 없어요.\n블로그 탭에서 초안을 먼저 만들어 주세요.', { duration: 5000, variant: 'err' });
+    if(!thBlogContent || !instaContentReady_(thBlogContent)){
+      setAppToast('인스타 최종본이 없어요.\n인스타 탭에서 캡션을 만든 뒤 발행완료 해 주세요.', { duration: 5000, variant: 'err' });
       return;
     }
+    applySheetInstaEdits_(thBlogContent);
+    persistDraftContent_(draftId, thBlogContent);
     var catTh = CATEGORIES[catId];
     var draftTh = catTh && catTh.drafts.find(function(d){ return d.id === draftId; });
     if(clickBtn) startButtonCountdown_(clickBtn, { estimateSec: Math.ceil(THREADS_BG_ESTIMATE_MS / 1000), busyLabel: '쓰레드 재생성 중', idleText: clickBtn.textContent });
-    enqueueThreadsFromBlog_(draftId, catId, draftTh ? draftTh.topic : '', thBlogContent.blog, { force: true });
-    setAppToast('쓰레드(본문+댓글)를 다시 만들고 있어요…', { duration: 5000, variant: 'ok' });
+    enqueueThreadsFromInsta_(draftId, catId, draftTh ? draftTh.topic : '', thBlogContent.insta, { force: true });
+    setAppToast('수정된 인스타 기준으로 쓰레드(본문+댓글)를 만들고 있어요…', { duration: 5000, variant: 'ok' });
     return;
   }
   if(tab === 'images' && !isHeiljagyaeCategory(catId) && !isDailyShareCategory(catId)){

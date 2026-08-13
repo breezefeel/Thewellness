@@ -1119,6 +1119,57 @@ margin-left: 4px;
 .subgoal-step-block[class*="step-tone-"] .subgoal-step-rationale { color: var(--st-accent); opacity: 0.92; }
 .subgoal-step-stats { font-size: 10px; font-weight: 700; color: #64748B; white-space: nowrap; }
 .subgoal-step-chevron { font-size: 11px; color: #94A3B8; flex-shrink: 0; }
+.misc-topic-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 0 12px 10px 40px;
+}
+.misc-topic-filter-btn {
+  appearance: none;
+  border: 1px solid #E2E8F0;
+  background: #fff;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1.2;
+  padding: 5px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.misc-topic-filter-btn:hover { border-color: #CBD5E1; background: #F8FAFC; }
+.misc-topic-filter-btn.on {
+  border-color: #64748B;
+  background: #334155;
+  color: #fff;
+}
+.misc-topic-filter-count {
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.75;
+  min-width: 1.1em;
+  text-align: center;
+}
+.misc-topic-filter-btn.on .misc-topic-filter-count { opacity: 0.9; }
+.misc-topic-filter-clear {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 4px 6px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.misc-topic-filter-clear:hover { color: #334155; }
 .subgoal-step-topics {
   padding: 0 12px 10px 40px;
   display: flex;

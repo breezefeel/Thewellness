@@ -10095,7 +10095,7 @@ const MANGO_PALETTES_BY_CAT = {
     card: '#FAF6F0',
     card2: '#EDE8DF',
     divider: '#333333',
-    desc: '아이보리·크림슨(기호·키워드만)'
+    desc: '아이보리·차콜 주조 · 크림슨은 작은 기호만(면·배경 금지)'
   },
   2: {
     key: 'gold',
@@ -10862,11 +10862,20 @@ function getMangoSparseAccentRule_(catId){
   if(!isMangoSparseAccentCat_(catId)) return '';
   var p = getMangoPaletteForCat_(catId);
   var pointLabel = Number(catId) === 1 ? ('크림슨 ' + p.point) : p.point;
-  return '포인트(' + pointLabel + ')는 **체크·기호·작은 아이콘·핵심 키워드 1~2단어만**. ' +
-    '제목·헤드·부제 전체·넓은 면·배경·카드 채움·하단 스크림·그라데이션에 포인트색 **금지**. ' +
-    '헤드·본문·표지 큰 타이포는 글·헤드 ' + p.head + '만. ' +
-    '표지 사진 하단은 차콜·다크 스크림만(포인트색 워시·레드 밴드 금지). ' +
-    '「리얼무브먼트」는 붙여 쓰고 **한 줄 고정**(리얼/무브먼트 줄바꿈 금지). 표지 큰 타이틀도 **한 줄**.';
+  return (
+    '【색 규칙 — 매우 중요 · 위반 금지】' +
+    '주조색은 아이보리 배경(' + p.bg + '·' + p.bg2 + ')과 차콜·다크 헤드(' + p.head + ')만. ' +
+    '포인트(' + pointLabel + ')는 **아주 작은 체크·기호·1~2단어 키워드**에만. ' +
+    '다음을 **절대 금지**: ' +
+    '(1) 빨강·크림슨·와인 **전체 배경**·풀블리드 레드 면 ' +
+    '(2) 아이콘을 채운 **큰 빨간 원·배지·버튼 배경** ' +
+    '(3) 제목·헤드·부제 전체를 빨강으로 칠하기 ' +
+    '(4) 카드·박스·하단 스크림·그라데이션·밴드에 포인트색 채움 ' +
+    '(5) 경고·응급·사이렌처럼 보이는 고채도 레드 면. ' +
+    'Self Check·STEP 아이콘은 **연한 카드(' + p.card + ') 위 차콜 라인 아이콘**이 기본이고, 포인트색은 작은 체크 한 개 정도만. ' +
+    '표지 사진 하단은 **차콜·다크 스크림만**(레드 워시·레드 밴드 금지). ' +
+    '「리얼무브먼트」는 붙여 쓰고 **한 줄 고정**. 표지 큰 타이틀도 **한 줄**.'
+  );
 }
 function buildMangoDesignToneLineFromPalette_(p){
   p = p || MANGO_PALETTES_BY_CAT[1];
@@ -10878,9 +10887,12 @@ function buildMangoDesignToneLineFromPalette_(p){
     '로고·워터마크: 우하단 고정, 슬라이드 높이 약 6~8% 이하, 본문·얼굴과 겹치지 않게(생성 중 어려우면 후처리 동일 규칙).';
 }
 function getMangoDesignToneLine_(catId){
-  var line = buildMangoDesignToneLineFromPalette_(getMangoPaletteForCat_(catId));
+  var p = getMangoPaletteForCat_(catId);
+  var line = buildMangoDesignToneLineFromPalette_(p);
   var sparse = getMangoSparseAccentRule_(catId);
-  return sparse ? (line + ' ' + sparse) : line;
+  if(!sparse) return line;
+  // 스파스 채널: "포인트 #dc143c"만 단독으로 읽히면 면 채색으로 오해 → 악센트 한정 문구를 앞에
+  return '주조=아이보리·차콜. 빨강·크림슨 전체 배경·큰 빨간 원 아이콘 **금지**. ' + sparse + ' ' + line;
 }
 function getMangoLayoutPasteBlock_(catId){
   var p = getMangoPaletteForCat_(catId);
@@ -10891,7 +10903,9 @@ function getMangoLayoutPasteBlock_(catId){
     '로고: 우하단 고정·높이 6~8% 이하·본문/얼굴과 겹침 금지(후처리 OK).\n' +
     '장별 역할 중복·블로그 원문·말줄임(…) 붙여넣기 금지. 쉬운 말만.\n' +
     m.pasteLine + '\n' +
-    '색: 배경 ' + p.bg + '·' + p.bg2 + ' · 글·헤드 ' + p.head + ' · 포인트 ' + p.point + ' · 카드 ' + p.card + '·' + p.card2 + '. 지정 외 색·흑백 모노 금지.\n' +
+    '색: 배경 ' + p.bg + '·' + p.bg2 + ' · 글·헤드 ' + p.head + ' · 포인트 ' + p.point +
+    (sparse ? '(작은 체크·기호만 · 빨강 전체 배경·큰 빨간 원 금지)' : '') +
+    ' · 카드 ' + p.card + '·' + p.card2 + '. 지정 외 색·흑백 모노 금지.\n' +
     (sparse ? sparse + '\n' : '') +
     '참고사진: ' + m.photoTipShort + '.';
 }
@@ -10900,7 +10914,7 @@ function getMangoLayoutCopyRule_(catId){
   var m = getMangoModelGuideForCat_(catId);
   var sparse = getMangoSparseAccentRule_(catId);
   return `[레이아웃·카피 — 망고보드 생성 시 필수]
-- 표·3열 표·긴 설명표 금지. 한 눈에 읽히는 「주의·안내」카드 / 짧은 불릿 / STEP 3~5개만.
+- 표·긴 설명표 금지. 한 눈에 읽히는 「주의·안내」카드 / 짧은 불릿 / STEP 3~5개만.
 - **블로그 원문 붙여넣기·말줄임(…) 금지.** 장마다 헤드+짧은 불릿으로 **이미지용 핵심만**.
 - 장별 역할·메시지가 겹치지 않게 (표지≠공감≠원리≠따라하기).
 - **타이포(필수)**
@@ -10913,7 +10927,7 @@ function getMangoLayoutCopyRule_(catId){
   - 생성 중 넣기 어려우면 후처리로 동일 규칙 적용.
 - 용어는 일반 회원용. 「가동성·안정성·ROM·고유수용」 대신 「잘 늘어나는 느낌 / 버티는 힘 / 조절 / 삐끗」처럼 쉬운 말.
 - ${m.copyBullet}
-- 픽토그램·간단한 아이콘 STEP은 유지 (과한 인포그래픽·표 UI 금지).
+- 픽토그램·간단한 아이콘 STEP은 유지 (과한 인포그래픽·표 UI 금지). Self Check 아이콘은 **연한 카드 위 차콜 라인**이 기본 — **큰 빨간 원으로 아이콘을 채우지 말 것**.
 - 전/후 비교는 환영. **추상 한발서기만 반복 금지**. **일상에서 있을 법한 동작**으로:
   앉았다 일어설 때 한쪽으로 기운다 / 스트레칭만 vs 버티며 움직이기 /
   방향 전환·계단·바닥에서 일어나기·삐끗하기 쉬운 한 발 딛기 등. **사진만 봐도 비교가 이해**되게.
@@ -21665,7 +21679,7 @@ ${getMangoDetailBriefRule_(id)}
 mangoBrief (망고보드 상세페이지 UI에 맞춤 — **빈 칸 금지**):
 - productName: 「제품명 혹은 주제」 **최대 ${MANGO_DETAIL_TITLE_MAX}자**, blog.title 축약. **필수**
 - intro / mangoInputPaste: 「소개」 **최대 ${MANGO_DETAIL_INTRO_MAX}자**, **동일 한글**. 【1~7장】이미지용 헤드+불릿. **블로그 원문·말줄임(…) 금지**, 장별 역할 중복 금지. **필수**
-- intro **맨 끝**에 [디자인]+[레이아웃] (배경 ${p.bg}·${p.bg2}, 글·헤드 ${p.head}, 포인트 ${p.point}, 카드 ${p.card}·${p.card2}, 구분선 ${p.divider || p.head}${isMangoSparseAccentCat_(id) ? ' · 포인트는 체크·기호·핵심 키워드만·헤드/넓은 면에 금지·표지 스크림 차콜만' : ''}, 지정 외 색·흑백 모노 금지, 표 금지, 쉬운 말, ${getMangoModelGuideForCat_(id).briefHint}, 한발서기만 X·일상 전/후)
+- intro **맨 끝**에 [디자인]+[레이아웃] (배경 ${p.bg}·${p.bg2}, 글·헤드 ${p.head}, 포인트 ${p.point}, 카드 ${p.card}·${p.card2}, 구분선 ${p.divider || p.head}${isMangoSparseAccentCat_(id) ? ' · 【필수】포인트는 작은 체크·기호·키워드만 · 빨강 전체 배경·큰 빨간 원 아이콘·넓은 면 채움 금지 · 표지 스크림은 차콜만' : ''}, 지정 외 색·흑백 모노 금지, 표 금지, 쉬운 말, ${getMangoModelGuideForCat_(id).briefHint}, 한발서기만 X·일상 전/후)
 - photoTip: 실사·시연 (${getMangoModelGuideForCat_(id).label} 모델) 1~2문장
 - slidePlan: 정확히 7개 — 각 장은 한 메시지, 표 없음, copyHint는 짧은 헤드
 - designTone: ${tone}
@@ -21774,7 +21788,7 @@ function ensureMangoIntroHasDesignBlock_(intro, catId){
       : true;
   var hasMatchingDesign = mangoIntroMatchesPalette_(body, palette) && !mangoIntroHasStalePaletteColors_(body, palette);
   // 무브먼트·움직임: 크림슨 스파스 규칙이 디자인 블록에 없으면 갱신
-  if(isMangoSparseAccentCat_(resolvedCatId) && !/체크·기호|핵심 키워드|포인트색.*금지|크림슨.*금지|차콜.*스크림/.test(body)){
+  if(isMangoSparseAccentCat_(resolvedCatId) && !/체크·기호|핵심 키워드|포인트색.*금지|크림슨.*금지|차콜.*스크림|빨간 원|전체 배경/.test(body)){
     hasMatchingDesign = false;
   }
   if(hasMatchingDesign && hasFreshLayout && hasMatchingModel){
@@ -22217,7 +22231,7 @@ function renderMangoDetailInputCard_(brief){
   var introVal = formatMangoBriefPaste_(brief, catId);
   var html = '';
   html += '<div class="img-section-title">망고보드 AI 상세페이지 입력</div>';
-  html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">주황 버튼으로 <strong>제목+소개</strong> 복사 → 망고보드 소개란에 붙여넣고 첫 줄만 제품명으로. 소개는 <strong>장별 헤드+짧은 불릿</strong>(블로그 원문·… 붙여넣기 X). 결과물: <strong>' + escapeHtml(p.label) + '</strong> · 배경 <strong>' + escapeHtml(p.bg + '·' + p.bg2) + '</strong>·헤드 <strong>' + escapeHtml(p.head) + '</strong>·포인트 <strong>' + escapeHtml(p.point) + '</strong>' + (isMangoSparseAccentCat_(catId) ? '(체크·기호·핵심 키워드만 · 제목·넓은 면·표지 스크림에 금지)' : '') + '·카드 <strong>' + escapeHtml(p.card + '·' + p.card2) + '</strong>·구분선 <strong>' + escapeHtml(p.divider || p.head) + '</strong>(지정 외 색·흑백 모노 X), 주의·안내형, ' + escapeHtml(getMangoModelGuideForCat_(catId).uiHint) + ', 픽토그램 OK.</p>';
+  html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">주황 버튼으로 <strong>제목+소개</strong> 복사 → 망고보드 소개란에 붙여넣고 첫 줄만 제품명으로. 소개는 <strong>장별 헤드+짧은 불릿</strong>(블로그 원문·… 붙여넣기 X). 결과물: <strong>' + escapeHtml(p.label) + '</strong> · 배경 <strong>' + escapeHtml(p.bg + '·' + p.bg2) + '</strong>·헤드 <strong>' + escapeHtml(p.head) + '</strong>·포인트 <strong>' + escapeHtml(p.point) + '</strong>' + (isMangoSparseAccentCat_(catId) ? '(작은 체크·기호만 · <strong>빨강 전체 배경·큰 빨간 원 아이콘 금지</strong> · 표지 스크림은 차콜만)' : '') + '·카드 <strong>' + escapeHtml(p.card + '·' + p.card2) + '</strong>·구분선 <strong>' + escapeHtml(p.divider || p.head) + '</strong>(지정 외 색·흑백 모노 X), 주의·안내형, ' + escapeHtml(getMangoModelGuideForCat_(catId).uiHint) + ', 픽토그램 OK.</p>';
   html += '<div class="img-tool-card">';
   html += '<label style="display:block;font-size:11px;color:#374151;margin:0 0 4px;">제품명 혹은 주제 <span id="sheet-mango-title-count" style="color:#9CA3AF;">' + titleVal.length + '/' + MANGO_DETAIL_TITLE_MAX + '</span></label>';
   html += '<input type="text" class="sheet-edit" id="sheet-mango-title" maxlength="' + MANGO_DETAIL_TITLE_MAX + '" value="' + escapeHtml(titleVal) + '" oninput="updateMangoFieldCounts_()" style="width:100%;margin-bottom:12px;padding:8px 10px;font-size:13px;border:1px solid #E5E7EB;border-radius:8px;box-sizing:border-box;">';

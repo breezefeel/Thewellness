@@ -1,5 +1,5 @@
 /* 브랜딩 플래너 — Service Worker (알림·딥링크·정적 캐시) */
-var PLANNER_CACHE = 'planner-static-v154';
+var PLANNER_CACHE = 'planner-static-v162';
 
 function isPlannerStaticRequest(url){
   if(!url || url.origin !== self.location.origin) return false;

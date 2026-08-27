@@ -9577,6 +9577,8 @@ function isOpsManualCategory(catId){ return catId === 8; }
 function isThreadCategory(catId){ return isDailyShareCategory(catId); }
 function isHeiljagyaeCategory(catId){ return catId === 7; }
 function isGeneralAudienceCategory(catId){ return catId === 0 || catId === 1 || catId === 2; }
+/** 리얼무브먼트 일반인 블로그 — 말미에 프로필·톡톡·인스타·예약 링크 카드를 고정 삽입 */
+function isRealMovementBlogCategory_(catId){ return Number(catId) === 1; }
 /** 도수치료·CMT Academy만 치료·시술 행위 서술 허용 */
 function allowsTreatmentActLanguage_(catId){
   var id = Number(catId);
@@ -9757,6 +9759,62 @@ const INSTAGRAM_USER_BY_PROGRAM = {
   face: 'dr.face_ifc',
   movement: 're.al_movement_official'
 };
+/** 리얼무브먼트 블로그 말미 — 네이버에 붙여넣으면 OG 링크 카드·지도로 변환 */
+const REAL_MOVEMENT_TALK_YAKSU_URL = 'https://talk.naver.com/profile/c/real_movement_y';
+const REAL_MOVEMENT_TALK_INCHEON_URL = 'https://talk.naver.com/profile/c/real_movement_i';
+const REAL_MOVEMENT_PLACE_YAKSU_URL = 'https://naver.me/x2YstInq';
+const REAL_MOVEMENT_PLACE_INCHEON_URL = 'https://naver.me/xYNbHrY9';
+const REAL_MOVEMENT_IG_PARK_URL = 'https://www.instagram.com/dr.park_dc.pt/';
+const REAL_MOVEMENT_IG_CENTER_URL = 'https://www.instagram.com/re.al_movement_official/';
+function getRealMovementBlogFooterText_(){
+  return [
+    '👇더 궁금한 점이 있다면 아래 링크를 참고해주세요',
+    PROFILE_BRAND_URL,
+    '',
+    '👇문의는 여기로 주세요 :)',
+    REAL_MOVEMENT_TALK_YAKSU_URL,
+    '',
+    REAL_MOVEMENT_TALK_INCHEON_URL,
+    '',
+    '인스타그램 @dr.park_dc.pt 에서도 움직임에 관련된 이야기를 하고 있습니다.',
+    REAL_MOVEMENT_IG_PARK_URL,
+    '',
+    REAL_MOVEMENT_IG_CENTER_URL,
+    '',
+    '👇리얼무브먼트 예약 / 상세정보 / 전화문의',
+    REAL_MOVEMENT_PLACE_YAKSU_URL,
+    '',
+    REAL_MOVEMENT_PLACE_INCHEON_URL
+  ].join('\n');
+}
+function withRealMovementBlogFooter_(text, catId){
+  var body = String(text || '').trim();
+  if(!body || !isRealMovementBlogCategory_(catId)) return body;
+  var footer = getRealMovementBlogFooterText_();
+  if(!footer) return body;
+  if(body.indexOf(REAL_MOVEMENT_TALK_YAKSU_URL) !== -1) return body;
+  return body + '\n\n' + footer;
+}
+function realMovementBlogFooterHtml_(){
+  var t = getRealMovementBlogFooterText_();
+  if(!t) return '';
+  return String(t).split(/\n\s*\n/).map(function(block){
+    var lines = String(block || '').split('\n').map(function(ln){ return ln.trim(); }).filter(Boolean);
+    if(!lines.length) return '';
+    return lines.map(function(ln){
+      if(/^https?:\/\//i.test(ln)){
+        return '<p style="margin:0 0 10px;line-height:1.6;font-size:14px;word-break:break-all;">' + escapeHtml(ln) + '</p>';
+      }
+      return '<p style="margin:14px 0 8px;line-height:1.65;font-size:14px;font-weight:700;color:#111827;word-break:keep-all;">' +
+        escapeHtml(ln) + '</p>';
+    }).join('');
+  }).join('');
+}
+function realMovementBlogFooterSheetHtml_(){
+  return '<div class="cb"><div class="cb-label">말미 링크 (고정 · 네이버에 붙여넣으면 카드로 변환)</div>' +
+    '<div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">' +
+    escapeHtml(getRealMovementBlogFooterText_()) + '</div></div>';
+}
 const APARTNER_ANDROID_PKG = 'kr.co.azsmart.apartner';
 const APARTNER_IOS_STORE = 'https://apps.apple.com/kr/app/id1243505765';
 const APARTNER_PLAY_STORE = 'https://play.google.com/store/apps/details?id=' + APARTNER_ANDROID_PKG;
@@ -11231,7 +11289,7 @@ ${MEDICAL_COMPLIANCE_RULE}
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     1: { // 리얼무브먼트
-      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[Movement 맥락] P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지. 프로그램명 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지, 영문 Re:Al 유지).\n[컬러] 보건의료 배경 임상가가 지도하는 **기능재활·움직임 센터**. 도수·카이로·시술 장면을 주인공처럼 부각하지 말 것.\n[치료행위] 우리가 치료했다는 내용 금지(치료한 결과·치료했어요 등). 「치료를 해도 반복=자세/움직임」 맥락은 허용.`,
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[Movement 맥락] P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지. 프로그램명 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지, 영문 Re:Al 유지).\n[컬러] 보건의료 배경 임상가가 지도하는 **기능재활·움직임 센터**. 도수·카이로·시술 장면을 주인공처럼 부각하지 말 것.\n[치료행위] 우리가 치료했다는 내용 금지(치료한 결과·치료했어요 등). 「치료를 해도 반복=자세/움직임」 맥락은 허용.\n[말미 링크] 프로필·톡톡·인스타·예약/지도 URL은 시스템이 글 하단에 고정 삽입합니다. cta에는 URL을 넣지 말고 2~3문장만 쓰세요.`,
       insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n캐러셀 없이 **한 포스트 캡션**에 동작·포인트·주의사항을 단계적으로 적습니다. 마지막에 저장·팔로우 유도 문장을 캡션 끝에 자연스럽게 넣으세요. 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지). 기능재활·움직임 센터 톤. 도수·카이로 부각·치료행위 수행 암시 금지.`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
@@ -21630,10 +21688,10 @@ function normalizeBlogBlock(raw, catId){
     hashtags: Array.isArray(raw.hashtags) ? raw.hashtags.filter(Boolean) : []
   };
 }
-function formatGeneralBlogPostText(b){
+function formatGeneralBlogPostText(b, catId){
   if(!b) return '';
   var tags = (b.hashtags || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
-  return [
+  var body = [
     (b.title || '').trim(),
     '',
     ensureProseParagraphBreaks_(getGeneralBlogProblemText_(b)),
@@ -21648,6 +21706,7 @@ function formatGeneralBlogPostText(b){
     if(i === 0) return true;
     return String(p || '').trim();
   }).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return withRealMovementBlogFooter_(body, catId);
 }
 function blogHasMinimumContent_(catId, b){
   if(!b || !String(b.title || '').trim()) return false;
@@ -24981,7 +25040,9 @@ function renderSheetContent(content) {
         sheetEditField_('원리 설명', 'sheet-blog-explanation', b.explanation || '', { rows: 6, regen: 'blog.explanation', copy: true, paragraphs: true }) +
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요. <strong>수정된 블로그 최종본</strong>으로 인스타 캡션이 백그라운드에서 만들어져요.</p>'
+        (isRealMovementBlogCategory_(blogCatId) ? realMovementBlogFooterSheetHtml_() : '') +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요. <strong>수정된 블로그 최종본</strong>으로 인스타 캡션이 백그라운드에서 만들어져요.' +
+        (isRealMovementBlogCategory_(blogCatId) ? ' 하단 <strong>말미 링크</strong>는 고정으로 붙어요.' : '') + '</p>'
       );
     } else if(isExpertCourseCategory(blogCatId)){
       bodyHTML = composeSheetTabLayout_(tab,
@@ -25093,8 +25154,8 @@ window.getFullCopy = function(){
   if(b && b.title){
     var blogCatId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
     t = blogUsesStructuredGeneralFormat_(blogCatId, b)
-      ? '[블로그]\n' + formatGeneralBlogPostText(b)
-      : '[블로그]\n제목: ' + b.title + '\n\n' + b.hook + '\n\n' + b.draft + '\n\n' + b.cta + '\n\n' + (b.hashtags||[]).map(h=>'#'+h).join(' ');
+      ? '[블로그]\n' + formatGeneralBlogPostText(b, blogCatId)
+      : withRealMovementBlogFooter_('[블로그]\n제목: ' + b.title + '\n\n' + b.hook + '\n\n' + b.draft + '\n\n' + b.cta + '\n\n' + (b.hashtags||[]).map(h=>'#'+h).join(' '), blogCatId);
   }
   const th = normalizeThreadBlock(content.thread);
   if(th && th.summary){
@@ -25131,9 +25192,9 @@ function getTabCopyText(tab, content){
     const b = content.blog;
     if(!b) return '';
     var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
-    if(blogUsesStructuredGeneralFormat_(catId, b)) return formatGeneralBlogPostText(b);
+    if(blogUsesStructuredGeneralFormat_(catId, b)) return formatGeneralBlogPostText(b, catId);
     const outline = (b.outline || []).map(function(o, i){ return (i + 1) + '. ' + o; }).join('\n');
-    return '[블로그]\n제목: ' + b.title + '\n\n' + (b.hook || '') + '\n\n' + outline + '\n\n' + (b.draft || '') + '\n\n' + (b.cta || '') + '\n\n' + (b.hashtags || []).map(function(h){ return '#' + h; }).join(' ');
+    return withRealMovementBlogFooter_('[블로그]\n제목: ' + b.title + '\n\n' + (b.hook || '') + '\n\n' + outline + '\n\n' + (b.draft || '') + '\n\n' + (b.cta || '') + '\n\n' + (b.hashtags || []).map(function(h){ return '#' + h; }).join(' '), catId);
   }
   if(tab === 'insta'){
     const ig = content.insta;
@@ -25206,17 +25267,17 @@ window.openExternalNaverBlog = function(){
 
 function buildBlogPasteTextForPublish_(b, catId){
   if(!b) return '';
-  if(blogUsesStructuredGeneralFormat_(catId, b)) return formatGeneralBlogPostText(b);
+  if(blogUsesStructuredGeneralFormat_(catId, b)) return formatGeneralBlogPostText(b, catId);
   var outline = (b.outline || []).map(function(o, i){ return (i + 1) + '. ' + o; }).join('\n');
   var tags = (b.hashtags || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
   if(isExpertCourseCategory(catId)){
     var expertParts = [b.title, b.hook, outline, b.draft, b.cta];
     if(tags) expertParts.push(tags);
-    return expertParts.filter(function(p){ return String(p || '').trim(); }).join('\n\n');
+    return withRealMovementBlogFooter_(expertParts.filter(function(p){ return String(p || '').trim(); }).join('\n\n'), catId);
   }
   var parts = [b.title, b.hook, outline, b.draft, b.cta];
   if(tags) parts.push(tags);
-  return parts.filter(function(p){ return String(p || '').trim(); }).join('\n\n');
+  return withRealMovementBlogFooter_(parts.filter(function(p){ return String(p || '').trim(); }).join('\n\n'), catId);
 }
 
 function ensureNotifyForInstaBg_(){
@@ -26370,7 +26431,8 @@ window.copyWholeTab_ = function(btn){
   if(tab === 'community' && clone.community){
     html = formatCommunityPostHtmlForCopy_(clone.community);
   } else if(tab === 'blog' && clone.blog && blogUsesStructuredGeneralFormat_(catId, clone.blog)){
-    html = formatGeneralBlogPostHtmlForCopy_(clone.blog);
+    // 리얼무브먼트는 말미 URL이 OG 카드로 바뀌도록 평문만 복사
+    html = isRealMovementBlogCategory_(catId) ? '' : formatGeneralBlogPostHtmlForCopy_(clone.blog, catId);
   } else {
     html = '<div style="white-space:pre-wrap;line-height:1.7;font-size:14px;color:#1F2937;font-family:sans-serif;word-break:keep-all;">' +
       escapeHtml(text).replace(/\n/g, '<br/>') + '</div>';
@@ -26462,7 +26524,7 @@ window.regenSheetField_ = async function(key, btn){
   var reference = buildSheetFieldReference_(meta, block);
   var sourceRef = '';
   if(meta.block === 'insta' && content.blog){
-    var blogSrc = buildBlogPasteTextForPublish_(content.blog, catId);
+    var blogSrc = buildBlogSourceText_(content.blog, catId);
     if(blogSrc) sourceRef = '[원본 블로그 최종본 — 이 내용을 인스타 톤으로 옮기는 것이 목적]\n' + blogSrc;
   } else if(meta.block === 'threads' && meta.__field === 'comment'){
     // 댓글 재생성: 화면의 수정된 본문을 1순위 기준으로 사용
@@ -26622,7 +26684,7 @@ function formatCommunityPostHtmlForCopy_(c){
   return '<div style="font-family:sans-serif;">' + parts.filter(Boolean).join('') + '</div>';
 }
 
-function formatGeneralBlogPostHtmlForCopy_(b){
+function formatGeneralBlogPostHtmlForCopy_(b, catId){
   if(!b) return '';
   var parts = [];
   if(b.title){
@@ -26636,6 +26698,9 @@ function formatGeneralBlogPostHtmlForCopy_(b){
   var tags = (b.hashtags || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
   if(tags){
     parts.push('<p style="margin:12px 0 0;line-height:1.6;font-size:13px;color:#4B5563;">' + escapeHtml(tags) + '</p>');
+  }
+  if(isRealMovementBlogCategory_(catId)){
+    parts.push(realMovementBlogFooterHtml_());
   }
   return '<div style="font-family:sans-serif;">' + parts.filter(Boolean).join('') + '</div>';
 }
@@ -27425,7 +27490,8 @@ window.copyCommunityFullPost_ = function(btn){
 window.copyBlogFullPost_ = function(btn){
   var edits = readSheetBlogEdits_();
   if(!edits){ setAppToast('복사할 내용이 없어요.', { duration: 3000, variant: 'err' }); return; }
-  cp(btn, formatGeneralBlogPostText(edits));
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
+  cp(btn, formatGeneralBlogPostText(edits, catId));
 };
 window.switchTab = function(t){
   if(isThreadCategory(state.selectedCatId) && t !== 'thread' && t !== 'images') return;

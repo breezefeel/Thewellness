@@ -22440,14 +22440,18 @@ function buildThumbMakerCopy_(content, catId, opts){
   });
   if(angle) keywords.push(clampThumbLine_(angle, 28));
 
-  var program = preset.program;
+  var brandName = normalizeThumbBrandOneLine_(preset.hero) || preset.hero;
+  var hero = brandName;
+  var program = normalizeThumbBrandOneLine_(preset.program) || preset.program;
   if(programMode === 'topic'){
-    // 주제 반영: 블로그 제목 → 주제 순 (짧은 주제 카드명 우선하려면 topic 먼저)
-    var topicProgram = (opts.preferTopic ? (topic || title) : (title || topic)) || '';
-    topicProgram = clampThumbLine_(topicProgram, 26);
-    if(topicProgram.length >= 4) program = topicProgram;
+    // 그리드 후킹: 큰 타이틀 = 주제/제목, 그 아래 = 브랜드명
+    var topicHero = (opts.preferTopic ? (topic || title) : (title || topic)) || '';
+    topicHero = clampThumbLine_(topicHero, 32);
+    if(topicHero.length >= 4){
+      hero = topicHero;
+      program = brandName;
+    }
   }
-  program = normalizeThumbBrandOneLine_(program) || program;
 
   // preferTopic(「주제 다시 반영」): 훅보다 주제·각도·제목을 우선해 체감 변화를 만듦
   var bodySrc = opts.preferTopic
@@ -22466,7 +22470,7 @@ function buildThumbMakerCopy_(content, catId, opts){
   if(!body) body = scrubNonClinicalTreatmentCopy_(preset.defaultBody, catId) || preset.defaultBody;
 
   return {
-    hero: normalizeThumbBrandOneLine_(preset.hero) || preset.hero,
+    hero: hero,
     tagline: preset.tagline,
     program: program,
     body: body,
@@ -22544,7 +22548,7 @@ function serializeThumbWorkspace_(st){
   st = st || ensureThumbMakerState_();
   var fields = st.fields || st.lastCopy || null;
   return {
-    v: 1,
+    v: 2,
     draftId: st.draftId,
     catId: st.catId,
     savedAt: Date.now(),
@@ -22599,7 +22603,7 @@ function schedulePersistThumbWorkspace_(immediate){
 function loadThumbWorkspace_(draftId){
   if(!draftId) return Promise.resolve(null);
   return idbGetKv_(THUMB_WS_KEY_PREFIX + draftId).then(function(row){
-    if(!row || row.v !== 1) return null;
+    if(!row || row.v < 1 || row.v > 2) return null;
     return row;
   }).catch(function(){ return null; });
 }
@@ -22617,7 +22621,7 @@ async function applyThumbWorkspaceRow_(st, row){
   st.bgDataUrlUpscaled = null;
   st.bgDataUrlBeforeUpscale = null;
   if(row.fields){
-    st.fields = {
+    var loadedFields = {
       hero: row.fields.hero || '',
       tagline: row.fields.tagline || '',
       program: row.fields.program || '',
@@ -22625,6 +22629,10 @@ async function applyThumbWorkspaceRow_(st, row){
       keywords: row.fields.keywords || [],
       brandProgram: row.fields.brandProgram || ''
     };
+    if(row.v === 1){
+      loadedFields = migrateThumbCopyToHookHero_(loadedFields, st.programMode);
+    }
+    st.fields = loadedFields;
     st.lastCopy = st.fields;
   }
   st.fileName = row.fileName || '';
@@ -23018,6 +23026,38 @@ function isThumbBrandKeepOneLine_(text){
   var t = String(text || '').replace(/\s+/g, '');
   return /^리:?얼무브먼트/i.test(t) || /^리:?얼페이스/i.test(t) || /^리얼무브먼트/.test(t) || /^리얼페이스/.test(t);
 }
+function isKnownThumbBrandHero_(text){
+  var t = String(text || '').replace(/\s+/g, ' ').trim();
+  if(!t) return false;
+  if(isThumbBrandKeepOneLine_(t)) return true;
+  var compact = t.replace(/\s+/g, '').toLowerCase();
+  for(var id in THUMB_BRAND_PRESETS){
+    if(!Object.prototype.hasOwnProperty.call(THUMB_BRAND_PRESETS, id)) continue;
+    var p = THUMB_BRAND_PRESETS[id];
+    var hero = String(p.hero || '').replace(/\s+/g, '').toLowerCase();
+    var prog = String(p.program || '').replace(/\s+/g, '').toLowerCase();
+    if(compact === hero || compact === prog) return true;
+  }
+  return /^(real\s*(movement|life|care|face)|cmt(\s*academy)?|ifc|re:?al)/i.test(t);
+}
+/** v1 작업공간: 큰 타이틀이 브랜드명이면 주제와 자리를 바꿈 */
+function migrateThumbCopyToHookHero_(fields, programMode){
+  if(!fields || programMode === 'brand') return fields;
+  var hero = String(fields.hero || '').trim();
+  var program = String(fields.program || '').trim();
+  if(!hero || !program) return fields;
+  if(isKnownThumbBrandHero_(hero) && !isKnownThumbBrandHero_(program) && program.replace(/\s+/g, '').length >= 6){
+    return {
+      hero: program,
+      tagline: fields.tagline,
+      program: hero,
+      body: fields.body,
+      keywords: fields.keywords,
+      brandProgram: fields.brandProgram
+    };
+  }
+  return fields;
+}
 function normalizeThumbBrandOneLine_(text){
   var raw = String(text || '').trim();
   if(!raw) return '';
@@ -23125,15 +23165,58 @@ function fitThumbTextBlock_(ctx, text, maxWidth, maxSize, minSize, weight, maxLi
   return { size: minSize, lines: wrapThumbLinesAtBreaks_(ctx, t, maxWidth, maxLines) };
 }
 
+/** 후킹 타이틀: 한 줄이 안 되면 글자를 줄이기보다 2줄로 크게 유지 */
+function fitThumbHeroHook_(ctx, text, maxWidth, maxSize, minSize){
+  var t = String(text || '').replace(/\s+/g, ' ').trim();
+  var fontFamily = '"Noto Sans KR","Apple SD Gothic Neo",sans-serif';
+  if(!t) return { size: maxSize, lines: [''] };
+  var size = maxSize;
+  while(size >= minSize){
+    ctx.font = '900 ' + size + 'px ' + fontFamily;
+    if(ctx.measureText(t).width <= maxWidth){
+      return { size: size, lines: [t] };
+    }
+    var lines = wrapThumbLinesAtBreaks_(ctx, t, maxWidth, 2);
+    var truncated = lines.length && /…$/.test(lines[lines.length - 1]);
+    var overflowLine = false;
+    for(var li = 0; li < lines.length; li++){
+      if(ctx.measureText(lines[li]).width > maxWidth + 1) overflowLine = true;
+    }
+    if(!truncated && !overflowLine && !(lines.length === 2 && String(lines[1]).replace(/…$/g, '').length <= 2)){
+      return { size: size, lines: lines };
+    }
+    size -= 1;
+  }
+  ctx.font = '900 ' + minSize + 'px ' + fontFamily;
+  return { size: minSize, lines: wrapThumbLinesAtBreaks_(ctx, t, maxWidth, 2) };
+}
+
 function layoutThumbPosterText_(ctx, W, H, copy, scale){
   scale = scale || 1;
   var padX = Math.round(W * 0.055);
   // 우측까지 넓게 써서 줄바꿈을 최소화 (기존 0.62 → 거의 전폭)
   var textMax = Math.max(40, W - padX * 2);
   var bottomPad = Math.round(H * 0.055);
-  var heroLines = splitThumbHeroLines_(copy.hero);
-  var heroSize = fitHeroFontSize_(ctx, heroLines, textMax, Math.round(W * 0.118 * scale), Math.round(W * 0.056));
-  var heroLineH = Math.round(heroSize * 0.92);
+  var heroRaw = String(copy.hero || '').trim();
+  var heroIsBrand = isKnownThumbBrandHero_(heroRaw);
+  var heroLines;
+  var heroSize;
+  var heroLineH;
+  var heroKorean = /[가-힣]/.test(heroRaw);
+  if(heroIsBrand){
+    heroLines = splitThumbHeroLines_(heroRaw);
+    heroSize = fitHeroFontSize_(ctx, heroLines, textMax, Math.round(W * 0.118 * scale), Math.round(W * 0.056));
+    heroLineH = Math.round(heroSize * (heroKorean ? 1.12 : 0.92));
+  } else {
+    var heroFit = fitThumbHeroHook_(
+      ctx, heroRaw, textMax,
+      Math.max(22, Math.round(W * 0.072 * scale)),
+      Math.max(16, Math.round(W * 0.042))
+    );
+    heroLines = heroFit.lines;
+    heroSize = heroFit.size;
+    heroLineH = Math.round(heroSize * 1.18);
+  }
 
   var tagFit = fitThumbTextBlock_(
     ctx, String(copy.tagline || ''), textMax,
@@ -23142,11 +23225,12 @@ function layoutThumbPosterText_(ctx, W, H, copy, scale){
     '500', 2
   );
   var progText = normalizeThumbBrandOneLine_(copy.program);
-  var progMaxLines = isThumbBrandKeepOneLine_(progText) ? 1 : 2;
+  var progIsBrand = isThumbBrandKeepOneLine_(progText) || isKnownThumbBrandHero_(progText);
+  var progMaxLines = progIsBrand ? 1 : 2;
   var progFit = fitThumbTextBlock_(
     ctx, progText, textMax,
-    Math.max(16, Math.round(W * 0.034 * scale)),
-    Math.max(12, Math.round(W * 0.02)),
+    Math.max(16, Math.round(W * (progIsBrand ? 0.056 : 0.034) * scale)),
+    Math.max(12, Math.round(W * (progIsBrand ? 0.032 : 0.02))),
     '800', progMaxLines
   );
   var bodyMaxLines = scale < 0.85 ? 2 : 3;
@@ -23318,8 +23402,12 @@ function drawThumbPosterOnCanvas_(ctx, W, H, copy, bgImg, opts){
   ctx.shadowOffsetY = Math.max(1, Math.round(W * 0.002));
 
   var heroY0 = y;
-  ctx.font = '900 ' + layout.heroSize + 'px "Archivo Black","Arial Black","Helvetica Neue","Noto Sans KR",sans-serif';
-  if(ctx.letterSpacing !== undefined) ctx.letterSpacing = '-0.02em';
+  var heroJoin = layout.heroLines.join('');
+  var heroIsKo = /[가-힣]/.test(heroJoin);
+  ctx.font = heroIsKo
+    ? '900 ' + layout.heroSize + 'px "Noto Sans KR","Apple SD Gothic Neo",sans-serif'
+    : '900 ' + layout.heroSize + 'px "Archivo Black","Arial Black","Helvetica Neue","Noto Sans KR",sans-serif';
+  if(ctx.letterSpacing !== undefined) ctx.letterSpacing = heroIsKo ? '-0.04em' : '-0.02em';
   var heroW = 0;
   for(var hi = 0; hi < layout.heroLines.length; hi++){
     heroW = Math.max(heroW, ctx.measureText(layout.heroLines[hi]).width);
@@ -23401,7 +23489,7 @@ function renderThumbMakerCard_(content){
   var photoName = st.fileName ? st.fileName : '배경 사진 올리기 (JPEG/PNG 권장 · HEIC는 변환 필요할 수 있어요)';
   var html = '';
   html += '<div class="img-section-title">썸네일 만들기</div>';
-  html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">첨부하신 스타일처럼 <strong>사진이 배경 전체</strong>에 들어가고, <strong>큰 흰 글씨</strong>로 프로그램명·핵심 문장을 올립니다. 하단 배경은 <strong>프로그램 팔레트 색</strong>으로 살짝 물들여 가독성을 확보해요. <strong>미리보기에서 사진을 드래그</strong>해 초점을 옮기고, 글자를 누르면 수정할 수 있어요.</p>';
+  html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">사진이 배경 전체에 들어가고, <strong>큰 흰 글씨로 주제 후킹</strong>을 올립니다. 브랜드명은 그 아래 두 번째로 크게 두어, 여러 장을 올려도 내용이 구분되게 합니다. 하단 배경은 <strong>프로그램 팔레트 색</strong>으로 살짝 물들여 가독성을 확보해요. <strong>미리보기에서 사진을 드래그</strong>해 초점을 옮기고, 글자를 누르면 수정할 수 있어요.</p>';
   html += '<div class="img-tool-card thumb-maker-card">';
   html += '<div class="thumb-maker-grid">';
   html += '<div class="thumb-maker-fields">';
@@ -23426,8 +23514,8 @@ function renderThumbMakerCard_(content){
     html += '</div>';
   }
   html += '<div class="thumb-maker-mode-row">';
-  html += '<button type="button" class="thumb-maker-mode-btn' + (mode === 'brand' ? ' on' : '') + '" data-thumb-mode="brand" onclick="setThumbProgramMode_(\'brand\')">브랜드 프로그램명</button>';
-  html += '<button type="button" class="thumb-maker-mode-btn' + (mode === 'topic' ? ' on' : '') + '" data-thumb-mode="topic" onclick="setThumbProgramMode_(\'topic\')">주제 반영</button>';
+  html += '<button type="button" class="thumb-maker-mode-btn' + (mode === 'brand' ? ' on' : '') + '" data-thumb-mode="brand" onclick="setThumbProgramMode_(\'brand\')">브랜드 타이틀</button>';
+  html += '<button type="button" class="thumb-maker-mode-btn' + (mode === 'topic' ? ' on' : '') + '" data-thumb-mode="topic" onclick="setThumbProgramMode_(\'topic\')">주제 후킹</button>';
   html += '</div>';
   html += '<label>사진 초점 (드래그 또는 버튼)</label>';
   html += '<div class="thumb-maker-mode-row">';
@@ -23471,11 +23559,11 @@ function renderThumbMakerCard_(content){
     html += '<option value="' + k + '"' + (k === sizeKey ? ' selected' : '') + '>' + escapeHtml(THUMB_SIZE_PRESETS[k].label) + '</option>';
   });
   html += '</select>';
-  html += '<label for="thumb-hero">큰 타이틀 · 한 줄 고정 · 미리보기에서 클릭</label>';
+  html += '<label for="thumb-hero">후킹 타이틀 · 그리드에서 가장 크게</label>';
   html += '<input type="text" id="thumb-hero" value="' + escapeHtml(copy.hero) + '" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'hero\')" onblur="onThumbMakerFieldBlur_()">';
   html += '<label for="thumb-tagline">슬로건</label>';
   html += '<input type="text" id="thumb-tagline" value="' + escapeHtml(copy.tagline) + '" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'tagline\')" onblur="onThumbMakerFieldBlur_()">';
-  html += '<label for="thumb-program">프로그램명</label>';
+  html += '<label for="thumb-program">브랜드명</label>';
   html += '<input type="text" id="thumb-program" value="' + escapeHtml(copy.program) + '" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'program\')" onblur="onThumbMakerFieldBlur_()">';
   html += '<label for="thumb-body">핵심 문장</label>';
   html += '<textarea id="thumb-body" rows="3" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'body\')" onblur="onThumbMakerFieldBlur_()">' + escapeHtml(copy.body) + '</textarea>';
@@ -23871,9 +23959,9 @@ window.setThumbProgramMode_ = function(mode){
     preferTopic: st.programMode === 'topic'
   });
   var cur = readThumbMakerFields_();
-  // 주제 반영: 프로그램명·핵심 문장 모두 갱신 / 브랜드: 프로그램명만 브랜드로, 본문은 유지
+  // 주제 후킹: 큰 타이틀·브랜드명·핵심 문장 갱신 / 브랜드: 큰 타이틀·브랜드명만, 본문은 유지
   st.fields = {
-    hero: cur.hero || copy.hero,
+    hero: copy.hero,
     tagline: cur.tagline || copy.tagline,
     program: copy.program,
     body: st.programMode === 'topic' ? copy.body : (cur.body || copy.body),
@@ -23888,7 +23976,7 @@ window.setThumbProgramMode_ = function(mode){
   }
   paintThumbMakerPreview_();
   schedulePersistThumbWorkspace_(true);
-  setAppToast(st.programMode === 'brand' ? '브랜드 프로그램명으로 바꿨어요.' : '주제 반영 프로그램명으로 바꿨어요.', { duration: 1600, variant: 'ok' });
+  setAppToast(st.programMode === 'brand' ? '브랜드명을 큰 타이틀로 바꿨어요.' : '주제를 큰 타이틀로 바꿨어요.', { duration: 1600, variant: 'ok' });
 };
 
 window.setThumbFocusX_ = function(v){
@@ -24223,7 +24311,7 @@ window.refreshThumbMakerFromTopic_ = function(){
   var st = ensureThumbMakerState_();
   var content = resolveThumbMakerContent_();
   var prev = readThumbMakerFields_();
-  // 「주제 다시 반영」= 브랜드명 유지가 아니라 현재 주제를 프로그램명·핵심 문장에 넣음
+  // 「주제 다시 반영」= 현재 주제를 큰 타이틀·핵심 문장에 넣음
   st.programMode = 'topic';
   st.fields = buildThumbMakerCopy_(content, state.selectedCatId, {
     programMode: 'topic',
@@ -24238,11 +24326,12 @@ window.refreshThumbMakerFromTopic_ = function(){
     btns[i].classList.toggle('on', btns[i].getAttribute('data-thumb-mode') === 'topic');
   }
   paintThumbMakerPreview_();
-  var changed = (prev.program || '') !== (st.fields.program || '') ||
+  var changed = (prev.hero || '') !== (st.fields.hero || '') ||
+    (prev.program || '') !== (st.fields.program || '') ||
     (prev.body || '') !== (st.fields.body || '');
   setAppToast(
     changed
-      ? '주제를 프로그램명·핵심 문장에 반영했어요.'
+      ? '주제를 큰 타이틀·핵심 문장에 반영했어요.'
       : '이미 주제와 같은 내용이에요. (바꿀 값이 없어요)',
     { duration: 2200, variant: 'ok' }
   );

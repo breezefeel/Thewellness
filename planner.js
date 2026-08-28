@@ -2528,8 +2528,8 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
     ]
   },
   '6': {
-    brandProfile: '일상 공유는 미카닥 박준규 개인 계정의 사람 레이어입니다. 페이스·도수·리얼무브먼트 계정에 올리지 않습니다. 원장이 준 재료(누구와·무엇을·오늘 몸 느낌)만 다듬고, 없는 일상을 만들지 마세요. 사진은 원본을 4:5로만 맞춥니다.',
-    strategyGuide: '기준:\n- 입력 세 칸(누구와 / 무엇을 / 몸 느낌) 밖을 창작하지 않는다.\n- 가르침·셀프 케어·CTA·독자 질문은 넣지 않는다.\n- 이미지는 망고·글자 썸네일 없이 원본 4:5 보정만 한다.\n\n의도:\n- AI가 많이 쓰는 계정에서 사람 냄새를 남긴다.\n- 생일 사진처럼 찍힌 날을 남긴다.\n- 프로그램 계정과 역할을 나눈다.',
+    brandProfile: '일상 공유는 미카닥 박준규 개인 계정의 사람 레이어입니다. 페이스·도수·리얼무브먼트 계정에 올리지 않습니다. 그날의 장면(누구와·무엇을·몸 느낌)이거나, 떠오른 생각 한 줄을 사람들이 자기 이야기로 느끼게 풀어 씁니다. 장면 글은 재료 밖을 창작하지 말고, 생각 글은 오늘 일어난 일처럼 꾸며 내지 마세요. 사진은 원본을 4:5로만 맞춥니다.',
+    strategyGuide: '기준:\n- 장면 글: 입력 세 칸(누구와 / 무엇을 / 몸 느낌) 밖을 창작하지 않는다.\n- 생각 글: 원문 한 줄의 뜻을 유지하고, 오늘 일기처럼 꾸며 내지 않는다. 정답·옳고 그름을 가르지 않는다.\n- 가르침·셀프 케어·CTA·독자 질문은 넣지 않는다.\n- 이미지는 망고·글자 썸네일 없이 원본 4:5 보정만 한다.\n\n의도:\n- AI가 많이 쓰는 계정에서 사람 냄새를 남긴다.\n- 찍힌 날과, 가끔 떠오른 한 줄을 함께 남긴다.\n- 프로그램 계정과 역할을 나눈다.',
     steps: [
       { id: '1', title: '1단계 · 장면 한 줄', summary: '누구와 무엇을 했는지 사실만', rationale: '제목만 바꾸면 개인 느낌이 사라집니다. 그날의 사람이 먼저여야 합니다.' },
       { id: '2', title: '2단계 · 몸 느낌', summary: '오늘 굳은 데·피로 한 가지', rationale: '전문가의 몸도 굳는다는 한 줄이 반전입니다. 가르침으로 바꾸지 마세요.' },
@@ -2996,8 +2996,9 @@ function applyInitialProgramTopicsToCat_(catId, opts){
   });
   return applied;
 }
-const DAILY_SHARE_MASTER_BRIDGE = '일상 공유는 미카닥 박준규 개인 계정의 사람 레이어. 강의·프로그램 계정이 아니라, 그날 실제로 있었던 장면·사람·몸 느낌을 남긴다. 「이 사람은 진짜」로 기억되게 한다.';
+const DAILY_SHARE_MASTER_BRIDGE = '일상 공유는 미카닥 박준규 개인 계정의 사람 레이어. 강의·프로그램 계정이 아니라, 그날 실제로 있었던 장면·사람·몸 느낌, 또는 떠오른 한 줄을 사람들이 자기 이야기로 느끼게 풀어 남긴다. 「이 사람은 진짜」로 기억되게 한다.';
 const DAILY_SHARE_TONE_ANCHOR = '원장이 적은 재료만 다듬는다. 누구와·무엇을·오늘 몸 느낌. 없는 사실·감정·상대를 만들지 말 것. 가르침·CTA·질문·과한 감성·시적 수사 금지. 한 줄 철학은 넣지 않거나 마지막 한 문장만.';
+const DAILY_SHARE_THOUGHT_TONE_ANCHOR = '원장이 적은 생각 한 줄의 뜻을 유지한다. 사람들이 「내 얘기네」 하게 일상 장면으로 풀어 쓰되, 오늘 실제로 일어난 일처럼 꾸며 내지 말 것. 정답·가르침·CTA·의료 해설 금지. 옳고 그름을 가르지 말고, 상황에 따라 다르다는 여지를 남긴다.';
 /** 개인 색깔·약력·포지셔닝 — 대화·프로필·블로그(미카닥 박준규 DC PT 공지) 기준. AI·기획 시 톤·역할 참고용 */
 const PERSONAL_BRAND_PROFILE = `
 [미카닥 박준규 — 누구인지 · 어떻게 불러야 하는지]
@@ -3033,7 +3034,7 @@ const PERSONAL_BRAND_PROFILE = `
 - 움직임·자세: PAR·Position — 일상 동작으로 연결
 - 얼굴·웰니스: 구조(경축·골격)·비수술 · 기대치 현실화
 - 전문가: 촉진·평가 우선, 교과서와 임상의 간격 메우기
-- 일상 공유: 강의·홍보 없이 **그날의 장면** — 누구와 / 무엇을 / 몸 느낌. AI는 문장만 다듬기
+- 일상 공유: 강의·홍보 없이 **그날의 장면**(누구와 / 무엇을 / 몸 느낌) 또는 **생각 한 줄**을 공감하게 풀어 쓰기
 
 [쓰지 말 것 · 톤]
 - 「최고의 의사」「완치 보장」「Doctor로만 신뢰」 류
@@ -3069,7 +3070,8 @@ const DEFAULT_DAILY_SHARE_THEMES = [
   { id: 'scene', label: '그날의 장면', note: '누구와 무엇을 했는지 한 줄 — 사진에 찍힌 그대로' },
   { id: 'body', label: '오늘 몸 느낌', note: '굳은 데·피로 한 가지. 가르침 없이' },
   { id: 'people', label: '함께한 사람', note: '이름·호칭만. 강의 후기가 되지 않게' },
-  { id: 'rest', label: '쉬는 컷', note: '매트·이동·커피. 꾸민 썸네일 없이 원본 4:5' }
+  { id: 'rest', label: '쉬는 컷', note: '매트·이동·커피. 꾸민 썸네일 없이 원본 4:5' },
+  { id: 'thought', label: '생각 한 줄', note: '떠오른 한 줄. 사람들이 공감하게 풀어 쓸 재료' }
 ];
 const DAILY_MONTH_LEGACY_KEY = 'legacy';
 const DAILY_TOPIC_SUGGEST_ESTIMATE_SEC = 28;
@@ -3572,14 +3574,17 @@ function hasDailyShareThemesCustomized_(){
     return def && String(t.note || '').trim() !== String(def.note || '').trim();
   });
 }
-function buildDailyShareContextBlock_(){
+function buildDailyShareContextBlock_(draft){
   var plan = getDailySharePlan_();
-  var lines = ['[일상 공유 · 이번 달 테마]', DAILY_SHARE_MASTER_BRIDGE, '톤: ' + DAILY_SHARE_TONE_ANCHOR];
+  var thought = isDailyThoughtDraft_(draft);
+  var lines = ['[일상 공유 · 이번 달 테마]', DAILY_SHARE_MASTER_BRIDGE, '톤: ' + (thought ? DAILY_SHARE_THOUGHT_TONE_ANCHOR : DAILY_SHARE_TONE_ANCHOR)];
   if(plan.intent) lines.push('나눔 방향: ' + plan.intent);
   plan.themes.forEach(function(t){
-    if(t.note) lines.push('- ' + t.label + ': ' + t.note);
+    if(!t.note) return;
+    if(thought && t.id !== 'thought') return;
+    if(!thought && t.id === 'thought') return;
+    lines.push('- ' + t.label + ': ' + t.note);
   });
-  if(lines.length === 1) return '';
   return lines.join('\n');
 }
 window.updateDailyShareIntent_ = function(value){
@@ -3632,6 +3637,14 @@ window.suggestDailyShareTopicsForMonth_ = async function(monthKey){
   var cat = CATEGORIES[catId];
   if(!cat) return;
   if(state.currentCat !== catId) selectCat(catId);
+  if(!state.showAdd){
+    state.showAdd = true;
+    if(state.newItem) state.newItem.catId = catId;
+    var addBtn = document.getElementById('add-toggle-btn');
+    if(addBtn) addBtn.textContent = '닫기';
+  } else if(state.newItem){
+    state.newItem.catId = catId;
+  }
   state.dailyShareCollapsed = false;
   if(!state.dailyMonthCollapsed) state.dailyMonthCollapsed = {};
   state.dailyMonthCollapsed[monthKey] = false;
@@ -3659,18 +3672,34 @@ window.suggestDailyShareTopicsForMonth_ = async function(monthKey){
     var themeLines = plan.themes.map(function(t){
       return '- ' + t.id + ' (' + t.label + '): ' + (t.note || '');
     }).join('\n');
+    var addMaterials = '';
+    if(state.newItem && isDailyShareCategory(state.newItem.catId)){
+      var addFacts = getDailyNewItemKeywords_();
+      var addMemo = String(state.newItem.refNote || '').trim();
+      if(addFacts) addMaterials += '[추가 폼 재료 — 우선]\n' + addFacts + '\n';
+      if(addMemo) addMaterials += '[사진 분석 메모 — 구도 참고. 재료에 없는 사람·감정 만들지 말 것]\n' + addMemo.slice(0, 1800) + '\n';
+    }
+    var thoughtMode = isDailyThoughtNewItem_();
     var prompt =
 buildContentStrategyPromptPrefix_({ program: '일상 공유 · 팔로워 일상 나눔' }) + '\n\n' +
-DAILY_SHARE_MASTER_BRIDGE + '\n톤: ' + DAILY_SHARE_TONE_ANCHOR + '\n\n' +
+DAILY_SHARE_MASTER_BRIDGE + '\n톤: ' + (thoughtMode ? DAILY_SHARE_THOUGHT_TONE_ANCHOR : DAILY_SHARE_TONE_ANCHOR) + '\n\n' +
 '[대상 월] ' + formatShareMonthLabel_(monthKey) + ' (' + monthKey + ')\n' +
-'- 이 달 실제 찍을 법한 장면으로 제안하세요. 계절 템플릿·뻐근함 반복 금지.\n' +
+(thoughtMode
+  ? '- 떠오른 생각·철학 한 줄을 공감하게 풀어 쓸 주제. 오늘 일기 장면으로 바꾸지 마세요.\n'
+  : '- 이 달 실제 찍을 법한 장면으로 제안하세요. 계절 템플릿·뻐근함 반복 금지. 생각 한 줄도 섞어도 됩니다.\n') +
 (plan.intent ? '[이번 달 나눔 방향] ' + plan.intent + '\n' : '') +
 '[테마 축]\n' + themeLines + '\n\n' +
+(addMaterials ? addMaterials + '\n' : '') +
 '[이미 있는 주제 — 비슷한 제목 피하기]\n' + (existing || '(없음)') + '\n\n' +
 '[요청] 위 달에 올릴 일상 공유 주제 6~8개를 제안하세요.\n' +
-'- 강의·홍보·의료 단정·셀프케어 금지. 누구와·무엇을·몸 느낌이 보이게.\n' +
-'- themeId는 scene|body|people|rest 중 하나.\n' +
-'- topic은 사실형 한 줄, angle은 다듬기 힌트.\n' +
+(thoughtMode
+  ? '- 강의·홍보·의료 단정·셀프케어·정답 금지. 원문 뜻을 유지하고 「내 얘기네」 하게.\n'
+  : '- 강의·홍보·의료 단정·셀프케어 금지. 누구와·무엇을·몸 느낌이 보이게.\n') +
+(addMaterials ? (thoughtMode
+  ? '- 추가 폼의 생각 한 줄이 있으면 **그 뜻을 유지한 주제**를 우선하세요.\n'
+  : '- 추가 폼 재료·사진이 있으면 **그 장면과 맞는 주제**를 우선하세요.\n') : '') +
+'- themeId는 scene|body|people|rest|thought 중 하나. 생각·철학 한 줄이면 thought.\n' +
+'- topic은 사실형 한 줄(장면) 또는 생각 원문 한 줄, angle은 다듬기·풀어쓰기 힌트.\n' +
 'JSON만: {"topics":[{"topic":"…","angle":"…","themeId":"scene"}]}';
     var text = await callClaudePlanner_(prompt, { maxTokens: 2200 });
     var obj = parsePlannerAiJsonObject_(text);
@@ -3729,16 +3758,19 @@ window.addSelectedDailyShareTopics_ = function(){
     var key = topic.toLowerCase();
     if(existingTopics[key]){ skipped++; return; }
     existingTopics[key] = true;
+    var isThoughtTopic = String(it.themeId) === 'thought';
     var draft = {
       id: 'd' + catId + '-c' + (baseTs + added),
       topic: topic,
-      angle: String(it.angle || '').trim() || (it.themeLabel ? it.themeLabel + ' 장면' : '일상 나눔'),
+      angle: String(it.angle || '').trim() || (isThoughtTopic ? '생각 한 줄을 공감하게 풀어 쓰기' : (it.themeLabel ? it.themeLabel + ' 장면' : '일상 나눔')),
       createdAt: shareMonthToCreatedAtIso_(monthKey),
       shareMonth: monthKey,
       series: getDefaultSeriesForCat_(catId),
       pillar: getDefaultPillarForCat_(catId),
-      rationale: it.themeLabel ? (it.themeLabel + ' · ' + formatShareMonthLabel_(monthKey)) : formatShareMonthLabel_(monthKey)
+      rationale: it.themeLabel ? (it.themeLabel + ' · ' + formatShareMonthLabel_(monthKey)) : formatShareMonthLabel_(monthKey),
+      dailyShareKind: isThoughtTopic ? 'thought' : 'scene'
     };
+    if(isThoughtTopic) draft.dailyThought = topic;
     cat.drafts.push(draft);
     added++;
   });
@@ -3749,6 +3781,9 @@ window.addSelectedDailyShareTopics_ = function(){
   if(!state.dailyMonthCollapsed) state.dailyMonthCollapsed = {};
   state.dailyMonthCollapsed[monthKey] = false;
   state.dailyTopicSuggestions = null;
+  state.showAdd = false;
+  var addBtnDone = document.getElementById('add-toggle-btn');
+  if(addBtnDone) addBtnDone.textContent = '추가';
   save({ driveImmediate: true, gasImmediate: true });
   renderMain();
   if(typeof setAppToast === 'function'){
@@ -4021,12 +4056,12 @@ function renderDailyShareSetupGuideHTML_(){
         '<button type="button" class="setup-step-btn" onclick="toggleDailySharePanel_(true)">설정</button>' +
       '</li>' +
       '<li class="planner-setup-step setup-tone-program">' +
-        '<span class="planner-setup-step-label">② 이번 달 주제 추천 · 선택 추가</span>' +
-        '<button type="button" class="setup-step-btn" onclick="suggestDailyShareTopicsForMonth_()">추천</button>' +
+        '<span class="planner-setup-step-label">② 추가에서 사진·재료 넣고 주제 만들기</span>' +
+        '<button type="button" class="setup-step-btn" onclick="openAddForm_()">추가</button>' +
       '</li>' +
       '<li class="planner-setup-step setup-tone-topic">' +
-        '<span class="planner-setup-step-label">③ 누구와·무엇을·몸 느낌 적고 사진 올리기</span>' +
-        '<span class="planner-setup-hint">이미지 탭은 4:5 보정만</span>' +
+        '<span class="planner-setup-step-label">③ 이미지 탭에서 원본 4:5 맞추기</span>' +
+        '<span class="planner-setup-hint">썸네일을 새로 만들지 않습니다</span>' +
       '</li>' +
     '</ol>' +
   '</div>';
@@ -7720,7 +7755,7 @@ function renderSubGoalStepBlockHTML_(catId, step, idx, activeId){
   return html;
 }
 function getDailyThemeToneClass_(idx){
-  return 'daily-theme-tone-' + (Math.max(0, parseInt(idx, 10) || 0) % 4);
+  return 'daily-theme-tone-' + (Math.max(0, parseInt(idx, 10) || 0) % 5);
 }
 function renderDailyTopicSuggestHTML_(monthKey){
   var sug = state.dailyTopicSuggestions;
@@ -7770,7 +7805,6 @@ function renderDailySharePanelHTML_(catId){
   if(!monthGroups.some(function(g){ return g.monthKey === curMonth; })){
     monthGroups.unshift({ monthKey: curMonth, label: formatShareMonthLabel_(curMonth), drafts: [] });
   }
-  var suggestBusy = !!(state.dailyTopicSuggestions && state.dailyTopicSuggestions.loading);
   var html = '<div class="planner-layer daily-layer' + (collapsed ? ' collapsed' : '') + '">' +
     '<div class="planner-layer-head">' +
       '<div class="planner-layer-kicker">' + escapeHtml(cat.name) + ' · ' + escapeHtml(cat.audience) + '</div>' +
@@ -7780,13 +7814,13 @@ function renderDailySharePanelHTML_(catId){
     '</div>';
   if(collapsed){
     var compact = plan.intent || plan.themes.map(function(t){ return t.label; }).join(' · ');
-    html += '<div class="planner-layer-compact">' + escapeHtml(compact || '사진·오늘 느낌으로 가볍게 올려요') + '</div>';
+    html += '<div class="planner-layer-compact">' + escapeHtml(compact || '장면·생각 한 줄로 가볍게 올려요') + '</div>';
   } else {
-    html += '<p class="daily-share-intro">미카닥 <strong>개인 계정</strong>용. <strong>누구와 · 무엇을 · 오늘 몸 느낌</strong>만 남깁니다. 사진은 원본 4:5.</p>';
+    html += '<p class="daily-share-intro">미카닥 <strong>개인 계정</strong>용. <strong>그날의 장면</strong>(누구와 · 무엇을 · 몸 느낌) 또는 떠오른 <strong>생각 한 줄</strong>을 남깁니다. 사진은 원본 4:5.</p>';
     html += '<p class="daily-share-bridge">' + escapeHtml(DAILY_SHARE_MASTER_BRIDGE) + '</p>';
     html += '<div class="ws-intent-block daily-intent-block">' +
       '<label class="ws-intent-label">이번 달 일상 나눔 방향 (선택)</label>' +
-      '<textarea class="ws-intent-input ws-grow-textarea daily-intent-input" rows="2" placeholder="예: 담백·관찰 위주. 핵심 한 가지 분명히, 장면·몸감각으로 살짝 공감. 감탄·짧은 철학 1문장까지" oninput="updateDailyShareIntent_(this.value);autoGrowTextarea_(this)">' + escapeHtml(plan.intent || '') + '</textarea>' +
+      '<textarea class="ws-intent-input ws-grow-textarea daily-intent-input" rows="2" placeholder="예: 담백·관찰 위주. 장면은 사실만, 생각 한 줄은 공감하게 풀기" oninput="updateDailyShareIntent_(this.value);autoGrowTextarea_(this)">' + escapeHtml(plan.intent || '') + '</textarea>' +
     '</div>';
     html += '<div class="daily-theme-grid">';
     plan.themes.forEach(function(t, idx){
@@ -7801,17 +7835,7 @@ function renderDailySharePanelHTML_(catId){
     '<div class="daily-draft-head">' +
       '<span class="daily-draft-title">일상 글 주제 · 달별</span>' +
       '<span class="daily-draft-stats">발행 ' + pubCount + '/' + drafts.length + '</span>' +
-    '</div>' +
-    '<div class="daily-month-toolbar">' +
-      '<button type="button" class="modal-btn ws-btn-ai daily-suggest-btn' + (suggestBusy ? ' is-disabled' : '') + '" data-daily-suggest-btn="' + escapeHtml(curMonth) + '"' +
-        (suggestBusy ? ' disabled' : '') +
-        ' onclick="suggestDailyShareTopicsForMonth_(\'' + escapeHtml(curMonth) + '\')">' +
-        escapeHtml(formatShareMonthLabel_(curMonth)) + ' 주제 추천</button>' +
-      '<button type="button" class="modal-btn-ghost daily-add-manual-btn" onclick="openAddForm_()">직접 추가</button>' +
     '</div>';
-  if(state.dailyTopicSuggestions && state.dailyTopicSuggestions.monthKey){
-    html += renderDailyTopicSuggestHTML_(state.dailyTopicSuggestions.monthKey);
-  }
   monthGroups.forEach(function(g){
     var monthCollapsed = isDailyMonthCollapsed_(g.monthKey);
     var mPub = g.drafts.filter(function(d){ return draftIsPublished_(d.id); }).length;
@@ -7823,11 +7847,6 @@ function renderDailySharePanelHTML_(catId){
           '<span class="daily-month-stats">발행 ' + mPub + '/' + g.drafts.length + '</span>' +
           '<span class="daily-month-chevron">' + (monthCollapsed ? '▸' : '▾') + '</span>' +
         '</button>' +
-        (g.monthKey !== DAILY_MONTH_LEGACY_KEY
-          ? '<button type="button" class="ws-item-btn daily-month-suggest-mini' + (suggestBusy ? ' is-disabled' : '') + '" data-daily-suggest-btn="' + escapeHtml(g.monthKey) + '"' +
-              (suggestBusy ? ' disabled' : '') +
-              ' onclick="suggestDailyShareTopicsForMonth_(\'' + escapeHtml(g.monthKey) + '\')" title="이 달 주제 추천">추천</button>'
-          : '') +
       '</div>';
     if(!monthCollapsed){
       html += '<div class="subgoal-step-cards daily-draft-cards">';
@@ -7836,7 +7855,7 @@ function renderDailySharePanelHTML_(catId){
           html += draftCardHTML(d, cat, false, cat.drafts.indexOf(d), false);
         });
       } else {
-        html += '<div class="subgoal-step-topics empty">아직 주제가 없어요. 위 <strong>주제 추천</strong>으로 채워 보세요.</div>';
+        html += '<div class="subgoal-step-topics empty">아직 주제가 없어요. 위쪽 <strong>추가</strong>에서 사진·장면 또는 <strong>생각 한 줄</strong>을 적어 보세요.</div>';
       }
       html += '</div>';
     }
@@ -9362,7 +9381,7 @@ let state = {
   generatedOnly: {},
   localSavedAt: '',
   showAdd: false,
-  newItem: { date:'', topic:'', catId:0, dailyWho:'', dailyWhat:'', dailyBody:'', refImages:[], refImage:null, refNote:'', imageAnalyzing:false, imageAnalysisWait:null, flowProposals:[], selectedFlowIdx:0, flowProposalsLoading:false, flowProposalsReady:false, cachedYoutubeAnalysis:'', _cachedFlowYoutubeUrl:'' },
+  newItem: { date:'', topic:'', catId:0, dailyShareKind:'scene', dailyThought:'', dailyWho:'', dailyWhat:'', dailyBody:'', refImages:[], refImage:null, refNote:'', imageAnalyzing:false, imageAnalysisWait:null, flowProposals:[], selectedFlowIdx:0, flowProposalsLoading:false, flowProposalsReady:false, cachedYoutubeAnalysis:'', _cachedFlowYoutubeUrl:'' },
   apiKey: '',
   plannerClaudeEnabled: false,
   geminiYoutubeEnabled: false,
@@ -10204,6 +10223,26 @@ const DEFAULT_DAILY_SHARE_IMAGE_PROMPT = `일상 공유 이미지는 **망고보
 
 [하지 말 것]
 훅 문구 오버레이, 하단 그라데이션 포스터, AI가 그린 일상 장면, 필름·뷰티 필터.`;
+
+const DEFAULT_DAILY_SHARE_THOUGHT_PROMPT = `**일상 공유 · 생각 한 줄**은 미카닥 박준규 **개인 계정**용입니다. 그날의 일기가 아니라, 원장이 남긴 한 줄을 사람들이 「내 얘기네」 하게 풀어 씁니다.
+
+[톤 앵커 — 최우선]
+${DAILY_SHARE_THOUGHT_TONE_ANCHOR}
+
+[재료]
+입력의 「생각 한 줄」 뜻을 유지하세요. 오늘 실제로 일어난 일·특정 사람을 꾸며 내지 마세요. 일반 장면은 「이런 때 있잖아요」 수준만.
+
+[글의 뼈대]
+- 원문 한 줄을 첫 문장 또는 글 안에 자연스럽게
+- 누구나 겪을 법한 순간에 비추기
+- 왜 와닿는지 한 가지
+- 옳고 그름을 가르지 않고 여운만
+- 가르침·셀프 케어·CTA·독자 질문·의료 해설 금지
+
+[이렇게 써 주세요]
+- **topicTitle**: 원문의 핵심을 담은 평서 한 줄 (질문 금지)
+- **summary**: 3~7문장, 번호·불릿 없이. 가르침 없이 여운.
+- 이모지 0~1개`;
 
 const DEFAULT_DAILY_SHARE_PROMPT = `**일상 공유**는 미카닥 박준규 **개인 계정**용입니다. Threads·인스타에 올리는 **그날의 일기**입니다. 페이스·도수·리얼무브먼트 계정용으로 쓰지 마세요.
 
@@ -16283,6 +16322,11 @@ function collectExtraDrafts(){
         articleFlow: d.articleFlow || null,
         updatedAt: d.updatedAt || (userAddedDraftTimestamp_(d.id) ? new Date(userAddedDraftTimestamp_(d.id)).toISOString() : '')
       };
+      if(d.dailyShareKind) row.dailyShareKind = d.dailyShareKind;
+      if(d.dailyThought) row.dailyThought = d.dailyThought;
+      if(d.dailyWho) row.dailyWho = d.dailyWho;
+      if(d.dailyWhat) row.dailyWhat = d.dailyWhat;
+      if(d.dailyBody) row.dailyBody = d.dailyBody;
       if(d.previousRoadmapStepId) row.previousRoadmapStepId = d.previousRoadmapStepId;
       if(d.previousSeries) row.previousSeries = d.previousSeries;
       return row;
@@ -16315,6 +16359,11 @@ function mergeExtraDrafts(byCat){
         previousSeries: d.previousSeries || ''
       });
       var merged = cat.drafts[cat.drafts.length - 1];
+      if(d.dailyShareKind) merged.dailyShareKind = d.dailyShareKind;
+      if(d.dailyThought) merged.dailyThought = d.dailyThought;
+      if(d.dailyWho) merged.dailyWho = d.dailyWho;
+      if(d.dailyWhat) merged.dailyWhat = d.dailyWhat;
+      if(d.dailyBody) merged.dailyBody = d.dailyBody;
       if(merged && !merged.previousRoadmapStepId) delete merged.previousRoadmapStepId;
       if(merged && !merged.previousSeries) delete merged.previousSeries;
       // 저장돼 있던 roadmapStepId(주제 기획안 단계)를 존중. 없을 때만 기타로.
@@ -19935,7 +19984,10 @@ function renderMain() {
       if(!d) return false;
       return (d.topic || '').includes(q) || (d.angle || '').includes(q) ||
         (d.series && d.series.includes(q)) || (d.rationale && d.rationale.includes(q)) ||
-        (d.pillar && d.pillar.includes(q));
+        (d.pillar && d.pillar.includes(q)) ||
+        (d.dailyThought && String(d.dailyThought).includes(q)) ||
+        (d.dailyWho && String(d.dailyWho).includes(q)) ||
+        (d.dailyWhat && String(d.dailyWhat).includes(q));
     });
     bodyHTML = renderMainGoalPanelHTML_() +
       '<div class="search-mode-note">검색 중 · ' + (isDailyShareCategory(state.currentCat) ? '일상 주제 목록' : (isOpsManualCategory(state.currentCat) ? '메뉴얼' : '단계별 로드맵')) + '은 검색어를 지우면 다시 보여요.</div>' +
@@ -19974,6 +20026,7 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
     : '미발행';
   const badges = [
     `<span class="badge badge-aud">${escapeHtml(audienceBadge)}</span>`,
+    isDailyThoughtDraft_(d) ? '<span class="badge badge-thought">생각</span>' : '',
     isRec && d.recType==='related' ? '<span class="badge badge-rec">관련</span>' : '',
     compactInSeries && stepBadge ? '<span class="badge badge-step">' + escapeHtml(stepBadge) + '</span>' : '',
     // 발행 배지가 있으면「초안있음」은 생략 (채널·발행완료로 충분)
@@ -20083,14 +20136,33 @@ function newItemHasRefImages_(){
 function createEmptyNewItem_(catId){
   return {
     date: '', topic: '', catId: typeof catId === 'number' ? catId : 0,
+    dailyShareKind: 'scene', dailyThought: '',
     dailyWho: '', dailyWhat: '', dailyBody: '',
     refImages: [], refImage: null, refNote: '', imageAnalyzing: false, imageAnalysisWait: null,
     flowProposals: [], selectedFlowIdx: 0, flowProposalsLoading: false,
     flowProposalsReady: false, cachedYoutubeAnalysis: '', _cachedFlowYoutubeUrl: ''
   };
 }
+function isDailyThoughtDraft_(item){
+  if(!item) return false;
+  if(item.dailyShareKind === 'thought') return true;
+  if(item.dailyShareKind === 'scene') return false;
+  return !!String(item.dailyThought || '').trim();
+}
+function getDailyThoughtText_(item){
+  return String((item && item.dailyThought) || '').trim();
+}
+function isDailyThoughtNewItem_(){
+  return !!(state.newItem && isDailyShareCategory(state.newItem.catId) && isDailyThoughtDraft_(state.newItem));
+}
+function buildDailyThoughtBlock_(item){
+  var t = getDailyThoughtText_(item);
+  if(!t) return '';
+  return '[원장이 남긴 생각 한 줄 — 이 문장의 뜻을 유지하고, 사람들이 자기 이야기로 느끼게 풀어 쓰기. 오늘 일어난 일처럼 꾸며 내지 말 것]\n' + t;
+}
 function buildDailyDiaryFactsBlock_(item){
   item = item || {};
+  if(isDailyThoughtDraft_(item)) return buildDailyThoughtBlock_(item);
   var who = String(item.dailyWho || '').trim();
   var what = String(item.dailyWhat || '').trim();
   var body = String(item.dailyBody || '').trim();
@@ -20102,6 +20174,12 @@ function buildDailyDiaryFactsBlock_(item){
   return lines.join('\n');
 }
 function getDailyNewItemKeywords_(){
+  if(isDailyThoughtNewItem_()){
+    var thought = buildDailyThoughtBlock_(state.newItem);
+    var extraT = String((state.newItem && state.newItem.topic) || '').trim();
+    if(thought && extraT) return thought + '\n\n' + extraT;
+    return thought || extraT;
+  }
   var facts = buildDailyDiaryFactsBlock_(state.newItem);
   var extra = String((state.newItem && state.newItem.topic) || '').trim();
   if(facts && extra) return facts + '\n\n' + extra;
@@ -20109,6 +20187,7 @@ function getDailyNewItemKeywords_(){
 }
 function newItemHasDailyFacts_(){
   var n = state.newItem || {};
+  if(isDailyThoughtDraft_(n)) return !!getDailyThoughtText_(n);
   return !!(String(n.dailyWho || '').trim() || String(n.dailyWhat || '').trim() || String(n.dailyBody || '').trim());
 }
 
@@ -20129,6 +20208,7 @@ function newItemHasMediaSource_(){
 }
 
 function newItemHasFlowSource_(){
+  if(isDailyThoughtNewItem_()) return !!getDailyThoughtText_(state.newItem);
   if(newItemHasRefImages_()) return true;
   if(isDailyShareCategory(state.newItem.catId) && newItemHasDailyFacts_()) return true;
   return !!buildDraftSourceNote_(getDailyNewItemKeywords_() || state.newItem.topic, state.newItem.refNote).trim();
@@ -20154,7 +20234,9 @@ function normalizeFlowProposal_(raw, idx){
   if(!title && steps[0]) title = String(steps[0]).slice(0, 36);
   if(!angle) angle = '카테고리·참고 자료 기반 흐름';
   var cleanSteps = steps.map(function(s){ return String(s).trim(); }).filter(Boolean);
-  var stepFallback = ['문제·장면 제기', '핵심 전개', '원리·마무리'];
+  var stepFallback = isDailyThoughtNewItem_()
+    ? ['한 줄을 일상 장면에 비추기', '왜 와닿는지 한 가지', '판단 없이 여운']
+    : ['문제·장면 제기', '핵심 전개', '원리·마무리'];
   while(cleanSteps.length < 3) cleanSteps.push(stepFallback[cleanSteps.length]);
   return {
     id: idx,
@@ -20175,7 +20257,7 @@ function buildFlowProposalPromptGuides_(catId){
   var base = getBasePrompt();
   if(base) chunks.push('[공통 기본 프롬프트 — 톤·포지셔닝·의료법]\n' + clipPromptGuideForFlow_(base, 4200));
   if(isDailyShareCategory(catId)){
-    var thread = getCatPrompt(catId, 'thread');
+    var thread = isDailyThoughtNewItem_() ? DEFAULT_DAILY_SHARE_THOUGHT_PROMPT : getCatPrompt(catId, 'thread');
     if(thread) chunks.push('[일상 공유(쓰레드) 작성 지침 — 각 흐름이 이 형식·톤·단계에 맞게]\n' + clipPromptGuideForFlow_(thread, 4200));
   } else if(isHeiljagyaeCategory(catId)){
     var community = getCatPrompt(catId, 'community');
@@ -20352,14 +20434,20 @@ function extractYoutubeUrlsFromText_(text){
 function getDraftReferenceText_(draft){
   if(!draft) return '';
   var parts = [];
-  if(draft.sourceNote && String(draft.sourceNote).trim()) parts.push(String(draft.sourceNote).trim());
+  var src = draft.sourceNote && String(draft.sourceNote).trim();
+  var thoughtTxt = getDailyThoughtText_(draft);
+  if(isDailyThoughtDraft_(draft)){
+    var thoughtBlock = buildDailyThoughtBlock_(draft);
+    if(thoughtBlock && (!src || !thoughtTxt || src.indexOf(thoughtTxt) < 0)) parts.push(thoughtBlock);
+  }
+  if(src) parts.push(src);
   if(draft.youtubeAnalysis && String(draft.youtubeAnalysis).trim()){
     parts.push('[YouTube 영상 분석 — Gemini]\n' + String(draft.youtubeAnalysis).trim());
   }
   return parts.join('\n\n');
 }
 
-function buildTopicGenFidelityBlock_(keywords, sourceNote, isDaily){
+function buildTopicGenFidelityBlock_(keywords, sourceNote, isDaily, isThought){
   var kw = String(keywords || '').trim();
   var hasNote = !!(sourceNote && String(sourceNote).trim());
   if(!kw && !hasNote) return '';
@@ -20375,8 +20463,11 @@ function buildTopicGenFidelityBlock_(keywords, sourceNote, isDaily){
     var preview = kw.length > 480 ? kw.slice(0, 480) + '…' : kw;
     lines.splice(2, 0, '사용자 입력 원문: 「' + preview + '」');
   }
-  if(isDaily) lines.push('- 원장 재료(누구와·무엇을·몸 느낌)와 사진 장면을 topic·angle에 반영. 없는 일상·가르침을 만들지 말 것');
-  else if(hasNote) lines.push('- 참고 메모의 테크닉·관점·용어를 topic·angle에 반영');
+  if(isDaily){
+    lines.push(isThought
+      ? '- 원장의 생각 한 줄 뜻을 유지하고, 공감하게 풀어 쓸 topic·angle. 오늘 일기 장면으로 바꾸지 말 것'
+      : '- 원장 재료(누구와·무엇을·몸 느낌)와 사진 장면을 topic·angle에 반영. 없는 일상·가르침을 만들지 말 것');
+  } else if(hasNote) lines.push('- 참고 메모의 테크닉·관점·용어를 topic·angle에 반영');
   return '\n' + lines.join('\n');
 }
 
@@ -20390,7 +20481,9 @@ function appendDraftReferenceToPrompt_(prompt, draft, catId){
   if(isExpertCourseCategory(catId)){
     tail = '\n위 참고·영상·사진·주제·각도 **범위 안에서만** 작성하세요. **영상·사진에 보이는 시연과 일치하는** 테크닉·원리 설명만 쓰고, 무관하게 **확장·일반화·다른 부위·케이스로 넓히지 마세요**. 원리 설명(draft)이 본문의 중심이 되게 하세요.';
   } else if(isDailyShareCategory(catId)){
-    tail = '\n사진 분석·메모는 **구도 참고**입니다. 본문은 [원장이 그날 준 재료](누구와/무엇을/몸 느낌)를 따릅니다. 분석에만 있는 사람·감정·대화를 본문에 넣지 마세요.';
+    tail = isDailyThoughtDraft_(draft)
+      ? '\n본문은 [원장이 남긴 생각 한 줄]을 사람들이 공감하게 풀어 씁니다. 오늘 있었던 일처럼 꾸며 내지 마세요. 정답·가르침·CTA 금지.'
+      : '\n사진 분석·메모는 **구도 참고**입니다. 본문은 [원장이 그날 준 재료](누구와/무엇을/몸 느낌)를 따릅니다. 분석에만 있는 사람·감정·대화를 본문에 넣지 마세요.';
   } else if(userAdded){
     tail = '\n위 내용은 사용자가 「추가」에 입력한 **원문**입니다. 주제 「' + (draft.topic || '') + '」·각도 「' + (draft.angle || '') + '」도 이 입력에서 나온 것입니다.\n' +
       '**제목·후킹·목차·본문이 입력에서 크게 벗어나지 않게** 작성하세요. 입력에 없는 질환·부위·케이스·주장·소재를 새로 붙이지 말고, 표현만 읽기 쉽게 다듬으며 카테고리·PSP 흐름에 맞게 풀어쓰세요.';
@@ -20462,27 +20555,115 @@ async function analyzeSingleRefImageForMemo_(image, catId){
   if(!list.length) return '';
   var isDaily = isDailyShareCategory(catId);
   var isExpert = isExpertCourseCategory(catId);
-  var prompt = isDaily
-    ? '첨부 사진 1장을 보고 **눈에 보이는 것만** 짧게 적으세요. 사람 이름·감정·대화·관계는 추측하지 마세요. 본문은 원장이 적은 누구와/무엇을/몸 느낌이 담당합니다.\n\n[보이는 것]\n- 1~3개\n\n과장·진단·없는 사실 금지. 분석만 출력하세요.'
+  var thoughtMode = isDaily && isDailyThoughtNewItem_();
+  var prompt = thoughtMode
+    ? '첨부 사진 1장을 보고 **눈에 보이는 것만** 짧게 적으세요. 사람 이름·감정·대화는 추측하지 마세요. 오늘 있었던 일처럼 쓰지 마세요.\n\n[보이는 것]\n- 1~3개\n과장·진단·없는 사실 금지.'
+    : (isDaily
+    ? '첨부 사진 1장을 보고 **눈에 보이는 것만** 짧게 적으세요. 사람 이름·감정·대화·관계는 추측하지 마세요.\n\n[보이는 것]\n- 1~3개\n\n마지막에 JSON 한 줄만 추가하세요. 추측이면 빈 문자열.\n{"who":"보이는 사람(혼자/두 명 등. 이름 금지)","what":"무엇을 하는 장면 한 줄","body":"자세·몸에서 보이는 느낌. 없으면 빈 문자열"}\n과장·진단·없는 사실 금지.'
     : (isExpert
       ? '첨부 사진 1장을 보고 강의·실습 캡처 내용을 한국어로 분석하세요. 아래 형식을 지켜 짧고 읽기 쉽게 쓰고, 사진에 없는 내용을 추측하지 마세요.\n\n[사진에서 보이는 장면]\n- 1~3개\n\n[테크닉·손 위치]\n- 1~4개\n\n[핵심 포인트·주의사항]\n- 1~4개\n\n분석 내용만 출력하세요.'
-      : '첨부 사진 1장을 보고 참고 영상/사진 캡처를 한국어로 분석하세요. 아래 형식을 지켜 짧고 읽기 쉽게 쓰고, 사진에 없는 내용을 추측하지 마세요.\n\n[사진에서 보이는 장면]\n- 1~3개\n\n[자세·부위·동작]\n- 1~4개\n\n[글에 활용할 핵심 포인트]\n- 1~4개\n\n진단을 단정하지 말고 분석 내용만 출력하세요.');
+      : '첨부 사진 1장을 보고 참고 영상/사진 캡처를 한국어로 분석하세요. 아래 형식을 지켜 짧고 읽기 쉽게 쓰고, 사진에 없는 내용을 추측하지 마세요.\n\n[사진에서 보이는 장면]\n- 1~3개\n\n[자세·부위·동작]\n- 1~4개\n\n[글에 활용할 핵심 포인트]\n- 1~4개\n\n진단을 단정하지 말고 분석 내용만 출력하세요.'));
   var text = await callClaudePlanner_(prompt, { image: list, maxTokens: 900 });
   return String(text || '').trim();
 }
 
+function cleanDailyPhotoFact_(s){
+  s = String(s || '').trim();
+  if(!s) return '';
+  if(/^(없음|모름|불명|해당\s*없음|알\s*수\s*없음|-|없음\.)$/i.test(s)) return '';
+  return s;
+}
+function mergeDailyPhotoFacts_(into, facts){
+  if(!into || !facts) return into;
+  function joinField(cur, add){
+    add = cleanDailyPhotoFact_(add);
+    if(!add) return cur;
+    cur = String(cur || '').trim();
+    if(!cur) return add;
+    if(cur.indexOf(add) !== -1) return cur;
+    return cur + ' · ' + add;
+  }
+  into.who = joinField(into.who, facts.who);
+  into.what = joinField(into.what, facts.what);
+  into.body = joinField(into.body, facts.body);
+  return into;
+}
+function splitDailyPhotoAnalysis_(text){
+  var s = String(text || '').trim();
+  var facts = null;
+  var memo = s;
+  var fence = s.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i);
+  var jsonStr = '';
+  var cutAt = -1;
+  if(fence){
+    jsonStr = fence[1];
+    cutAt = s.indexOf(fence[0]);
+  } else {
+    var idx = s.lastIndexOf('{');
+    if(idx >= 0){
+      jsonStr = s.slice(idx);
+      var end = jsonStr.lastIndexOf('}');
+      if(end >= 0) jsonStr = jsonStr.slice(0, end + 1);
+      cutAt = idx;
+    }
+  }
+  if(jsonStr){
+    try {
+      var obj = JSON.parse(jsonStr);
+      if(obj && typeof obj === 'object' && (obj.who != null || obj.what != null || obj.body != null)){
+        facts = {
+          who: cleanDailyPhotoFact_(obj.who),
+          what: cleanDailyPhotoFact_(obj.what),
+          body: cleanDailyPhotoFact_(obj.body)
+        };
+        memo = cutAt >= 0 ? s.slice(0, cutAt).trim() : s;
+      }
+    } catch(eSplit){}
+  }
+  return { memo: memo, facts: facts };
+}
+function applyDailyFactsFromPhotoIfEmpty_(facts){
+  if(!facts || !state.newItem || !isDailyShareCategory(state.newItem.catId)) return false;
+  if(isDailyThoughtNewItem_()) return false;
+  var filled = false;
+  if(!String(state.newItem.dailyWho || '').trim() && facts.who){
+    state.newItem.dailyWho = facts.who;
+    filled = true;
+  }
+  if(!String(state.newItem.dailyWhat || '').trim() && facts.what){
+    state.newItem.dailyWhat = facts.what;
+    filled = true;
+  }
+  if(!String(state.newItem.dailyBody || '').trim() && facts.body){
+    state.newItem.dailyBody = facts.body;
+    filled = true;
+  }
+  return filled;
+}
 async function analyzeRefImagesForMemo_(images, catId, startIndex){
   var list = normalizeRefImages_(images);
-  if(!list.length) return '';
+  if(!list.length) return { text: '', dailyFacts: null };
   var start = parseInt(startIndex, 10);
   if(isNaN(start) || start < 0) start = 0;
+  var isDaily = isDailyShareCategory(catId);
   var parts = [];
+  var dailyFacts = { who: '', what: '', body: '' };
   for(var i = 0; i < list.length; i++){
     var label = koreanPhotoOrdinalLabel_(start + i + 1);
     var body = await analyzeSingleRefImageForMemo_(list[i], catId);
-    if(body) parts.push(label + '\n' + body);
+    if(!body) continue;
+    if(isDaily){
+      var split = splitDailyPhotoAnalysis_(body);
+      if(split.facts) mergeDailyPhotoFacts_(dailyFacts, split.facts);
+      if(split.memo) parts.push(label + '\n' + split.memo);
+    } else {
+      parts.push(label + '\n' + body);
+    }
   }
-  return parts.join('\n\n');
+  return {
+    text: parts.join('\n\n'),
+    dailyFacts: isDaily && (dailyFacts.who || dailyFacts.what || dailyFacts.body) ? dailyFacts : null
+  };
 }
 async function generateTopicFromKeywords_(catId, keywords, imagePayload, sourceNote, youtubeAnalysis){
   var cat = CATEGORIES[catId];
@@ -20493,7 +20674,9 @@ async function generateTopicFromKeywords_(catId, keywords, imagePayload, sourceN
   var imgNote = '';
   if(images.length){
     imgNote = isDaily
-      ? '\n[첨부 사진' + (images.length > 1 ? ' ' + images.length + '장' : '') + '] 구도 참고만. **원장이 준 누구와·무엇을·몸 느낌**이 topic·angle의 중심. 사진에서 새 사람·감정을 만들지 마세요.'
+      ? (isDailyThoughtNewItem_()
+        ? '\n[첨부 사진' + (images.length > 1 ? ' ' + images.length + '장' : '') + '] 분위기에만 참고. 오늘 일기 장면으로 쓰지 마세요.'
+        : '\n[첨부 사진' + (images.length > 1 ? ' ' + images.length + '장' : '') + '] 구도 참고만. **원장이 준 누구와·무엇을·몸 느낌**이 topic·angle의 중심. 사진에서 새 사람·감정을 만들지 마세요.')
       : '\n[첨부 참고 사진' + (images.length > 1 ? ' ' + images.length + '장' : '') + '] 사진에 보이는 자세·부위·상황을 topic·angle에 반영하세요.';
   }
   var noteBlock = '';
@@ -20508,9 +20691,13 @@ async function generateTopicFromKeywords_(catId, keywords, imagePayload, sourceN
     ? ('입력 (키워드·아이디어·문장): ' + keywords)
     : (isDaily && images.length ? '입력 (키워드·아이디어·문장): (없음 — 사진·메모만 참고)' : (sourceNote ? '입력 (키워드·아이디어·문장): (없음 — 참고 메모만)' : '입력 (키워드·아이디어·문장): '));
   var topicGuide = isDaily
-    ? ('일상 공유용 주제 1개. **원장이 준 누구와·무엇을·몸 느낌**을 중심으로 (다른 일상 소재로 바꾸지 마세요).\n' +
-       '- topic: 담백한 제목 한 줄 (15~32자, 질문 금지·장면). 재료의 사람·동작이 드러나게\n' +
-       '- angle: 다듬기 힌트 한 줄 — 가르침·CTA 없이. 몸 느낌이 있으면 그 한 줄만\n')
+    ? (isDailyThoughtNewItem_()
+      ? ('일상 공유 · **생각 한 줄** 주제 1개. 원문 뜻을 유지하고 사람들이 공감하게 풀어 쓸 제목.\n' +
+         '- topic: 원문의 핵심을 담은 평서 한 줄 (12~36자, 질문·낚시 금지)\n' +
+         '- angle: 어떻게 풀어 쓸지 한 줄 — 가르침·정답 없이, 일상 장면에 비추기\n')
+      : ('일상 공유용 주제 1개. **원장이 준 누구와·무엇을·몸 느낌**을 중심으로 (다른 일상 소재로 바꾸지 마세요).\n' +
+         '- topic: 담백한 제목 한 줄 (15~32자, 질문 금지·장면). 재료의 사람·동작이 드러나게\n' +
+         '- angle: 다듬기 힌트 한 줄 — 가르침·CTA 없이. 몸 느낌이 있으면 그 한 줄만\n'))
     : (isExpertCourseCategory(catId)
       ? ('전문가 과정 **강연·교육 영상·실습 공유**용 주제 1개.\n' +
          '- topic: ' + getExpertCourseTopicAudienceLine_(catId) + ' (15~40자, 과장·낚시 금지)\n' +
@@ -20520,7 +20707,7 @@ async function generateTopicFromKeywords_(catId, keywords, imagePayload, sourceN
       : ('입력한 키워드·아이디어·문장을 **중심 소재**로 블로그·SNS 주제 1개를 만드세요. 입력에서 벗어난 새 소재로 바꾸지 마세요.\n' +
          '- topic: 한국어 제목 한 줄 (15~36자, **호기심·궁금증을 자극하는 후킹**·질문형 권장). **입력 핵심 키워드가 드러나게**\n' +
          '- angle: 입력·메모의 관점·테크닉·메커니즘을 한 줄로 (입력에 없는 새 각도 금지)\n'));
-  var fidelityBlock = buildTopicGenFidelityBlock_(keywords, sourceNote, isDaily);
+  var fidelityBlock = buildTopicGenFidelityBlock_(keywords, sourceNote, isDaily, isDailyThoughtNewItem_());
   var identityBlock = buildProgramIdentityPromptBlock_(catId);
   var prompt =
 '당신은 "브랜딩 플래너"입니다.\n' +
@@ -20553,11 +20740,15 @@ async function generateArticleFlowProposals_(catId, keywords, imagePayload, sour
   var imgNote = '';
   if(hasPhotoAnalysis && images.length){
     imgNote = isDaily
-      ? '\n[첨부 사진] ' + images.length + '장 — 바이너리는 생략. 사진 메모는 구도 참고. 제목·흐름은 누구와/무엇을/몸 느낌을 따릅니다.'
+      ? (isDailyThoughtNewItem_()
+        ? '\n[첨부 사진] ' + images.length + '장 — 바이너리는 생략. 분위기에만 참고. 오늘 일기 장면으로 쓰지 마세요.'
+        : '\n[첨부 사진] ' + images.length + '장 — 바이너리는 생략. 사진 메모는 구도 참고. 제목·흐름은 누구와/무엇을/몸 느낌을 따릅니다.')
       : '\n[첨부 사진] ' + images.length + '장 — 바이너리는 생략. 아래 사진 분석·메모를 기준으로 반영하세요.';
   } else if(images.length){
     imgNote = isDaily
-      ? '\n[첨부 사진' + (images.length > 1 ? ' ' + images.length + '장' : '') + '] 구도 참고만. 원장 재료에 없는 사람·감정을 만들지 마세요.'
+      ? (isDailyThoughtNewItem_()
+        ? '\n[첨부 사진' + (images.length > 1 ? ' ' + images.length + '장' : '') + '] 분위기에만 참고. 오늘 있었던 일처럼 꾸며 내지 마세요.'
+        : '\n[첨부 사진' + (images.length > 1 ? ' ' + images.length + '장' : '') + '] 구도 참고만. 원장 재료에 없는 사람·감정을 만들지 마세요.')
       : '\n[첨부 참고 사진' + (images.length > 1 ? ' ' + images.length + '장' : '') + '] 사진에 보이는 자세·부위·상황을 각 제안에 반영하세요.';
   }
   var noteBlock = '';
@@ -20572,9 +20763,13 @@ async function generateArticleFlowProposals_(catId, keywords, imagePayload, sour
     ? ('입력 (키워드·아이디어·문장): ' + keywords)
     : (images.length || memoOnly ? '입력 (키워드·아이디어·문장): (없음 — 사진·메모만 참고)' : '입력: ');
   var flowStructureGuide = isDaily
-    ? ('각 제안은 **일상 공유(개인 계정)** 용입니다. steps는 반드시 3단계:\n' +
-       '  ① 누구와 무엇을 했는지 한 줄  ② 오늘 몸 느낌 한 가지  ③ 담백한 마무리(가르침·CTA 없이)\n' +
-       '원장 재료에 없는 사람·감정·동작을 만들지 마세요. 셀프 케어·루틴 제안 금지.')
+    ? (isDailyThoughtNewItem_()
+      ? ('각 제안은 **일상 공유 · 생각 한 줄** 용입니다. steps는 반드시 3단계:\n' +
+         '  ① 원문 한 줄을 누구나 겪을 법한 순간에 비추기  ② 왜 그게 와닿는지 한 가지  ③ 판단·가르침 없이 여운만\n' +
+         '오늘 실제로 일어난 일처럼 꾸며 내지 마세요. 「이런 때 있잖아요」 수준의 일반 장면만. 정답·CTA·의료 해설 금지.')
+      : ('각 제안은 **일상 공유(개인 계정)** 용입니다. steps는 반드시 3단계:\n' +
+         '  ① 누구와 무엇을 했는지 한 줄  ② 오늘 몸 느낌 한 가지  ③ 담백한 마무리(가르침·CTA 없이)\n' +
+         '원장 재료에 없는 사람·감정·동작을 만들지 마세요. 셀프 케어·루틴 제안 금지.'))
     : (isExpert
       ? ('각 제안은 **전문가 동료 공유**용입니다. (' + getExpertCourseTopicAudienceLine_(catId) + ')\n' +
          'steps는 반드시 3단계:\n' +
@@ -20591,7 +20786,7 @@ async function generateArticleFlowProposals_(catId, keywords, imagePayload, sour
       return (i + 1) + ') ' + f.title + ' / ' + f.angle;
     }).join('\n') + '\n위와 **겹치지 않는** 새 각도 3가지를 제안하세요.';
   }
-  var fidelityBlock = buildTopicGenFidelityBlock_(keywords, memoOnly, isDaily);
+  var fidelityBlock = buildTopicGenFidelityBlock_(keywords, memoOnly, isDaily, isDailyThoughtNewItem_());
   var identityBlock = buildProgramIdentityPromptBlock_(catId);
   var promptGuides = buildFlowProposalPromptGuides_(catId);
   var prompt =
@@ -20715,7 +20910,12 @@ window.regenerateFlowProposals = async function(){
     return;
   }
   if(!newItemHasFlowSource_()){
-    if(typeof setAppToast === 'function') setAppToast('키워드·아이디어, 참고 메모 또는 사진을 먼저 추가해 주세요.', { duration: 3500, variant: 'err' });
+    var emptyMsg = isDailyThoughtNewItem_()
+      ? '떠오른 한 줄을 먼저 적어 주세요.'
+      : (isDailyShareCategory(state.newItem.catId)
+        ? '누구와·무엇을·몸 느낌을 적거나 사진을 올려 주세요.'
+        : '키워드·아이디어, 참고 메모 또는 사진을 먼저 추가해 주세요.');
+    if(typeof setAppToast === 'function') setAppToast(emptyMsg, { duration: 3500, variant: 'err' });
     return;
   }
   if(!isPlannerAiAvailable_()){ openApiModal(); return; }
@@ -20846,6 +21046,7 @@ window.onNewItemImage = async function(input){
   }
   var startIndex = existingImages.length;
   var analysisOk = false;
+  var filledDailyFacts = false;
   var imgEstSec = REF_IMAGE_ANALYSIS_PREP_SEC + (files.length * REF_IMAGE_ANALYSIS_ESTIMATE_SEC_PER);
   state.newItem.imageAnalysisWait = {
     startedAt: Date.now(),
@@ -20886,12 +21087,15 @@ window.onNewItemImage = async function(input){
           { duration: 3200, variant: 'ok' }
         );
       }
-      var analysis = await analyzeRefImagesForMemo_(newImages, state.newItem.catId, startIndex);
+      var analysisPack = await analyzeRefImagesForMemo_(newImages, state.newItem.catId, startIndex);
+      var analysis = analysisPack && typeof analysisPack === 'object' ? String(analysisPack.text || '') : String(analysisPack || '');
       var prevMemo = String(state.newItem.refNote || '').trim();
       if(analysis){
         state.newItem.refNote = prevMemo ? (prevMemo + '\n\n' + analysis) : analysis;
       }
+      var filledDaily = applyDailyFactsFromPhotoIfEmpty_(analysisPack && analysisPack.dailyFacts);
       analysisOk = true;
+      filledDailyFacts = !!filledDaily;
     } else {
       if(typeof setAppToast === 'function') setAppToast('사진은 저장됐어요. AI 메모 자동 작성은 API 키 설정 후 다시 선택해 주세요.', { duration: 5200, variant: 'err' });
       else openApiModal();
@@ -20910,7 +21114,12 @@ window.onNewItemImage = async function(input){
     if(input) input.value = '';
     renderMain();
     if(analysisOk && typeof setAppToast === 'function'){
-      setAppToast('사진 분석을 정리했어요. 내용을 확인한 뒤 「글의 흐름 만들기」를 눌러 주세요.', { duration: 5200, variant: 'ok' });
+      setAppToast(
+        filledDailyFacts
+          ? '사진에서 누구와·무엇을·몸 느낌을 채웠어요. 확인하고 「글의 흐름 만들기」를 눌러 주세요.'
+          : '사진 분석을 정리했어요. 내용을 확인한 뒤 「글의 흐름 만들기」를 눌러 주세요.',
+        { duration: 5200, variant: 'ok' }
+      );
     }
   }
 };
@@ -20924,7 +21133,7 @@ function invalidateNewItemFlowsFromInput_(){
     var activeId = null;
     var sel = null;
     var ae = document.activeElement;
-    if(ae && (ae.id === 'new-item-topic-input' || ae.id === 'new-item-ref-note-input')){
+    if(ae && (ae.id === 'new-item-topic-input' || ae.id === 'new-item-ref-note-input' || ae.id === 'new-item-daily-thought')){
       activeId = ae.id;
       try { sel = ae.selectionStart; } catch(e0){}
     }
@@ -20947,11 +21156,32 @@ window.onNewItemTopicInput_ = function(el){
 };
 window.onNewItemDailyField_ = function(field, el){
   if(!state.newItem) return;
-  if(field === 'dailyWho' || field === 'dailyWhat' || field === 'dailyBody'){
+  if(field === 'dailyWho' || field === 'dailyWhat' || field === 'dailyBody' || field === 'dailyThought'){
     state.newItem[field] = el ? el.value : '';
     invalidateNewItemFlowsFromInput_();
   }
 };
+window.setNewDailyShareKind_ = function(kind){
+  if(!state.newItem) return;
+  var next = kind === 'thought' ? 'thought' : 'scene';
+  if(state.newItem.dailyShareKind === next) return;
+  state.newItem.dailyShareKind = next;
+  resetNewItemFlowProposals_();
+  renderMain();
+  if(next === 'thought'){
+    var ta = document.getElementById('new-item-daily-thought');
+    if(ta){
+      try { ta.focus(); } catch(eF){}
+      if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(ta);
+    }
+  }
+};
+function dailyKindToggleHtml_(isThought, onclickName){
+  return '<div class="daily-kind-toggle" role="tablist" aria-label="일상 글 종류">' +
+    '<button type="button" class="daily-kind-btn' + (!isThought ? ' is-active' : '') + '" role="tab" aria-selected="' + (!isThought) + '" onclick="' + onclickName + '(\'scene\')">그날의 장면</button>' +
+    '<button type="button" class="daily-kind-btn' + (isThought ? ' is-active' : '') + '" role="tab" aria-selected="' + (!!isThought) + '" onclick="' + onclickName + '(\'thought\')">생각 한 줄</button>' +
+  '</div>';
+}
 window.onNewItemRefNoteInput_ = function(el){
   state.newItem.refNote = el ? el.value : '';
   invalidateNewItemFlowsFromInput_();
@@ -20965,13 +21195,17 @@ function renderAddFormFlowSectionHTML_(){
   var isDaily = isDailyShareCategory(state.newItem.catId);
   var isExpert = isExpertCourseCategory(state.newItem.catId);
   var stepHint = isDaily
-    ? '① 누구와·무엇을  ② 몸 느낌  ③ 다듬기만'
+    ? (isDailyThoughtNewItem_()
+      ? '① 한 줄을 일상에 비추기  ② 왜 와닿는지  ③ 판단 없이 여운'
+      : '① 누구와·무엇을  ② 몸 느낌  ③ 다듬기만')
     : (isExpert ? '① 영상·사진 맥락 ② 시연 포인트 ③ 원리 설명' : '① 문제 제기 ② 셀프 케어 ③ 원리 설명');
   var header = '<div class="add-flow-header"><div class="form-label" style="margin-bottom:0;">글 흐름 제안 (3가지)</div>' +
     '<span style="font-size:11px;color:#9CA3AF;">' + stepHint + '</span></div>';
   if(loading){
     return '<div class="add-flow-section">' + header +
-      '<div class="add-flow-loading">사진·영상·메모를 보고 글 흐름 3가지를 제안하고 있어요…</div></div>';
+      '<div class="add-flow-loading">' + (isDailyThoughtNewItem_()
+        ? '생각 한 줄을 보고 글 흐름 3가지를 제안하고 있어요…'
+        : '사진·영상·메모를 보고 글 흐름 3가지를 제안하고 있어요…') + '</div></div>';
   }
   if(!ready) return '';
   var cards = flows.map(function(flow, i){
@@ -20986,7 +21220,9 @@ function renderAddFormFlowSectionHTML_(){
       '</div></div></label>';
   }).join('');
   return '<div class="add-flow-section">' + header +
-    '<p class="add-flow-guide">하나를 고르고 제목·부제·전개 순서를 수정할 수 있어요. 참고영상 메모·키워드 아이디어·카테고리 컨셉을 함께 반영한 흐름입니다.</p>' +
+    '<p class="add-flow-guide">' + (isDailyThoughtNewItem_()
+      ? '하나를 고르고 제목·부제·전개 순서를 수정할 수 있어요. 원문 뜻을 유지한 채 공감하게 푸는 흐름입니다.'
+      : '하나를 고르고 제목·부제·전개 순서를 수정할 수 있어요. 참고영상 메모·키워드 아이디어·카테고리 컨셉을 함께 반영한 흐름입니다.') + '</p>' +
     cards + '</div>';
 }
 
@@ -20994,6 +21230,7 @@ function renderAddForm(){
   const catId = state.newItem.catId;
   const cat = CATEGORIES[catId] || CATEGORIES[0];
   const isDaily = isDailyShareCategory(state.newItem.catId);
+  const isThought = isDaily && isDailyThoughtNewItem_();
   const isExpert = isExpertCourseCategory(state.newItem.catId);
   const hasPhoto = newItemHasRefImages_();
   const analyzing = !!state.newItem.imageAnalyzing;
@@ -21007,17 +21244,21 @@ function renderAddForm(){
   const imgAnalyzingCount = (imgWait && imgWait.count) ? imgWait.count : (imgNames.length || 1);
   const imgHint = analyzing
     ? '<span id="new-item-img-analysis-hint" style="font-size:11px;color:#D97706;">사진 ' + imgAnalyzingCount + '장 분석 중… <strong id="new-item-img-analysis-cd">' +
-      escapeHtml(formatCountdownLong_(imgLeftSec)) + '</strong> · 참고 메모에 순서대로 채워집니다.</span>'
+      escapeHtml(formatCountdownLong_(imgLeftSec)) + '</strong>' + (isThought ? ' · 분위기에만 참고합니다.' : (isDaily ? ' · 누구와·무엇을·몸 느낌을 채웁니다.' : ' · 참고 메모에 순서대로 채워집니다.')) + '</span>'
     : (hasPhoto
-      ? '<span style="font-size:11px;color:#0F766E;">참고 사진 ' + imgNames.length + '장: ' + escapeHtml(imgNames.join(', ')) + ' — 추가로 고르면 기존 분석 아래에 이어 붙여요' + (isDaily ? ' · 담백·관찰 톤' : '') + '</span>'
-      : (isDaily
-        ? '<span style="font-size:11px;color:#9CA3AF;">여러 장·추가 첨부 가능. 장마다 「첫 번째 사진」… 순으로 메모에 쌓여요.</span>'
-        : '<span style="font-size:11px;color:#9CA3AF;">여러 장·추가 첨부 가능 · 최대 12MB(자동 압축). 장마다 순서대로 메모에 쌓여요.</span>'));
-  const addIntro = isDaily
-    ? '미카닥 <strong>개인 계정</strong>용입니다. <strong>누구와 · 무엇을 · 오늘 몸 느낌</strong>을 적으면 AI는 그 문장만 다듬습니다. 사진은 원본을 이미지 탭에서 4:5로만 맞춥니다.'
+      ? '<span style="font-size:11px;color:#0F766E;">참고 사진 ' + imgNames.length + '장: ' + escapeHtml(imgNames.join(', ')) + ' — 추가로 고르면 기존 분석 아래에 이어 붙여요' + (isThought ? ' · 오늘 일기처럼 쓰지 않습니다' : (isDaily ? ' · 빈 칸만 사진으로 채웁니다' : '')) + '</span>'
+      : (isThought
+        ? '<span style="font-size:11px;color:#9CA3AF;">선택. 분위기에만 쓰고, 오늘 있었던 일처럼 쓰지 않습니다.</span>'
+        : (isDaily
+        ? '<span style="font-size:11px;color:#9CA3AF;">여러 장 가능. 올리면 아래 누구와·무엇을·몸 느낌을 사진에서 채웁니다.</span>'
+        : '<span style="font-size:11px;color:#9CA3AF;">여러 장·추가 첨부 가능 · 최대 12MB(자동 압축). 장마다 순서대로 메모에 쌓여요.</span>')));
+  const addIntro = isThought
+    ? '떠오른 <strong>한 줄</strong>을 적으면, 사람들이 「내 얘기네」 하게 풀어 초안을 만듭니다. 오늘 있었던 일처럼 꾸며 내지 않고, 정답·가르침으로 바꾸지 않습니다.'
+    : (isDaily
+    ? '미카닥 <strong>개인 계정</strong>용입니다. <strong>사진을 올리면 누구와 · 무엇을 · 몸 느낌을 채웁니다.</strong> 직접 적어도 되고, 이번 달 주제만 여러 개 받으려면 아래 주제 추천을 쓰세요. 글은 그 재료만 다듬습니다.'
     : (isExpert
       ? '교육·강의 때 촬영한 <strong>영상 링크</strong> 또는 <strong>실습·시연 사진</strong>을 올리고, 그 내용에 맞춰 동료에게 공유할 주제를 만듭니다. 글은 영상·사진·메모 범위 안에서만 쓰여요.'
-      : '추가한 주제는 <strong>선택한 카테고리 탭</strong>의 <strong>「기타 주제」</strong> 그룹에 카드로 생깁니다. (하위 목표가 없는 탭은 전체 목록 맨 아래)');
+      : '추가한 주제는 <strong>선택한 카테고리 탭</strong>의 <strong>「기타 주제」</strong> 그룹에 카드로 생깁니다. (하위 목표가 없는 탭은 전체 목록 맨 아래)'));
   const kwLabel = isExpert ? '테크닉 · 개념' : '키워드 · 아이디어';
   const kwPlaceholder = isExpert
       ? '예: 어깨 관절 가동술 — 강의에서 시연한 접근'
@@ -21025,30 +21266,40 @@ function renderAddForm(){
   const kwHint = isExpert
       ? '다룰 <strong>테크닉/개념</strong>을 한 줄로. 핵심 포인트·시연 내용은 아래 메모에 — <strong>영상·강의에서 말한 것만</strong> 적어 주세요.'
       : '적은 키워드·문장도 <strong>입력한 내용에서 크게 벗어나지 않고</strong> 주제·초안을 만듭니다.';
-  const dailyFactsHtml = isDaily
+  const dailyKindHtml = isDaily ? dailyKindToggleHtml_(isThought, 'setNewDailyShareKind_') : '';
+  const dailyFactsHtml = isThought
+    ? ('<div class="form-field"><label class="form-label">생각 한 줄</label>' +
+      '<textarea id="new-item-daily-thought" class="form-input form-textarea" rows="4" oninput="onNewItemDailyField_(\'dailyThought\', this);autoGrowTextarea_(this)" placeholder="예: 세상은 단순한데 복잡하게 보려는 사람이 많다.">' +
+      escapeHtml(state.newItem.dailyThought || '') + '</textarea>' +
+      '<div style="font-size:11px;color:#9CA3AF;margin-top:4px;">뜻을 유지한 채 누구나 겪을 법한 순간에 비춥니다. 어떤 성향이 옳다고 가르지 않습니다.</div></div>')
+    : (isDaily
     ? ('<div class="form-field"><label class="form-label">누구와</label>' +
-      '<input type="text" class="form-input" value="' + escapeHtml(state.newItem.dailyWho || '') + '" oninput="onNewItemDailyField_(\'dailyWho\', this)" placeholder="예: 이유주, 혼자, 입주민 분">' +
+      '<input type="text" class="form-input" value="' + escapeHtml(state.newItem.dailyWho || '') + '" oninput="onNewItemDailyField_(\'dailyWho\', this)" placeholder="예: 혼자, 가족과, 입주민 분">' +
       '</div>' +
       '<div class="form-field"><label class="form-label">무엇을</label>' +
       '<textarea class="form-input form-textarea" rows="2" oninput="onNewItemDailyField_(\'dailyWhat\', this)" placeholder="예: 폼롤러로 옆구리 풀었다, 매트에 누워 쉬었다">' + escapeHtml(state.newItem.dailyWhat || '') + '</textarea>' +
       '</div>' +
       '<div class="form-field"><label class="form-label">오늘 몸 느낌</label>' +
       '<textarea class="form-input form-textarea" rows="2" oninput="onNewItemDailyField_(\'dailyBody\', this)" placeholder="예: 나도 이쪽이 굳더라">' + escapeHtml(state.newItem.dailyBody || '') + '</textarea>' +
-      '<div style="font-size:11px;color:#9CA3AF;margin-top:4px;">세 칸이 본문 재료입니다. 비우면 사진만으로도 만들 수 있어요. 없는 이야기는 만들지 않습니다.</div></div>')
+      '<div style="font-size:11px;color:#9CA3AF;margin-top:4px;">세 칸이 본문 재료입니다. 사진으로 채운 뒤 고칠 수 있어요. 없는 이야기는 만들지 않습니다.</div></div>')
     : ('<div class="form-field"><label class="form-label">' + kwLabel + '</label>' +
       '<textarea id="new-item-topic-input" class="form-input form-textarea" rows="6" oninput="onNewItemTopicInput_(this)" placeholder="' + kwPlaceholder + '">' + escapeHtml(state.newItem.topic) + '</textarea>' +
-      '<div style="font-size:11px;color:#9CA3AF;margin-top:4px;">' + kwHint + '</div></div>');
-  const refNoteLabel = hasPhoto ? '사진 분석 내용 · 참고 메모' : (isDaily ? '참고 메모 (선택)' : (isExpert ? '핵심 포인트 · 영상 메모' : '참고 영상 · 메모 (선택)'));
-  const refNotePlaceholder = isDaily
+      '<div style="font-size:11px;color:#9CA3AF;margin-top:4px;">' + kwHint + '</div></div>'));
+  const refNoteLabel = hasPhoto ? '사진 분석 내용 · 참고 메모' : (isThought ? '풀어 쓸 장면 (선택)' : (isDaily ? '참고 메모 (선택)' : (isExpert ? '핵심 포인트 · 영상 메모' : '참고 영상 · 메모 (선택)')));
+  const refNotePlaceholder = isThought
+    ? '이런 때 있잖아요 — 정도의 일반 장면만. 오늘 일어난 일처럼 적지 마세요.'
+    : (isDaily
     ? '사진에 대한 짧은 메모만. 가르침·루틴은 적지 마세요.'
     : (isExpert
       ? '핵심 포인트 1~3개, 영상 링크, 시연 타임스탬프, 평가·동작 요령…'
-      : '영상 링크, 테크닉 이름, 동작 요령, 타임스탬프(예: 2:30~), 자막·핵심 메모…');
-  const refNoteHint = isDaily
-    ? '세 칸이 우선입니다. 메모는 사진 분석·보완용입니다.'
+      : '영상 링크, 테크닉 이름, 동작 요령, 타임스탬프(예: 2:30~), 자막·핵심 메모…'));
+  const refNoteHint = isThought
+    ? '한 줄을 비출 일상 장면이 있으면 적어요. 없어도 초안은 만들어집니다.'
+    : (isDaily
+    ? '사진은 위 세 칸을 채우고, 이 메모는 장면 보완용입니다.'
     : (isExpert
       ? '공개 <strong>유튜브 URL</strong>이 있으면 서버(Gemini)가 영상을 분석해요. GAS 스크립트 속성 <code style="font-size:10px;">GEMINI_API_KEY</code> 필요. 비공개 영상은 자막·메모를 붙여 주세요.'
-      : '공개 유튜브 URL → 서버(Gemini) 분석. 그 외는 <strong>링크·메모</strong>가 초안까지 전달돼요.');
+      : '공개 유튜브 URL → 서버(Gemini) 분석. 그 외는 <strong>링크·메모</strong>가 초안까지 전달돼요.'));
   const flowsReady = !!state.newItem.flowProposalsReady && (state.newItem.flowProposals || []).length > 0;
   const flowLoading = !!state.newItem.flowProposalsLoading;
   const btnLabel = analyzing
@@ -21060,6 +21311,27 @@ function renderAddForm(){
     ? '<button type="button" class="btn-flow-regen" onclick="regenerateFlowProposals()" ' + (analyzing || flowLoading ? 'disabled' : '') + '>흐름 다시 제안</button>'
     : '';
   const actionButtonHtml = '<button type="button" class="btn-submit" id="btn-add-draft-submit" onclick="runNewItemFlowAction()" ' + (submitDisabled ? 'disabled' : '') + '>' + btnLabel + '</button>';
+  const photoFieldHtml = '<div class="form-field">' +
+    '<label class="form-label">참고 사진' + (isThought ? ' (선택)' : (isDaily ? ' (올리면 아래 칸을 채움 · 원본 4:5)' : ' (선택)')) + '</label>' +
+    '<input class="form-input" type="file" accept="image/*" multiple onchange="onNewItemImage(this)" style="padding:8px;" />' +
+    '<div style="margin-top:4px;">' + imgHint + '</div>' +
+  '</div>';
+  var dailySuggestHtml = '';
+  if(isDaily){
+    var sugMonth = getCurrentShareMonthKey_();
+    var sugBusy = !!(state.dailyTopicSuggestions && state.dailyTopicSuggestions.loading);
+    dailySuggestHtml = '<div class="form-field daily-add-suggest-block">' +
+      '<label class="form-label">이번 달 주제 여러 개</label>' +
+      '<p class="daily-add-suggest-hint">' + (isThought
+        ? '한 줄이 있으면 그 방향으로, 없으면 이번 달 테마로 생각·철학 주제를 제안합니다.'
+        : '사진·재료가 있으면 그 장면으로, 없으면 목록의 이번 달 방향·테마로 6~8개를 제안합니다.') + '</p>' +
+      '<button type="button" class="modal-btn ws-btn-ai daily-suggest-btn' + (sugBusy || analyzing ? ' is-disabled' : '') + '" data-daily-suggest-btn="' + escapeHtml(sugMonth) + '"' +
+        (sugBusy || analyzing ? ' disabled' : '') +
+        ' onclick="suggestDailyShareTopicsForMonth_(\'' + escapeHtml(sugMonth) + '\')">' +
+        escapeHtml(formatShareMonthLabel_(sugMonth)) + ' 주제 추천</button>' +
+      (state.dailyTopicSuggestions && state.dailyTopicSuggestions.monthKey ? renderDailyTopicSuggestHTML_(state.dailyTopicSuggestions.monthKey) : '') +
+    '</div>';
+  }
   return `<div class="add-form-layout"><div class="add-form">
     <div class="form-title">새 주제 추가</div>
     <p style="font-size:12px;color:#6B7280;line-height:1.55;margin-bottom:12px;">${addIntro}</p>
@@ -21068,17 +21340,16 @@ function renderAddForm(){
       <select class="form-select" onchange="setNewCat(this.value)">${catOpts}</select>
       <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">독자: <strong>${getProgramAudienceLine_(catId)}</strong> (카테고리에 맞게 자동)</div>
     </div>
+    ${dailyKindHtml}
+    ${isDaily && !isThought ? photoFieldHtml : ''}
     ${dailyFactsHtml}
     <div class="form-field">
       <label class="form-label">${refNoteLabel}</label>
       <textarea id="new-item-ref-note-input" class="form-input form-textarea${hasPhoto ? ' image-analysis-textarea' : ''}" rows="${hasPhoto ? '9' : '5'}" oninput="onNewItemRefNoteInput_(this)" placeholder="${refNotePlaceholder}" ${analyzing ? 'disabled' : ''}>${escapeHtml(state.newItem.refNote || '')}</textarea>
-      <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">${refNoteHint} 사진 선택 시 AI 분석이 「첫 번째 사진」… 순으로 쌓이며, 직접 수정할 수 있어요.</div>
+      <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">${refNoteHint}${hasPhoto ? ' 사진 선택 시 AI 분석이 「첫 번째 사진」… 순으로 쌓이며, 직접 수정할 수 있어요.' : ''}</div>
     </div>
-    <div class="form-field">
-      <label class="form-label">참고 사진${isDaily ? ' (원본 · 이미지 탭에서 4:5)' : ' (선택)'}</label>
-      <input class="form-input" type="file" accept="image/*" multiple onchange="onNewItemImage(this)" style="padding:8px;" />
-      <div style="margin-top:4px;">${imgHint}</div>
-    </div>
+    ${!isDaily || isThought ? photoFieldHtml : ''}
+    ${dailySuggestHtml}
     ${flowsReady ? '' : actionButtonHtml}
   </div>
   ${flowSectionHtml ? `<div class="add-flow-outside">${flowSectionHtml}${regenBtnHtml}${flowsReady ? actionButtonHtml : ''}</div>` : ''}
@@ -21123,13 +21394,16 @@ function scrollTextareaCaretIntoView_(ta){
   }
 }
 function bindNewItemTopicInput_(){
-  var el = document.getElementById('new-item-topic-input');
-  if(!el || el._caretScrollBound) return;
-  el._caretScrollBound = true;
-  var sync = function(){ scrollTextareaCaretIntoView_(el); };
-  ['keyup','select','input'].forEach(function(ev){
-    el.addEventListener(ev, function(){
-      requestAnimationFrame(function(){ requestAnimationFrame(sync); });
+  ['new-item-topic-input', 'new-item-daily-thought'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el || el._caretScrollBound) return;
+    el._caretScrollBound = true;
+    if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(el);
+    var sync = function(){ scrollTextareaCaretIntoView_(el); };
+    ['keyup','select','input'].forEach(function(ev){
+      el.addEventListener(ev, function(){
+        requestAnimationFrame(function(){ requestAnimationFrame(sync); });
+      });
     });
   });
 }
@@ -21187,6 +21461,7 @@ window.addDraft = async function(){
     return;
   }
   var isDaily = isDailyShareCategory(state.newItem.catId);
+  var isThought = isDaily && isDailyThoughtNewItem_();
   var keywords = isDaily ? getDailyNewItemKeywords_() : (state.newItem.topic || '').trim();
   var refNote = (state.newItem.refNote || '').trim();
   var sourceNote = buildDraftSourceNote_(keywords, refNote);
@@ -21194,7 +21469,13 @@ window.addDraft = async function(){
   var hasMedia = newItemHasMediaSource_();
   var selectedFlow = getSelectedNewItemFlow_();
   var hasFlow = !!state.newItem.flowProposalsReady && !!selectedFlow;
-  if(!sourceNote && !(isDaily && hasPhoto)){
+  if(isThought){
+    if(!getDailyThoughtText_(state.newItem)){
+      if(typeof setAppToast === 'function') setAppToast('떠오른 한 줄을 적어 주세요.', { duration: 3500, variant: 'err' });
+      else alert('생각 한 줄을 적어 주세요');
+      return;
+    }
+  } else if(!sourceNote && !(isDaily && hasPhoto)){
     if(typeof setAppToast === 'function') setAppToast(isDaily ? '누구와·무엇을·몸 느낌을 적거나 사진을 올려 주세요.' : '키워드 또는 참고 메모를 입력해 주세요.', { duration: 3500, variant: 'err' });
     else alert(isDaily ? '재료 세 칸 또는 사진이 필요합니다' : '키워드 또는 참고 메모를 입력해주세요');
     return;
@@ -21270,6 +21551,8 @@ window.addDraft = async function(){
     assignUserAddedDraftToMisc_(draft, state.newItem.catId);
     if(sourceNote) draft.sourceNote = sourceNote;
     if(isDaily){
+      draft.dailyShareKind = isThought ? 'thought' : 'scene';
+      draft.dailyThought = getDailyThoughtText_(state.newItem);
       draft.dailyWho = String(state.newItem.dailyWho || '').trim();
       draft.dailyWhat = String(state.newItem.dailyWhat || '').trim();
       draft.dailyBody = String(state.newItem.dailyBody || '').trim();
@@ -25717,7 +26000,9 @@ function buildDraftReferencePreviewHTML_(draft, opts){
 
 function renderSheetEmpty(draft, cat) {
   const genLine = isDailyShareCategory(cat.id)
-    ? 'AI가 <strong>누구와 · 무엇을 · 오늘 몸 느낌</strong>만 다듬어<br><strong>한 줄 + 3~7문장</strong> 일기를 씁니다. 사진은 이미지 탭에서 4:5로만 맞춥니다.'
+    ? (isDailyThoughtDraft_(draft)
+      ? 'AI가 원장의 <strong>생각 한 줄</strong>을 사람들이 「내 얘기네」 하게<br><strong>한 줄 + 3~7문장</strong>으로 풀어 씁니다. 오늘 일기처럼 꾸며 내지 않습니다.'
+      : 'AI가 <strong>누구와 · 무엇을 · 오늘 몸 느낌</strong>만 다듬어<br><strong>한 줄 + 3~7문장</strong> 일기를 씁니다. 사진은 이미지 탭에서 4:5로만 맞춥니다.')
     : isHeiljagyaeCategory(cat.id)
     ? 'AI가 <strong>아파트너 게시판 글</strong>을 만들어드려요'
     : isGeneralAudienceCategory(cat.id)
@@ -27664,25 +27949,66 @@ function persistSheetDailyFactsToDraft_(){
   var cat = CATEGORIES[state.selectedCatId];
   var draft = cat && Array.isArray(cat.drafts) ? cat.drafts.find(function(d){ return d && d.id === state.selectedId; }) : null;
   if(!draft) return;
+  var thoughtEl = document.getElementById('sheet-daily-thought');
+  if(thoughtEl){
+    draft.dailyShareKind = 'thought';
+    draft.dailyThought = String(thoughtEl.value || '').trim();
+    return;
+  }
   var whoEl = document.getElementById('sheet-daily-who');
   var whatEl = document.getElementById('sheet-daily-what');
   var feelEl = document.getElementById('sheet-daily-body');
+  if(whoEl || whatEl || feelEl) draft.dailyShareKind = 'scene';
   if(whoEl) draft.dailyWho = String(whoEl.value || '').trim();
   if(whatEl) draft.dailyWhat = String(whatEl.value || '').trim();
   if(feelEl) draft.dailyBody = String(feelEl.value || '').trim();
 }
 
 window.onSheetDailyFact_ = function(field){
-  if(field !== 'dailyWho' && field !== 'dailyWhat' && field !== 'dailyBody') return;
+  if(field !== 'dailyWho' && field !== 'dailyWhat' && field !== 'dailyBody' && field !== 'dailyThought') return;
   persistSheetDailyFactsToDraft_();
+};
+
+window.setSheetDailyShareKind_ = function(kind){
+  var cat = CATEGORIES[state.selectedCatId];
+  var draft = cat && Array.isArray(cat.drafts) ? cat.drafts.find(function(d){ return d && d.id === state.selectedId; }) : null;
+  if(!draft) return;
+  var content = getDraftContent_(state.selectedId);
+  if(content && state.activeTab === 'thread'){
+    applySheetThreadEdits_(content);
+    persistDraftContent_(state.selectedId, content);
+  } else {
+    persistSheetDailyFactsToDraft_();
+  }
+  var next = kind === 'thought' ? 'thought' : 'scene';
+  if(draft.dailyShareKind === next) return;
+  draft.dailyShareKind = next;
+  if(next === 'thought' && !getDailyThoughtText_(draft)){
+    draft.dailyThought = String(draft.topic || '').trim();
+  }
+  save({ skipDriveUpload: true, skipGasPush: true });
+  if(content) renderSheetContent(content);
+  else renderSheetEmpty(draft, cat);
+  renderMain();
 };
 
 function renderDailyDiaryFactsSheetHtml_(draft){
   if(!draft || !isDailyShareCategory(state.selectedCatId)) return '';
+  var thought = isDailyThoughtDraft_(draft);
+  var toggle = dailyKindToggleHtml_(thought, 'setSheetDailyShareKind_');
+  if(thought){
+    return '<div class="sheet-add-source-preview" style="margin-bottom:12px;padding:12px 14px;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:10px;">' +
+      toggle +
+      '<div style="font-size:10px;font-weight:700;color:#6D28D9;letter-spacing:.6px;margin-bottom:8px;">생각 한 줄 · 재생성 때 이 뜻을 유지하고 공감하게 풀어 씁니다</div>' +
+      '<textarea class="form-input form-textarea" id="sheet-daily-thought" rows="4" oninput="onSheetDailyFact_(\'dailyThought\', this);autoGrowTextarea_(this)" placeholder="예: 세상은 단순한데 복잡하게 보려는 사람이 많다.">' + escapeHtml(getDailyThoughtText_(draft) || draft.topic || '') + '</textarea>' +
+      '<div style="font-size:11px;color:#6B7280;margin-top:6px;line-height:1.5;">오늘 일어난 일처럼 꾸며 내지 않습니다. 정답·가르침으로 바꾸지 않습니다.</div>' +
+      '</div>';
+  }
   return '<div class="sheet-add-source-preview" style="margin-bottom:12px;padding:12px 14px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;">' +
+    toggle +
     '<div style="font-size:10px;font-weight:700;color:#166534;letter-spacing:.6px;margin-bottom:8px;">원장 재료 · 재생성 때 이 문장만 다듬습니다</div>' +
     '<label style="display:block;font-size:11px;color:#6B7280;margin:0 0 4px;">누구와</label>' +
-    '<input type="text" class="form-input" id="sheet-daily-who" value="' + escapeHtml(draft.dailyWho || '') + '" oninput="onSheetDailyFact_(\'dailyWho\', this)" placeholder="예: 이유주, 혼자">' +
+    '<input type="text" class="form-input" id="sheet-daily-who" value="' + escapeHtml(draft.dailyWho || '') + '" oninput="onSheetDailyFact_(\'dailyWho\', this)" placeholder="예: 혼자, 가족과">' +
     '<label style="display:block;font-size:11px;color:#6B7280;margin:8px 0 4px;">무엇을</label>' +
     '<textarea class="form-input form-textarea" id="sheet-daily-what" rows="2" oninput="onSheetDailyFact_(\'dailyWhat\', this)" placeholder="예: 폼롤러로 옆구리 풀었다">' + escapeHtml(draft.dailyWhat || '') + '</textarea>' +
     '<label style="display:block;font-size:11px;color:#6B7280;margin:8px 0 4px;">오늘 몸 느낌</label>' +
@@ -28647,7 +28973,9 @@ async function generateRelatedTopicsAfterPublish_(catId, sourceDraft, finalText,
     .filter(Boolean)
     .slice(0, 80);
   var categoryGuide = isDailyShareCategory(catId)
-    ? '일상 공유용입니다. 누구와·무엇을·오늘 몸 느낌 중심의 일기 후속. 가르침·셀프 케어·전문가 해설 소재로 만들지 마세요.'
+    ? (isDailyThoughtDraft_(sourceDraft)
+      ? '생각 한 줄을 공감하게 풀어 쓴 글의 후속. 오늘 일기 장면으로 바꾸지 마세요. 정답·가르침·셀프 케어 금지.'
+      : '일상 공유용입니다. 누구와·무엇을·오늘 몸 느낌 중심의 일기 후속. 가르침·셀프 케어·전문가 해설 소재로 만들지 마세요.')
     : (isHeiljagyaeCategory(catId)
       ? '힐자계 입주민용 아파트너 게시글입니다. 동네 일상 공감과 부담 없는 셀프 케어로 이어지는 후속 소재로 만드세요.'
       : '블로그·인스타용입니다. 방금 발행한 글에서 자연스럽게 이어지는 후속, 심화, 오해 해소, 실천 팁 소재로 만드세요.');
@@ -28667,7 +28995,11 @@ buildBrandContextForPrompt_(catId, sourceDraft) + '\n\n' +
 '- topic: 한국어 제목 한 줄. 기존 주제와 표현·핵심 소재가 겹치지 않게\n' +
 '- angle: 이 주제를 어떤 관점으로 풀지 한 줄\n' +
 buildTopicBrandJsonGuide_(catId) +
-'- 방금 발행한 글을 본 독자가 다음으로 궁금해할 만한 **시리즈 순서**를 이어가세요\n\n' +
+'- 방금 발행한 글을 본 독자가 다음으로 궁금해할 만한 **시리즈 순서**를 이어가세요\n' +
+(isDailyShareCategory(catId) && isDailyThoughtDraft_(sourceDraft)
+  ? '- topic은 생각·철학 평서 한 줄. 오늘 일기 장면으로 바꾸지 말 것\n'
+  : '') +
+'\n' +
 'JSON 배열만 출력:\n' +
 '[\n' +
 '  {"topic":"...","angle":"...","series":"...","step":"...","pillar":"...","rationale":"..."}\n' +
@@ -28714,8 +29046,17 @@ async function ensureMinimumPendingDraftsAfterPublish_(catId, sourceDraft, final
   try {
     var topics = await generateRelatedTopicsAfterPublish_(catId, sourceDraft, finalText, missing);
     topics.forEach(function(t, i){
-      var draft = { id: makeExtraDraftId_(catId, i), topic: t.topic, angle: t.angle };
+      var draft = { id: makeExtraDraftId_(catId, i), topic: t.topic, angle: t.angle, createdAt: new Date().toISOString() };
       applyTopicFieldsToDraft_(draft, t, catId);
+      if(isDailyShareCategory(catId)){
+        draft.shareMonth = getCurrentShareMonthKey_();
+        if(isDailyThoughtDraft_(sourceDraft)){
+          draft.dailyShareKind = 'thought';
+          draft.dailyThought = t.topic;
+        } else {
+          draft.dailyShareKind = 'scene';
+        }
+      }
       cat.drafts.push(draft);
       created.push(draft);
     });
@@ -29705,7 +30046,9 @@ try {
 
 const blogGuide = getCatPromptForGeneration_(catId, 'blog');
 const communityGuide = getCatPromptForGeneration_(catId, 'community');
-const threadGuide = getCatPromptForGeneration_(catId, 'thread');
+const threadGuide = (isDailyShareCategory(catId) && isDailyThoughtDraft_(draft))
+  ? DEFAULT_DAILY_SHARE_THOUGHT_PROMPT
+  : getCatPromptForGeneration_(catId, 'thread');
 const imageGuide = getCatPromptForGeneration_(catId, 'image');
 const baseInfo = getBasePrompt();
 const brandBlock = buildBrandContextForPrompt_(catId, draft);
@@ -29716,9 +30059,31 @@ const imgJsonTail = buildImageGptVisualsJsonExample_(catId);
 
 let prompt;
 if(isDailyShareCategory(catId)){
-  var dailyCtxBlock = buildDailyShareContextBlock_();
+  var dailyThought = isDailyThoughtDraft_(draft);
+  var dailyCtxBlock = buildDailyShareContextBlock_(draft);
   const dailyImgGuide = getCatPromptForGeneration_(catId, 'image');
   const dailyImgJsonTail = buildImageGptVisualsJsonExample_(6);
+  var dailyThoughtRule = dailyThought
+    ? ('이 글은 **그날의 일기 장면이 아니라 생각 한 줄**입니다.\n' +
+      DAILY_SHARE_THOUGHT_TONE_ANCHOR + '\n' +
+      '원문 뜻을 유지한 채 사람들이 「내 얘기네」 하게 풀어 쓰세요.\n' +
+      '오늘 있었던 일·특정 사람을 꾸며 내지 마세요. 일반 장면은 「이런 때」 수준만.\n' +
+      '정답·훈계·셀프케어·CTA·질문 금지. 원문 한 줄은 첫 문장 또는 글 안에 자연스럽게.\n' +
+      'blog, insta, community 키는 JSON에 넣지 마세요. mangoBrief는 null. images.gptVisuals는 빈 배열 [].\n\n' +
+      'JSON만 출력:\n' +
+      '{\n' +
+      '  "thread": {\n' +
+      '    "topicTitle": "원문의 핵심을 담은 평서 한 줄 (질문 금지)",\n' +
+      '    "summary": "3~7문장. 원문을 일상 장면에 비추어 공감하게. 번호·불릿 금지. 가르침 없이 여운."\n' +
+      '  },\n')
+    : ('이 카테고리는 **담백한 생활 나눔(thread)** 만 만듭니다. 사진은 초안에 올린 원본을 이미지 탭에서 4:5로 맞춥니다. **망고보드·분위기 컷·장면 컷 프롬프트는 만들지 마세요.**\n' +
+      '본문은 [원장이 그날 준 재료]만 다듬습니다. 없는 사람·감정·동작·전문가 해설을 보태지 마세요. 강의·임상·홍보·과한 감성 톤 금지. blog, insta, community 키는 JSON에 넣지 마세요. mangoBrief는 null. images.gptVisuals는 빈 배열 [].\n\n' +
+      '계절·날씨는 재료에 있을 때만. JSON만 출력:\n' +
+      '{\n' +
+      '  "thread": {\n' +
+      '    "topicTitle": "오늘의 한 줄 (평서·짧은 감탄·장면 — 질문형·독자에게 묻는 말 금지)",\n' +
+      '    "summary": "topicTitle에 이어지는 연속 본문. 3~6문장. 누구와 무엇을 → 오늘 몸 느낌. 담백·구어체. 재료에 없는 철학·가르침·질문 금지. 번호·불릿 금지."\n' +
+      '  },\n');
   prompt = `${baseInfo}
 
 ${brandBlock}
@@ -29734,16 +30099,7 @@ ${threadGuide}
 
 ${dailyImgGuide ? '[일상 공유 이미지 지침]\n' + dailyImgGuide + '\n' : ''}
 
-이 카테고리는 **담백한 생활 나눔(thread)** 만 만듭니다. 사진은 초안에 올린 원본을 이미지 탭에서 4:5로 맞춥니다. **망고보드·분위기 컷·장면 컷 프롬프트는 만들지 마세요.**
-본문은 [원장이 그날 준 재료]만 다듬습니다. 없는 사람·감정·동작·전문가 해설을 보태지 마세요. 강의·임상·홍보·과한 감성 톤 금지. blog, insta, community 키는 JSON에 넣지 마세요. mangoBrief는 null. images.gptVisuals는 빈 배열 [].
-
-계절·날씨는 재료에 있을 때만. JSON만 출력:
-{
-  "thread": {
-    "topicTitle": "오늘의 한 줄 (평서·짧은 감탄·장면 — 질문형·독자에게 묻는 말 금지)",
-    "summary": "topicTitle에 이어지는 연속 본문. 3~6문장. 누구와 무엇을 → 오늘 몸 느낌. 담백·구어체. 재료에 없는 철학·가르침·질문 금지. 번호·불릿 금지."
-  },
-${dailyImgJsonTail}
+${dailyThoughtRule}${dailyImgJsonTail}
 }
 
 thread.summary는 **하나의 문자열**만. images.gptVisuals는 **빈 배열 []**.`;
@@ -29878,7 +30234,9 @@ if(isUserAddedDraftId_(draft.id) && getDraftReferenceText_(draft)){
 var draftRefImages = getDraftRefImages_(draft);
 if(draftRefImages.length){
   if(isDailyShareCategory(catId)){
-    prompt += '\n\n[첨부 사진' + (draftRefImages.length > 1 ? ' ' + draftRefImages.length + '장' : '') + '] 사진은 구도 참고입니다. **본문은 누구와/무엇을/몸 느낌**을 따릅니다. 사진에서 새 사람·감정·대화를 만들지 마세요. 교육·강의·세미나 사진이어도 수업 후기·전문 설명 금지.';
+    prompt += isDailyThoughtDraft_(draft)
+      ? '\n\n[첨부 사진' + (draftRefImages.length > 1 ? ' ' + draftRefImages.length + '장' : '') + '] 사진은 분위기에만 참고합니다. 오늘 있었던 일처럼 꾸며 내지 마세요. 사진에서 새 사람·대화를 만들지 마세요.'
+      : '\n\n[첨부 사진' + (draftRefImages.length > 1 ? ' ' + draftRefImages.length + '장' : '') + '] 사진은 구도 참고입니다. **본문은 누구와/무엇을/몸 느낌**을 따릅니다. 사진에서 새 사람·감정·대화를 만들지 마세요. 교육·강의·세미나 사진이어도 수업 후기·전문 설명 금지.';
   } else {
     prompt += '\n\n[첨부 참고 사진' + (draftRefImages.length > 1 ? ' ' + draftRefImages.length + '장' : '') + '] 사진에 보이는 자세·부위·상황을 topic·본문에 반영하세요. 과장·단정적 진단 표현은 피하세요.';
   }
@@ -30137,6 +30495,16 @@ window.genContent = async function(ev){
   if(isHeiljagyaeCategory(catId) || tab === 'community') statusKind = 'community';
   else if(isDailyShareCategory(catId) || tab === 'thread') statusKind = 'thread';
   else if(tab === 'blog' || tab === 'images') statusKind = 'blog';
+
+  if(isDailyShareCategory(catId)){
+    persistSheetDailyFactsToDraft_();
+    var catDaily = CATEGORIES[catId];
+    var draftDaily = catDaily && catDaily.drafts.find(function(d){ return d && d.id === draftId; });
+    if(isDailyThoughtDraft_(draftDaily) && !getDailyThoughtText_(draftDaily)){
+      if(typeof setAppToast === 'function') setAppToast('생각 한 줄을 적어 주세요.', { duration: 3500, variant: 'err' });
+      return;
+    }
+  }
 
   var estSec = Math.ceil(estimateDraftMs(catId) / 1000);
   if(clickBtn && !clickBtn.classList.contains('btn-regen')){

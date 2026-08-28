@@ -433,6 +433,7 @@ margin-left: 4px;
 .daily-theme-tone-1 { --dt-accent:#0D9488; --dt-bg:#F0FDFA; --dt-border:#99F6E4; }
 .daily-theme-tone-2 { --dt-accent:#6366F1; --dt-bg:#EEF2FF; --dt-border:#C7D2FE; }
 .daily-theme-tone-3 { --dt-accent:#059669; --dt-bg:#ECFDF5; --dt-border:#A7F3D0; }
+.daily-theme-tone-4 { --dt-accent:#7C3AED; --dt-bg:#F5F3FF; --dt-border:#DDD6FE; }
 .daily-theme-row[class*="daily-theme-tone-"] {
   background: var(--dt-bg);
   border-color: var(--dt-border);
@@ -440,7 +441,7 @@ margin-left: 4px;
 }
 .daily-theme-label {
   flex-shrink: 0;
-  width: 72px;
+  width: 78px;
   font-size: 10px;
   font-weight: 800;
   color: var(--dt-accent);
@@ -480,6 +481,24 @@ margin-left: 4px;
   min-width: 120px;
   padding: 10px 12px;
   font-size: 12px;
+}
+.daily-add-suggest-block {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px dashed #E5E7EB;
+}
+.daily-add-suggest-hint {
+  font-size: 11px;
+  color: #9CA3AF;
+  line-height: 1.5;
+  margin: 0 0 8px;
+}
+.add-form .daily-suggest-panel {
+  margin: 12px 0 0;
+}
+.add-form .daily-suggest-btn {
+  width: 100%;
+  margin-top: 0;
 }
 .daily-month-group {
   margin: 0 10px 10px;
@@ -1520,6 +1539,33 @@ font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700;
 .badge-ch-thread { background: #ECFDF5; color: #0F766E; }
 .badge-ch-image { background: #DBEAFE; color: #1D4ED8; }
 .badge-gen { background: #DBEAFE; color: #2563EB; }
+.badge-thought { background: #F5F3FF; color: #6D28D9; }
+
+.daily-kind-toggle {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+.daily-kind-btn {
+  flex: 1;
+  border: 1.5px solid #E5E7EB;
+  background: #fff;
+  color: #6B7280;
+  font: inherit;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 11px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.daily-kind-btn.is-active {
+  border-color: #7C3AED;
+  background: #F5F3FF;
+  color: #5B21B6;
+}
+.sheet-add-source-preview .daily-kind-toggle {
+  margin: 0 0 10px;
+}
 
 .card-topic {
 font-weight: 700; font-size: 14px; color: #1A1A1A; margin-bottom: 5px; line-height: 1.45;

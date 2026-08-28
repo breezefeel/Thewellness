@@ -2208,7 +2208,13 @@ function buildImageGptVisualsJsonExample_(catId, opts){
     '"photoTip":"' + getMangoModelGuideForCat_(id).photoTipShort.replace(/"/g, '\\"') + '",\n' +
     '"mangoInputPaste":"intro와 동일(끝 [디자인][레이아웃])"\n' +
     '}';
-  return `"images": {\n"gptVisuals": [],\n${mangoBriefEx}\n}`;
+  var gptEx =
+    '"gptVisuals": [\n' +
+    '{"title":"공감 컷","role":"problem","placeAfter":"공감 단락 뒤","prompt":"한글 실사 프롬프트 180~450자(일상 불편 장면)"},\n' +
+    '{"title":"따라하기 컷","role":"selfCare","placeAfter":"따라하기 단락 뒤","prompt":"한글 실사 프롬프트 180~450자(핵심 동작·손 위치)"},\n' +
+    '{"title":"원리 컷","role":"explanation","placeAfter":"원리 단락 뒤","prompt":"한글 실사 프롬프트 180~450자(유지·전후 느낌)"}\n' +
+    ']';
+  return `"images": {\n${gptEx},\n${mangoBriefEx}\n}`;
 }
 const SUBGOAL_MISC_ID = 'misc';
 const SUBGOAL_MISC_LABEL = '기타 주제';
@@ -9807,7 +9813,7 @@ function getStepToneClass_(idx){ return 'step-tone-' + (Math.max(0, parseInt(idx
 function getPlanTierClass_(tier){ return 'plan-tier-' + tier; }
 /** 블로그·인스타·이미지 워크플로 — 도수·리:얼·뷰티·교육 탭 */
 function isBlogInstaCategory(catId){ return catId !== 6 && catId !== 7 && catId !== 8; }
-/** 망고보드·블로그 삽화용 사진 슬롯 수 (일반·전문가 3장 / 힐자계 2장 / 일상 0) */
+/** 본문 삽입용 사진 슬롯 수 (일반·전문가 3장 / 힐자계 2장 / 일상 0) */
 function getImageSlotCount(catId){
   if(isOpsManualCategory(catId) || isDailyShareCategory(catId)) return 0;
   if(isHeiljagyaeCategory(catId)) return 2;
@@ -11324,15 +11330,39 @@ const MANGO_SLIDE_VISUAL_COPY_RULE = `[이미지용 카피 — 소개란 본문 
 
 const MANGO_DETAIL_BRIEF_RULE = getMangoDetailBriefRule_(2);
 
-const DEFAULT_BLOG_INSTA_IMAGE_PROMPT = `망고보드 AI 상세페이지용 **한글 기획만** 작성합니다. GPT·영문 이미지 프롬프트는 만들지 않습니다.
+/** 블로그·전문가: 긴 글 사이에 끼울 실사 컷 3장 (망고보드 7장 상세페이지가 아님) */
+const BLOG_INSERT_GPT_VISUALS_RULE = `[우선 — images.gptVisuals 정확히 3개]
+긴 블로그·캡션 **문단 사이에 넣을 사진**입니다. 7장 슬라이드·상세페이지·포스터가 아닙니다.
+각 항목: title, role, placeAfter, prompt (영문-only 금지)
+
+1) role "problem" · title "공감 컷" · placeAfter "공감 단락 뒤"
+   - 독자가 겪는 **일상 불편 장면**(앉았다 일어서기·책상·엘리베이터 등). 과장된 고통 연출 금지.
+2) role "selfCare" · title "따라하기 컷" · placeAfter "따라하기 단락 뒤"
+   - blog.selfCare(또는 본문의 핵심 동작) **손 위치·자세·시선**이 보이게. 가장 중요한 컷.
+3) role "explanation" · title "원리 컷" · placeAfter "원리 단락 뒤"
+   - 원리를 한눈에: 편한 지점에서 유지하는 모습, 또는 전/후 느낌. 도표·긴 글자·해부 일러스트 금지.
+
+[각 prompt 작성법]
+- **한글 한 덩어리** 180~450자. 샷 타입(전신/상반신)·인물·장소·구체 동작·조명·금지를 문장으로.
+- 실사 사진풍. 생성 시 카테고리 **남/여 모델 가이드**를 따름.
+- 금지: 병원·수술·의료기기, 로고·긴 문장 텍스트, 만화·3D, 해부학적으로 어색한 손·팔, 영문만인 문장.
+
+[부차 — mangoBrief]
+망고보드 7장이 필요할 때만 쓰는 **선택** 기획입니다. 토큰이 부족하면 mangoBrief는 null(시스템이 블로그에서 로컬 변환).
+**gptVisuals 3장 본문 삽입 컷이 최우선.**`;
+
+const DEFAULT_BLOG_INSTA_IMAGE_PROMPT = `블로그·인스타용 **본문 삽입 사진 프롬프트**를 작성합니다. 상세페이지 슬라이드가 아닙니다.
+
+${BLOG_INSERT_GPT_VISUALS_RULE}
 
 ${MANGO_SLIDE_VISUAL_COPY_RULE}
 
 제품명·소개(mangoBrief)·[디자인][레이아웃] 색상은 **생성 시 카테고리별 팔레트 지침**을 따릅니다.
-참고 사진은 사용자가 실사·시연 컷을 직접 올립니다.`;
+참고 사진은 「기타 사진」의 남/여 모델·실사 시연 컷을 씁니다.`;
 
-const DEFAULT_EXPERT_COURSE_IMAGE_PROMPT = `전문가 과정·강연 공유 — 망고보드 상세페이지용 **한글 기획(mangoBrief)만**.
-영문 GPT 이미지 프롬프트 금지. gptVisuals는 [].
+const DEFAULT_EXPERT_COURSE_IMAGE_PROMPT = `전문가 과정·강연 공유 — 긴 글 **사이에 넣을 실사 컷** 프롬프트가 우선입니다.
+
+${BLOG_INSERT_GPT_VISUALS_RULE}
 
 ${MANGO_SLIDE_VISUAL_COPY_RULE}
 
@@ -11805,9 +11835,14 @@ function migrateMangoImagePromptDefaults_(){
       return;
     }
 
-    // 이미 망고보드만(GPT 불필요) 지침이면 스킵
-    if(/GPT 이미지 프롬프트는 만들지 않습니다|gptVisuals는 \[\]|영문 GPT 이미지 프롬프트 금지/i.test(cur)) return;
-    if(/망고보드|mangoBrief|상세페이지 사진 슬롯|MANGO_DETAIL/i.test(cur) && !/영문 한 덩어리|정확히 3장|photorealistic/i.test(cur)) return;
+    // 구형: 망고보드만(gptVisuals 빈 배열) → 본문 삽입 컷 3장 + 망고보드 선택
+    if(/GPT 이미지 프롬프트는 만들지 않습니다|images\.gptVisuals는 빈 배열|gptVisuals는 \[\]|영문 GPT 이미지 프롬프트 금지/i.test(cur) &&
+      !/본문 삽입|placeAfter|공감 컷/i.test(cur)){
+      var insertDef = getDefaultCatPrompt_(catId, 'image');
+      if(insertDef){ cat.image = insertDef; changed = true; }
+      return;
+    }
+    if(/망고보드|mangoBrief|상세페이지 사진 슬롯|MANGO_DETAIL/i.test(cur) && !/영문 한 덩어리|정확히 3장|photorealistic|본문 삽입|placeAfter/i.test(cur)) return;
     var def = getDefaultCatPrompt_(catId, 'image');
     if(!def) return;
     // 구형 썸네일 밴드·영문 GPT 3장 지침은 기본값으로 교체
@@ -22033,26 +22068,26 @@ function buildImagePromptGuide(topic, angle, customGuide, catId){
   const pillar = CAT_DEFAULT_PILLAR[id] || '';
   const p = getMangoPaletteForCat_(id);
   const tone = getMangoDesignToneLine_(id);
+  var model = getMangoModelGuideForCat_(id);
   return `
-[망고보드 상세페이지 기획 — GPT 이미지 프롬프트 불필요]
+[본문 삽입 사진 + 선택 망고보드]
 이번 초안 주제: "${t}"
 작성 각도: "${a}"
 ${pillar ? '프로그램 톤: ' + pillar : ''}
+인물: ${model.briefHint} (${model.label})
 
-**images.gptVisuals는 빈 배열 []** 로 두세요. (영문 사진 생성 프롬프트 작성 금지)
-**mangoBrief만** 채웁니다.
+${BLOG_INSERT_GPT_VISUALS_RULE}
 
+[부차 mangoBrief — 빈 칸이어도 됨. 채울 때만 아래 형식]
 ${getMangoDetailBriefRule_(id)}
-
-mangoBrief (망고보드 상세페이지 UI에 맞춤 — **빈 칸 금지**):
-- productName: 「제품명 혹은 주제」 **최대 ${MANGO_DETAIL_TITLE_MAX}자**, blog.title 축약. **필수**
-- intro / mangoInputPaste: 「소개」 **최대 ${MANGO_DETAIL_INTRO_MAX}자**, **동일 한글**. 【1~7장】이미지용 헤드+불릿. **블로그 원문·말줄임(…) 금지**, 장별 역할 중복 금지. **필수**
-- intro **맨 끝**에 [디자인]+[레이아웃] (배경 ${p.bg}·${p.bg2}, 글·헤드 ${p.head}, 포인트 ${p.point}, 카드 ${p.card}·${p.card2}, 구분선 ${p.divider || p.head}${isMangoSparseAccentCat_(id) ? ' · 【필수】포인트는 작은 체크·기호·키워드만 · 빨강 전체 배경·큰 빨간 원 아이콘·넓은 면 채움 금지 · 표지 스크림은 차콜만' : ''}, 지정 외 색·흑백 모노 금지, 표 금지, 쉬운 말, ${getMangoModelGuideForCat_(id).briefHint}, 한발서기만 X·일상 전/후)
-- photoTip: 실사·시연 (${getMangoModelGuideForCat_(id).label} 모델) 1~2문장
+- productName: 「제품명 혹은 주제」 **최대 ${MANGO_DETAIL_TITLE_MAX}자**, blog.title 축약
+- intro / mangoInputPaste: 「소개」 **최대 ${MANGO_DETAIL_INTRO_MAX}자**, **동일 한글**. 【1~7장】이미지용 헤드+불릿. **블로그 원문·말줄임(…) 금지**
+- intro **맨 끝**에 [디자인]+[레이아웃] (배경 ${p.bg}·${p.bg2}, 글·헤드 ${p.head}, 포인트 ${p.point}, 카드 ${p.card}·${p.card2}, 구분선 ${p.divider || p.head}${isMangoSparseAccentCat_(id) ? ' · 【필수】포인트는 작은 체크·기호·키워드만 · 빨강 전체 배경·큰 빨간 원 아이콘·넓은 면 채움 금지 · 표지 스크림은 차콜만' : ''}, 지정 외 색·흑백 모노 금지, 표 금지, 쉬운 말, ${model.briefHint}, 한발서기만 X·일상 전/후)
+- photoTip: 실사·시연 (${model.label} 모델) 1~2문장
 - slidePlan: 정확히 7개 — 각 장은 한 메시지, 표 없음, copyHint는 짧은 헤드
 - designTone: ${tone}
 
-${g ? '[카테고리별 망고보드 지침]\n' + g : ''}
+${g ? '[카테고리별 이미지 지침]\n' + g : ''}
 `;
 }
 
@@ -22598,8 +22633,8 @@ function renderMangoDetailInputCard_(brief){
   var titleVal = formatMangoTitlePaste_(brief);
   var introVal = formatMangoBriefPaste_(brief, catId);
   var html = '';
-  html += '<div class="img-section-title">망고보드 AI 상세페이지 입력</div>';
-  html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">주황 버튼으로 <strong>제목+소개</strong> 복사 → 망고보드 소개란에 붙여넣고 첫 줄만 제품명으로. 소개는 <strong>장별 헤드+짧은 불릿</strong>(블로그 원문·… 붙여넣기 X). 결과물: <strong>' + escapeHtml(p.label) + '</strong> · 배경 <strong>' + escapeHtml(p.bg + '·' + p.bg2) + '</strong>·헤드 <strong>' + escapeHtml(p.head) + '</strong>·포인트 <strong>' + escapeHtml(p.point) + '</strong>' + (isMangoSparseAccentCat_(catId) ? '(작은 체크·기호만 · <strong>빨강 전체 배경·큰 빨간 원 아이콘 금지</strong> · 표지 스크림은 차콜만)' : '') + '·카드 <strong>' + escapeHtml(p.card + '·' + p.card2) + '</strong>·구분선 <strong>' + escapeHtml(p.divider || p.head) + '</strong>(지정 외 색·흑백 모노 X), 주의·안내형, ' + escapeHtml(getMangoModelGuideForCat_(catId).uiHint) + ', 픽토그램 OK.</p>';
+  html += '<div class="img-section-title">선택 · 망고보드 7장 상세페이지</div>';
+  html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">본문 삽입 사진이 우선입니다. 망고보드가 필요할 때만 주황 버튼으로 <strong>제목+소개</strong> 복사 → 소개란에 붙여넣고 첫 줄만 제품명으로. 소개는 <strong>장별 헤드+짧은 불릿</strong>(블로그 원문·… 붙여넣기 X). 결과물: <strong>' + escapeHtml(p.label) + '</strong> · 배경 <strong>' + escapeHtml(p.bg + '·' + p.bg2) + '</strong>·헤드 <strong>' + escapeHtml(p.head) + '</strong>·포인트 <strong>' + escapeHtml(p.point) + '</strong>' + (isMangoSparseAccentCat_(catId) ? '(작은 체크·기호만 · <strong>빨강 전체 배경·큰 빨간 원 아이콘 금지</strong> · 표지 스크림은 차콜만)' : '') + '·카드 <strong>' + escapeHtml(p.card + '·' + p.card2) + '</strong>·구분선 <strong>' + escapeHtml(p.divider || p.head) + '</strong>(지정 외 색·흑백 모노 X), 주의·안내형, ' + escapeHtml(getMangoModelGuideForCat_(catId).uiHint) + ', 픽토그램 OK.</p>';
   html += '<div class="img-tool-card">';
   html += '<label style="display:block;font-size:11px;color:#374151;margin:0 0 4px;">제품명 혹은 주제 <span id="sheet-mango-title-count" style="color:#9CA3AF;">' + titleVal.length + '/' + MANGO_DETAIL_TITLE_MAX + '</span></label>';
   html += '<input type="text" class="sheet-edit" id="sheet-mango-title" maxlength="' + MANGO_DETAIL_TITLE_MAX + '" value="' + escapeHtml(titleVal) + '" oninput="updateMangoFieldCounts_()" style="width:100%;margin-bottom:12px;padding:8px 10px;font-size:13px;border:1px solid #E5E7EB;border-radius:8px;box-sizing:border-box;">';
@@ -22614,7 +22649,7 @@ function renderMangoDetailInputCard_(brief){
   html += '<button type="button" class="img-tool-main-btn mango" onclick="copyMangoBriefAndOpen_()">망고보드 열기 · 제목·소개 복사</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="copyMangoTitleOnly_()">제품명만 복사</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="copyMangoBriefOnly_()">소개만 복사</button>';
-  html += '<button type="button" class="img-tool-copy-btn" onclick="genContent(event)">소개 재생성</button>';
+  html += '<button type="button" class="img-tool-copy-btn" data-regen="mango" onclick="genContent(event)">소개 재생성</button>';
   html += '</div></div>';
   return html;
 }
@@ -25015,7 +25050,7 @@ function buildImageTabBody(content){
     var slots = getDisplayGptVisuals_((content.images && content.images.gptVisuals) || [], catId);
     var htmlHj = '';
     htmlHj += '<div class="img-section-title">망고보드 AI 디자인 · 따라하기 이미지</div>';
-    htmlHj += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">게시판 <strong>셀프 케어(따라하기)</strong>를 바탕으로 만든 프롬프트입니다. 하단 <strong>복사</strong>를 누르면 따라하기 컷 프롬프트를 복사하고 <strong>망고보드 AI 디자인</strong>으로 이동합니다.</p>';
+    htmlHj += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">게시판 <strong>셀프 케어(따라하기)</strong>를 바탕으로 만든 프롬프트입니다. 하단 <strong>복사</strong>를 누르면 따라하기 컷 프롬프트를 복사하고 <strong>망고보드 AI 디자인</strong>으로 이동합니다. Cursor에 <strong>「이 초안 이미지 만들어줘」</strong>라고 해도 됩니다.</p>';
     if(!slots.length){
       htmlHj += '<p class="empty-note" style="padding:0;line-height:1.55;">프롬프트가 아직 없어요. 본문 초안이 있으면 자동으로 채워지고, 아래에서 AI가 다시 다듬을 수 있어요.</p>';
       htmlHj += '<button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin:10px 0 14px;">프롬프트 재생성</button>';
@@ -25039,20 +25074,47 @@ function buildImageTabBody(content){
     return htmlHj;
   }
 
-  // 블로그·전문가: 망고보드 제품명·소개만
+  // 블로그·전문가: 본문 삽입 컷 프롬프트 + 선택 망고보드
   if(!content){
     return '<p class="empty-note" style="padding:0;line-height:1.55;">초안이 없어요. 블로그 탭에서 먼저 초안을 만들어 주세요.</p>' +
       renderThumbMakerCard_(null);
   }
   if(!content.images) content.images = { gptVisuals: [], mangoBrief: null };
+  ensureBlogInsertImagePrompts_(content);
   ensureMangoBriefOnContent_(content);
+  var slots = getDisplayGptVisuals_((content.images && content.images.gptVisuals) || [], catId);
   const brief = content.images.mangoBrief || null;
 
   let html = '';
+  html += '<div class="img-section-title">본문 삽입용 사진 프롬프트</div>';
+  html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">긴 글 <strong>문단 사이</strong>에 넣을 실사 컷입니다. 상세페이지가 아니에요. Cursor 채팅에 <strong>「이 초안 이미지 만들어줘」</strong>라고 하면 아래 프롬프트로 사진을 바로 만들 수 있어요. 프롬프트는 복사해서 그대로 써도 됩니다.</p>';
+  if(!slots.length){
+    html += '<p class="empty-note" style="padding:0;line-height:1.55;">프롬프트가 아직 없어요. 본문 초안이 있으면 자동으로 채워지고, 아래에서 AI가 다시 다듬을 수 있어요.</p>';
+    html += '<button type="button" class="btn-gen-big" data-regen="insert" onclick="genContent(event)" style="width:100%;margin:10px 0 14px;">프롬프트 재생성</button>';
+  } else {
+    slots.forEach(function(item, i){
+      var title = String(item.title || ('이미지 ' + (i + 1))).trim();
+      var place = String(item.placeAfter || getBlogInsertPlaceAfter_(item.role)).trim();
+      var roleHint = '';
+      if(item.role === 'selfCare') roleHint = '따라하기 핵심 동작';
+      else if(item.role === 'problem') roleHint = '일상 불편 장면';
+      else if(item.role === 'explanation') roleHint = '원리·유지 장면';
+      html += '<div class="cb"><div class="cb-label">' + escapeHtml(title) +
+        (place ? ' <span style="color:#9CA3AF;font-weight:600;">· ' + escapeHtml(place) + '</span>' : '') +
+        (roleHint ? ' <span style="color:#9CA3AF;font-weight:600;">· ' + escapeHtml(roleHint) + '</span>' : '') +
+        ' <button type="button" class="sheet-field-btn sheet-field-copy" onclick="copyCommunityOrDailyImageSlot_(' + i + ', this)">복사</button></div>';
+      html += '<textarea class="sheet-edit" id="sheet-image-prompt-' + i + '" data-image-index="' + i + '" rows="7" oninput="autoGrowTextarea_(this)">' +
+        escapeHtml(String(item.prompt || '')) + '</textarea></div>';
+    });
+    html += '<div class="img-tool-actions" style="margin:4px 0 12px;">';
+    html += '<button type="button" class="img-tool-copy-btn" onclick="copyAllBlogInsertPrompts_(this)">프롬프트 전체 복사</button>';
+    html += '</div>';
+    html += '<button type="button" class="btn-gen-big" data-regen="insert" onclick="genContent(event)" style="width:100%;margin:0 0 8px;">프롬프트 재생성</button>';
+  }
   html += renderThumbMakerCard_(content);
   html += renderMangoDetailInputCard_(brief);
-  html += '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">하단 <strong>저장</strong>으로 초안만 보관할 수 있어요. <strong>발행완료</strong>는 이미지 최종본을 확정할 때 쓰며, 카드의「발행완료」배지에는 <strong>필수가 아니에요</strong>(블로그·인스타·쓰레드만). 참고 사진은 실사·시연 컷을 올리면 되고, 로고·타이포는 망고보드에서 올립니다.</p>';
-  html += '<div class="img-tool-hint"><strong>망고보드 열기 · 제목·소개 복사</strong> → 소개란에 붙여넣기 → <strong>첫 줄(제목)</strong>만 잘라 제품명란으로 옮기세요. <a href="' + escapeHtml(DEFAULT_MANGO_DESIGNER_URL) + '" target="_blank" rel="noopener noreferrer">AI 디자이너</a></div>';
+  html += '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">하단 <strong>저장</strong>으로 초안만 보관할 수 있어요. <strong>발행완료</strong>는 이미지 최종본을 확정할 때 쓰며, 카드의「발행완료」배지에는 <strong>필수가 아니에요</strong>(블로그·인스타·쓰레드만). 망고보드 7장은 <strong>선택</strong>입니다.</p>';
+  html += '<div class="img-tool-hint">망고보드가 필요할 때만 <strong>제목·소개 복사</strong> → 소개란에 붙여넣기 → <strong>첫 줄(제목)</strong>만 제품명란으로. <a href="' + escapeHtml(DEFAULT_MANGO_DESIGNER_URL) + '" target="_blank" rel="noopener noreferrer">AI 디자이너</a></div>';
   return html;
 }
 
@@ -25099,6 +25161,130 @@ window.copyMangoBriefAndOpen_ = function(){
     window.prompt('제목+소개를 복사해 주세요:', text);
   });
 };
+
+function getBlogInsertPlaceAfter_(role){
+  var r = String(role || '');
+  if(r === 'problem' || r === 'cover' || r === 'thumbnail') return '공감 단락 뒤';
+  if(r === 'selfCare' || r === 'body' || r === 'demo') return '따라하기 단락 뒤';
+  if(r === 'explanation' || r === 'principle') return '원리 단락 뒤';
+  return '본문 중간';
+}
+
+function getBlogInsertGenderLine_(catId){
+  var m = getMangoModelGuideForCat_(catId);
+  if(m.gender === 'female') return '30~40대 한국인 여성, 편한 홈웨어 또는 심플한 운동복';
+  if(m.gender === 'male') return '30~50대 한국인 남성, 편한 홈웨어 또는 심플한 운동복';
+  return '30~50대 한국인 성인, 편한 홈웨어';
+}
+
+function getBlogInsertSourceHints_(blog, catId){
+  var b = (blog && typeof blog === 'object') ? (normalizeBlogBlock(blog, catId) || blog) : {};
+  var title = String((b && b.title) || '').trim();
+  var problem = String(getGeneralBlogProblemText_(b) || '').replace(/\s+/g, ' ').trim();
+  var care = String((b && b.selfCare) || '').trim();
+  var expl = String((b && b.explanation) || '').trim();
+  var draft = String((b && b.draft) || '').trim();
+  if(!problem) problem = String((b && b.hook) || '').replace(/\s+/g, ' ').trim();
+  if(!care && draft) care = draft.slice(0, 180);
+  if(!expl && draft) expl = draft.slice(180, 360) || String((b && b.cta) || '').trim();
+  return {
+    title: title,
+    problem: problem.slice(0, 140),
+    care: care,
+    expl: expl.slice(0, 140)
+  };
+}
+
+function normalizeBlogInsertVisualItem_(item, i){
+  var roles = ['problem', 'selfCare', 'explanation'];
+  var titles = ['공감 컷', '따라하기 컷', '원리 컷'];
+  var role = String((item && item.role) || roles[i] || 'problem').trim() || roles[i];
+  if(role === 'cover' || role === 'thumbnail' || role === 'hook') role = 'problem';
+  if(role === 'body' || role === 'demo') role = 'selfCare';
+  if(role === 'principle' || role === 'draft') role = 'explanation';
+  return {
+    title: String((item && item.title) || titles[i] || ('이미지 ' + (i + 1))).trim(),
+    role: role,
+    placeAfter: String((item && item.placeAfter) || getBlogInsertPlaceAfter_(role)).trim(),
+    prompt: String((item && item.prompt) || '').trim()
+  };
+}
+
+/** 블로그 본문 → 삽입 컷 한글 프롬프트 3장 (로컬 백업) */
+function buildBlogInsertImagePromptsFromBlog_(blog, topic, catId){
+  var hints = getBlogInsertSourceHints_(blog, catId);
+  var topicLine = String(topic || hints.title || '셀프 케어').replace(/^🌿\s*/, '').trim();
+  var person = getBlogInsertGenderLine_(catId);
+  var steps = parseSelfCareSteps_(hints.care || '');
+  var stripRe = /^(👉|✅|▶|Step\s*\d+[.:)]?|\d+[.)]|[①②③④⑤⑥⑦⑧⑨⑩]|[-·•])\s*/i;
+  var stepBodies = steps.map(function(s){
+    return String(s || '').replace(stripRe, '').trim();
+  }).filter(Boolean);
+  var mainAction = stepBodies[0] || String(hints.care || '가벼운 셀프 케어 동작').replace(stripRe, '').trim();
+  var secondAction = stepBodies[1] || '';
+
+  var problemPrompt =
+    '블로그 본문 삽입용 실사 사진. 주제 「' + topicLine + '」. ' +
+    (hints.problem ? '상황 힌트: ' + hints.problem + '. ' : '') +
+    person + '이 거실·책상·현관 등 일상 공간에서 뻐근함·불편을 느끼는 자연스러운 순간. ' +
+    '상반신 또는 전신, 부드러운 자연광, 깨끗한 배경. 과장된 고통 표정·병원·의료기기·로고·긴 글자 금지.';
+
+  var carePrompt =
+    '블로그 본문 삽입용 따라하기 시연 컷. 주제 「' + topicLine + '」. ' +
+    person + '. 밝은 실내, 실사풍. 핵심 동작: ' + mainAction +
+    (secondAction ? ' 이어서 ' + secondAction : '') + '. ' +
+    '손 위치·자세·시선이 또렷하게 보이게 전신 또는 상반신. 시원한 지점에서 멈춘 듯한 안정감. ' +
+    '병원·수술·의료기기·로고·긴 문장 텍스트·만화·3D 금지.';
+
+  var explPrompt =
+    '블로그 본문 삽입용 원리 컷. 주제 「' + topicLine + '」. ' +
+    person + '이 동작을 편한 범위에서 유지하거나, 숨이 풀리며 몸이 가벼워진 느낌을 담은 실사. ' +
+    (hints.expl ? '원리 힌트: ' + hints.expl + '. ' : '') +
+    '도표·해부 일러스트·긴 글자·병원 금지. 부드러운 자연광, 여유 있는 구도.';
+
+  return [
+    { title: '공감 컷', role: 'problem', placeAfter: '공감 단락 뒤', prompt: problemPrompt },
+    { title: '따라하기 컷', role: 'selfCare', placeAfter: '따라하기 단락 뒤', prompt: carePrompt },
+    { title: '원리 컷', role: 'explanation', placeAfter: '원리 단락 뒤', prompt: explPrompt }
+  ];
+}
+
+function ensureBlogInsertImagePrompts_(content, topic, catId){
+  if(!content) return content;
+  catId = catId != null ? catId : (state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId));
+  if(!isBlogInstaCategory(catId)) return content;
+  if(!content.images || typeof content.images !== 'object') content.images = { gptVisuals: [], mangoBrief: null };
+  var existing = getDisplayGptVisuals_(content.images.gptVisuals, catId).map(function(item, i){
+    return normalizeBlogInsertVisualItem_(item, i);
+  }).filter(function(x){ return x.prompt; });
+  if(existing.length >= 3){
+    content.images.gptVisuals = existing.slice(0, 3);
+    return content;
+  }
+  var draft = null;
+  try {
+    var cat = CATEGORIES[catId];
+    draft = cat && cat.drafts.find(function(d){ return d.id === state.selectedId; });
+  } catch(e){}
+  var local = buildBlogInsertImagePromptsFromBlog_(
+    content.blog,
+    topic || (draft && draft.topic) || '',
+    catId
+  );
+  if(!content.blog){
+    if(existing.length) content.images.gptVisuals = existing;
+    return content;
+  }
+  var merged = existing.slice();
+  local.forEach(function(item){
+    if(merged.length >= 3) return;
+    var hasRole = merged.some(function(x){ return x.role === item.role; });
+    if(!hasRole) merged.push(item);
+  });
+  while(merged.length < 3 && local[merged.length]) merged.push(local[merged.length]);
+  content.images.gptVisuals = merged.slice(0, 3);
+  return content;
+}
 
 /** 게시판 셀프케어 → 망고보드 AI용 한글 프롬프트 2장 (로컬 백업) */
 function buildHeiljagyaeImagePromptsFromCommunity_(community, topic){
@@ -25203,6 +25389,7 @@ function readCommunityOrDailyImagePromptsFromSheet_(){
   if(!slots.length){
     if(isHeiljagyaeCategory(catId) && content.community) ensureHeiljagyaeImagePrompts_(content);
     if(isDailyShareCategory(catId)) ensureDailyShareImagePrompts_(content);
+    if(isBlogInstaCategory(catId) && content.blog) ensureBlogInsertImagePrompts_(content);
     slots = getDisplayGptVisuals_(content.images.gptVisuals, catId);
   }
   return { content: content, slots: slots, catId: catId };
@@ -25230,6 +25417,25 @@ window.copyCommunityOrDailyImageSlot_ = function(index, btn){
       setTimeout(function(){ btn.textContent = label || '복사'; }, 1500);
     }
     setAppToast('프롬프트를 복사했어요.', { duration: 2000, variant: 'ok' });
+  });
+};
+
+window.copyAllBlogInsertPrompts_ = function(btn){
+  var pack = readCommunityOrDailyImagePromptsFromSheet_();
+  var text = (pack.slots || []).map(function(item, i){
+    var title = String(item.title || ('이미지 ' + (i + 1))).trim();
+    var place = String(item.placeAfter || getBlogInsertPlaceAfter_(item.role)).trim();
+    return '【' + title + (place ? ' · ' + place : '') + '】\n' + String(item.prompt || '').trim();
+  }).filter(Boolean).join('\n\n');
+  if(!text){ setAppToast('복사할 프롬프트가 없어요.', { duration: 2500, variant: 'err' }); return; }
+  if(pack.content) persistDraftContent_(state.selectedId, pack.content);
+  var label = btn ? btn.textContent : '';
+  writeClipboardRich_(text, '', function(){
+    if(btn){
+      btn.textContent = '복사됨';
+      setTimeout(function(){ btn.textContent = label || '프롬프트 전체 복사'; }, 1500);
+    }
+    setAppToast('본문 삽입 프롬프트 3장을 복사했어요. Cursor에 「이 초안 이미지 만들어줘」라고 해도 됩니다.', { duration: 3500, variant: 'ok' });
   });
 };
 
@@ -25319,6 +25525,47 @@ async function generateHeiljagyaeImagePromptsFromCommunity_(catId, community, to
       prompt: String(item.prompt || '').trim()
     };
   });
+}
+
+async function generateBlogInsertPromptsFromBlog_(catId, blog, topic, draft){
+  var imageGuide = getCatPromptForGeneration_(catId, 'image');
+  var model = getMangoModelGuideForCat_(catId);
+  var prompt =
+    getBasePrompt() + '\n\n' +
+    '주제: "' + (topic || '') + '"\n\n' +
+    (imageGuide ? '[카테고리 이미지 지침]\n' + imageGuide + '\n\n' : '') +
+    '아래 **확정·수정된 블로그**를 바탕으로 **본문 삽입용 실사 사진 프롬프트 3개**만 만드세요.\n' +
+    '7장 상세페이지·망고보드 슬라이드가 아닙니다. mangoBrief는 null. blog·insta 키는 출력하지 마세요.\n' +
+    '인물: ' + model.briefHint + ' (' + model.label + ')\n\n' +
+    '요구사항:\n' +
+    '- gptVisuals 정확히 3개: (1) role problem / title 공감 컷 / placeAfter 공감 단락 뒤\n' +
+    '  (2) role selfCare / title 따라하기 컷 / placeAfter 따라하기 단락 뒤\n' +
+    '  (3) role explanation / title 원리 컷 / placeAfter 원리 단락 뒤\n' +
+    '- 각 prompt는 한글 180~450자, 구도·인물·공간·동작·손 위치·조명·금지를 구체적으로\n' +
+    '- 따라하기 컷이 핵심: selfCare 동작이 한눈에 보이게\n' +
+    '- 영문-only·병원·수술·로고·긴 텍스트·만화·3D 금지\n\n' +
+    'JSON만:\n' +
+    '{"images":{"gptVisuals":[' +
+    '{"title":"공감 컷","role":"problem","placeAfter":"공감 단락 뒤","prompt":"..."},' +
+    '{"title":"따라하기 컷","role":"selfCare","placeAfter":"따라하기 단락 뒤","prompt":"..."},' +
+    '{"title":"원리 컷","role":"explanation","placeAfter":"원리 단락 뒤","prompt":"..."}' +
+    '],"mangoBrief":null}}\n\n' +
+    '[블로그 원문]\n' + buildBlogSourceText_(blog, catId);
+  var text = await callClaudePlanner_(prompt, { maxTokens: 2800, timeoutMs: MANGO_BG_TIMEOUT_MS });
+  var obj = parsePlannerAiJsonObject_(text);
+  var images = (obj && obj.images) || obj;
+  var list = images && Array.isArray(images.gptVisuals) ? images.gptVisuals : [];
+  list = (list || []).filter(function(x){ return x && String(x.prompt || '').trim(); });
+  var local = buildBlogInsertImagePromptsFromBlog_(blog, topic, catId);
+  if(list.length < 1) return local;
+  var mapped = list.map(function(item, i){ return normalizeBlogInsertVisualItem_(item, i); });
+  local.forEach(function(item){
+    if(mapped.length >= 3) return;
+    var hasRole = mapped.some(function(x){ return x.role === item.role; });
+    if(!hasRole) mapped.push(item);
+  });
+  while(mapped.length < 3 && local[mapped.length]) mapped.push(local[mapped.length]);
+  return mapped.slice(0, 3);
 }
 
 window.copyOpenImageToolFromField = function(btn, index){
@@ -25644,7 +25891,7 @@ window.getFullCopy = function(){
   if(im){
     var imgCatId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
     var imgText = getImagePromptTextForData_(content, imgCatId);
-    if(imgText) t += '\n\n[망고보드 상세페이지 입력]\n' + imgText;
+    if(imgText) t += '\n\n' + imgText;
   }
   return t;
 };
@@ -25691,7 +25938,7 @@ function getTabCopyText(tab, content){
     var imgCatId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
     if(isDailyShareCategory(imgCatId)) return '';
     var imgCopy = getImagePromptTextForData_(content, imgCatId);
-    return imgCopy ? '[망고보드 상세페이지 입력]\n' + imgCopy : '';
+    return imgCopy ? imgCopy : '';
   }
   return '';
 }
@@ -27359,6 +27606,11 @@ function applySheetImageEdits_(content){
     });
   }
   content.images.gptVisuals = gpt;
+  if(isBlogInstaCategory(catId)){
+    content.images.gptVisuals = (content.images.gptVisuals || []).map(function(item, i){
+      return normalizeBlogInsertVisualItem_(item, i);
+    }).filter(function(x){ return x.prompt; });
+  }
   var titleEl = document.getElementById('sheet-mango-title');
   var briefEl = document.getElementById('sheet-mango-brief-paste');
   if(titleEl || briefEl){
@@ -27689,7 +27941,6 @@ function enqueueMangoFromBlog_(draftId, catId, topic, blog, draft){
       if(content){
         if(!content.images) content.images = { gptVisuals: [], mangoBrief: null };
         content.images.mangoBrief = brief;
-        content.images.gptVisuals = [];
         persistDraftContent_(draftId, content);
       }
       renderTabs();
@@ -28098,15 +28349,25 @@ function getImagePromptTextForData_(content, catId){
     }).filter(Boolean).join('\n\n');
   }
   if(isDailyShareCategory(catId)) return '';
-  // GPT 영문 프롬프트는 더 이상 저장·복사하지 않음 — mangoBrief만
+  var insertSlots = getDisplayGptVisuals_(im.gptVisuals, catId);
+  var insertText = insertSlots.map(function(item, i){
+    var title = String(item.title || ('이미지 ' + (i + 1))).trim();
+    var place = String(item.placeAfter || getBlogInsertPlaceAfter_(item.role)).trim();
+    return '【' + title + (place ? ' · ' + place : '') + '】\n' + String(item.prompt || '').trim();
+  }).filter(Boolean).join('\n\n');
   var briefText = formatMangoBriefPaste_(im.mangoBrief, catId);
-  if(!briefText && !(im.mangoBrief && im.mangoBrief.productName)) return '';
-  var mb = im.mangoBrief || {};
-  var head = '[망고보드 상세페이지 입력]';
-  if(mb.productName) head += '\n제품명(' + String(mb.productName).length + '/' + MANGO_DETAIL_TITLE_MAX + '): ' + mb.productName;
-  if(briefText) head += '\n소개(' + briefText.length + '/' + MANGO_DETAIL_INTRO_MAX + '):\n' + briefText;
-  if(mb.photoTip) head += '\n참고사진 TIP: ' + mb.photoTip;
-  return head;
+  if(!insertText && !briefText && !(im.mangoBrief && im.mangoBrief.productName)) return '';
+  var parts = [];
+  if(insertText) parts.push('[본문 삽입용 사진 프롬프트]\n' + insertText);
+  if(briefText || (im.mangoBrief && im.mangoBrief.productName)){
+    var mb = im.mangoBrief || {};
+    var head = '[망고보드 상세페이지 입력 · 선택]';
+    if(mb.productName) head += '\n제품명(' + String(mb.productName).length + '/' + MANGO_DETAIL_TITLE_MAX + '): ' + mb.productName;
+    if(briefText) head += '\n소개(' + briefText.length + '/' + MANGO_DETAIL_INTRO_MAX + '):\n' + briefText;
+    if(mb.photoTip) head += '\n참고사진 TIP: ' + mb.photoTip;
+    parts.push(head);
+  }
+  return parts.join('\n\n');
 }
 
 function buildPublishedPromptData_(draft, catId, content, finalTexts){
@@ -29631,6 +29892,7 @@ if(isThreadCategory(catId)){
   if(content.blog) content.blog = normalizeBlogBlock(content.blog, catId);
   normalizeContentImages_(content, catId);
   fillMangoBriefFromContent_(content, { catId: catId, draftId: jobDraftId, topic: draft && draft.topic });
+  ensureBlogInsertImagePrompts_(content, draft && draft.topic, catId);
   delete content.insta;
   delete content.threads;
 }
@@ -29746,10 +30008,7 @@ window.genContent = async function(ev){
       openApiModal();
       return;
     }
-    if(mangoBgByDraft[draftId]){
-      setAppToast('망고보드 소개를 만들고 있어요.\n잠시만 기다려 주세요.', { duration: 4500, variant: 'ok' });
-      return;
-    }
+    var mangoOnly = !!(clickBtn && (clickBtn.getAttribute('data-regen') === 'mango' || /소개 재생성/.test(String(clickBtn.textContent || ''))));
     var mangoContent = getDraftContent_(draftId);
     if(!mangoContent || !mangoContent.blog || !blogHasMinimumContent_(catId, mangoContent.blog)){
       setAppToast('블로그 초안이 없어요.\n블로그 탭에서 먼저 초안을 생성해 주세요.', { duration: 5000, variant: 'err' });
@@ -29758,9 +30017,42 @@ window.genContent = async function(ev){
     applySheetEditsForTab_(mangoContent, 'images');
     var catMg = CATEGORIES[catId];
     var draftMg = catMg && catMg.drafts.find(function(d){ return d.id === draftId; });
-    if(clickBtn) startButtonCountdown_(clickBtn, { estimateSec: Math.ceil(MANGO_BG_ESTIMATE_MS / 1000), busyLabel: '망고보드 재생성 중', idleText: clickBtn.textContent });
-    enqueueMangoFromBlog_(draftId, catId, draftMg ? draftMg.topic : '', mangoContent.blog, draftMg);
-    setAppToast('블로그 기준으로 망고보드 소개만 다시 만들고 있어요…', { duration: 5000, variant: 'ok' });
+    if(mangoOnly){
+      if(mangoBgByDraft[draftId]){
+        setAppToast('망고보드 소개를 만들고 있어요.\n잠시만 기다려 주세요.', { duration: 4500, variant: 'ok' });
+        return;
+      }
+      if(clickBtn) startButtonCountdown_(clickBtn, { estimateSec: Math.ceil(MANGO_BG_ESTIMATE_MS / 1000), busyLabel: '망고보드 재생성 중', idleText: clickBtn.textContent });
+      enqueueMangoFromBlog_(draftId, catId, draftMg ? draftMg.topic : '', mangoContent.blog, draftMg);
+      setAppToast('블로그 기준으로 망고보드 소개만 다시 만들고 있어요…', { duration: 5000, variant: 'ok' });
+      return;
+    }
+    if(clickBtn) startButtonCountdown_(clickBtn, { estimateSec: Math.ceil(MANGO_BG_ESTIMATE_MS / 1000), busyLabel: '이미지 프롬프트 재생성 중', idleText: '프롬프트 재생성' });
+    setAppToast('블로그 기준으로 본문 삽입 사진 프롬프트를 다시 만들고 있어요…', { duration: 4500, variant: 'ok' });
+    try {
+      var insertSlots = await generateBlogInsertPromptsFromBlog_(
+        catId,
+        mangoContent.blog,
+        draftMg ? draftMg.topic : '',
+        draftMg
+      );
+      var insertLatest = getDraftContent_(draftId) || mangoContent;
+      if(!insertLatest.images) insertLatest.images = { gptVisuals: [], mangoBrief: null };
+      insertLatest.images.gptVisuals = insertSlots;
+      persistDraftContent_(draftId, insertLatest);
+      if(state.selectedId === draftId){
+        state.activeTab = 'images';
+        renderSheetContent(insertLatest);
+      }
+      renderTabs();
+      renderMain();
+      setAppToast('본문 삽입 사진 프롬프트를 다시 만들었어요. Cursor에 「이 초안 이미지 만들어줘」라고 하면 사진을 만들 수 있어요.', { duration: 5000, variant: 'ok' });
+    } catch(err){
+      console.warn('[본문 삽입 이미지 재생성]', err);
+      setAppToast('이미지 프롬프트 재생성에 실패했어요.\n' + ((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
+    } finally {
+      if(clickBtn) stopButtonCountdown_(clickBtn);
+    }
     return;
   }
 

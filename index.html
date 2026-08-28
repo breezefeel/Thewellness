@@ -79,49 +79,8 @@
 <div id="planner-boot-splash" role="status" aria-live="polite">
   <div class="boot-spin" aria-hidden="true"></div>
   <div class="boot-brand">브랜딩 플래너</div>
-  <div class="boot-sub" id="planner-boot-sub">화면을 여는 중이에요.<br>처음 한 번만 파일이 커서 조금 걸릴 수 있어요.</div>
+  <div class="boot-sub">화면을 여는 중이에요.<br>처음 한 번만 파일이 커서 조금 걸릴 수 있어요.</div>
 </div>
-<script>
-(function(){
-  function ready(){
-    try { return document.documentElement.classList.contains('planner-ready'); } catch(e){ return false; }
-  }
-  function showRetry(){
-    if(ready()) return;
-    var sub = document.getElementById('planner-boot-sub');
-    if(sub){
-      sub.innerHTML = window.__plannerJsFailed
-        ? '파일을 불러오지 못했어요.<br>인터넷을 확인한 뒤 다시 열어 주세요.'
-        : '열기가 오래 걸려요.<br>아래 버튼으로 다시 열어 주세요.';
-    }
-    var splash = document.getElementById('planner-boot-splash');
-    if(!splash || document.getElementById('boot-retry-btn')) return;
-    var b = document.createElement('button');
-    b.id = 'boot-retry-btn';
-    b.type = 'button';
-    b.textContent = '다시 열기';
-    b.style.cssText = 'margin-top:12px;border:0;background:#111827;color:#fff;font:800 14px/1.2 inherit;padding:12px 18px;border-radius:10px;cursor:pointer;';
-    b.onclick = function(){
-      try {
-        if(navigator.serviceWorker && navigator.serviceWorker.getRegistrations){
-          navigator.serviceWorker.getRegistrations().then(function(regs){
-            return Promise.all((regs || []).map(function(r){ return r.unregister(); }));
-          }).catch(function(){}).then(function(){ location.reload(); });
-          return;
-        }
-      } catch(e1){}
-      location.reload();
-    };
-    splash.appendChild(b);
-  }
-  setTimeout(showRetry, 8000);
-  setTimeout(function(){
-    if(!ready()){
-      try { document.documentElement.classList.add('planner-ready'); } catch(e2){}
-    }
-  }, 20000);
-})();
-</script>
 
 <div id="drive-oauth-busy" aria-live="polite" aria-busy="true">
   <div class="spin" aria-hidden="true"></div>
@@ -438,7 +397,7 @@
 <div id="main-content"></div>
 </div>
 <script src="ops-naver-kw-seed.js?v=154"></script>
-<script src="planner.js?v=164" defer onerror="window.__plannerJsFailed=1"></script>
+<script src="planner.js?v=165" defer></script>
 <script>
 function openLinksModal_(){
   var o = document.getElementById('links-modal-overlay');

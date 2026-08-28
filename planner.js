@@ -4042,7 +4042,7 @@ function needsPlannerSetupGuide_(){
   if(isDailyShareCategory(state.currentCat)){
     var dailyCat = CATEGORIES[state.currentCat];
     var draftCount = dailyCat && dailyCat.drafts ? dailyCat.drafts.filter(function(d){ return d && d.id; }).length : 0;
-    return !hasDailyShareThemesCustomized_() && draftCount < 2;
+    return draftCount < 2;
   }
   return !isYearPlanCustomized_() || !hasSubGoalPlan_(state.currentCat) || !hasTopicsFilledInPlan_(state.currentCat);
 }
@@ -4051,16 +4051,12 @@ function renderDailyShareSetupGuideHTML_(){
     '<button type="button" class="planner-setup-dismiss" onclick="dismissPlannerSetupGuide_()" aria-label="안내 닫기">×</button>' +
     '<div class="planner-setup-title">일상 공유, 이렇게 시작해요</div>' +
     '<ol class="planner-setup-steps">' +
-      '<li class="planner-setup-step setup-tone-year">' +
-        '<span class="planner-setup-step-label">① 이번 달 테마 · 나눔 방향 잡기</span>' +
-        '<button type="button" class="setup-step-btn" onclick="toggleDailySharePanel_(true)">설정</button>' +
-      '</li>' +
       '<li class="planner-setup-step setup-tone-program">' +
-        '<span class="planner-setup-step-label">② 추가에서 사진·재료 넣고 주제 만들기</span>' +
+        '<span class="planner-setup-step-label">① 추가에서 그날의 장면 또는 생각 한 줄로 주제 만들기</span>' +
         '<button type="button" class="setup-step-btn" onclick="openAddForm_()">추가</button>' +
       '</li>' +
       '<li class="planner-setup-step setup-tone-topic">' +
-        '<span class="planner-setup-step-label">③ 이미지 탭에서 원본 4:5 맞추기</span>' +
+        '<span class="planner-setup-step-label">② 이미지 탭에서 원본 4:5 맞추기</span>' +
         '<span class="planner-setup-hint">썸네일을 새로 만들지 않습니다</span>' +
       '</li>' +
     '</ol>' +
@@ -7796,8 +7792,6 @@ function renderDailyTopicSuggestHTML_(monthKey){
 function renderDailySharePanelHTML_(catId){
   var cat = CATEGORIES[catId];
   if(!cat) return '';
-  var plan = getDailySharePlan_();
-  var collapsed = state.dailyShareCollapsed !== false;
   var drafts = getVisibleDraftsInMain_(catId);
   var pubCount = drafts.filter(function(d){ return draftIsPublished_(d.id); }).length;
   var curMonth = getCurrentShareMonthKey_();
@@ -7805,33 +7799,7 @@ function renderDailySharePanelHTML_(catId){
   if(!monthGroups.some(function(g){ return g.monthKey === curMonth; })){
     monthGroups.unshift({ monthKey: curMonth, label: formatShareMonthLabel_(curMonth), drafts: [] });
   }
-  var html = '<div class="planner-layer daily-layer' + (collapsed ? ' collapsed' : '') + '">' +
-    '<div class="planner-layer-head">' +
-      '<div class="planner-layer-kicker">' + escapeHtml(cat.name) + ' · ' + escapeHtml(cat.audience) + '</div>' +
-      '<div class="planner-layer-actions">' +
-        '<button type="button" class="layer-btn subtle" onclick="toggleDailySharePanel_()" aria-expanded="' + (!collapsed) + '">' + (collapsed ? '펼치기' : '접기') + '</button>' +
-      '</div>' +
-    '</div>';
-  if(collapsed){
-    var compact = plan.intent || plan.themes.map(function(t){ return t.label; }).join(' · ');
-    html += '<div class="planner-layer-compact">' + escapeHtml(compact || '장면·생각 한 줄로 가볍게 올려요') + '</div>';
-  } else {
-    html += '<p class="daily-share-intro">미카닥 <strong>개인 계정</strong>용. <strong>그날의 장면</strong>(누구와 · 무엇을 · 몸 느낌) 또는 떠오른 <strong>생각 한 줄</strong>을 남깁니다. 사진은 원본 4:5.</p>';
-    html += '<p class="daily-share-bridge">' + escapeHtml(DAILY_SHARE_MASTER_BRIDGE) + '</p>';
-    html += '<div class="ws-intent-block daily-intent-block">' +
-      '<label class="ws-intent-label">이번 달 일상 나눔 방향 (선택)</label>' +
-      '<textarea class="ws-intent-input ws-grow-textarea daily-intent-input" rows="2" placeholder="예: 담백·관찰 위주. 장면은 사실만, 생각 한 줄은 공감하게 풀기" oninput="updateDailyShareIntent_(this.value);autoGrowTextarea_(this)">' + escapeHtml(plan.intent || '') + '</textarea>' +
-    '</div>';
-    html += '<div class="daily-theme-grid">';
-    plan.themes.forEach(function(t, idx){
-      html += '<div class="daily-theme-row ' + getDailyThemeToneClass_(idx) + '">' +
-        '<span class="daily-theme-label">' + escapeHtml(t.label) + '</span>' +
-        '<input type="text" class="daily-theme-input" value="' + escapeHtml(t.note || '') + '" placeholder="이 축에서 나눌 느낌·장면" onchange="updateDailyShareThemeNote_(\'' + escapeHtml(t.id) + '\',this.value)" />' +
-      '</div>';
-    });
-    html += '</div>';
-  }
-  html += '<div class="daily-draft-section">' +
+  var html = '<div class="daily-draft-section">' +
     '<div class="daily-draft-head">' +
       '<span class="daily-draft-title">일상 글 주제 · 달별</span>' +
       '<span class="daily-draft-stats">발행 ' + pubCount + '/' + drafts.length + '</span>' +
@@ -7861,7 +7829,7 @@ function renderDailySharePanelHTML_(catId){
     }
     html += '</div>';
   });
-  html += '</div></div>';
+  html += '</div>';
   return html;
 }
 function renderProgramRoadmapHTML_(catId){

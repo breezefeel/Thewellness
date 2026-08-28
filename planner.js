@@ -18105,7 +18105,27 @@ function bootPlannerLocalState_(){
   try { lsRaw = localStorage.getItem(SK) || ''; } catch(eRaw){ lsRaw = ''; }
   var lsStub = isPlannerLsIdbStubRaw_(lsRaw);
 
-  state._bootLocalPromise = readPlannerIdbPayload_().then(function(idbRaw){
+  var idbRead_ = readPlannerIdbPayload_();
+  var idbWait_ = new Promise(function(resolve){
+    var settled = false;
+    var t = setTimeout(function(){
+      if(settled) return;
+      settled = true;
+      resolve('');
+    }, 2500);
+    idbRead_.then(function(v){
+      if(settled) return;
+      settled = true;
+      clearTimeout(t);
+      resolve(v);
+    }).catch(function(){
+      if(settled) return;
+      settled = true;
+      clearTimeout(t);
+      resolve('');
+    });
+  });
+  state._bootLocalPromise = idbWait_.then(function(idbRaw){
     var raw = '';
     var fromIdb = false;
     if(idbRaw && idbRaw.length > 2 && !isPlannerLsIdbStubRaw_(idbRaw)){
@@ -18207,7 +18227,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=164').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=166').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -18280,10 +18300,18 @@ window.onload = () => {
   } else {
     setTimeout(startUi_, 0);
   }
-  // 스플래시가 영구히 남지 않게 안전장치
+  // 스플래시만 걷고 본문이 비지 않게 — 저장본 로드가 늦으면 기본 화면을 먼저 그림
   setTimeout(function(){
-    try { document.documentElement.classList.add('planner-ready'); } catch(eSafe){}
-  }, 12000);
+    try {
+      if(!state._bootFirstPaintDone){
+        try { renderTabs(); } catch(eTabs){}
+        try { updateAddButtonVisibility_(); } catch(eAdd){}
+        try { renderMain(); } catch(eMain){}
+        state._bootFirstPaintDone = true;
+      }
+      document.documentElement.classList.add('planner-ready');
+    } catch(eSafe){}
+  }, 4000);
   window.addEventListener('pageshow', function(ev){
     if(readCachedDriveToken_()) hideDriveOAuthBusy_();
     var hasOAuthHash = !!(location.hash || '').match(/access_token=|error=/);
@@ -23209,6 +23237,7 @@ function syncThumbMakerFields_(content, force){
       if(force) st.programMode = 'topic';
       st.fields = buildThumbMakerCopy_(content, catId, { programMode: st.programMode || 'topic' });
     }
+  }
   st.lastCopy = st.fields;
   return st.fields;
 }

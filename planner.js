@@ -25329,12 +25329,12 @@ function buildImageTabBody(content){
     ensureHeiljagyaeImagePrompts_(content);
     var slots = getDisplayGptVisuals_((content.images && content.images.gptVisuals) || [], catId);
     var htmlHj = '';
+    htmlHj += renderThumbMakerCard_(content);
     htmlHj += '<div class="img-section-title">망고보드 AI 디자인 · 따라하기 이미지</div>';
     htmlHj += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">게시판 <strong>셀프 케어(따라하기)</strong>를 바탕으로 만든 프롬프트입니다. 하단 <strong>복사</strong>를 누르면 따라하기 컷 프롬프트를 복사하고 <strong>망고보드 AI 디자인</strong>으로 이동합니다. Cursor에 <strong>「이 초안 이미지 만들어줘」</strong>라고 해도 됩니다.</p>';
     if(!slots.length){
       htmlHj += '<p class="empty-note" style="padding:0;line-height:1.55;">프롬프트가 아직 없어요. 본문 초안이 있으면 자동으로 채워지고, 아래에서 AI가 다시 다듬을 수 있어요.</p>';
       htmlHj += '<button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin:10px 0 14px;">프롬프트 재생성</button>';
-      htmlHj += renderThumbMakerCard_(content);
       return htmlHj;
     }
     slots.forEach(function(item, i){
@@ -25350,7 +25350,6 @@ function buildImageTabBody(content){
     });
     htmlHj += '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">프롬프트를 수정한 뒤 하단 <strong>복사</strong> → 망고보드 AI 채팅란에 붙여넣기 하세요. <a href="' + escapeHtml(DEFAULT_MANGO_DESIGNER_URL) + '" target="_blank" rel="noopener noreferrer">AI 디자이너 열기</a></p>';
     htmlHj += '<button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin:10px 0 8px;">프롬프트 재생성</button>';
-    htmlHj += renderThumbMakerCard_(content);
     return htmlHj;
   }
 
@@ -25366,6 +25365,7 @@ function buildImageTabBody(content){
   const brief = content.images.mangoBrief || null;
 
   let html = '';
+  html += renderThumbMakerCard_(content);
   html += '<div class="img-section-title">본문 삽입용 사진 프롬프트</div>';
   html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">긴 글 <strong>문단 사이</strong>에 넣을 실사 컷입니다. 상세페이지가 아니에요. Cursor 채팅에 <strong>「이 초안 이미지 만들어줘」</strong>라고 하면 아래 프롬프트로 사진을 바로 만들 수 있어요. 프롬프트는 복사해서 그대로 써도 됩니다.</p>';
   if(!slots.length){
@@ -25391,7 +25391,6 @@ function buildImageTabBody(content){
     html += '</div>';
     html += '<button type="button" class="btn-gen-big" data-regen="insert" onclick="genContent(event)" style="width:100%;margin:0 0 8px;">프롬프트 재생성</button>';
   }
-  html += renderThumbMakerCard_(content);
   html += renderMangoDetailInputCard_(brief);
   html += '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">하단 <strong>저장</strong>으로 초안만 보관할 수 있어요. <strong>발행완료</strong>는 이미지 최종본을 확정할 때 쓰며, 카드의「발행완료」배지에는 <strong>필수가 아니에요</strong>(블로그·인스타·쓰레드만). 망고보드 7장은 <strong>선택</strong>입니다.</p>';
   html += '<div class="img-tool-hint">망고보드가 필요할 때만 <strong>제목·소개 복사</strong> → 소개란에 붙여넣기 → <strong>첫 줄(제목)</strong>만 제품명란으로. <a href="' + escapeHtml(DEFAULT_MANGO_DESIGNER_URL) + '" target="_blank" rel="noopener noreferrer">AI 디자이너</a></div>';

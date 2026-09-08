@@ -10238,13 +10238,16 @@ ${DAILY_SHARE_TONE_ANCHOR}
 const BLOG_UNIVERSAL_QUALITY_RULE = `[블로그 공통 완성도 — 주제와 무관하게 적용]
 - 글마다 **독자 한 집단·핵심 메시지 한 가지**를 먼저 정하고 끝까지 유지하세요.
 - 문단마다 새 정보가 진행되어야 합니다. 같은 결론·가치·감정을 표현만 바꿔 반복하지 마세요.
+- **핵심 메시지는 글 전체에서 한 번만** 분명히 쓰고, problem·selfCare·explanation·FAQ·cta에서 같은 주장(“통증 없어도 문제다”, “구조를 먼저”, “좌우 차이를 보라”)을 되풀이하지 마세요.
+- 단락 끝마다 “이유가 여기 있어요 / 첫 순간이에요 / 시작점이에요” 식 **교훈 한 줄로 닫지 마세요.** 다음 정보로 이어지거나 그냥 끝내세요.
 - 비유는 가장 이해를 돕는 **한 번만** 사용하고, 이후에는 구체적인 장면·관찰·근거로 설명하세요.
-- 입력에 장소·대상·질문·현장 장면이 있으면 구체적으로 활용하되, 없는 사실·반응·성과를 만들지 마세요.
-- 정보형 글은 **독자 장면 → 원인·오해 → 구체적 도움 → 원리·주의 → 다음 행동**으로 전개하세요.
+- 입력에 장소·대상·질문·현장 장면이 있으면 구체적으로 활용하되, 없는 사실·반응·성과를 만들지 마세요. **실제 관찰·숫자·손 느낌 1개**가 없으면 분위기 문장으로 채우지 마세요.
+- 정보형 글은 **독자 장면 → (필요 시) 오해 1개 → 구체 도움 → 짧은 원리 → 다음 행동**으로 전개하세요. 모든 템플릿 칸을 억지로 채우지 마세요.
 - 강의·연수·행사 후기라면 **왜 이 자리가 필요했는지 → 현장 장면 → 핵심 내용 2~3개 → 실제 질문·반응 → 역할의 경계 → 달라진 관점 → 자연스러운 문의**로 전개하세요.
 - 진단·교정·치료 주체와 관찰·교육·운동 안내자의 역할을 분명히 구분하세요.
 - CTA는 본문의 결론과 직접 연결하고, 갑작스러운 홍보·상담 압박·상투적인 감사 인사를 피하세요.
-- 복사 과정의 "접기/펴기", 빈 제목, 중복 구분선 같은 편집 흔적을 본문에 넣지 마세요.`;
+- 복사 과정의 "접기/펴기", 빈 제목, 중복 구분선 같은 편집 흔적을 본문에 넣지 마세요.
+- 번호 목록을 쓰면 **1번 제목 다음에 바로 내용**이 오게 하고, 개요만 두고 2번부터 본문을 시작하지 마세요.`;
 
 const THREADS_UNIVERSAL_QUALITY_RULE = `[Threads 댓글 완성도 보강]
 - **맥락·과정 → 핵심 구분 → 구체적 장면·근거 → 관점·다음 행동** 순서로 전개하세요.
@@ -11408,12 +11411,23 @@ const DEFAULT_EXPERT_COURSE_SCOPE_RULE = `[범위·집중 — 최우선]
 /** 미카닥 말투 카드 v1 — 기준 원문: mikadoc-voice-card.md */
 const MIKADOC_VOICE_CARD_RULE = `[미카닥 말투 카드]
 - 정체성: 현장에서 본 걸 설명하는 임상가. 따뜻하되 과장 없음.
-- 뼈대: 장면·질문 → 흔한 오해 → 구분·순서 → 손·숫자·비유(글당 1개) → 짧은 결론·다음 행동.
+- 뼈대: 장면·질문 → 흔한 오해(최대 1개) → 구분·순서 → 손·숫자·비유(글당 1개) → 짧은 결론·다음 행동.
 - 할 것: 해요체(~해요/~이에요/~있어요). 짧은 문단. "직접 받아보면/손끝으로/같은 자리 비교" 식 현장 검증. 전문용어는 쓰고 바로 한 줄로 풀기. 1인칭 관찰("요즘은~하고 있어요") OK.
-- 금지: "오늘은 모든 질문에 답드리겠습니다"·"충격적인 연구"·"명품 치료"·이모지/구분선 남발. "좋아요/효과가 좋아요" 형용사만. 없는 통계·전후·완치·즉효. Doctor/닥터/원장님을 제목·헤드에. 같은 결론 반복.
+- 금지: "오늘은 모든 질문에 답드리겠습니다"·"충격적인 연구"·"명품 치료"·이모지/구분선 남발. "좋아요/효과가 좋아요" 형용사만. 없는 통계·전후·완치·즉효. Doctor/닥터/원장님을 제목·헤드에. **같은 결론을 표현만 바꿔 반복**.
+- **추상·홍보 AI 문체 금지**(분위기만 만드는 말): "반복의 씨앗"·"시각이 달라지기/전환"·"움직임의 질감"·"구조를 먼저 살펴봐야 한다는 신호"·"변화의 실질적인 시작점"·"내 몸에 이유가 있다"·"첫 순간이에요" 등. 대신 **무엇을 어떻게 했는지**를 쓰세요.
 - 샘플 감각: "들어가자마자 손 들어보세요" / "림프만으로는 어렵습니다" / "망치가 최고? 적절하진 않죠" / "고정은 미는 게 아니라 버티기".`;
 
-const BLOG_CONTENT_VOICE_RULE = '미카닥 박준규 톤 — 따뜻하고 신뢰감 있는 **설명하는 전문가**. **존댓말(해요체)**로 씀(~해요/~이에요/~습니다). 한다체·반말(~한다/~이다) 금지. 제목·서명·헤드라인에 Doctor·닥터·원장님을 쓰지 않음. 과장·즉효 약속 금지.\n\n' + MIKADOC_VOICE_CARD_RULE;
+/** 통증·기능·부하 — 구조 결정론·불안 조장 완화 */
+const PAIN_FUNCTION_LOAD_SAFETY_RULE = `[통증·기능·부하 — 안전 문장]
+- 결론은 **"구조가 원인이다"가 아니라** 통증·기능(움직임)·활동 부하를 **함께** 보는 방향.
+- **금지(강한 단정)**: "통증이 없다=몸이 안전하지 않다/위험 신호다", "증상만 잠재우고 원인 구조는 그대로", "근막 활주·미세 가동 제한이 통증 없이 시작해 나중에 터진다", "표층만 늘고 심층은 안 변한다", "좌우 차이=구조적 문제".
+- **허용(완화)**: 통증만으로 모든 기능을 판단하진 않는다. 다만 일상·운동에 문제가 없으면 좌우 차이만으로 이상으로 단정하지 않는다. 평소와 달라졌거나 불편·기능 제한이 같이 올 때를 보라.
+- 통증은 조직 상태만의 측정기가 아님(민감도·경험·부하 등). **화재경보기/연기 가득**처럼 "손상은 있는데 통증만 없다"로 읽히는 비유 금지.
+- 자가 점검은 "문제 찾기"가 아니라 **관찰 힌트**. 차이를 곧바로 진단·원인 구조로 연결하지 말 것.
+- 영상·병원: "저림이 퍼지면 영상검사 선행"처럼 일률 금지. 심한 통증·마비·대소변·급악화 등 **적신호면 병원 먼저** 한 줄. 일반 요통에 일상적 영상 권고처럼 쓰지 말 것.
+- 출처 없는 통계·일반화("요통의 N%", "초기에 통증 없이 시작") 금지. 입력에 없는 근거를 만들지 말 것.`;
+
+const BLOG_CONTENT_VOICE_RULE = '미카닥 박준규 톤 — 따뜻하고 신뢰감 있는 **설명하는 전문가**. **존댓말(해요체)**로 씀(~해요/~이에요/~습니다). 한다체·반말(~한다/~이다) 금지. 제목·서명·헤드라인에 Doctor·닥터·원장님을 쓰지 않음. 과장·즉효 약속 금지.\n\n' + MIKADOC_VOICE_CARD_RULE + '\n\n' + PAIN_FUNCTION_LOAD_SAFETY_RULE;
 const MEDICAL_COMPLIANCE_RULE = `[의료법·포지셔닝 — 필수]
 - 작성자(미카닥 박준규)는 **현재 병원에서 근무하지 않습니다**. 진단·처방·치료행위를 하거나 암시하지 마세요(아래 채널 예외 참고).
 - 제공 범위는 **운동·재활·웰니스 프로그램**(리얼무브먼트, P-스트레칭, 기능운동 등)이며, 의료행위가 아님을 전제로 씁니다.
@@ -11435,10 +11449,17 @@ const FUNCTIONAL_REHAB_CENTER_POSITIONING_RULE = `[기능재활운동센터 컬�
 - 배경으로만 허용: 「치료를 받아도 반복되면 자세·움직임」처럼 **짧게**. 도수/카이로를 이 채널의 차별점으로 내세우지 말 것.
 - 신뢰 연결: DC·PT·20년 임상은 「인체를 아는 지도자」로. Doctor/닥터·치료원·병원 근무 톤 금지.`;
 
-const GEO_CONTENT_STRUCTURE_RULE = `[GEO · AI 인용 가능 구조 — explanation 필드에 자연스럽게 녹이기]
-**explanation 맨 앞 2~3문장은 TL;DR(핵심 결론 요약)**으로 시작할 것. AI가 먼저 발췌할 수 있게 결론을 선제시한 뒤, 아래 요소를 번호·"N단계" 표기 없이 문단으로 이어 연결:
-① (TL;DR — 위에서 이미 작성) ② 자가 점검 2~4개 ③ 가능한 원인 ④ 생활·운동으로 관리할 때 참고할 점 ⑤ 안전한 셀프 확인·이완 ⑥ 주의·금기(무리 금지) ⑦ 근골격계 전문가 관점 ⑧ 익명 사례 톤의 변화(숫자는 예시로) ⑨ FAQ 2~3개 ⑩ 다음 행동(프로그램·프로필 안내) — 주제와 맞으면 프로필 증상 허브 딥링크 1개 포함 가능
-※ explanation·FAQ에 병원 진료 안내를 다시 쓰지 마세요. (병원 안내는 selfCare 한 줄만)`;
+const GEO_CONTENT_STRUCTURE_RULE = `[GEO · 인용 가능한 짧은 구조 — explanation에만, 필요한 것만]
+**explanation 맨 앞 1~2문장은 TL;DR** (핵심만, 뒤에서 같은 문장을 되풀이하지 말 것).
+아래는 **체크리스트가 아니라 선택지**입니다. 새 정보가 생기는 항목만 고르고, 칸을 채우려고 분량을 늘리지 마세요.
+- 동작이 왜 도움이 되는지 짧은 원리(과장·단정 없이)
+- 생활·운동 시 참고 1~2개 / 무리 금지 한 줄
+- FAQ는 **진짜 다른 질문** 0~2개만 (본문 결론 재탕 FAQ 금지)
+- 다음 행동·허브 링크는 cta와 겹치지 않게 한 번만
+※ 자가 점검은 **selfCare에만**. explanation에서 다시 나열하지 마세요.
+※ 브랜드·PAR·프로그램 정당화용으로 근막·심층 구조를 과도하게 단정하지 마세요.
+※ explanation·FAQ에 병원 진료 안내를 다시 쓰지 마세요. (병원 안내는 selfCare 한 줄만)
+※ 전체 본문은 **짧게**. 같은 메시지를 서론·본문·FAQ·결론에 네 번 쓰지 마세요.`;
 
 const DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW = `**일반인 독자**용 블로그입니다. ${BLOG_CONTENT_VOICE_RULE}
 
@@ -11451,9 +11472,9 @@ ${MEDICAL_COMPLIANCE_RULE}
 ${GEO_CONTENT_STRUCTURE_RULE}
 
 [글 흐름 — 반드시 이 순서·필드]
-1. **문제 제기** (problem): 일상 장면에서 공감되는 불편·궁금증 2~4문장. 불릿·번호 나열 금지. 문장(문단) 사이에는 **빈 줄**로 띄워 가독성 확보. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스. **병원 안내 금지**.
-2. **셀프 케어** (selfCare): **👉 로 시작**. 동작·자세·**초·회·분**을 앞쪽에. "아 시원하다" 지점에서 멈추라는 뉘앙스. 무리·재통증 주의 한 줄. **병원 진료 권고는 여기에만 한 문장**(통증·적신호 시 병원 먼저). 같은 글을 다른 필드에서 반복하지 마세요.
-3. **원리 설명** (explanation): **맨 앞 2~3문장 TL;DR(핵심 결론)** → 동작 **뒤에** 왜 도움이 되는지 + GEO 구조. 비유 한 줄. **병원·진료 안내 반복 금지**. **문단 사이 빈 줄**로 읽기 쉽게.
+1. **문제 제기** (problem): 일상 장면에서 공감되는 불편·궁금증 2~4문장. 불릿·번호 나열 금지. 문장(문단) 사이에는 **빈 줄**로 띄워 가독성 확보. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스. **병원 안내 금지**. 교훈 결론으로 닫지 말 것.
+2. **셀프 케어** (selfCare): **👉 로 시작**. 동작·자세·**초·회·분**을 앞쪽에. "아 시원하다" 지점에서 멈추라는 뉘앙스. 무리·재통증 주의 한 줄. **병원 진료 권고는 여기에만 한 문장**(심한 통증·적신호 시 병원 먼저 — 영상검사 일률 권고 금지). 같은 글을 다른 필드에서 반복하지 마세요. 좌우 차이·자가 점검은 **관찰**이지 진단이 아님을 한 줄로만.
+3. **원리 설명** (explanation): **맨 앞 1~2문장 TL;DR** → 동작 **뒤에** 왜 도움이 되는지. GEO는 **새 정보만**. 비유 최대 1개(손상=숨은 화재 식 금지). **병원·진료 안내 반복 금지**. **문단 사이 빈 줄**. 분량보다 구체 장면 1개를 우선.
 
 [형식]
 - title: 호기심·질문형 한 줄 (35자 내외, 네이버 SEO 고려, 과장 금지)
@@ -11479,6 +11500,7 @@ function buildExpertCourseBlogPrompt_(opts){
     '- 두 유형을 섞어 나열하지 말고, 입력의 중심에 더 가까운 하나를 선택하세요.\n\n' +
     BLOG_INSTA_HONORIFIC_SPEECH_RULE + '\n\n' +
     MIKADOC_VOICE_CARD_RULE + '\n\n' +
+    PAIN_FUNCTION_LOAD_SAFETY_RULE + '\n\n' +
     '[톤 & 스타일]\n' +
     '- 과장·낚시·"꼭 해야 한다" 압박 금지. **내용으로 말하는** 느낌\n' +
     '- 전문 용어는 쓰되, **한 줄 정도 풀어서** 설명\n' +
@@ -11767,6 +11789,44 @@ function migrateHospitalGuidanceOnceInSelfCare_(){
       if(!cat || !cat.blog) return;
       var next = ensureAddendum_(cat.blog);
       if(next.changed){ cat.blog = next.text; changed = true; }
+    });
+  }
+  return changed;
+}
+
+/** 저장 프롬프트: AI 티 완화 + 통증·기능·부하 안전 문장 */
+function migrateAntiAiPainSafetyPrompts_(){
+  if(!state.prompts) return false;
+  var changed = false;
+  var marker = '[통증·기능·부하 — 안전 문장]';
+  var antiAiMarker = '[AI 티 완화 — 반복·추상어]';
+  var antiAiAddendum =
+    antiAiMarker + '\n' +
+    '- 핵심 메시지는 글에서 **한 번만**. problem·selfCare·explanation·FAQ·cta에서 같은 주장을 표현만 바꿔 반복하지 마세요.\n' +
+    '- 단락 끝마다 "이유가 여기 있어요/첫 순간이에요/시작점이에요" 식 교훈 한 줄로 닫지 마세요.\n' +
+    '- 추상·홍보 문체 금지: "움직임의 질감", "시각이 전환", "반복의 씨앗", "변화의 실질적 시작점" 등. 구체 장면·동작·손 느낌으로.\n' +
+    '- GEO·FAQ 칸을 채우려고 분량을 늘리지 마세요. 새 정보만.\n' +
+    '- 번호 목록은 1번 제목 바로 다음에 내용이 오게.';
+  function ensureMarker_(text, mk, body){
+    var t = String(text || '');
+    if(!t.trim()) return { text: t, changed: false };
+    if(t.indexOf(mk) >= 0) return { text: t, changed: false };
+    return { text: t.trim() + '\n\n' + body, changed: true };
+  }
+  if(state.prompts.base){
+    var b1 = ensureMarker_(state.prompts.base, marker, PAIN_FUNCTION_LOAD_SAFETY_RULE);
+    if(b1.changed){ state.prompts.base = b1.text; changed = true; }
+    var b2 = ensureMarker_(state.prompts.base, antiAiMarker, antiAiAddendum);
+    if(b2.changed){ state.prompts.base = b2.text; changed = true; }
+  }
+  if(state.prompts.categories){
+    [0, 1, 2].forEach(function(catId){
+      var cat = state.prompts.categories[catId];
+      if(!cat || !cat.blog) return;
+      var n1 = ensureMarker_(cat.blog, marker, PAIN_FUNCTION_LOAD_SAFETY_RULE);
+      if(n1.changed){ cat.blog = n1.text; changed = true; }
+      var n2 = ensureMarker_(cat.blog, antiAiMarker, antiAiAddendum);
+      if(n2.changed){ cat.blog = n2.text; changed = true; }
     });
   }
   return changed;
@@ -16464,6 +16524,7 @@ function applyPersistPayload(s, opts){
   if(migrateUniversalContentFlowPrompts_()) migrated = true;
   if(migrateSpeechStylePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrateHospitalGuidanceOnceInSelfCare_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateAntiAiPainSafetyPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrated){
     if(opts && opts.authoritativeAdopt) state._postAdoptMigration = true;
@@ -18028,6 +18089,7 @@ function runDeferredBootMigrations_(){
     if(migrateUniversalContentFlowPrompts_()) migrated = true;
     if(migrateSpeechStylePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrateHospitalGuidanceOnceInSelfCare_()){ migrated = true; touchPromptsUpdatedAt_(); }
+    if(migrateAntiAiPainSafetyPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrated){
       state.syncDirty = true;

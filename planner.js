@@ -19,7 +19,7 @@ const CATEGORIES = [
       {id:"d1-3", topic:"앉아서 일하는 당신을 위한 3분 루틴",                  angle:"재택·사무직을 위한 척추-고관절 기능운동 시퀀스"},
       {id:"d1-4", topic:"걷기만 해도 자세가 교정된다, 가능한 이야기일까요?",   angle:"보행 패턴과 자세 교정의 연관성, 올바른 걷기 방법"},
     ]},
-  { id:2, icon:"", name:"리얼 페이스",    color:"#D4A853", audience:"일반인",
+  { id:2, icon:"", name:"리얼 페이스",    color:"#9ca98a", audience:"일반인",
     sub:"리얼 페이스 · 얼굴 교정 · 작은얼굴",
     drafts:[
       {id:"d2-0", topic:"셀카에서 한쪽 얼굴만 작아 보이는 진짜 이유",          angle:"안면비대칭의 원인 — 습관, 교합, 경추 연관성 설명"},
@@ -37,7 +37,7 @@ const CATEGORIES = [
       {id:"d3-3", topic:"CMT에서 관절가동술을 쓰는 타이밍은?",                  angle:"HVLA와 LVLA의 선택 기준, 실전 판단 프레임 공유"},
       {id:"d3-4", topic:"환자가 '좋아졌다'고 할 때 치료사가 확인해야 할 것",   angle:"주관적 개선과 객관적 지표의 차이, 재발 방지 전략"},
     ]},
-  { id:4, icon:"", name:"IFC 얼굴교육",   color:"#A67C52", audience:"전문가",
+  { id:4, icon:"", name:"IFC 얼굴교육",   color:"#7c8a6c", audience:"전문가",
     sub:"얼굴교정 전문가 과정",
     drafts:[
       {id:"d4-0", topic:"IFC 얼굴교정, 단순 마사지와 다른 점은 무엇인가?",     angle:"구조적 접근 vs 표면 접근의 차이, IFC 핵심 원리"},
@@ -2094,9 +2094,9 @@ const CAT_IMAGE_THUMBNAIL_FIXED = {
 const CAT_IMAGE_BAND_COLOR_EN = {
   0: 'deep charcoal top and bottom bands with subtle teal accent',
   1: 'warm ivory bands with crimson accent',
-  2: 'warm rose and soft cream top and bottom bands',
+  2: 'muted sage green and warm cream top and bottom bands',
   3: 'deep navy and muted purple top and bottom bands',
-  4: 'burgundy rose and soft gray top and bottom bands',
+  4: 'dark olive brown and muted sage top and bottom bands',
   5: 'deep ivory and charcoal bands with wine crimson accent',
   6: 'soft sage green and warm cream top and bottom bands',
   7: 'soft emerald green and light mint top and bottom bands'
@@ -10397,8 +10397,9 @@ function shadeHexColor_(hex, amount){
   return '#' + pad(r) + pad(g) + pad(b);
 }
 
-/** 프로그램별 망고보드 7장 팔레트 — navy / gold / devon / green + 전문가 변형
- * 망고보드 팔레트 — 색상 미리보기 모달·카테고리 상수와 동일 소스. */
+/** 프로그램별 망고보드 7장 팔레트 — navy / sage / devon / green + 전문가 변형
+ * 망고보드 팔레트 — 색상 미리보기 모달·카테고리 상수와 동일 소스.
+ * 리얼 페이스(2)·IFC(4): FACE × FUNCTION 강의 팔레트(크림·세이지·다크 올리브). */
 const MANGO_PALETTES_BY_CAT = {
   0: {
     key: 'navy',
@@ -10425,16 +10426,16 @@ const MANGO_PALETTES_BY_CAT = {
     desc: '아이보리·차콜 주조 · 크림슨은 작은 기호만(면·배경 금지)'
   },
   2: {
-    key: 'gold',
+    key: 'sage',
     label: '리얼 페이스',
-    bg: '#f0efeb',
-    bg2: '#eee9de',
-    head: '#3d2c27',
-    point: '#6b493d',
-    card: '#f7efe9',
-    card2: '#f5ebe4',
-    divider: '#3d2c27',
-    desc: '소프트 아이보리·웜 골드'
+    bg: '#faf6ef',
+    bg2: '#eee3d2',
+    head: '#5c5347',
+    point: '#9ca98a',
+    card: '#fffdf8',
+    card2: '#eee3d2',
+    divider: '#7c8a6c',
+    desc: '크림·세이지 · FACE × FUNCTION'
   },
   3: {
     key: 'navy-expert',
@@ -10449,16 +10450,16 @@ const MANGO_PALETTES_BY_CAT = {
     desc: '딥 네이비·인디고·교육'
   },
   4: {
-    key: 'gold-expert',
+    key: 'sage-expert',
     label: 'IFC 얼굴교육',
-    bg: '#F5EDE4',
-    bg2: '#EDE3D6',
-    head: '#5C3D2E',
-    point: '#9E4B5A',
-    card: '#FAF6F0',
-    card2: '#F3EBE2',
-    divider: '#5C3D2E',
-    desc: '앤티크 골드·로즈브론즈'
+    bg: '#faf6ef',
+    bg2: '#e4d5bc',
+    head: '#332b23',
+    point: '#7c8a6c',
+    card: '#faf6ef',
+    card2: '#dcc7a8',
+    divider: '#332b23',
+    desc: '다크 올리브·세이지 · IFC 강의톤'
   },
   5: {
     key: 'devon-expert',
@@ -10516,9 +10517,9 @@ const MANGO_PALETTES_BY_CAT = {
 const THUMB_SCRIM_BY_CAT = {
   0: { tint: '#1e2a44', tint2: '#3A5080', glow: '#3a5080' },
   1: { tint: '#333333', tint2: '#2a2a2a', glow: '#1f1f1f' },
-  2: { tint: '#3d2c27', tint2: '#D4A853', glow: '#6b493d' },
+  2: { tint: '#332b23', tint2: '#9ca98a', glow: '#7c8a6c' },
   3: { tint: '#0F172A', tint2: '#1E3A5F', glow: '#4F46E5' },
-  4: { tint: '#5C3D2E', tint2: '#A67C52', glow: '#9E4B5A' },
+  4: { tint: '#332b23', tint2: '#7c8a6c', glow: '#9ca98a' },
   5: { tint: '#1A1A1A', tint2: '#3D1520', glow: '#9F1239' },
   6: { tint: '#1f3d32', tint2: '#3D8B6A', glow: '#3d8b6a' },
   7: { tint: '#14532D', tint2: '#34D399', glow: '#059669' },
@@ -11404,7 +11405,15 @@ const DEFAULT_EXPERT_COURSE_SCOPE_RULE = `[범위·집중 — 최우선]
 - **쓰지 말 것**: 참고에 없는 평가·질환·부위·테크닉으로 **확장**, PSP·임상 전체 흐름으로 **넓혀 쓰기**, "통상적으로는~" 식 **교과서적 부가 설명**, 영상·사진과 무관한 **별도 케이스·일반론**.
 - 정보가 부족하면 억지로 채우지 말고, 참고·영상·사진에 있는 것만 **더 명확하게** 풀어라. 강의 본 동료와 대화하는 톤.`;
 
-const BLOG_CONTENT_VOICE_RULE = '미카닥 박준규 톤 — 따뜻하고 신뢰감 있는 **설명하는 전문가**. **존댓말(해요체)**로 씀(~해요/~이에요/~습니다). 한다체·반말(~한다/~이다) 금지. 제목·서명·헤드라인에 Doctor·닥터·원장님을 쓰지 않음. 과장·즉효 약속 금지.';
+/** 미카닥 말투 카드 v1 — 기준 원문: mikadoc-voice-card.md */
+const MIKADOC_VOICE_CARD_RULE = `[미카닥 말투 카드]
+- 정체성: 현장에서 본 걸 설명하는 임상가. 따뜻하되 과장 없음.
+- 뼈대: 장면·질문 → 흔한 오해 → 구분·순서 → 손·숫자·비유(글당 1개) → 짧은 결론·다음 행동.
+- 할 것: 해요체(~해요/~이에요/~있어요). 짧은 문단. "직접 받아보면/손끝으로/같은 자리 비교" 식 현장 검증. 전문용어는 쓰고 바로 한 줄로 풀기. 1인칭 관찰("요즘은~하고 있어요") OK.
+- 금지: "오늘은 모든 질문에 답드리겠습니다"·"충격적인 연구"·"명품 치료"·이모지/구분선 남발. "좋아요/효과가 좋아요" 형용사만. 없는 통계·전후·완치·즉효. Doctor/닥터/원장님을 제목·헤드에. 같은 결론 반복.
+- 샘플 감각: "들어가자마자 손 들어보세요" / "림프만으로는 어렵습니다" / "망치가 최고? 적절하진 않죠" / "고정은 미는 게 아니라 버티기".`;
+
+const BLOG_CONTENT_VOICE_RULE = '미카닥 박준규 톤 — 따뜻하고 신뢰감 있는 **설명하는 전문가**. **존댓말(해요체)**로 씀(~해요/~이에요/~습니다). 한다체·반말(~한다/~이다) 금지. 제목·서명·헤드라인에 Doctor·닥터·원장님을 쓰지 않음. 과장·즉효 약속 금지.\n\n' + MIKADOC_VOICE_CARD_RULE;
 const MEDICAL_COMPLIANCE_RULE = `[의료법·포지셔닝 — 필수]
 - 작성자(미카닥 박준규)는 **현재 병원에서 근무하지 않습니다**. 진단·처방·치료행위를 하거나 암시하지 마세요(아래 채널 예외 참고).
 - 제공 범위는 **운동·재활·웰니스 프로그램**(리얼무브먼트, P-스트레칭, 기능운동 등)이며, 의료행위가 아님을 전제로 씁니다.
@@ -11469,6 +11478,7 @@ function buildExpertCourseBlogPrompt_(opts){
     '- **강의·연수 후기형**: 교육이 필요했던 이유와 현장 장면(hook) → 다룬 관찰·학습 포인트 2~3개(outline) → 실제 질문·역할의 경계·달라진 관점(draft)\n' +
     '- 두 유형을 섞어 나열하지 말고, 입력의 중심에 더 가까운 하나를 선택하세요.\n\n' +
     BLOG_INSTA_HONORIFIC_SPEECH_RULE + '\n\n' +
+    MIKADOC_VOICE_CARD_RULE + '\n\n' +
     '[톤 & 스타일]\n' +
     '- 과장·낚시·"꼭 해야 한다" 압박 금지. **내용으로 말하는** 느낌\n' +
     '- 전문 용어는 쓰되, **한 줄 정도 풀어서** 설명\n' +

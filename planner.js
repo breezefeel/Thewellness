@@ -521,11 +521,67 @@ var OPS_NAVER_KW_MAX_CHARS = 25;
 /** 검색광고 키워드 입찰가: 70~100000원, 10원 단위 */
 var OPS_NAVER_KW_BID_MIN = 70;
 var OPS_NAVER_KW_BID_MAX = 100000;
+/** 약수 지점: 네이버 광고그룹 현황(일반 첫 줄 · ID는 기본값·수정 가능) */
+var OPS_NAVER_KW_YAKSU_ADGROUP_SEED = {
+  version: 'yaksu-2026-03-09',
+  bid: '70',
+  pcUrl: 'https://realmovement.imweb.me/85',
+  mobileUrl: 'https://realmovement.imweb.me/85',
+  groups: [
+    { name: '일반', id: 'grp-a001-01-000000073136704' },
+    { name: '약수', id: 'grp-a001-01-000000073132456' },
+    { name: '약수역', id: 'grp-a001-01-000000073136208' },
+    { name: '금호', id: 'grp-a001-01-000000073136254' },
+    { name: '금호역', id: 'grp-a001-01-000000073136293' },
+    { name: '옥수', id: 'grp-a001-01-000000073136338' },
+    { name: '옥수역', id: 'grp-a001-01-000000073136367' },
+    { name: '신당', id: 'grp-a001-01-000000073136420' },
+    { name: '신당역', id: 'grp-a001-01-000000073136455' },
+    { name: '동대입구', id: 'grp-a001-01-000000073136523' },
+    { name: '청구', id: 'grp-a001-01-000000073136562' },
+    { name: '버티고개', id: 'grp-a001-01-000000073136607' },
+    { name: '중구', id: 'grp-a001-01-000000073136662' }
+  ]
+};
+function opsNaverKwBranchAdGroupPack_(branchKey){
+  if(branchKey === 'yaksu') return OPS_NAVER_KW_YAKSU_ADGROUP_SEED;
+  return null;
+}
+function isOpsNaverKwBaseLabel_(name){
+  var t = normalizeOpsNaverKwKeyword_(name);
+  return t === '일반' || t === 'base' || t === '공통';
+}
 function opsDefaultNaverNeighborhoods_(branchKey){
-  if(branchKey === 'jakjeon'){
-    return ['작전', '작전역', '계양', '계양역', '임학', '임학역', '계산', '계산역', '귤현', '박촌', '인천'];
+  var pack = opsNaverKwBranchAdGroupPack_(branchKey);
+  if(pack && pack.groups && pack.groups.length){
+    return pack.groups.map(function(g){ return g.name; });
   }
-  return ['약수', '약수역', '금호', '금호역', '옥수', '옥수역', '신당', '신당역', '동대입구', '청구', '버티고개', '중구'];
+  if(branchKey === 'jakjeon'){
+    return ['일반', '작전', '작전역', '계양', '계양역', '임학', '임학역', '계산', '계산역', '귤현', '박촌', '인천'];
+  }
+  return ['일반', '약수', '약수역', '금호', '금호역', '옥수', '옥수역', '신당', '신당역', '동대입구', '청구', '버티고개', '중구'];
+}
+function opsDefaultNaverAdGroupIds_(branchKey){
+  var pack = opsNaverKwBranchAdGroupPack_(branchKey);
+  if(pack && pack.groups && pack.groups.length){
+    return pack.groups.map(function(g){ return String(g.id || '').trim(); });
+  }
+  return [];
+}
+function applyOpsNaverKwBranchAdGroupSeed_(st, branchKey, opts){
+  opts = opts || {};
+  var pack = opsNaverKwBranchAdGroupPack_(branchKey);
+  if(!pack || !pack.groups || !pack.groups.length) return false;
+  if(!opts.force && st.adGroupSeedVersion === pack.version) return false;
+  st.neighborhoods = pack.groups.map(function(g){ return g.name; });
+  st.adGroupId = pack.groups.map(function(g){ return String(g.id || '').trim(); }).join('\n');
+  var base = pack.groups.filter(function(g){ return isOpsNaverKwBaseLabel_(g.name); })[0] || pack.groups[0];
+  st.adGroupIdBase = String((base && base.id) || '').trim();
+  st.bid = normalizeOpsNaverKwBid_(pack.bid || '70');
+  st.pcUrl = normalizeOpsNaverKwUrl_(pack.pcUrl || st.pcUrl);
+  st.mobileUrl = normalizeOpsNaverKwUrl_(pack.mobileUrl || st.mobileUrl || st.pcUrl);
+  st.adGroupSeedVersion = pack.version;
+  return true;
 }
 function opsNaverKwSeedKeywords_(){
   var seed = (typeof OPS_NAVER_KW_SEED !== 'undefined' && OPS_NAVER_KW_SEED) ? OPS_NAVER_KW_SEED : null;
@@ -533,20 +589,29 @@ function opsNaverKwSeedKeywords_(){
   return parseOpsNaverKwLines_(seed.keywords.join('\n'));
 }
 function opsNaverKwPreferredLandingUrl_(){
+  var pack = opsNaverKwBranchAdGroupPack_('yaksu');
+  if(pack && pack.pcUrl) return String(pack.pcUrl).trim();
   return String((OPS_BRAND_COPY && OPS_BRAND_COPY.profileUrl) || '').trim() || 'https://breezefeel.github.io/drpark/';
 }
 function opsNaverKwSeedMeta_(){
   var seed = (typeof OPS_NAVER_KW_SEED !== 'undefined' && OPS_NAVER_KW_SEED) ? OPS_NAVER_KW_SEED : {};
-  var legacyHost = /htcenter\.co\.kr/i;
-  var pc = String(seed.pcUrl || '').trim();
-  var mo = String(seed.mobileUrl || '').trim();
+  var pack = OPS_NAVER_KW_YAKSU_ADGROUP_SEED;
+  var legacyHost = /htcenter\.co\.kr|breezefeel\.github\.io\/drpark/i;
+  var pc = String((pack && pack.pcUrl) || seed.pcUrl || '').trim();
+  var mo = String((pack && pack.mobileUrl) || seed.mobileUrl || '').trim();
   if(!pc || legacyHost.test(pc)) pc = opsNaverKwPreferredLandingUrl_();
   if(!mo || legacyHost.test(mo)) mo = pc;
+  var baseId = '';
+  if(pack && pack.groups && pack.groups.length){
+    var baseG = pack.groups.filter(function(g){ return isOpsNaverKwBaseLabel_(g.name); })[0] || pack.groups[0];
+    baseId = String((baseG && baseG.id) || '').trim();
+  }
+  if(!baseId) baseId = String(seed.adGroupId || '').trim();
   return {
-    adGroupId: String(seed.adGroupId || '').trim(),
+    adGroupId: baseId,
     pcUrl: pc,
     mobileUrl: mo,
-    bid: normalizeOpsNaverKwBid_(seed.bid || '70')
+    bid: normalizeOpsNaverKwBid_((pack && pack.bid) || seed.bid || '70')
   };
 }
 function isOpsNaverKwItemId_(itemId){
@@ -611,23 +676,26 @@ function syncOpsNaverKwAdGroupIdsToHoods_(st){
   if(!st || typeof st !== 'object') return [];
   var hoods = Array.isArray(st.neighborhoods) ? st.neighborhoods : [];
   var aligned = alignOpsNaverKwHoodAdGroupIds_(st.adGroupId, hoods.length);
-  // 예전: ID 1개 + 동네 여러 개 → 일반용으로 옮기고 동네 칸은 비움(동네별 1:1 입력 유도)
-  if(!String(st.adGroupIdBase || '').trim()){
-    var filled = aligned.filter(Boolean);
-    if(filled.length === 1 && hoods.length > 1){
-      st.adGroupIdBase = filled[0];
-      aligned = hoods.map(function(){ return ''; });
+  st.adGroupId = aligned.join('\n');
+  // 「일반」 항목 ID ↔ adGroupIdBase 동기화
+  for(var i = 0; i < hoods.length; i++){
+    if(isOpsNaverKwBaseLabel_(hoods[i]) && aligned[i]){
+      st.adGroupIdBase = aligned[i];
+      break;
     }
   }
-  st.adGroupId = aligned.join('\n');
   return aligned;
 }
 function getOpsNaverKwBaseAdGroupId_(st){
+  var hoods = (st && st.neighborhoods) || [];
+  var hoodIds = alignOpsNaverKwHoodAdGroupIds_(st && st.adGroupId, hoods.length);
+  for(var i = 0; i < hoods.length; i++){
+    if(isOpsNaverKwBaseLabel_(hoods[i]) && hoodIds[i]) return hoodIds[i];
+  }
   var base = String((st && st.adGroupIdBase) || '').trim();
   if(base) return base;
-  var hoodIds = alignOpsNaverKwHoodAdGroupIds_(st && st.adGroupId, ((st && st.neighborhoods) || []).length);
-  for(var i = 0; i < hoodIds.length; i++){
-    if(hoodIds[i]) return hoodIds[i];
+  for(var j = 0; j < hoodIds.length; j++){
+    if(hoodIds[j]) return hoodIds[j];
   }
   var any = parseOpsNaverKwAdGroupIds_(st && st.adGroupId);
   return any[0] || '';
@@ -643,6 +711,10 @@ function buildOpsNaverKwCombinedByHood_(kwState){
   hoods.forEach(function(hood){
     var h = normalizeOpsNaverKwKeyword_(hood);
     if(!h) return;
+    if(isOpsNaverKwBaseLabel_(h)){
+      groups.push({ hood: h, keywords: [], isBase: true });
+      return;
+    }
     var list = [];
     var localSeen = {};
     kws.forEach(function(kw){
@@ -655,7 +727,7 @@ function buildOpsNaverKwCombinedByHood_(kwState){
       globalSeen[combined] = true;
       list.push(combined);
     });
-    groups.push({ hood: h, keywords: list });
+    groups.push({ hood: h, keywords: list, isBase: false });
   });
   groups._skippedLong = skippedLong;
   return groups;
@@ -670,12 +742,13 @@ function getOpsNaverKwState_(itemId){
     cur = {
       keywords: opsNaverKwSeedKeywords_(),
       neighborhoods: opsDefaultNaverNeighborhoods_(branchKey),
-      adGroupId: meta.adGroupId,
+      adGroupId: opsDefaultNaverAdGroupIds_(branchKey).join('\n') || meta.adGroupId,
       adGroupIdBase: meta.adGroupId,
       pcUrl: meta.pcUrl,
       mobileUrl: meta.mobileUrl,
       bid: meta.bid,
-      joinMode: 'none'
+      joinMode: 'none',
+      adGroupSeedVersion: ''
     };
     om.keywordAds[itemId] = cur;
   }
@@ -686,24 +759,25 @@ function getOpsNaverKwState_(itemId){
     var seedKw = opsNaverKwSeedKeywords_();
     if(seedKw.length) cur.keywords = seedKw;
   }
+  // 약수 등 지점 광고그룹 시드 반영(버전 바뀌면 목록·ID·URL·입찰가 갱신)
+  applyOpsNaverKwBranchAdGroupSeed_(cur, branchKey, { force: false });
   if(!cur.neighborhoods.length){
     cur.neighborhoods = opsDefaultNaverNeighborhoods_(branchKey);
   }
   if(!cur.joinMode) cur.joinMode = 'none';
-  if(!String(cur.adGroupId || '').trim() && meta.adGroupId) cur.adGroupId = meta.adGroupId;
+  if(!String(cur.adGroupId || '').trim()){
+    var defIds = opsDefaultNaverAdGroupIds_(branchKey);
+    cur.adGroupId = defIds.length ? defIds.join('\n') : meta.adGroupId;
+  }
   if(cur.adGroupIdBase == null) cur.adGroupIdBase = '';
   if(!String(cur.bid || '').trim()) cur.bid = meta.bid;
   else cur.bid = normalizeOpsNaverKwBid_(cur.bid);
   // 구형 랜딩 URL 교체
-  if(!cur.pcUrl || /htcenter\.co\.kr/i.test(cur.pcUrl)) cur.pcUrl = meta.pcUrl;
-  if(!cur.mobileUrl || /htcenter\.co\.kr/i.test(cur.mobileUrl)) cur.mobileUrl = meta.mobileUrl || cur.pcUrl;
+  if(!cur.pcUrl || /htcenter\.co\.kr|breezefeel\.github\.io\/drpark/i.test(cur.pcUrl)) cur.pcUrl = meta.pcUrl;
+  if(!cur.mobileUrl || /htcenter\.co\.kr|breezefeel\.github\.io\/drpark/i.test(cur.mobileUrl)) cur.mobileUrl = meta.mobileUrl || cur.pcUrl;
   // 동네 수만큼 광고그룹ID 슬롯 정렬(빈 칸 유지)
   syncOpsNaverKwAdGroupIdsToHoods_(cur);
-  if(!String(cur.adGroupIdBase || '').trim() && meta.adGroupId){
-    var hoodFilled = alignOpsNaverKwHoodAdGroupIds_(cur.adGroupId, (cur.neighborhoods || []).length).filter(Boolean);
-    // 시드 ID 1개만 있을 때는 일반 키워드용으로 둠
-    if(hoodFilled.length <= 1) cur.adGroupIdBase = meta.adGroupId;
-  }
+  if(!String(cur.adGroupIdBase || '').trim()) cur.adGroupIdBase = getOpsNaverKwBaseAdGroupId_(cur) || meta.adGroupId;
   return cur;
 }
 /** 키워드·동네 목록 파싱. 기본은 줄바꿈만 구분(쉼표 포함 키워드 보존). allowCommaSplit로 프롬프트 추가 시 쉼표도 허용. */
@@ -728,7 +802,7 @@ function buildOpsNaverKwCombined_(kwState){
   var out = [];
   hoods.forEach(function(hood){
     var h = normalizeOpsNaverKwKeyword_(hood);
-    if(!h) return;
+    if(!h || isOpsNaverKwBaseLabel_(h)) return;
     kws.forEach(function(kw){
       var k = normalizeOpsNaverKwKeyword_(kw);
       if(!k) return;
@@ -1179,17 +1253,16 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
   }
   if(byId === 'ops-y-23' || byId === 'ops-j-23'){
     var pk23 = opsPlaceBranchKey_(byId);
-    var hoodSample = opsDefaultNaverNeighborhoods_(pk23).slice(0, 4).join(', ');
     return [
-      { id:'kw-base', title:'일반 키워드 리스트',
-        brief: opsPurposeIntent_('검수된 일반 키워드를 확인하고 추가·수정합니다.', '아래 키워드 패널에서 목록을 편집하세요.'),
-        text: opsProposalWithReason_('정리본 시드(약 ' + (opsNaverKwSeedKeywords_().length || 728) + '개)를 기본으로 불러옵니다. 한 줄에 하나씩 추가·삭제하고, 필요하면 재생성으로 시드를 다시 불러오세요.', '수술·홍보성 키워드는 이미 제외된 상태를 권장합니다.') },
-      { id:'kw-hood', title:'동네 이름 붙이기',
-        brief: opsPurposeIntent_('지점 상권 동네명을 리스트로 만듭니다.', '예: ' + hoodSample),
-        text: opsProposalWithReason_('동네명 한 줄씩 입력 → 조합 미리보기로 「동네 + 키워드」를 확인 → CSV 다운로드.', '패턴 예: 약수 허리통증 / 약수역 허리통증') },
-      { id:'kw-csv', title:'대량등록 CSV',
-        brief: opsPurposeIntent_('네이버 검색광고 키워드 일괄등록 템플릿으로 내려받습니다.', '1~6행 안내문은 삭제하지 마세요.'),
-        text: opsProposalWithReason_('동네별 광고그룹ID(네이버에서 만든 실제 ID)·URL·입찰가를 채운 뒤 「일반만 / 동네조합만 / 둘 다」 중 선택해 다운로드합니다. 동네 5개면 광고그룹ID 입력칸도 5개가 생기고, 조합 키워드는 동네→그룹에 1:1로 배정됩니다. ID는 임의 생성이 불가하니 검색광고 「광고다운로드」에서 복사하세요.', '업로드 전 광고그룹ID·랜딩 URL이 실제 계정과 같은지 확인하세요.') }
+      { id:'kw-creative', title:'소재 만들기',
+        brief: opsPurposeIntent_('파워링크 「소재 만들기」에 넣을 유형·URL·제목·설명을 확정합니다.', '반응형 권장 · 의료 업종 제한 시 단일형.'),
+        text: opsProposalWithReason_(buildOpsNaverKwCreativeGuideText_(pk23), '치료·완치 표현 없이 운동·웰니스·예약 톤을 유지하세요.') },
+      { id:'kw-extension', title:'확장소재 만들기',
+        brief: opsPurposeIntent_('캠페인 「확장 소재」에 전화·위치·추가링크를 등록합니다.', '소재와 함께 파트 2로 진행하세요.'),
+        text: opsProposalWithReason_(buildOpsNaverKwExtensionGuideText_(pk23), '키워드 등록(파트 1) 이후·병행 모두 가능합니다.') },
+      { id:'kw-tips', title:'보완하면 좋은 점',
+        brief: opsPurposeIntent_('등록 실수·한도·채널 검토를 줄이는 운영 팁입니다.', '체크리스트로 쓰고 완료 표시하세요.'),
+        text: opsProposalWithReason_(buildOpsNaverKwImproveTipsText_(), '비즈채널 승인·그룹명 순서·소재/확장소재 순서가 중요합니다.') }
     ];
   }
   if(byId === 'ops-y-17' || byId === 'ops-j-17'){
@@ -1550,15 +1623,12 @@ function buildOpsGuideForItem_(item, branchId){
   }
   if(byId === 'ops-y-23' || byId === 'ops-j-23'){
     var kwGuide = [
-      '무엇을 하나요: 네이버 검색광고용 일반 키워드·동네 조합을 정리하고 대량등록 CSV를 만듭니다.',
-      '어떻게 하나요:',
-      '1) 일반 키워드 — 현재 리스트 확인 후 추가·수정 (또는 시드 재생성)',
-      '2) 동네 이름 — 지점 상권 동네를 리스트로 추가·수정·재생성',
-      '3) 조합 미리보기 — 「동네 + 키워드」 형태 확인',
-      '4) 광고그룹ID·URL·입찰가 입력',
-      '5) 템플릿 CSV 다운로드 후 네이버 검색광고에 업로드',
-      '제안: 파일당 최대 10,000행. 동네 조합이 많으면 「동네조합만」으로 나눠 받으세요.',
-      '함께 기획/검토: 약수/인천 동네 범위를 어디까지 잡을지 함께 정합니다.'
+      '무엇을 하나요: 파워링크 키워드 대량등록(파트 1)과 소재·확장소재(파트 2)를 세팅합니다.',
+      '파트 1 · 키워드:',
+      '1) 새 캠페인 → 2) 광고그룹(일반·동네) → 3) ID 다운로드 → 4) 플래너 입력 → 5) CSV 다운로드 → 6) 대량관리 업로드',
+      '파트 2 · 소재·확장소재:',
+      '1) 소재 만들기(반응형·제목/설명 기본값) → 2) 확장 소재(전화·위치·링크)',
+      '제안: 비즈채널 승인 후 진행하고, 의료 업종 제한 시 소재는 단일형으로 전환하세요.'
     ].join('\n');
     return { short: kwGuide, full: kwGuide, long: true };
   }
@@ -1783,11 +1853,11 @@ function buildOpsReviewDraft_(item, branchId){
     proposals = '제안 문장\n- 운영: ' + OPS_BRAND_COPY.hoursNote + '\n- 예약: ' + OPS_BRAND_COPY.cta;
     placement = '반영 위치 가이드\n- 스마트플레이스 부가정보·가격·휴무일·영업시간\n- 네이버 예약 상품·톡톡·스마트콜';
   } else if(byId === 'ops-y-23' || byId === 'ops-j-23'){
-    purpose = '네이버 검색광고에 올릴 일반 키워드와 동네 조합을 정리하고 대량등록 CSV를 만듭니다.';
-    intent = '지역×증상 검색 유입을 키워드 자산으로 쌓아 상담·예약으로 연결합니다.';
-    todo = '해야 할 일\n1) 일반 키워드 검수·수정\n2) 동네명 리스트 확정\n3) 조합 미리보기\n4) 광고그룹ID·URL·입찰가\n5) CSV 다운로드·업로드';
-    proposals = '제안 문장\n- 조합 예: 약수 허리통증 / 약수역 거북목교정';
-    placement = '반영 위치 가이드\n- 네이버 검색광고 키워드 일괄등록\n- 광고그룹별 키워드(그룹당 최대 1000개)\n- 플래너 키워드 리스트(재다운로드용)';
+    purpose = '네이버 파워링크에 일반·동네 키워드를 대량등록하고 확장소재를 세팅합니다.';
+    intent = '지역×증상 검색 유입을 키워드·확장소재로 상담·예약에 연결합니다.';
+    todo = '해야 할 일\n【파트 1 키워드】\n1) 캠페인·광고그룹(일반 포함)\n2) ID 확보·플래너 입력\n3) CSV 다운로드·대량등록\n【파트 2 소재】\n4) 소재 만들기(제목·설명)\n5) 확장소재(전화·위치·링크)';
+    proposals = '제안 문장\n- 「소재 만들기」「확장소재 만들기」「보완하면 좋은 점」 참고';
+    placement = '반영 위치 가이드\n- 파워링크 캠페인·광고그룹·소재\n- 도구 → 대량 관리 (키워드)\n- 캠페인 확장 소재\n- 플래너 키워드·소재 기본값';
   } else if(byId === 'ops-y-17' || byId === 'ops-j-17'){
     var gbpKey = opsPlaceBranchKey_(byId);
     purpose = 'Google Business Profile 지점 정보를 최신화해 지도/검색 전환을 높입니다.';
@@ -19440,6 +19510,167 @@ function countOpsManualProgress_(branchId){
   });
   return { done: done, total: total };
 }
+
+function buildOpsNaverKwCreativeSeed_(branchKey){
+  branchKey = branchKey || 'yaksu';
+  var url = 'https://realmovement.imweb.me/85';
+  var siteName = branchKey === 'jakjeon' ? '리얼무브먼트인천점' : '리얼무브먼트약수점';
+  var area = branchKey === 'jakjeon' ? '작전' : '약수';
+  var areaSt = branchKey === 'jakjeon' ? '작전역' : '약수역';
+  var district = branchKey === 'jakjeon' ? '계양' : '중구';
+  return {
+    type: 'responsive',
+    typeNote: '가능하면 반응형(조합↑). 의료 업종으로 분류되면 단일형으로 전환.',
+    siteName: siteName,
+    displayUrlPc: url,
+    finalUrlPc: url,
+    displayUrlMo: url,
+    finalUrlMo: url,
+    titles: [
+      '1:1 리:얼 움직임',
+      area + ' 체형자세교정',
+      '편해지는 움직임부터',
+      areaSt + ' 1:1 맞춤운동',
+      '예약제 1:1 프로그램',
+      district + ' ' + area + ' 맞춤운동',
+      '리:얼 움직임 상담',
+      '몸의 정렬 다시맞추기',
+      '기능운동 1:1 맞춤',
+      '골반자세 맞춤운동',
+      '거북목 움직임관리',
+      '허리통증 맞춤운동'
+    ],
+    descriptions: [
+      '근골격 움직임 전문가와 1:1 리:얼 프로그램. 사전 예약 후 방문하세요.',
+      '의료행위가 아닌 운동 웰니스입니다. 몸에 맞는 움직임을 상담으로 시작하세요.',
+      areaSt + ' 인근 1:1 맞춤 운동. 체형 자세 기능운동을 함께 안내합니다.',
+      '리:얼은 편해지는 움직임, Re Alignment는 몸의 정렬을 다시 맞춥니다.'
+    ],
+    reviewRequest: 'no',
+    reviewNote: '웰니스·운동 프로그램 포지션이면 「아니오」. 서류 요청 시에만 「네」.'
+  };
+}
+function buildOpsNaverKwCreativeGuideText_(branchKey){
+  var c = buildOpsNaverKwCreativeSeed_(branchKey);
+  var lines = [
+    '【소재 만들기 — 광고그룹(또는 캠페인)에서 소재 등록】',
+    '',
+    '■ 선택 권장',
+    '· 소재 유형: 반응형 소재 (제목·설명 조합이 많아 테스트에 유리)',
+    '  ※ 네이버가 의료 업종으로 보면 반응형 등록이 막힐 수 있음 → 그때는 단일형으로',
+    '  단일형 추천 조합: 제목「' + c.titles[0] + '」 + 설명 1번',
+    '· 검토 요청: ' + (c.reviewRequest === 'no' ? '아니오' : '네') + ' — ' + c.reviewNote,
+    '',
+    '■ 필수 필드 (플래너 기본값)',
+    '· 사이트 이름: ' + c.siteName + ' (' + c.siteName.length + '/10)',
+    '· 표시 URL (PC/모바일): ' + c.displayUrlPc,
+    '· 연결 URL (PC/모바일): ' + c.finalUrlPc,
+    '',
+    '■ 제목 (최대 15자 · 3개 이상 필수 · 아래 ' + c.titles.length + '개 권장)'
+  ];
+  c.titles.forEach(function(t, i){ lines.push((i + 1) + ') ' + t + '  (' + t.length + '자)'); });
+  lines.push('');
+  lines.push('■ 설명 (최대 45자 · 20자 이상 · 2개 이상 필수 · 아래 ' + c.descriptions.length + '개 권장)');
+  c.descriptions.forEach(function(d, i){ lines.push((i + 1) + ') ' + d + '  (' + d.length + '자)'); });
+  lines.push('');
+  lines.push('■ 작성 원칙');
+  lines.push('· 치료·완치·시술·보장 표현 금지 · 「운동·웰니스·1:1·예약」 톤');
+  lines.push('· 제목은 짧고 지역·프로그램 중심, 설명은 예약 CTA·면책 톤');
+  lines.push('· 표시 URL과 연결 URL은 동일하게 맞춰 검수 리스크를 줄임');
+  return lines.join('\n');
+}
+function buildOpsNaverKwCreativePanelHTML_(itemId){
+  var branchKey = opsPlaceBranchKey_(itemId);
+  var c = buildOpsNaverKwCreativeSeed_(branchKey);
+  var titleLines = c.titles.map(function(t, i){ return (i + 1) + '. ' + t; }).join('\n');
+  var descLines = c.descriptions.map(function(d, i){ return (i + 1) + '. ' + d; }).join('\n');
+  return '<div class="ops-review-group ops-kw-group ops-kw-creative" style="border:1px solid rgba(30,58,110,.16);background:rgba(30,58,110,.03);padding:12px 14px;border-radius:10px">' +
+    '<div class="ops-review-group-title"><strong>파트 2 · 소재 기본값</strong> <span class="ops-review-group-hint">소재 만들기 화면에 그대로 붙여넣기 · 수정 가능</span></div>' +
+    '<div style="font-size:13px;line-height:1.55;margin-top:8px">' +
+      '<div><strong>유형</strong> 반응형 소재 <span style="opacity:.75">(의료 업종 제한 시 → 단일형)</span></div>' +
+      '<div><strong>사이트 이름</strong> ' + escapeHtml(c.siteName) + '</div>' +
+      '<div><strong>표시·연결 URL</strong> ' + escapeHtml(c.displayUrlPc) + '</div>' +
+      '<div><strong>검토 요청</strong> 아니오</div>' +
+    '</div>' +
+    '<div class="ops-kw-preview-head" style="margin-top:10px">제목 ' + c.titles.length + '개 <span>각 ≤15자</span></div>' +
+    '<pre class="ops-kw-preview">' + escapeHtml(titleLines) + '</pre>' +
+    '<div class="ops-kw-preview-head">설명 ' + c.descriptions.length + '개 <span>20~45자</span></div>' +
+    '<pre class="ops-kw-preview">' + escapeHtml(descLines) + '</pre>' +
+    '<p style="margin:8px 0 0;font-size:12px;opacity:.8;line-height:1.45">상세 가이드·확장소재는 아래 제안 문장 「소재 만들기」「확장소재 만들기」를 참고하세요.</p>' +
+  '</div>';
+}
+function buildOpsNaverKwRegisterManualHTML_(){
+  return '<div class="ops-review-group ops-kw-group ops-kw-manual" style="border:1px solid rgba(15,118,110,.18);background:rgba(15,118,110,.04);padding:12px 14px;border-radius:10px">' +
+    '<div class="ops-review-group-title"><strong>광고 등록 방법</strong> <span class="ops-review-group-hint">네이버 검색광고(파워링크)</span></div>' +
+    '<div style="margin-top:10px;font-size:12px;font-weight:800;letter-spacing:.02em;color:#0F766E">파트 1 · 키워드 등록</div>' +
+    '<ol class="ops-kw-manual-steps" style="margin:6px 0 0;padding-left:1.25em;line-height:1.55;font-size:13px">' +
+      '<li><strong>파워링크</strong>에서 <strong>+ 새 캠페인</strong> 생성 (예: 리얼무브먼트 약수점)</li>' +
+      '<li><strong>+ 새 광고그룹</strong> — 예: 일반, 금호, 금호역, 약수, 약수역… (플래너와 같은 순서)</li>' +
+      '<li>광고그룹 <strong>일괄 체크 → 다운로드</strong> → 광고그룹 ID(grp-…) 복사</li>' +
+      '<li>아래 플래너 <strong>광고그룹ID</strong>·입찰가·채널 URL 확인/수정</li>' +
+      '<li>플래너 <strong>다운로드</strong> (일반+동네 합본 · 1만 개 초과 시 자동 분할)</li>' +
+      '<li><strong>도구 → 대량 관리</strong> · 파워링크 · 작업 「키워드 등록」 · CSV 업로드</li>' +
+    '</ol>' +
+    '<div style="margin-top:14px;font-size:12px;font-weight:800;letter-spacing:.02em;color:#1e3a6e">파트 2 · 소재 · 확장소재</div>' +
+    '<ol class="ops-kw-manual-steps" start="1" style="margin:6px 0 0;padding-left:1.25em;line-height:1.55;font-size:13px">' +
+      '<li>광고그룹(또는 캠페인)에서 <strong>소재 만들기</strong> — 반응형 권장 · 아래 「파트 2 · 소재 기본값」 붙여넣기</li>' +
+      '<li>캠페인 <strong>확장 소재</strong> — 전화걸기 · 위치/플레이스 · 추가링크 · (선택) 이미지</li>' +
+    '</ol>' +
+    '<p style="margin:10px 0 0;font-size:12px;opacity:.8;line-height:1.45">CSV 1~6행은 삭제하지 마세요. 그룹당 ≤1,000 · 파일당 ≤10,000. 비즈채널 검토 중이면 키워드·소재 노출이 막힐 수 있습니다.</p>' +
+  '</div>';
+}
+function buildOpsNaverKwExtensionGuideText_(branchKey){
+  branchKey = branchKey || 'yaksu';
+  var phone = (typeof opsBranchPhone_ === 'function') ? opsBranchPhone_(branchKey) : '0507-1359-4596';
+  var store = (typeof opsStoreName_ === 'function') ? (opsStoreName_(branchKey) || '리얼무브먼트') : '리얼무브먼트';
+  var blog = '';
+  try {
+    var meta = (typeof opsBranchMeta_ === 'function') ? opsBranchMeta_(branchKey) : null;
+    blog = (meta && meta.blogDirections) || '';
+  } catch(eBlog){}
+  var placeUrl = '';
+  try {
+    var m2 = (typeof opsBranchMeta_ === 'function') ? opsBranchMeta_(branchKey) : null;
+    placeUrl = (m2 && (m2.placeUrl || m2.placeMapUrl)) || '';
+  } catch(ePlace){}
+  return [
+    '【확장소재 만들기 — 캠페인 「확장 소재」 탭】',
+    '경로: 광고 관리 → 파워링크 → 해당 캠페인 → 「확장 소재」 → + 새 확장 소재',
+    '',
+    '■ 권장 구성 (' + store + ')',
+    '· 전화걸기: ' + phone + ' (예약 안내와 동일 번호)',
+    '· 위치 / 네이버 플레이스: ' + store + (placeUrl ? (' · ' + placeUrl) : ' 플레이스 연결'),
+    '· 추가 링크(3~4개):',
+    '  - 프로필/랜딩: https://realmovement.imweb.me/85 (또는 플래너 채널 URL)',
+    '  - 오시는 길 블로그' + (blog ? (': ' + blog) : ''),
+    '  - (선택) 증상별 가이드 · 상담/예약 안내',
+    '· 이미지: 외관·내부·1:1 프로그램 (과장·의료 시술 연출 금지)',
+    '',
+    '■ 문구 톤',
+    '· 한 줄: 근골격·움직임 전문가의, 1:1 리:얼 움직임 프로그램',
+    '· CTA: 내 몸에 맞는 리:얼 움직임, 1:1 상담으로 시작해 보세요.',
+    '· 면책: ※ 본 프로그램은 의료행위가 아닌 운동·웰니스 프로그램입니다.',
+    '',
+    '■ 체크리스트',
+    '· 확장 소재 ON · 검수/승인 상태 확인',
+    '· 캠페인 공통으로 등록해도 충분 (그룹마다 복제할 필요 거의 없음)',
+    '· 전화·URL이 플레이스·플래너 채널과 일치하는지 확인',
+    '· 키워드 파트 1이 끝난 뒤, 소재와 함께 파트 2로 진행하세요'
+  ].join('\n');
+}
+function buildOpsNaverKwImproveTipsText_(){
+  return [
+    '【보완하면 좋은 점】',
+    '1) 파트 1(키워드)과 파트 2(소재·확장소재)를 나눠 진행하면 검수·오류 추적이 쉽습니다.',
+    '2) 광고그룹 이름 = 플래너 「일반·동네」 순서와 같게 만들면 ID 붙여넣기 실수가 줄어듭니다.',
+    '3) 비즈채널 검토중이면 키워드·소재가 안 나갈 수 있습니다. 채널 URL 승인을 먼저 확인하세요.',
+    '4) 소재는 반응형으로 여러 제목·설명을 넣고, 막히면 단일형(제목1+설명1)으로 전환하세요.',
+    '5) 확장소재(전화·위치·링크)를 소재와 같이 켜 두면 초기 CTR·신뢰에 도움이 됩니다.',
+    '6) 그룹당 1,000·파일당 10,000 한도 초과 시 플래너가 CSV를 나눕니다. 대량관리에 순서대로 업로드하세요.',
+    '7) 치료·완치·시술 보장 표현은 키워드·소재·확장소재·랜딩 모두에서 제외하세요.'
+  ].join('\n');
+}
+
 function renderOpsNaverKwPanelHTML_(itemId){
   var st = getOpsNaverKwState_(itemId);
   var kwText = (st.keywords || []).join('\n');
@@ -19450,6 +19681,7 @@ function renderOpsNaverKwPanelHTML_(itemId){
   var baseCount = (st.keywords || []).length;
   var hoods = st.neighborhoods || [];
   var hoodCount = hoods.length;
+  var comboHoodCount = hoods.filter(function(h){ return !isOpsNaverKwBaseLabel_(h); }).length;
   var comboCount = combo.length;
   var bothRows = buildOpsNaverKwCsvRows_(st, 'both');
   var bothCount = bothRows.length;
@@ -19457,24 +19689,30 @@ function renderOpsNaverKwPanelHTML_(itemId){
   var seedCount = opsNaverKwSeedKeywords_().length;
   var hoodAdIds = syncOpsNaverKwAdGroupIdsToHoods_(st);
   var hoodFilled = hoodAdIds.filter(Boolean).length;
-  var baseAdId = getOpsNaverKwBaseAdGroupId_(st);
+  var fileParts = Math.max(1, Math.ceil(Math.max(bothCount, 1) / OPS_NAVER_KW_MAX_ROWS));
+  if(bothCount === 0) fileParts = 1;
   var adGroupHint = hoodCount
-    ? ('동네 ' + hoodCount + '개 → 광고그룹ID 칸 ' + hoodCount + '개 · 입력됨 ' + hoodFilled + '개' +
-      (baseAdId ? ' · 일반용 ID 있음' : ' · 일반용 ID 없음') +
-      ' · 조합은 동네별 1:1 배정 (그룹당 ≤' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개)')
-    : ('동네를 입력하면 광고그룹ID 칸이 동네 수만큼 생깁니다. ID는 네이버 「광고다운로드」에서 복사하세요.');
+    ? ('항목 ' + hoodCount + '개(일반 포함) · ID 입력 ' + hoodFilled + '/' + hoodCount +
+      ' · 조합 대상 동네 ' + comboHoodCount + '개 · 합산 ' + bothCount.toLocaleString() + '개' +
+      (bothCount > OPS_NAVER_KW_MAX_ROWS ? ' → CSV ' + Math.ceil(bothCount / OPS_NAVER_KW_MAX_ROWS) + '개로 분할' : '') +
+      ' · 그룹당 ≤' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개')
+    : ('일반·동네를 입력하면 광고그룹ID 칸이 항목 수만큼 생깁니다.');
   var hoodMapRows = hoods.map(function(hood, idx){
+    var isBase = isOpsNaverKwBaseLabel_(hood);
     return '<div class="ops-kw-hood-ad-row" style="display:grid;grid-template-columns:minmax(72px,96px) 1fr;gap:8px;align-items:center">' +
-      '<span class="ops-kw-hood-ad-label" style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHtml(hood) + '">' + escapeHtml(hood) + '</span>' +
-      '<input type="text" class="ops-review-input ops-kw-hood-ad-input" data-ops-kw-hood-adgroup="' + idx + '" value="' + escapeHtml(hoodAdIds[idx] || '') + '" placeholder="grp-a001-… (네이버에서 복사)" onchange="setOpsNaverKwHoodAdGroupId_(\'' + itemId + '\', ' + idx + ', this.value)" />' +
+      '<span class="ops-kw-hood-ad-label" style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' +
+        (isBase ? ';color:#0F766E' : '') + '" title="' + escapeHtml(hood) + (isBase ? ' (일반 키워드용 · 조합 안 함)' : '') + '">' +
+        escapeHtml(hood) + (isBase ? ' ·일반' : '') + '</span>' +
+      '<input type="text" class="ops-review-input ops-kw-hood-ad-input" data-ops-kw-hood-adgroup="' + idx + '" value="' + escapeHtml(hoodAdIds[idx] || '') + '" placeholder="grp-a001-… (수정 가능)" onchange="setOpsNaverKwHoodAdGroupId_(\'' + itemId + '\', ' + idx + ', this.value)" />' +
     '</div>';
   }).join('');
   if(!hoodMapRows){
-    hoodMapRows = '<div class="ops-kw-hood-ad-empty" style="font-size:12px;opacity:.7">동네를 위에 입력하면 여기에 광고그룹ID 입력칸이 생깁니다.</div>';
+    hoodMapRows = '<div class="ops-kw-hood-ad-empty" style="font-size:12px;opacity:.7">일반·동네를 위에 입력하면 여기에 광고그룹ID 입력칸이 생깁니다.</div>';
   }
   return '<div class="ops-kw-panel" data-ops-kw="' + escapeHtml(itemId) + '">' +
+    buildOpsNaverKwRegisterManualHTML_() +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>일반 키워드 설정하기</strong> <span class="ops-review-group-hint">한 줄에 하나 · 시드 ' + seedCount + '개</span>' +
+      '<div class="ops-review-group-title"><strong>일반 키워드 설정하기</strong> <span class="ops-review-group-hint">한 줄에 하나 · 시드 ' + seedCount + '개 · 「일반」 광고그룹에 등록</span>' +
         '<span class="ops-review-group-progress">' + baseCount + '개</span></div>' +
       '<textarea class="ops-review-input ops-kw-textarea" rows="8" data-ops-kw-field="keywords" placeholder="예: 허리통증&#10;거북목교정" onchange="setOpsNaverKwList_(\'' + itemId + '\', \'keywords\', this.value)">' + escapeHtml(kwText) + '</textarea>' +
       '<div class="ops-kw-actions">' +
@@ -19484,9 +19722,9 @@ function renderOpsNaverKwPanelHTML_(itemId){
       '</div>' +
     '</div>' +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>일반 키워드에 + 동네 붙이기</strong> <span class="ops-review-group-hint">동네명 한 줄에 하나</span>' +
+      '<div class="ops-review-group-title"><strong>일반 · 동네 항목</strong> <span class="ops-review-group-hint">한 줄에 하나 · 첫 줄 「일반」권장(조합 제외)</span>' +
         '<span class="ops-review-group-progress">' + hoodCount + '개</span></div>' +
-      '<textarea class="ops-review-input ops-kw-textarea ops-kw-hood-textarea" rows="5" data-ops-kw-field="neighborhoods" placeholder="예: 약수&#10;약수역" onchange="setOpsNaverKwList_(\'' + itemId + '\', \'neighborhoods\', this.value)">' + escapeHtml(hoodText) + '</textarea>' +
+      '<textarea class="ops-review-input ops-kw-textarea ops-kw-hood-textarea" rows="8" data-ops-kw-field="neighborhoods" placeholder="예: 일반&#10;약수&#10;약수역" onchange="setOpsNaverKwList_(\'' + itemId + '\', \'neighborhoods\', this.value)">' + escapeHtml(hoodText) + '</textarea>' +
       '<div class="ops-kw-actions">' +
         '<button type="button" class="ops-kw-btn" onclick="addOpsNaverKwLine_(\'' + itemId + '\', \'neighborhoods\')">추가</button>' +
         '<button type="button" class="ops-kw-btn" onclick="focusOpsNaverKwField_(\'' + itemId + '\', \'neighborhoods\')">수정</button>' +
@@ -19497,30 +19735,29 @@ function renderOpsNaverKwPanelHTML_(itemId){
             '<option value="space"' + (st.joinMode === 'space' ? ' selected' : '') + '>띄어쓰기 (약수 허리통증)</option>' +
           '</select></label>' +
       '</div>' +
-      '<div class="ops-kw-preview-head">조합 미리보기 <span>' + comboCount.toLocaleString() + '개</span></div>' +
-      '<pre class="ops-kw-preview">' + escapeHtml(comboPreview || '(동네·키워드를 입력하면 여기에 표시됩니다)') + '</pre>' +
+      '<div class="ops-kw-preview-head">동네 조합 미리보기 <span>' + comboCount.toLocaleString() + '개</span></div>' +
+      '<pre class="ops-kw-preview">' + escapeHtml(comboPreview || '(동네·키워드를 입력하면 여기에 표시됩니다. 「일반」은 조합하지 않습니다.)') + '</pre>' +
     '</div>' +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>대량등록 CSV 다운로드</strong> <span class="ops-review-group-hint">네이버 키워드 일괄등록 · 그룹당 ' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개</span></div>' +
+      '<div class="ops-review-group-title"><strong>대량등록 CSV</strong> <span class="ops-review-group-hint">일반+동네 합본 · 파일당 최대 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() + '개 · 그룹당 ' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개</span></div>' +
       '<div class="ops-kw-meta-grid">' +
         '<div class="ops-kw-meta ops-kw-meta-wide">' +
-          '<span>동네별 광고그룹ID <em class="ops-kw-id-note" style="font-style:normal;font-weight:500;opacity:.75">임의 생성 불가 · 네이버 「광고다운로드」에서 복사 · 동네 ' + hoodCount + '개면 칸 ' + hoodCount + '개</em></span>' +
+          '<span>광고그룹ID (기본값 · 수정 가능) <em class="ops-kw-id-note" style="font-style:normal;font-weight:500;opacity:.75">일반 포함 ' + hoodCount + '칸</em></span>' +
           '<div class="ops-kw-hood-ad-map" style="display:flex;flex-direction:column;gap:6px;margin-top:8px">' + hoodMapRows + '</div>' +
         '</div>' +
-        '<label class="ops-kw-meta ops-kw-meta-wide"><span>일반 키워드용 광고그룹ID</span><input type="text" data-ops-kw-meta="adGroupIdBase" value="' + escapeHtml(st.adGroupIdBase || '') + '" placeholder="grp-a001-… (일반만 / 일반+동네 시)" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'adGroupIdBase\', this.value)" /></label>' +
         '<label class="ops-kw-meta"><span>입찰가 (70~100000 · 10원 단위)</span><input type="text" data-ops-kw-meta="bid" inputmode="numeric" value="' + escapeHtml(st.bid || '') + '" placeholder="70" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'bid\', this.value)" /></label>' +
-        '<label class="ops-kw-meta ops-kw-meta-wide"><span>PC URL</span><input type="text" data-ops-kw-meta="pcUrl" value="' + escapeHtml(st.pcUrl || '') + '" placeholder="https://…" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'pcUrl\', this.value)" /></label>' +
-        '<label class="ops-kw-meta ops-kw-meta-wide"><span>모바일 URL</span><input type="text" data-ops-kw-meta="mobileUrl" value="' + escapeHtml(st.mobileUrl || '') + '" placeholder="https://…" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'mobileUrl\', this.value)" /></label>' +
+        '<label class="ops-kw-meta ops-kw-meta-wide"><span>PC URL (채널)</span><input type="text" data-ops-kw-meta="pcUrl" value="' + escapeHtml(st.pcUrl || '') + '" placeholder="https://…" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'pcUrl\', this.value)" /></label>' +
+        '<label class="ops-kw-meta ops-kw-meta-wide"><span>모바일 URL (채널)</span><input type="text" data-ops-kw-meta="mobileUrl" value="' + escapeHtml(st.mobileUrl || '') + '" placeholder="https://…" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'mobileUrl\', this.value)" /></label>' +
       '</div>' +
-      '<div class="ops-kw-dl-counts">일반 ' + baseCount.toLocaleString() + ' · 동네조합 ' + comboCount.toLocaleString() + ' · 합산(중복·' + OPS_NAVER_KW_MAX_CHARS + '자 초과 제외) ' + bothCount.toLocaleString() + ' / 파일 최대 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() +
+      '<div class="ops-kw-dl-counts">일반 ' + baseCount.toLocaleString() + ' · 동네조합 ' + comboCount.toLocaleString() + ' · 합산(중복·' + OPS_NAVER_KW_MAX_CHARS + '자 초과 제외) ' + bothCount.toLocaleString() +
+        (bothCount > OPS_NAVER_KW_MAX_ROWS ? ' → <strong>' + Math.ceil(bothCount / OPS_NAVER_KW_MAX_ROWS) + '개 파일</strong>로 분할' : ' / 파일 최대 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString()) +
         (skippedLong ? ' · <span class="ops-kw-warn">' + skippedLong + '개 길이초과 제외</span>' : '') +
         '<br><span class="ops-kw-adgroup-hint">' + escapeHtml(adGroupHint) + '</span></div>' +
       '<div class="ops-kw-actions ops-kw-dl-actions">' +
-        '<button type="button" class="ops-kw-btn ops-kw-btn-dl" onclick="downloadOpsNaverKwCsv_(\'' + itemId + '\', \'base\')">일반 키워드만</button>' +
-        '<button type="button" class="ops-kw-btn ops-kw-btn-dl" onclick="downloadOpsNaverKwCsv_(\'' + itemId + '\', \'combo\')">동네 조합만</button>' +
-        '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="downloadOpsNaverKwCsv_(\'' + itemId + '\', \'both\')">일반+동네 함께</button>' +
+        '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="downloadOpsNaverKwCsv_(\'' + itemId + '\', \'both\')">다운로드</button>' +
       '</div>' +
     '</div>' +
+    buildOpsNaverKwCreativePanelHTML_(itemId) +
   '</div>';
 }
 function setOpsNaverKwList_(itemId, field, text){
@@ -19543,6 +19780,7 @@ function setOpsNaverKwHoodAdGroupId_(itemId, index, value){
   if(i < 0 || i >= ids.length) return;
   ids[i] = String(value == null ? '' : value).trim();
   st.adGroupId = ids.join('\n');
+  if(isOpsNaverKwBaseLabel_((st.neighborhoods || [])[i])) st.adGroupIdBase = ids[i];
   getOpsManualState_().updatedAt = new Date().toISOString();
   save({ skipDriveUpload: true, skipGasPush: true });
   var panel = document.querySelector('.ops-kw-panel[data-ops-kw="' + itemId + '"]');
@@ -19562,12 +19800,14 @@ function updateOpsNaverKwAdGroupHint_(itemId){
   var hoods = st.neighborhoods || [];
   var hoodAdIds = syncOpsNaverKwAdGroupIdsToHoods_(st);
   var hoodFilled = hoodAdIds.filter(Boolean).length;
-  var baseAdId = getOpsNaverKwBaseAdGroupId_(st);
+  var comboHoodCount = hoods.filter(function(h){ return !isOpsNaverKwBaseLabel_(h); }).length;
+  var bothCount = buildOpsNaverKwCsvRows_(st, 'both').length;
   hint.textContent = hoods.length
-    ? ('동네 ' + hoods.length + '개 → 광고그룹ID 칸 ' + hoods.length + '개 · 입력됨 ' + hoodFilled + '개' +
-      (baseAdId ? ' · 일반용 ID 있음' : ' · 일반용 ID 없음') +
-      ' · 조합은 동네별 1:1 배정 (그룹당 ≤' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개)')
-    : ('동네를 입력하면 광고그룹ID 칸이 동네 수만큼 생깁니다. ID는 네이버 「광고다운로드」에서 복사하세요.');
+    ? ('항목 ' + hoods.length + '개(일반 포함) · ID 입력 ' + hoodFilled + '/' + hoods.length +
+      ' · 조합 대상 동네 ' + comboHoodCount + '개 · 합산 ' + bothCount.toLocaleString() + '개' +
+      (bothCount > OPS_NAVER_KW_MAX_ROWS ? ' → CSV ' + Math.ceil(bothCount / OPS_NAVER_KW_MAX_ROWS) + '개로 분할' : '') +
+      ' · 그룹당 ≤' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개')
+    : ('일반·동네를 입력하면 광고그룹ID 칸이 항목 수만큼 생깁니다.');
 }
 function setOpsNaverKwMeta_(itemId, field, value){
   // 형제 필드(광고그룹ID 여러 줄 등) 보존
@@ -19638,9 +19878,12 @@ function regenOpsNaverKwList_(itemId, field){
   var st = getOpsNaverKwState_(itemId);
   var branchKey = opsPlaceBranchKey_(itemId);
   if(field === 'neighborhoods'){
-    if(!window.confirm('동네 이름을 지점 기본 목록으로 다시 불러올까요? 현재 동네 목록은 덮어씁니다.')) return;
-    st.neighborhoods = opsDefaultNaverNeighborhoods_(branchKey);
-    syncOpsNaverKwAdGroupIdsToHoods_(st);
+    if(!window.confirm('일반·동네·광고그룹ID를 지점 기본값으로 다시 불러올까요? 현재 목록·ID는 덮어씁니다.')) return;
+    applyOpsNaverKwBranchAdGroupSeed_(st, branchKey, { force: true });
+    if(!opsNaverKwBranchAdGroupPack_(branchKey)){
+      st.neighborhoods = opsDefaultNaverNeighborhoods_(branchKey);
+      syncOpsNaverKwAdGroupIdsToHoods_(st);
+    }
   } else {
     var seed = opsNaverKwSeedKeywords_();
     if(!seed.length){
@@ -19650,17 +19893,16 @@ function regenOpsNaverKwList_(itemId, field){
     if(!window.confirm('일반 키워드를 정리본 시드(' + seed.length + '개)로 다시 불러올까요? 현재 목록은 덮어씁니다.')) return;
     st.keywords = seed;
     var meta = opsNaverKwSeedMeta_();
-    // 이미 입력한 광고그룹ID(여러 개 포함)는 재생성 시에도 유지
-    if(!String(st.adGroupId || '').trim()) st.adGroupId = meta.adGroupId;
+    if(!String(st.adGroupId || '').trim()) st.adGroupId = opsDefaultNaverAdGroupIds_(branchKey).join('\n') || meta.adGroupId;
     if(!String(st.adGroupIdBase || '').trim()) st.adGroupIdBase = meta.adGroupId;
     if(!st.bid) st.bid = meta.bid;
-    if(!st.pcUrl || /htcenter\.co\.kr/i.test(st.pcUrl)) st.pcUrl = meta.pcUrl;
-    if(!st.mobileUrl || /htcenter\.co\.kr/i.test(st.mobileUrl)) st.mobileUrl = meta.mobileUrl;
+    if(!st.pcUrl || /htcenter\.co\.kr|breezefeel\.github\.io\/drpark/i.test(st.pcUrl)) st.pcUrl = meta.pcUrl;
+    if(!st.mobileUrl || /htcenter\.co\.kr|breezefeel\.github\.io\/drpark/i.test(st.mobileUrl)) st.mobileUrl = meta.mobileUrl;
   }
   getOpsManualState_().updatedAt = new Date().toISOString();
   save({ skipDriveUpload: false, gasImmediate: true, driveImmediate: true });
   refreshOpsNaverKwPanel_(itemId, { skipDomSync: true });
-  if(typeof setAppToast === 'function') setAppToast(field === 'neighborhoods' ? '동네 목록을 재생성했습니다.' : '일반 키워드를 재생성했습니다.', { duration: 2500 });
+  if(typeof setAppToast === 'function') setAppToast(field === 'neighborhoods' ? '일반·동네·광고그룹ID를 재생성했습니다.' : '일반 키워드를 재생성했습니다.', { duration: 2500 });
 }
 window.regenOpsNaverKwList_ = regenOpsNaverKwList_;
 function refreshOpsNaverKwPanel_(itemId, opts){
@@ -19701,19 +19943,19 @@ function downloadOpsNaverKwCsv_(itemId, mode){
   var needCombo = (mode === 'combo' || mode === 'both');
 
   if(needBase && !baseAdId){
-    if(typeof setAppToast === 'function') setAppToast('일반 키워드용 광고그룹ID를 입력해 주세요.\n(네이버 검색광고에서 만든 실제 ID만 사용 가능 · 임의 생성 불가)', { duration: 5200, variant: 'err' });
-    else alert('일반 키워드용 광고그룹ID를 입력해 주세요.');
+    if(typeof setAppToast === 'function') setAppToast('「일반」 항목의 광고그룹ID를 입력해 주세요.\n(네이버에서 만든 실제 ID · 수정 가능)', { duration: 5200, variant: 'err' });
+    else alert('「일반」 항목의 광고그룹ID를 입력해 주세요.');
     return;
   }
   if(needCombo){
     var missingHoods = [];
     (st.neighborhoods || []).forEach(function(hood, idx){
+      if(isOpsNaverKwBaseLabel_(hood)) return;
       if(!hoodAdIds[idx]) missingHoods.push(hood);
     });
     if(missingHoods.length){
       var missMsg = '동네별 광고그룹ID가 비어 있습니다.\n비어 있는 동네: ' + missingHoods.slice(0, 8).join(', ') +
-        (missingHoods.length > 8 ? ' 외 ' + (missingHoods.length - 8) + '개' : '') +
-        '\n\n네이버에서 동네 수만큼 광고그룹을 만든 뒤 ID를 붙여넣으세요. (임의 생성 불가)';
+        (missingHoods.length > 8 ? ' 외 ' + (missingHoods.length - 8) + '개' : '');
       if(typeof setAppToast === 'function') setAppToast(missMsg, { duration: 6500, variant: 'err' });
       else alert(missMsg);
       return;
@@ -19733,7 +19975,6 @@ function downloadOpsNaverKwCsv_(itemId, mode){
   st.bid = normalizeOpsNaverKwBid_(st.bid);
   var bidNum = normalizeOpsNaverKwBid_(st.bid);
 
-  // [{ adGroupId, keywords: [] }] — 동네별 1:1 + 일반용
   var buckets = [];
   var skippedLong = 0;
   var truncated = false;
@@ -19744,7 +19985,6 @@ function downloadOpsNaverKwCsv_(itemId, mode){
     if(!gid || !keywords || !keywords.length) return;
     var chunks = chunkOpsNaverKwRows_(keywords, OPS_NAVER_KW_PER_ADGROUP);
     if(chunks.length > 1){
-      // 동네(또는 일반) 1그룹에 1000개 초과 → 앞 1000만 넣고 경고
       overPerGroup = true;
       chunks = [chunks[0]];
     }
@@ -19761,12 +20001,18 @@ function downloadOpsNaverKwCsv_(itemId, mode){
     var byHood = buildOpsNaverKwCombinedByHood_(st);
     skippedLong += byHood._skippedLong || 0;
     byHood.forEach(function(g, idx){
+      if(g.isBase || isOpsNaverKwBaseLabel_(g.hood)) return;
       pushBucket(hoodAdIds[idx], g.keywords);
     });
   }
 
-  var totalRows = 0;
-  buckets.forEach(function(b){ totalRows += b.keywords.length; });
+  var flatRows = [];
+  buckets.forEach(function(b){
+    b.keywords.forEach(function(kw){
+      flatRows.push({ adGroupId: b.adGroupId, kw: kw });
+    });
+  });
+  var totalRows = flatRows.length;
   if(!totalRows){
     if(typeof setAppToast === 'function'){
       setAppToast(skippedLong
@@ -19774,20 +20020,6 @@ function downloadOpsNaverKwCsv_(itemId, mode){
         : '다운로드할 키워드가 없습니다.', { duration: 4000, variant: 'err' });
     }
     return;
-  }
-  if(totalRows > OPS_NAVER_KW_MAX_ROWS){
-    if(!window.confirm('키워드가 ' + totalRows.toLocaleString() + '개입니다. 템플릿 최대 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() + '개만 저장합니다. 계속할까요?')) return;
-    var remain = OPS_NAVER_KW_MAX_ROWS;
-    var trimmed = [];
-    buckets.forEach(function(b){
-      if(remain <= 0) return;
-      var take = b.keywords.slice(0, remain);
-      remain -= take.length;
-      if(take.length) trimmed.push({ adGroupId: b.adGroupId, keywords: take });
-    });
-    buckets = trimmed;
-    totalRows = OPS_NAVER_KW_MAX_ROWS - Math.max(0, remain);
-    truncated = true;
   }
   if(overPerGroup){
     var overNote = '일부 그룹의 키워드가 그룹당 ' + OPS_NAVER_KW_PER_ADGROUP + '개를 넘어 앞부분만 넣었습니다. 초과분은 광고그룹을 추가로 만든 뒤 나눠 등록하세요.';
@@ -19799,29 +20031,36 @@ function downloadOpsNaverKwCsv_(itemId, mode){
   var branchKey = opsPlaceBranchKey_(itemId);
   var place = opsBranchShortLabel_(branchKey);
   var groupCount = Object.keys(usedGroupIds).length;
+  var fileChunks = chunkOpsNaverKwRows_(flatRows, OPS_NAVER_KW_MAX_ROWS);
+  var fileCount = fileChunks.length;
 
-  var allLines = OPS_NAVER_KW_CSV_HEADER_LINES.slice();
-  buckets.forEach(function(b){
-    b.keywords.forEach(function(kw){
+  if(fileCount > 1){
+    if(!window.confirm('키워드 ' + totalRows.toLocaleString() + '개 → 파일당 최대 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() + '개로 CSV ' + fileCount + '개로 나눠 저장합니다. 계속할까요?')) return;
+  }
+
+  fileChunks.forEach(function(chunk, fi){
+    var allLines = OPS_NAVER_KW_CSV_HEADER_LINES.slice();
+    chunk.forEach(function(row){
       allLines.push([
-        escapeOpsNaverKwCsvCell_(b.adGroupId),
-        escapeOpsNaverKwCsvCell_(kw),
+        escapeOpsNaverKwCsvCell_(row.adGroupId),
+        escapeOpsNaverKwCsvCell_(row.kw),
         escapeOpsNaverKwCsvCell_(st.pcUrl),
         escapeOpsNaverKwCsvCell_(st.mobileUrl),
         escapeOpsNaverKwCsvCell_(bidNum)
       ].join(','));
     });
+    var csvText = allLines.join('\r\n') + '\r\n';
+    var partTag = fileCount > 1 ? ('_' + (fi + 1) + 'of' + fileCount) : '';
+    var filename = '네이버키워드_' + place + '_' + modeLabel + '_' + chunk.length + '개_' + groupCount + '그룹' + partTag + '.csv';
+    triggerOpsNaverKwFileDownload_(filename, csvText);
   });
-  var csvText = allLines.join('\r\n') + '\r\n';
-  var filename = '네이버키워드_' + place + '_' + modeLabel + '_' + totalRows + '개_' + groupCount + '그룹.csv';
-  triggerOpsNaverKwFileDownload_(filename, csvText);
 
   refreshOpsNaverKwPanel_(itemId);
   if(typeof setAppToast === 'function'){
-    var tip = filename + ' 다운로드' +
-      (truncated ? ' (수량 조정됨)' : '') +
+    var tip = (fileCount > 1 ? (fileCount + '개 CSV 다운로드') : (fileChunks[0] ? ('네이버키워드_' + place + '_' + modeLabel + '_' + totalRows + '개 다운로드') : '다운로드')) +
+      (truncated ? ' (그룹당 수량 조정)' : '') +
       (skippedLong ? ' · ' + skippedLong + '개 길이초과 제외' : '') +
-      '\n' + groupCount + '개 광고그룹 · 동네별 1:1 배정 · 그룹당 ≤' + OPS_NAVER_KW_PER_ADGROUP + '개';
+      '\n' + groupCount + '개 광고그룹 · 일반+동네 1:1 · 파일당 ≤' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() + '개';
     setAppToast(tip, { duration: 6500, variant: 'ok' });
   }
 }

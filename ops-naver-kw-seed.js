@@ -9,7 +9,6 @@ var OPS_NAVER_KW_SEED = {
     '1인운동지도',
     'O다리교정',
     'p스트레칭',
-    're alignment',
     'realignment',
     'realmovement',
     'X다리',

@@ -544,35 +544,35 @@ var OPS_NAVER_KW_YAKSU_ADGROUP_SEED = {
     { name: '중구', id: 'grp-a001-01-000000073136662' }
   ]
 };
-/** 인천(작전) 지점: 약수와 동일 구조 · 네이버에서 그룹 만든 뒤 ID 채움 */
+/** 인천(작전) 지점: 약수와 동일 구조 · 네이버 광고그룹 ID 동기화 */
 var OPS_NAVER_KW_JAKJEON_ADGROUP_SEED = {
-  version: 'jakjeon-2026-09-09b',
+  version: 'jakjeon-2026-09-09c',
   bid: '70',
   pcUrl: 'https://realmovement.imweb.me/85',
   mobileUrl: 'https://realmovement.imweb.me/85',
   groups: [
-    { name: '일반', id: '' },
-    { name: '작전', id: '' },
-    { name: '작전역', id: '' },
-    { name: '효성', id: '' },
-    { name: '효성동', id: '' },
-    { name: '계양', id: '' },
-    { name: '계양역', id: '' },
-    { name: '임학', id: '' },
-    { name: '임학역', id: '' },
-    { name: '계산', id: '' },
-    { name: '계산역', id: '' },
-    { name: '귤현', id: '' },
-    { name: '박촌', id: '' },
-    { name: '갈산', id: '' },
-    { name: '갈산역', id: '' },
-    { name: '부평', id: '' },
-    { name: '부평역', id: '' },
-    { name: '삼산', id: '' },
-    { name: '부평구', id: '' },
-    { name: '루원', id: '' },
-    { name: '루원시티', id: '' },
-    { name: '인천', id: '' }
+    { name: '일반', id: 'grp-a001-01-000000073169048' },
+    { name: '작전', id: 'grp-a001-01-000000073169083' },
+    { name: '작전역', id: 'grp-a001-01-000000073169115' },
+    { name: '효성', id: 'grp-a001-01-000000073169129' },
+    { name: '효성동', id: 'grp-a001-01-000000073169142' },
+    { name: '계양', id: 'grp-a001-01-000000073169154' },
+    { name: '계양역', id: 'grp-a001-01-000000073169163' },
+    { name: '임학', id: 'grp-a001-01-000000073169174' },
+    { name: '임학역', id: 'grp-a001-01-000000073169182' },
+    { name: '계산', id: 'grp-a001-01-000000073169195' },
+    { name: '계산역', id: 'grp-a001-01-000000073169204' },
+    { name: '귤현', id: 'grp-a001-01-000000073169210' },
+    { name: '박촌', id: 'grp-a001-01-000000073173350' },
+    { name: '갈산', id: 'grp-a001-01-000000073173367' },
+    { name: '갈산역', id: 'grp-a001-01-000000073173384' },
+    { name: '부평', id: 'grp-a001-01-000000073173406' },
+    { name: '부평역', id: 'grp-a001-01-000000073173427' },
+    { name: '삼산', id: 'grp-a001-01-000000073173449' },
+    { name: '부평구', id: 'grp-a001-01-000000073173483' },
+    { name: '루원', id: 'grp-a001-01-000000073173512' },
+    { name: '루원시티', id: 'grp-a001-01-000000073173533' },
+    { name: '인천', id: 'grp-a001-01-000000073173557' }
   ]
 };
 function opsNaverKwBranchAdGroupPack_(branchKey){

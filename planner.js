@@ -524,7 +524,7 @@ var OPS_NAVER_KW_BID_MIN = 70;
 var OPS_NAVER_KW_BID_MAX = 100000;
 /** 약수 지점: 네이버 광고그룹 현황(일반 첫 줄 · ID는 기본값·수정 가능) */
 var OPS_NAVER_KW_YAKSU_ADGROUP_SEED = {
-  version: 'yaksu-2026-09-09',
+  version: 'yaksu-2026-09-09b',
   bid: '70',
   pcUrl: 'https://realmovement.imweb.me',
   mobileUrl: 'https://realmovement.imweb.me',
@@ -532,15 +532,32 @@ var OPS_NAVER_KW_YAKSU_ADGROUP_SEED = {
     { name: '일반', id: 'grp-a001-01-000000073136704' },
     { name: '약수', id: 'grp-a001-01-000000073132456' },
     { name: '약수역', id: 'grp-a001-01-000000073136208' },
+    { name: '다산동', id: '' },
     { name: '금호', id: 'grp-a001-01-000000073136254' },
     { name: '금호역', id: 'grp-a001-01-000000073136293' },
+    { name: '신금호', id: '' },
+    { name: '신금호역', id: '' },
     { name: '옥수', id: 'grp-a001-01-000000073136338' },
     { name: '옥수역', id: 'grp-a001-01-000000073136367' },
     { name: '신당', id: 'grp-a001-01-000000073136420' },
     { name: '신당역', id: 'grp-a001-01-000000073136455' },
-    { name: '동대입구', id: 'grp-a001-01-000000073136523' },
     { name: '청구', id: 'grp-a001-01-000000073136562' },
+    { name: '동대입구', id: 'grp-a001-01-000000073136523' },
+    { name: '장충', id: '' },
+    { name: '장충동', id: '' },
     { name: '버티고개', id: 'grp-a001-01-000000073136607' },
+    { name: '충무로', id: '' },
+    { name: '충무로역', id: '' },
+    { name: '녹사평', id: '' },
+    { name: '녹사평역', id: '' },
+    { name: '이태원', id: '' },
+    { name: '이태원역', id: '' },
+    { name: '한남', id: '' },
+    { name: '한남동', id: '' },
+    { name: '행당', id: '' },
+    { name: '행당역', id: '' },
+    { name: '왕십리', id: '' },
+    { name: '왕십리역', id: '' },
     { name: '중구', id: 'grp-a001-01-000000073136662' }
   ]
 };
@@ -603,20 +620,23 @@ function applyOpsNaverKwBranchAdGroupSeed_(st, branchKey, opts){
   var pack = opsNaverKwBranchAdGroupPack_(branchKey);
   if(!pack || !pack.groups || !pack.groups.length) return false;
   if(!opts.force && st.adGroupSeedVersion === pack.version) return false;
+  var prevHoods = (st.neighborhoods || []).slice();
+  var prevIds = alignOpsNaverKwHoodAdGroupIds_(st.adGroupId, prevHoods.length);
+  var prevByName = {};
+  prevHoods.forEach(function(h, i){
+    var key = normalizeOpsNaverKwKeyword_(h);
+    if(key && prevIds[i]) prevByName[key] = prevIds[i];
+  });
   st.neighborhoods = pack.groups.map(function(g){ return g.name; });
-  var packIds = pack.groups.map(function(g){ return String(g.id || '').trim(); });
-  var packHasIds = packIds.some(Boolean);
-  if(packHasIds){
-    st.adGroupId = packIds.join('\n');
-    var base = pack.groups.filter(function(g){ return isOpsNaverKwBaseLabel_(g.name); })[0] || pack.groups[0];
-    st.adGroupIdBase = String((base && base.id) || '').trim();
-  } else {
-    // ID 미등록 시드(인천 등): 동네만 맞추고 기존에 붙여 둔 ID는 슬롯 정렬만
-    syncOpsNaverKwAdGroupIdsToHoods_(st);
-    if(!String(st.adGroupIdBase || '').trim()){
-      st.adGroupIdBase = getOpsNaverKwBaseAdGroupId_(st);
-    }
-  }
+  var mergedIds = pack.groups.map(function(g){
+    var fromPack = String(g.id || '').trim();
+    if(fromPack) return fromPack;
+    return prevByName[normalizeOpsNaverKwKeyword_(g.name)] || '';
+  });
+  st.adGroupId = mergedIds.join('\n');
+  var base = pack.groups.filter(function(g){ return isOpsNaverKwBaseLabel_(g.name); })[0] || pack.groups[0];
+  var baseFromPack = String((base && base.id) || '').trim();
+  st.adGroupIdBase = baseFromPack || getOpsNaverKwBaseAdGroupId_(st) || String(st.adGroupIdBase || '').trim();
   st.bid = normalizeOpsNaverKwBid_(pack.bid || '70');
   st.pcUrl = normalizeOpsNaverKwUrl_(pack.pcUrl || st.pcUrl);
   st.mobileUrl = normalizeOpsNaverKwUrl_(pack.mobileUrl || st.mobileUrl || st.pcUrl);

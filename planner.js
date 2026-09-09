@@ -628,6 +628,7 @@ function applyOpsNaverKwBranchAdGroupSeed_(st, branchKey, opts){
     if(key && prevIds[i]) prevByName[key] = prevIds[i];
   });
   st.neighborhoods = pack.groups.map(function(g){ return g.name; });
+  st.hoodCsvSelected = pack.groups.map(function(){ return true; });
   var mergedIds = pack.groups.map(function(g){
     var fromPack = String(g.id || '').trim();
     if(fromPack) return fromPack;
@@ -744,7 +745,23 @@ function syncOpsNaverKwAdGroupIdsToHoods_(st){
       break;
     }
   }
+  syncOpsNaverKwHoodCsvSelected_(st);
   return aligned;
+}
+/** 동네(일반 포함) CSV 다운로드 체크 상태 — 칸 수 맞추고 신규는 기본 선택 */
+function syncOpsNaverKwHoodCsvSelected_(st){
+  if(!st || typeof st !== 'object') return [];
+  var n = (st.neighborhoods || []).length;
+  var prev = Array.isArray(st.hoodCsvSelected) ? st.hoodCsvSelected : [];
+  var out = [];
+  for(var i = 0; i < n; i++){
+    out.push(prev[i] == null ? true : !!prev[i]);
+  }
+  st.hoodCsvSelected = out;
+  return out;
+}
+function getOpsNaverKwHoodCsvSelected_(st){
+  return syncOpsNaverKwHoodCsvSelected_(st);
 }
 function getOpsNaverKwBaseAdGroupId_(st){
   var hoods = (st && st.neighborhoods) || [];
@@ -952,6 +969,18 @@ function syncOpsNaverKwPanelFromDom_(itemId){
     var adEl = panel.querySelector('[data-ops-kw-meta="adGroupId"]');
     if(adEl) st.adGroupId = String(adEl.value || '');
     syncOpsNaverKwAdGroupIdsToHoods_(st);
+  }
+  var selBoxes = panel.querySelectorAll('[data-ops-kw-hood-select]');
+  if(selBoxes && selBoxes.length){
+    var sels = [];
+    for(var si = 0; si < selBoxes.length; si++){
+      sels.push(!!selBoxes[si].checked);
+    }
+    var nSel = (st.neighborhoods || []).length;
+    while(sels.length < nSel) sels.push(true);
+    st.hoodCsvSelected = sels.slice(0, nSel);
+  } else {
+    syncOpsNaverKwHoodCsvSelected_(st);
   }
   var baseEl = panel.querySelector('[data-ops-kw-meta="adGroupIdBase"]');
   if(baseEl) st.adGroupIdBase = String(baseEl.value || '').trim();
@@ -19941,18 +19970,38 @@ function renderOpsNaverKwPanelHTML_(itemId){
   var skippedLong = bothRows._skippedLong || 0;
   var seedCount = opsNaverKwSeedKeywords_().length;
   var hoodAdIds = syncOpsNaverKwAdGroupIdsToHoods_(st);
+  var hoodSel = getOpsNaverKwHoodCsvSelected_(st);
   var hoodFilled = hoodAdIds.filter(Boolean).length;
+  var hoodSelCount = hoodSel.filter(Boolean).length;
   var fileParts = Math.max(1, Math.ceil(Math.max(bothCount, 1) / OPS_NAVER_KW_MAX_ROWS));
   if(bothCount === 0) fileParts = 1;
   var adGroupHint = hoodCount
-    ? ('항목 ' + hoodCount + '개(일반 포함) · ID 입력 ' + hoodFilled + '/' + hoodCount +
+    ? ('항목 ' + hoodCount + '개(일반 포함) · 선택 ' + hoodSelCount + '/' + hoodCount +
+      ' · ID 입력 ' + hoodFilled + '/' + hoodCount +
       ' · 조합 대상 동네 ' + comboHoodCount + '개 · 합산 ' + bothCount.toLocaleString() + '개' +
       (bothCount > OPS_NAVER_KW_MAX_ROWS ? ' → CSV ' + Math.ceil(bothCount / OPS_NAVER_KW_MAX_ROWS) + '개로 분할' : '') +
-      ' · 그룹당 ≤' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개')
+      ' · 그룹당 ≤' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개 · 체크한 항목만 다운로드')
     : ('일반·동네를 입력하면 광고그룹ID 칸이 항목 수만큼 생깁니다.');
+  var allSel = hoodCount > 0 && hoodSelCount === hoodCount;
+  var hoodMapToolbar = hoodCount
+    ? ('<div class="ops-kw-hood-ad-toolbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 4px">' +
+        '<label class="ops-kw-hood-select-all" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;cursor:pointer">' +
+          '<input type="checkbox" data-ops-kw-hood-select-all' + (allSel ? ' checked' : '') +
+            ' onchange="setOpsNaverKwHoodCsvSelectedAll_(\'' + itemId + '\', this.checked)" />' +
+          '전체 선택</label>' +
+        '<button type="button" class="ops-kw-btn" style="padding:4px 10px;font-size:11px" onclick="setOpsNaverKwHoodCsvSelectedAll_(\'' + itemId + '\', true)">일괄 체크</button>' +
+        '<button type="button" class="ops-kw-btn" style="padding:4px 10px;font-size:11px" onclick="setOpsNaverKwHoodCsvSelectedAll_(\'' + itemId + '\', false)">일괄 해제</button>' +
+        '<span style="font-size:11px;opacity:.7">선택 ' + hoodSelCount + '/' + hoodCount + '</span>' +
+      '</div>')
+    : '';
   var hoodMapRows = hoods.map(function(hood, idx){
     var isBase = isOpsNaverKwBaseLabel_(hood);
-    return '<div class="ops-kw-hood-ad-row" style="display:grid;grid-template-columns:minmax(72px,96px) 1fr;gap:8px;align-items:center">' +
+    var checked = hoodSel[idx] !== false;
+    return '<div class="ops-kw-hood-ad-row" style="display:grid;grid-template-columns:22px minmax(72px,96px) 1fr;gap:8px;align-items:center">' +
+      '<label style="display:flex;align-items:center;justify-content:center;margin:0;cursor:pointer" title="CSV에 포함">' +
+        '<input type="checkbox" data-ops-kw-hood-select="' + idx + '"' + (checked ? ' checked' : '') +
+          ' onchange="setOpsNaverKwHoodCsvSelected_(\'' + itemId + '\', ' + idx + ', this.checked)" />' +
+      '</label>' +
       '<span class="ops-kw-hood-ad-label" style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' +
         (isBase ? ';color:#0F766E' : '') + '" title="' + escapeHtml(hood) + (isBase ? ' (일반 키워드용 · 조합 안 함)' : '') + '">' +
         escapeHtml(hood) + (isBase ? ' ·일반' : '') + '</span>' +
@@ -19995,8 +20044,9 @@ function renderOpsNaverKwPanelHTML_(itemId){
       '<div class="ops-review-group-title"><strong>대량등록 CSV</strong> <span class="ops-review-group-hint">일반+동네 합본 · 파일당 최대 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() + '개 · 그룹당 ' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개</span></div>' +
       '<div class="ops-kw-meta-grid">' +
         '<div class="ops-kw-meta ops-kw-meta-wide">' +
-          '<span>광고그룹ID (기본값 · 수정 가능) <em class="ops-kw-id-note" style="font-style:normal;font-weight:500;opacity:.75">일반 포함 ' + hoodCount + '칸</em></span>' +
-          '<div class="ops-kw-hood-ad-map" style="display:flex;flex-direction:column;gap:6px;margin-top:8px">' + hoodMapRows + '</div>' +
+          '<span>광고그룹ID (기본값 · 수정 가능) <em class="ops-kw-id-note" style="font-style:normal;font-weight:500;opacity:.75">일반 포함 ' + hoodCount + '칸 · 체크한 항목만 다운로드</em></span>' +
+          hoodMapToolbar +
+          '<div class="ops-kw-hood-ad-map" style="display:flex;flex-direction:column;gap:6px;margin-top:4px">' + hoodMapRows + '</div>' +
         '</div>' +
         '<label class="ops-kw-meta"><span>입찰가 (70~100000 · 10원 단위)</span><input type="text" data-ops-kw-meta="bid" inputmode="numeric" value="' + escapeHtml(st.bid || '') + '" placeholder="70" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'bid\', this.value)" /></label>' +
         '<label class="ops-kw-meta ops-kw-meta-wide"><span>PC URL (채널)</span><input type="text" data-ops-kw-meta="pcUrl" value="' + escapeHtml(st.pcUrl || '') + '" placeholder="https://…" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'pcUrl\', this.value)" /></label>' +
@@ -20007,7 +20057,7 @@ function renderOpsNaverKwPanelHTML_(itemId){
         (skippedLong ? ' · <span class="ops-kw-warn">' + skippedLong + '개 길이초과 제외</span>' : '') +
         '<br><span class="ops-kw-adgroup-hint">' + escapeHtml(adGroupHint) + '</span></div>' +
       '<div class="ops-kw-actions ops-kw-dl-actions">' +
-        '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="downloadOpsNaverKwCsv_(\'' + itemId + '\', \'both\')">다운로드</button>' +
+        '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="downloadOpsNaverKwCsv_(\'' + itemId + '\', \'both\')">선택 항목 다운로드</button>' +
       '</div>' +
     '</div>' +
     buildOpsNaverKwCreativePanelHTML_(itemId) +
@@ -20044,6 +20094,51 @@ function setOpsNaverKwHoodAdGroupId_(itemId, index, value){
   updateOpsNaverKwAdGroupHint_(itemId);
 }
 window.setOpsNaverKwHoodAdGroupId_ = setOpsNaverKwHoodAdGroupId_;
+function setOpsNaverKwHoodCsvSelected_(itemId, index, checked){
+  syncOpsNaverKwPanelFromDom_(itemId);
+  var st = getOpsNaverKwState_(itemId);
+  var sels = getOpsNaverKwHoodCsvSelected_(st);
+  var i = index | 0;
+  if(i < 0 || i >= sels.length) return;
+  sels[i] = !!checked;
+  st.hoodCsvSelected = sels;
+  getOpsManualState_().updatedAt = new Date().toISOString();
+  save({ skipDriveUpload: true, skipGasPush: true });
+  updateOpsNaverKwHoodSelectUi_(itemId);
+}
+window.setOpsNaverKwHoodCsvSelected_ = setOpsNaverKwHoodCsvSelected_;
+function setOpsNaverKwHoodCsvSelectedAll_(itemId, checked){
+  syncOpsNaverKwPanelFromDom_(itemId);
+  var st = getOpsNaverKwState_(itemId);
+  var n = (st.neighborhoods || []).length;
+  var on = !!checked;
+  st.hoodCsvSelected = [];
+  for(var i = 0; i < n; i++) st.hoodCsvSelected.push(on);
+  getOpsManualState_().updatedAt = new Date().toISOString();
+  save({ skipDriveUpload: true, skipGasPush: true });
+  var panel = document.querySelector('.ops-kw-panel[data-ops-kw="' + itemId + '"]');
+  if(panel){
+    panel.querySelectorAll('[data-ops-kw-hood-select]').forEach(function(el){ el.checked = on; });
+    var allEl = panel.querySelector('[data-ops-kw-hood-select-all]');
+    if(allEl) allEl.checked = on;
+  }
+  updateOpsNaverKwHoodSelectUi_(itemId);
+}
+window.setOpsNaverKwHoodCsvSelectedAll_ = setOpsNaverKwHoodCsvSelectedAll_;
+function updateOpsNaverKwHoodSelectUi_(itemId){
+  var st = getOpsNaverKwState_(itemId);
+  var panel = document.querySelector('.ops-kw-panel[data-ops-kw="' + itemId + '"]');
+  if(!panel) return;
+  var sels = getOpsNaverKwHoodCsvSelected_(st);
+  var selCount = sels.filter(Boolean).length;
+  var allEl = panel.querySelector('[data-ops-kw-hood-select-all]');
+  if(allEl) allEl.checked = sels.length > 0 && selCount === sels.length;
+  var note = panel.querySelector('.ops-kw-hood-ad-toolbar span:last-child');
+  if(note && /선택\s*\d+/.test(note.textContent || '')){
+    note.textContent = '선택 ' + selCount + '/' + sels.length;
+  }
+  updateOpsNaverKwAdGroupHint_(itemId);
+}
 function updateOpsNaverKwAdGroupHint_(itemId){
   var st = getOpsNaverKwState_(itemId);
   var panel = document.querySelector('.ops-kw-panel[data-ops-kw="' + itemId + '"]');
@@ -20053,13 +20148,16 @@ function updateOpsNaverKwAdGroupHint_(itemId){
   var hoods = st.neighborhoods || [];
   var hoodAdIds = syncOpsNaverKwAdGroupIdsToHoods_(st);
   var hoodFilled = hoodAdIds.filter(Boolean).length;
+  var hoodSel = getOpsNaverKwHoodCsvSelected_(st);
+  var hoodSelCount = hoodSel.filter(Boolean).length;
   var comboHoodCount = hoods.filter(function(h){ return !isOpsNaverKwBaseLabel_(h); }).length;
   var bothCount = buildOpsNaverKwCsvRows_(st, 'both').length;
   hint.textContent = hoods.length
-    ? ('항목 ' + hoods.length + '개(일반 포함) · ID 입력 ' + hoodFilled + '/' + hoods.length +
+    ? ('항목 ' + hoods.length + '개(일반 포함) · 선택 ' + hoodSelCount + '/' + hoods.length +
+      ' · ID 입력 ' + hoodFilled + '/' + hoods.length +
       ' · 조합 대상 동네 ' + comboHoodCount + '개 · 합산 ' + bothCount.toLocaleString() + '개' +
       (bothCount > OPS_NAVER_KW_MAX_ROWS ? ' → CSV ' + Math.ceil(bothCount / OPS_NAVER_KW_MAX_ROWS) + '개로 분할' : '') +
-      ' · 그룹당 ≤' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개')
+      ' · 그룹당 ≤' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개 · 체크한 항목만 다운로드')
     : ('일반·동네를 입력하면 광고그룹ID 칸이 항목 수만큼 생깁니다.');
 }
 function setOpsNaverKwMeta_(itemId, field, value){
@@ -20191,9 +20289,25 @@ function downloadOpsNaverKwCsv_(itemId, mode){
 
   mode = mode || 'both';
   var hoodAdIds = syncOpsNaverKwAdGroupIdsToHoods_(st);
+  var hoodSel = getOpsNaverKwHoodCsvSelected_(st);
+  var hoods = st.neighborhoods || [];
+  var selectedIdx = [];
+  hoods.forEach(function(hood, idx){
+    if(hoodSel[idx]) selectedIdx.push(idx);
+  });
+  if(!selectedIdx.length){
+    if(typeof setAppToast === 'function') setAppToast('다운로드할 항목을 체크해 주세요.', { duration: 4000, variant: 'err' });
+    else alert('다운로드할 항목을 체크해 주세요.');
+    return;
+  }
+
   var baseAdId = getOpsNaverKwBaseAdGroupId_(st);
-  var needBase = (mode === 'base' || mode === 'both');
-  var needCombo = (mode === 'combo' || mode === 'both');
+  var needBase = (mode === 'base' || mode === 'both') && selectedIdx.some(function(i){
+    return isOpsNaverKwBaseLabel_(hoods[i]);
+  });
+  var needCombo = (mode === 'combo' || mode === 'both') && selectedIdx.some(function(i){
+    return !isOpsNaverKwBaseLabel_(hoods[i]);
+  });
 
   if(needBase && !baseAdId){
     if(typeof setAppToast === 'function') setAppToast('「일반」 항목의 광고그룹ID를 입력해 주세요.\n(네이버에서 만든 실제 ID · 수정 가능)', { duration: 5200, variant: 'err' });
@@ -20202,12 +20316,13 @@ function downloadOpsNaverKwCsv_(itemId, mode){
   }
   if(needCombo){
     var missingHoods = [];
-    (st.neighborhoods || []).forEach(function(hood, idx){
+    selectedIdx.forEach(function(idx){
+      var hood = hoods[idx];
       if(isOpsNaverKwBaseLabel_(hood)) return;
       if(!hoodAdIds[idx]) missingHoods.push(hood);
     });
     if(missingHoods.length){
-      var missMsg = '동네별 광고그룹ID가 비어 있습니다.\n비어 있는 동네: ' + missingHoods.slice(0, 8).join(', ') +
+      var missMsg = '선택한 동네의 광고그룹ID가 비어 있습니다.\n비어 있는 동네: ' + missingHoods.slice(0, 8).join(', ') +
         (missingHoods.length > 8 ? ' 외 ' + (missingHoods.length - 8) + '개' : '');
       if(typeof setAppToast === 'function') setAppToast(missMsg, { duration: 6500, variant: 'err' });
       else alert(missMsg);
@@ -20253,8 +20368,9 @@ function downloadOpsNaverKwCsv_(itemId, mode){
   if(needCombo){
     var byHood = buildOpsNaverKwCombinedByHood_(st);
     skippedLong += byHood._skippedLong || 0;
-    byHood.forEach(function(g, idx){
-      if(g.isBase || isOpsNaverKwBaseLabel_(g.hood)) return;
+    selectedIdx.forEach(function(idx){
+      var g = byHood[idx];
+      if(!g || g.isBase || isOpsNaverKwBaseLabel_(g.hood)) return;
       pushBucket(hoodAdIds[idx], g.keywords);
     });
   }
@@ -20313,7 +20429,7 @@ function downloadOpsNaverKwCsv_(itemId, mode){
     var tip = (fileCount > 1 ? (fileCount + '개 CSV 다운로드') : (fileChunks[0] ? ('네이버키워드_' + place + '_' + modeLabel + '_' + totalRows + '개 다운로드') : '다운로드')) +
       (truncated ? ' (그룹당 수량 조정)' : '') +
       (skippedLong ? ' · ' + skippedLong + '개 길이초과 제외' : '') +
-      '\n' + groupCount + '개 광고그룹 · 일반+동네 1:1 · 파일당 ≤' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() + '개';
+      '\n선택 ' + selectedIdx.length + '개 항목 · ' + groupCount + '개 광고그룹 · 파일당 ≤' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() + '개';
     setAppToast(tip, { duration: 6500, variant: 'ok' });
   }
 }

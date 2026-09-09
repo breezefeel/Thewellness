@@ -160,9 +160,9 @@ const OPS_BRANCH_LABELS = {
 };
 const OPS_BRANCH_HINTS = {
   global: '콘텐츠 플래너가 담지 못하는 브랜딩·GEO·법적 문구',
-  yaksu: '서울 약수 — 네이버 상호 「리얼무브먼트 약수점」',
-  jakjeon: '인천 계양(작전) — 네이버 상호 「리얼무브먼트 인천점」',
-  new: '3호점 — 약수·인천과 같은 스마트플레이스 순서로 셋팅'
+  yaksu: '새 지점 오픈 시 1→8 순서로 채널을 셋팅하세요. 각 항목의 「함께 검토」에서 등록 가이드·기본값을 확인합니다.',
+  jakjeon: '새 지점 오픈 시 1→8 순서로 채널을 셋팅하세요. 각 항목의 「함께 검토」에서 등록 가이드·기본값을 확인합니다.',
+  new: '3호점 — 약수·인천과 같은 스마트플레이스 순서로 셋팅한 뒤, 지점 오픈 1→8 채널을 이어 갑니다.'
 };
 /** 리얼무브먼트 — 공통 브랜딩 확정 문구 (플레이스·채널 동기화) */
 const OPS_BRAND_COPY = {
@@ -207,6 +207,7 @@ const OPS_BRAND_COPY = {
       placeMapUrl: 'https://map.naver.com/p/entry/place/2018185163',
       talktalkUrl: 'http://talk.naver.com/w3iw2d3',
       talktalkProfile: 'https://talk.naver.com/profile/c/real_movement_y',
+      instagramUrl: 'https://www.instagram.com/re.al_movement_official/',
       categoryLive: '스포츠시설',
       conveniences: ['예약', '무선 인터넷', '남/녀 화장실 구분', '대기공간', '간편결제', '주차'],
       hours: '평일 09:00–21:00 / 토요일 09:00–18:00 / 일·공휴일 휴무',
@@ -543,8 +544,40 @@ var OPS_NAVER_KW_YAKSU_ADGROUP_SEED = {
     { name: '중구', id: 'grp-a001-01-000000073136662' }
   ]
 };
+/** 인천(작전) 지점: 약수와 동일 구조 · 네이버에서 그룹 만든 뒤 ID 채움 */
+var OPS_NAVER_KW_JAKJEON_ADGROUP_SEED = {
+  version: 'jakjeon-2026-09-09b',
+  bid: '70',
+  pcUrl: 'https://realmovement.imweb.me/85',
+  mobileUrl: 'https://realmovement.imweb.me/85',
+  groups: [
+    { name: '일반', id: '' },
+    { name: '작전', id: '' },
+    { name: '작전역', id: '' },
+    { name: '효성', id: '' },
+    { name: '효성동', id: '' },
+    { name: '계양', id: '' },
+    { name: '계양역', id: '' },
+    { name: '임학', id: '' },
+    { name: '임학역', id: '' },
+    { name: '계산', id: '' },
+    { name: '계산역', id: '' },
+    { name: '귤현', id: '' },
+    { name: '박촌', id: '' },
+    { name: '갈산', id: '' },
+    { name: '갈산역', id: '' },
+    { name: '부평', id: '' },
+    { name: '부평역', id: '' },
+    { name: '삼산', id: '' },
+    { name: '부평구', id: '' },
+    { name: '루원', id: '' },
+    { name: '루원시티', id: '' },
+    { name: '인천', id: '' }
+  ]
+};
 function opsNaverKwBranchAdGroupPack_(branchKey){
   if(branchKey === 'yaksu') return OPS_NAVER_KW_YAKSU_ADGROUP_SEED;
+  if(branchKey === 'jakjeon') return OPS_NAVER_KW_JAKJEON_ADGROUP_SEED;
   return null;
 }
 function isOpsNaverKwBaseLabel_(name){
@@ -555,9 +588,6 @@ function opsDefaultNaverNeighborhoods_(branchKey){
   var pack = opsNaverKwBranchAdGroupPack_(branchKey);
   if(pack && pack.groups && pack.groups.length){
     return pack.groups.map(function(g){ return g.name; });
-  }
-  if(branchKey === 'jakjeon'){
-    return ['일반', '작전', '작전역', '계양', '계양역', '임학', '임학역', '계산', '계산역', '귤현', '박촌', '인천'];
   }
   return ['일반', '약수', '약수역', '금호', '금호역', '옥수', '옥수역', '신당', '신당역', '동대입구', '청구', '버티고개', '중구'];
 }
@@ -574,9 +604,19 @@ function applyOpsNaverKwBranchAdGroupSeed_(st, branchKey, opts){
   if(!pack || !pack.groups || !pack.groups.length) return false;
   if(!opts.force && st.adGroupSeedVersion === pack.version) return false;
   st.neighborhoods = pack.groups.map(function(g){ return g.name; });
-  st.adGroupId = pack.groups.map(function(g){ return String(g.id || '').trim(); }).join('\n');
-  var base = pack.groups.filter(function(g){ return isOpsNaverKwBaseLabel_(g.name); })[0] || pack.groups[0];
-  st.adGroupIdBase = String((base && base.id) || '').trim();
+  var packIds = pack.groups.map(function(g){ return String(g.id || '').trim(); });
+  var packHasIds = packIds.some(Boolean);
+  if(packHasIds){
+    st.adGroupId = packIds.join('\n');
+    var base = pack.groups.filter(function(g){ return isOpsNaverKwBaseLabel_(g.name); })[0] || pack.groups[0];
+    st.adGroupIdBase = String((base && base.id) || '').trim();
+  } else {
+    // ID 미등록 시드(인천 등): 동네만 맞추고 기존에 붙여 둔 ID는 슬롯 정렬만
+    syncOpsNaverKwAdGroupIdsToHoods_(st);
+    if(!String(st.adGroupIdBase || '').trim()){
+      st.adGroupIdBase = getOpsNaverKwBaseAdGroupId_(st);
+    }
+  }
   st.bid = normalizeOpsNaverKwBid_(pack.bid || '70');
   st.pcUrl = normalizeOpsNaverKwUrl_(pack.pcUrl || st.pcUrl);
   st.mobileUrl = normalizeOpsNaverKwUrl_(pack.mobileUrl || st.mobileUrl || st.pcUrl);
@@ -588,18 +628,18 @@ function opsNaverKwSeedKeywords_(){
   if(!seed || !Array.isArray(seed.keywords)) return [];
   return parseOpsNaverKwLines_(seed.keywords.join('\n'));
 }
-function opsNaverKwPreferredLandingUrl_(){
-  var pack = opsNaverKwBranchAdGroupPack_('yaksu');
+function opsNaverKwPreferredLandingUrl_(branchKey){
+  var pack = opsNaverKwBranchAdGroupPack_(branchKey || 'yaksu');
   if(pack && pack.pcUrl) return String(pack.pcUrl).trim();
   return String((OPS_BRAND_COPY && OPS_BRAND_COPY.profileUrl) || '').trim() || 'https://breezefeel.github.io/drpark/';
 }
-function opsNaverKwSeedMeta_(){
+function opsNaverKwSeedMeta_(branchKey){
   var seed = (typeof OPS_NAVER_KW_SEED !== 'undefined' && OPS_NAVER_KW_SEED) ? OPS_NAVER_KW_SEED : {};
-  var pack = OPS_NAVER_KW_YAKSU_ADGROUP_SEED;
+  var pack = opsNaverKwBranchAdGroupPack_(branchKey) || OPS_NAVER_KW_YAKSU_ADGROUP_SEED;
   var legacyHost = /htcenter\.co\.kr|breezefeel\.github\.io\/drpark/i;
   var pc = String((pack && pack.pcUrl) || seed.pcUrl || '').trim();
   var mo = String((pack && pack.mobileUrl) || seed.mobileUrl || '').trim();
-  if(!pc || legacyHost.test(pc)) pc = opsNaverKwPreferredLandingUrl_();
+  if(!pc || legacyHost.test(pc)) pc = opsNaverKwPreferredLandingUrl_(branchKey);
   if(!mo || legacyHost.test(mo)) mo = pc;
   var baseId = '';
   if(pack && pack.groups && pack.groups.length){
@@ -737,7 +777,7 @@ function getOpsNaverKwState_(itemId){
   if(!om.keywordAds || typeof om.keywordAds !== 'object') om.keywordAds = {};
   var branchKey = opsPlaceBranchKey_(itemId);
   var cur = om.keywordAds[itemId];
-  var meta = opsNaverKwSeedMeta_();
+  var meta = opsNaverKwSeedMeta_(branchKey);
   if(!cur || typeof cur !== 'object'){
     cur = {
       keywords: opsNaverKwSeedKeywords_(),
@@ -991,20 +1031,20 @@ function buildOpsKakaoMapProfile_(branchKey){
     '※ 카카오맵·네이버·구글 소개·사진·영업시간을 통일하세요.';
 }
 function buildOpsUnifiedInstagramBio_(){
-  return '리얼무브먼트 · 1:1 리:얼 움직임\n' +
+  return '계정: https://www.instagram.com/re.al_movement_official/\n\n' +
+    '리얼무브먼트 · 1:1 리:얼 움직임\n' +
     OPS_BRAND_COPY.realDualShort + '\n' +
     'Real Movement · Passive Stretching · 기능운동\n' +
     '📍 약수점 · 인천점\n' +
     '약수 ' + OPS_BRAND_COPY.branch.yaksu.phone + ' · 인천 ' + OPS_BRAND_COPY.branch.jakjeon.phone + '\n' +
     '🔗 ' + OPS_BRAND_COPY.profileUrl + '\n' +
     '예약·문의 DM 또는 프로필 링크\n' +
-    OPS_BRAND_COPY.disclaimer + '\n' +
-    '※ 통합 브랜드 계정 1개 (지점별 분리 없음) · 계정 신규 생성 후 URL을 메모에 기록';
+    OPS_BRAND_COPY.disclaimer;
 }
 function buildOpsUnifiedSnsGuide_(){
   return '【운영 방침】 통합 브랜드 계정 1개 · 약수·인천 모두 소개\n' +
-    '※ 인스타·Threads·유튜브 계정은 신규 생성 예정 — 생성 후 URL을 항목 메모에 적어 두세요.\n\n' +
-    '【인스타그램 — 계정명 예: realmovement_kr / 리얼무브먼트】\n' +
+    '※ 인스타 공식: https://www.instagram.com/re.al_movement_official/\n\n' +
+    '【인스타그램】\n' +
     '바이오:\n' + buildOpsUnifiedInstagramBio_() + '\n' +
     '하이라이트: 프로그램 · 약수점 · 인천점 · 1:1 공간 · 후기\n' +
     'Reels: 1:1 지도·스트레칭·공간 소개 (지점명 자막, 15~60초)\n\n' +
@@ -1206,14 +1246,21 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
   }
   if(byId === 'ops-y-6' || byId === 'ops-j-6' || byId === 'ops-n-6'){
     var pk = opsPlaceBranchKey_(byId);
+    var metaSp = opsBranchMeta_(pk);
     var storeReason = pk === 'new'
       ? '3호점은 「리얼무브먼트 ○○점」. 상단 신규 지점 메모의 지점명을 씁니다.'
       : '현재 네이버 스마트플레이스 등록명과 동일합니다.';
-    var detailNote = opsBranchMeta_(pk).liveDetailNote || '리:얼 · 1:1 · Real Movement · 면책으로 통일합니다.';
+    var detailNote = metaSp.liveDetailNote || '리:얼 · 1:1 · Real Movement · 면책으로 통일합니다.';
     return [
-      { id:'setup', title:'입력 순서 1~15 (약수·인천·3호점 공통)',
-        brief: opsPurposeIntent_('스마트플레이스를 항상 같은 순서로 채웁니다.', '3호점도 이 목록 그대로 따라가면 됩니다.'),
-        text: opsProposalWithReason_(buildOpsSmartPlaceSetupOrder_(pk), '관리자에서 위 번호 순으로 붙여 넣습니다. 1~9는 이 항목, 10~14는 부가·예약 항목.') },
+      { id:'url', title: opsBranchShortLabel_(pk) + '점 URL',
+        brief: '',
+        text: opsProposalWithReason_(
+          '단축: ' + (metaSp.placeUrl || '(없음)') + '\n지도: ' + (metaSp.placeMapUrl || '(없음)') + (metaSp.placeId ? ('\nPlace ID: ' + metaSp.placeId) : ''),
+          '프로필·블로그·확장소재·카카오에 동일 URL을 연결합니다.'
+        ) },
+      { id:'setup', title:'등록 가이드 · 입력 순서 1~15',
+        brief: '',
+        text: opsProposalWithReason_(buildOpsSmartPlaceSetupOrder_(pk), '관리자에서 위 번호 순으로 붙여 넣습니다. 1~9는 기본, 10~14는 부가·예약.') },
       { id:'store', title:'1) 업체명 (30자)',
         brief: opsPurposeIntent_('네이버 플레이스 업체명을 확정합니다.', '지점명이 검색·지도에 그대로 노출됩니다.'),
         text: opsProposalWithReason_(opsStoreName_(pk), storeReason) },
@@ -1236,8 +1283,14 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
         brief: opsPurposeIntent_('대표 사진 순서·컷을 정합니다.', '첫 3장에 외관·내부·1:1 지도가 보이게 합니다.'),
         text: opsProposalWithReason_(buildOpsPhotoShotList_(), '의료 시술처럼 보이는 컷은 피합니다.') },
       { id:'cta', title:'14) 문의 CTA (톡톡·스마트콜)',
-        brief: opsPurposeIntent_('전화·톡톡·스마트콜 안내 문구를 맞춥니다.', '상세설명 말미 CTA와 동일 톤입니다.'),
-        text: opsProposalWithReason_(OPS_BRAND_COPY.cta + '\n톡톡: ' + opsTalkLine_(pk), '스마트콜 자동응답에도 같은 톤을 씁니다.') }
+        brief: '',
+        text: opsProposalWithReason_(OPS_BRAND_COPY.cta + '\n톡톡: ' + opsTalkLine_(pk), '스마트콜 자동응답에도 같은 톤을 씁니다.') },
+      { id:'extra', title:'10~12) 부가·가격·영업시간',
+        brief: '',
+        text: opsProposalWithReason_(buildOpsPlaceExtraForm_(pk), '방문 전 실무 정보. 가격·편의·영업시간을 플레이스에 반영.') },
+      { id:'booking', title:'13) 예약·톡톡',
+        brief: '',
+        text: opsProposalWithReason_(buildOpsPlaceBookingProducts_() + '\n자동응답: ' + OPS_BRAND_COPY.cta, '「예약 시작하기」를 먼저 등록하세요.') }
     ];
   }
   if(byId === 'ops-y-15' || byId === 'ops-j-15' || byId === 'ops-n-15' || byId === 'ops-y-16' || byId === 'ops-j-16'){
@@ -1283,15 +1336,15 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
     var pk7 = opsPlaceBranchKey_(byId);
     var meta7 = opsBranchMeta_(pk7);
     return [
-      { id:'blog-link', title:'오시는 길 글 URL',
-        brief: opsPurposeIntent_('기존 블로그 글 주소를 고정합니다.', '수정·공유 시 바로 열 수 있게 합니다.'),
-        text: opsProposalWithReason_(meta7.blogDirections || '(블로그 오시는 글 URL)', '플레이스·프로필 링크와 동일하게 맞춥니다.') },
-      { id:'directions', title:'오시는 길 글 본문',
-        brief: opsPurposeIntent_('블로그 지점 안내 글을 플레이스와 맞춥니다.', '지도·주차·층수 상세.'),
-        text: opsProposalWithReason_(buildOpsBlogDirectionsSnippet_(pk7), '기존 글 수정 또는 신규 발행.') },
+      { id:'blog-link', title:'블로그 오시는 길 URL',
+        brief: '',
+        text: opsProposalWithReason_(meta7.blogDirections || '(블로그 오시는 글 URL)', '플레이스·프로필·확장소재에 동일 URL을 연결합니다.') },
+      { id:'template', title:'작성 템플릿 · 필수·주의 (펼쳐서 확인)',
+        brief: '',
+        text: opsProposalWithReason_(buildOpsBlogVisitTemplateText_(pk7), '기본은 접어 두고, 글 작성·수정할 때만 펼치세요.') },
       { id:'cta', title:'글 말미 CTA',
-        brief: opsPurposeIntent_('오시는 길 글 말미에 예약 CTA를 넣습니다.', '프로필·플레이스와 연결.'),
-        text: opsProposalWithReason_(OPS_BRAND_COPY.cta + '\n전화: ' + opsBranchPhone_(pk7) + '\n' + OPS_BRAND_COPY.disclaimer, '지도 링크·네이버 플레이스 링크 추가 권장.') }
+        brief: '',
+        text: opsProposalWithReason_(OPS_BRAND_COPY.cta + '\n전화: ' + opsBranchPhone_(pk7) + '\n' + OPS_BRAND_COPY.disclaimer, '지도·플레이스 링크를 함께 넣습니다.') }
     ];
   }
   if(byId === 'ops-y-19' || byId === 'ops-j-19'){
@@ -1318,29 +1371,60 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
   }
   if(byId === 'ops-y-21' || byId === 'ops-j-21'){
     var pk21 = opsPlaceBranchKey_(byId);
+    var m21 = opsBranchMeta_(pk21);
     return [
-      { id:'portals', title:'등록 포털 주소',
-        brief: opsPurposeIntent_('카카오맵·비즈니스 접속 주소를 고정합니다.', '담당자가 바로 열 수 있게 북마크합니다.'),
-        text: opsProposalWithReason_('매장관리: map.kakao.com · 비즈니스: business.kakao.com', '등록·수정 시 이 주소로 접속합니다.') },
-      { id:'basic', title:'카카오맵 기본정보',
-        brief: opsPurposeIntent_('카카오맵·카카오비즈니스에 매장 정보를 등록합니다.', '지도 검색·길찾기·전화 연결.'),
-        text: opsProposalWithReason_(buildOpsKakaoMapProfile_(pk21), '네이버·구글과 주소·전화·영업시간을 통일하세요.') },
-      { id:'photos', title:'사진·소개',
-        brief: opsPurposeIntent_('대표 사진·소개글을 플레이스와 맞춥니다.', '첫인상 일관성.'),
-        text: opsProposalWithReason_(buildOpsPhotoShotList_().split('\n').slice(0, 6).join('\n'), '외관·내부·1:1 지도 우선 업로드.') }
+      { id:'url', title: opsBranchShortLabel_(pk21) + '점 카카오맵 URL',
+        brief: '',
+        text: opsProposalWithReason_(
+          (m21.kakaoMapUrl || '(카카오맵 등록 후 URL을 여기에 고정)') +
+          (m21.placeUrl ? ('\n참고 네이버: ' + m21.placeUrl) : ''),
+          '등록 완료 후 단축·공유 URL을 메모·고정하세요.'
+        ) },
+      { id:'guide', title:'등록 가이드',
+        brief: '',
+        text: opsProposalWithReason_(
+          '경로: map.kakao.com 매장관리 / business.kakao.com\n' +
+          '1) 매장 등록·소유 확인\n2) 상호·주소·전화·영업시간 입력\n3) 카테고리: 헬스·PT·체형교정 톤\n4) 소개·사진 업로드\n5) 네이버·구글과 정보 통일\n6) 등록 후 URL을 위 항목에 저장',
+          '지도 검색·길찾기·전화 연결용.'
+        ) },
+      { id:'basic', title:'작성 항목 · 지점 정보',
+        brief: '',
+        text: opsProposalWithReason_(buildOpsKakaoMapProfile_(pk21) + (m21.placeUrl ? '\n참고(네이버): ' + m21.placeUrl : ''), '주소·전화·영업시간을 다른 채널과 동일하게.') },
+      { id:'photos', title:'사진',
+        brief: '',
+        text: opsProposalWithReason_(buildOpsPhotoShotList_().split('\n').slice(0, 6).join('\n'), '외관·내부·1:1 지도 우선.') }
+    ];
+  }
+  if(byId === 'ops-y-24' || byId === 'ops-j-24'){
+    var pk24 = opsPlaceBranchKey_(byId);
+    return [
+      { id:'guide', title:'등록 가이드 · 채널 기본값',
+        brief: '',
+        text: opsProposalWithReason_(buildOpsKakaoChannelGuide_(pk24), '카카오맵과 상호·전화를 맞추세요.') }
     ];
   }
   if(byId === 'ops-y-22' || byId === 'ops-j-22'){
+    var igUrl = 'https://www.instagram.com/re.al_movement_official/';
+    try {
+      var my = OPS_BRAND_COPY.branch.yaksu;
+      if(my && my.instagramUrl) igUrl = my.instagramUrl;
+    } catch(eIg){}
     return [
-      { id:'instagram', title:'인스타그램 (통합 계정)',
-        brief: opsPurposeIntent_('브랜드 통합 인스타 계정을 신규 개설·세팅합니다.', '약수·인천을 한 계정에서 소개합니다.'),
+      { id:'account', title:'공식 계정 URL',
+        brief: '',
+        text: opsProposalWithReason_(igUrl, '통합 브랜드 계정 · 약수·인천 공통. 신규 개설이 아니라 이 계정을 기준으로 운영합니다.') },
+      { id:'instagram', title:'바이오 · 하이라이트',
+        brief: '',
         text: opsProposalWithReason_(buildOpsUnifiedInstagramBio_(), '하이라이트: 프로그램 · 약수점 · 인천점 · 1:1 공간 · 후기') },
-      { id:'threads', title:'Threads (인스타 연동)',
-        brief: opsPurposeIntent_('Threads에 브랜드 소개·움직임 팁을 올립니다.', '인스타와 동일 통합 계정.'),
-        text: opsProposalWithReason_('리얼무브먼트 — 1:1 Real Movement · 체형·자세\n' + OPS_BRAND_COPY.realDualShort + '\n' + OPS_BRAND_COPY.profileUrl, '지점별 전화는 프로필·플레이스로 안내.') },
-      { id:'youtube', title:'유튜브 (통합 채널)',
-        brief: opsPurposeIntent_('유튜브 통합 채널·Shorts 주제를 정합니다.', '약수·인천 오시는 길을 Shorts로 분리.'),
-        text: opsProposalWithReason_(buildOpsUnifiedYoutubeGuide_(), '설명란·고정 댓글에 프로필·면책 링크.') }
+      { id:'posting', title:'운영 가이드 (요약)',
+        brief: '',
+        text: opsProposalWithReason_(
+          'Reels: 1:1 지도·스트레칭·공간 (지점명 자막)\n' +
+          '링크: 프로필/플레이스/오시는 길\n' +
+          '톤: ' + OPS_BRAND_COPY.master + '\n' +
+          OPS_BRAND_COPY.disclaimer,
+          'Threads·유튜브는 필요 시 같은 브랜드로 연동.'
+        ) }
     ];
   }
   if(byId === 'ops-y-8' || byId === 'ops-j-8'){
@@ -1424,43 +1508,132 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
   }
   return null;
 }
-function opsBranchItem_(id, text, purpose){
-  return { id: id, text: text, purpose: purpose || '', hint: '' };
+function opsBranchItem_(id, text, purpose, meta){
+  meta = meta || {};
+  return {
+    id: id,
+    text: text,
+    purpose: purpose || '',
+    hint: '',
+    brand: meta.brand || '',
+    step: meta.step || 0
+  };
+}
+/** 지점 브랜딩 채널 시각 메타 (아이콘·브랜드색) */
+var OPS_CHANNEL_BRAND = {
+  naver: { label: '네이버', color: '#03C75A', icon: 'N' },
+  kakao: { label: '카카오', color: '#FEE500', ink: '#3C1E1E', icon: 'K' },
+  google: { label: '구글', color: '#4285F4', icon: 'G' },
+  karrot: { label: '당근', color: '#FF6F0F', icon: 'D' },
+  instagram: { label: '인스타', color: '#E4405F', icon: 'I' }
+};
+function opsChannelBadgeHTML_(brandKey){
+  var b = OPS_CHANNEL_BRAND[brandKey];
+  if(!b) return '';
+  var ink = b.ink || '#fff';
+  return '<span class="ops-ch-badge" style="background:' + b.color + ';color:' + ink + '" title="' + escapeHtml(b.label) + '">' + escapeHtml(b.icon) + '</span>';
+}
+function buildOpsItemTitleHTML_(it){
+  var step = it && it.step ? ('<span class="ops-step-num">' + it.step + '</span>') : '';
+  var badge = (it && it.brand) ? opsChannelBadgeHTML_(it.brand) : '';
+  return step + badge + '<span class="ops-ch-title">' + escapeHtml(it && it.text ? it.text : '') + '</span>';
+}
+function ensureOpsBrandStyles_(){
+  if(typeof document === 'undefined') return;
+  if(document.getElementById('ops-brand-styles')) return;
+  var css = [
+    '.ops-ch-badge{display:inline-flex;align-items:center;justify-content:center;width:1.35em;height:1.35em;margin-right:.45em;border-radius:6px;font-size:.78em;font-weight:800;letter-spacing:-.02em;vertical-align:-.15em;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}',
+    '.ops-step-num{display:inline-flex;align-items:center;justify-content:center;min-width:1.35em;height:1.35em;margin-right:.4em;padding:0 .25em;border-radius:999px;background:#1f2937;color:#fff;font-size:.72em;font-weight:700;vertical-align:-.12em}',
+    '.ops-ch-title{vertical-align:middle}',
+    '.ops-check-item.ops-ch-naver{border-left:3px solid #03C75A}',
+    '.ops-check-item.ops-ch-kakao{border-left:3px solid #FEE500}',
+    '.ops-check-item.ops-ch-google{border-left:3px solid #4285F4}',
+    '.ops-check-item.ops-ch-karrot{border-left:3px solid #FF6F0F}',
+    '.ops-check-item.ops-ch-instagram{border-left:3px solid #E4405F}',
+    '.ops-review-brief-field{display:none !important}',
+    '.ops-guide-fold{margin:.35rem 0 .55rem;border:1px solid rgba(15,23,42,.12);border-radius:10px;background:#f8fafc;overflow:hidden}',
+    '.ops-guide-fold>summary{cursor:pointer;list-style:none;padding:.65rem .85rem;font-weight:650;color:#0f172a;user-select:none}',
+    '.ops-guide-fold>summary::-webkit-details-marker{display:none}',
+    '.ops-guide-fold>summary::before{content:"▸ ";color:#64748b;font-weight:700}',
+    '.ops-guide-fold[open]>summary::before{content:"▾ "}',
+    '.ops-guide-fold .ops-review-proposal{border:0;border-radius:0;background:transparent;margin:0;padding:0 .85rem .85rem}',
+    '.ops-manual-desc{line-height:1.55}'
+  ].join('\n');
+  var el = document.createElement('style');
+  el.id = 'ops-brand-styles';
+  el.textContent = css;
+  document.head.appendChild(el);
+}
+function buildOpsBlogVisitTemplateText_(branchKey){
+  var meta = opsBranchMeta_(branchKey);
+  var sn = opsStoreName_(branchKey);
+  return [
+    '【블로그 오시는 길 — 템플릿】',
+    '제목 예: ' + sn + ' 오시는 길 · 주차 · 약수역 도보',
+    '',
+    '■ 꼭 넣을 내용',
+    '1) 상호: ' + sn,
+    '2) 주소: ' + meta.address,
+    '3) 지하철·출구·도보 (출구 번호 명시)',
+    '4) 내비 검색어·골목 랜드마크',
+    '5) 주차: ' + meta.parking,
+    '6) 전화: ' + opsBranchPhone_(branchKey) + ' (사전 예약)',
+    '7) 지도/플레이스 링크 · 프로필 링크',
+    '8) 말미 CTA + 면책 (의료행위 아님)',
+    '',
+    '■ 본문 초안',
+    buildOpsBlogDirectionsSnippet_(branchKey),
+    '',
+    '■ 주의',
+    '· 층수·출구·주차 칸 정보가 플레이스와 다르면 안 됨',
+    '· 치료·완치·시술 표현 금지',
+    '· 글 URL을 플레이스·프로필·확장소재에 동일하게 연결',
+    '· 기존 글: ' + (meta.blogDirections || '(신규 발행)')
+  ].join('\n');
+}
+function buildOpsKakaoChannelGuide_(branchKey){
+  var meta = opsBranchMeta_(branchKey);
+  var sn = opsStoreName_(branchKey);
+  return [
+    '【카카오톡 채널 등록 가이드】',
+    '경로: business.kakao.com → 채널 만들기/관리',
+    '',
+    '■ 기본값 (' + sn + ')',
+    '· 채널명: ' + sn,
+    '· 검색용 아이디: real_movement_' + (branchKey === 'jakjeon' ? 'icn' : 'y') + ' (가용 시)',
+    '· 전화번호: ' + opsBranchPhone_(branchKey),
+    '· 홈 URL: ' + ((meta.placeUrl) || OPS_BRAND_COPY.profileUrl),
+    '· 소개: ' + OPS_BRAND_COPY.master,
+    '· 환영 메시지: ' + OPS_BRAND_COPY.cta,
+    '',
+    '■ 체크',
+    '· 영업시간·휴무 = 플레이스와 동일',
+    '· 자동응답에 예약·방문 전 안내',
+    '· 면책 한 줄 포함',
+    '· 프로필 이미지 = 플레이스 대표 사진 톤'
+  ].join('\n');
 }
 function buildOpsBranchOnlineItems_(prefix, branchKey){
-  var meta = opsBranchMeta_(branchKey);
   var placeLabel = opsBranchShortLabel_(branchKey);
+  var visitTitle = placeLabel + ' 지점 방문 안내';
   var items = [
-    opsBranchItem_(prefix + '-7', '네이버 블로그 ' + placeLabel + ' 오시는 길 글·지도 링크',
-      opsItemPurpose_('블로그 지점 안내 글을 플레이스·프로필과 맞춥니다.', '방문 전 길찾기·주차 정보를 검색에서 바로 찾게 합니다.')),
-    opsBranchItem_(prefix + '-6', '네이버 스마트플레이스 — 1~9단계 업체명·소개·키워드·사진',
-      opsItemPurpose_('네이버 지도·검색에 보이는 기본 정보를 ' + placeLabel + ' 지점에 맞게 정비합니다. 입력 순서는 약수·인천·3호점이 같습니다.', '첫인상·신뢰·리:얼 톤이 한눈에 드러나게 합니다.')),
-    opsBranchItem_(prefix + '-15', '네이버 스마트플레이스 — 10~14단계 부가·가격·시간·예약·톡톡',
-      opsItemPurpose_('방문 전에 꼭 알아야 할 실무 정보를 플레이스에 채웁니다.', '예약·가격·영업시간·톡톡 경로가 한곳에 모이게 합니다.')),
-    opsBranchItem_(prefix + '-23', '네이버 키워드 등록 — 일반·동네 조합·대량 CSV',
-      opsItemPurpose_('검색광고에 올릴 일반 키워드와 동네 조합을 정리합니다.', '템플릿 CSV로 대량 등록해 지역×증상 유입을 만듭니다.')),
-    opsBranchItem_(prefix + '-17', 'Google Business Profile — 기본정보·소개·사진',
-      opsItemPurpose_('구글 지도·검색용 지점 정보를 최신화합니다.', '네이버와 같은 신뢰·톤으로 맞춥니다.')),
-    opsBranchItem_(prefix + '-21', '카카오맵·카카오비즈니스 — 매장등록·소개·사진',
-      opsItemPurpose_('카카오 지도에서 매장을 찾고 길찾기·전화 연결을 받습니다.', '주소·전화·사진이 다른 채널과 일치하게 합니다.')),
-    opsBranchItem_(prefix + '-19', '숨고 — 프로필·서비스 등록·견적 응답',
-      opsItemPurpose_('숨고에서 1:1 운동·체형 프로그램 문의를 받습니다.', '플레이스와 같은 톤으로 견적 답변을 빠르게 합니다.')),
-    opsBranchItem_(prefix + '-20', '당근마켓 동네생활 — 비즈프로필·홍보 글',
-      opsItemPurpose_('근거리·입주민 고객에게 가볍게 노출합니다.', '과장 없이 상담·1:1 맞춤으로 이어지게 합니다.'))
+    opsBranchItem_(prefix + '-7', visitTitle, '', { brand: 'naver', step: 1 }),
+    opsBranchItem_(prefix + '-6', '네이버 스마트플레이스', '', { brand: 'naver', step: 2 }),
+    opsBranchItem_(prefix + '-23', '네이버 키워드 등록', '', { brand: 'naver', step: 3 }),
+    opsBranchItem_(prefix + '-21', '카카오맵 등록', '', { brand: 'kakao', step: 4 }),
+    opsBranchItem_(prefix + '-24', '카카오채널 등록', '', { brand: 'kakao', step: 5 }),
+    opsBranchItem_(prefix + '-17', '구글 비즈니스', '', { brand: 'google', step: 6 }),
+    opsBranchItem_(prefix + '-20', '당근마켓', '', { brand: 'karrot', step: 7 }),
+    opsBranchItem_(prefix + '-22', '인스타그램', '', { brand: 'instagram', step: 8 })
   ];
-  if(branchKey === 'yaksu'){
-    items.push(opsBranchItem_(prefix + '-22', '인스타그램 · Threads · 유튜브 — 통합 브랜드 계정 (신규 생성)',
-      opsItemPurpose_('약수·인천 공통 SNS 계정을 개설·연결합니다.', '브랜드 톤·프로필 링크·면책을 한 계정에서 유지합니다.')));
-  }
   return items;
 }
 function buildOpsBranchSearchItems_(prefix, branchKey){
   var placeLabel = opsBranchShortLabel_(branchKey);
   return [
-    opsBranchItem_(prefix + '-8', '프로필·홈페이지 ' + placeLabel + ' 링크·문구 반영',
-      opsItemPurpose_('프로필·홈페이지에 ' + placeLabel + ' 지점 정보를 반영합니다.', '주소·전화·오시는 길이 플레이스·블로그와 일치하게 합니다.')),
-    opsBranchItem_(prefix + '-9', '지역×증상 롱테일 키워드 3개 · 프로필 허브·블로그 연결',
-      opsItemPurpose_('지역×증상 검색어를 정하고 허브·블로그를 연결합니다.', '전환 의도 높은 키워드로 상담 문의를 늘립니다.'))
+    opsBranchItem_(prefix + '-8', '프로필·홈페이지 ' + placeLabel + ' 링크', '', { step: 0 }),
+    opsBranchItem_(prefix + '-9', '지역×증상 롱테일 키워드 3개', '', { step: 0 }),
+    opsBranchItem_(prefix + '-19', '숨고 (선택)', '', { step: 0 })
   ];
 }
 function buildOpsBranchOpsItems_(prefix){
@@ -1673,42 +1846,49 @@ function buildOpsGuideForItem_(item, branchId){
   }
   if(byId === 'ops-y-21' || byId === 'ops-j-21'){
     var kakao = [
-      '무엇을 하나요: 카카오맵 매장등록·카카오비즈니스에 지점 정보를 넣어 지도 검색·길찾기를 받습니다.',
+      '무엇을 하나요: 카카오맵에 지점을 등록해 지도 검색·길찾기를 받습니다.',
       '어떻게 하나요:',
-      '1) 카카오맵 매장관리 — 상호·주소·전화·영업시간·지도핀',
-      '2) 소개글·카테고리 — 네이버·구글과 동일 톤(리:얼 · 1:1)',
-      '3) 대표 사진 6~10장(플레이스와 동일 세트 권장)',
-      '4) 홈페이지·예약 링크 = 프로필 URL',
-      '5) 카카오비즈니스 채널·상담 연결(해당 시)',
-      '제안: 네이버·구글·카카오 세 지도 채널의 문구·시간을 한 번에 대조하세요.',
-      '참고: map.kakao.com · business.kakao.com'
+      '1) 매장 등록·소유 확인 → URL 확보',
+      '2) 상호·주소·전화·영업시간 = 네이버와 동일',
+      '3) 소개·사진 업로드',
+      '4) 등록 URL을 「함께 검토」에 고정',
+      '제안: 네이버·구글·카카오 정보 한 번에 대조.'
     ].join('\n');
     return { short: kakao, full: kakao, long: true };
   }
+  if(byId === 'ops-y-24' || byId === 'ops-j-24'){
+    var kch = [
+      '무엇을 하나요: 카카오톡 채널을 만들어 문의·안내를 받습니다.',
+      '어떻게 하나요:',
+      '1) business.kakao.com에서 채널 생성',
+      '2) 채널명·전화·소개 = 플레이스와 동일',
+      '3) 환영 메시지·영업시간·자동응답',
+      '4) 면책 한 줄 · 예약 안내',
+      '제안: 카카오맵 상호·전화와 먼저 맞춘 뒤 채널을 연결하세요.'
+    ].join('\n');
+    return { short: kch, full: kch, long: true };
+  }
   if(byId === 'ops-y-22' || byId === 'ops-j-22'){
     var sns = [
-      '무엇을 하나요: 인스타·Threads·유튜브 통합 브랜드 계정을 신규 개설·세팅합니다.',
+      '무엇을 하나요: 공식 인스타(통합 계정) 바이오·하이라이트·운영을 맞춥니다.',
       '어떻게 하나요:',
-      '1) 인스타 통합 계정 개설 — 바이오에 약수·인천 모두 안내',
-      '2) 하이라이트: 프로그램 · 약수점 · 인천점 · 1:1 공간 · 후기',
-      '3) Threads — 인스타 연동, 짧은 소개·움직임 팁',
-      '4) 유튜브 통합 채널 — Shorts(프로그램·약수·인천 오시는길)',
-      '5) 생성된 계정 URL을 항목 메모에 기록',
-      '6) 모든 채널 설명란에 면책·프로필 링크',
-      '제안: Reels·Shorts는 주 1회만 꾸준히 올려도 충분합니다.',
-      '운영 방침: 통합 브랜드 계정 1개 (지점별 분리 없음 — 확정)'
+      '1) 계정 확인: https://www.instagram.com/re.al_movement_official/',
+      '2) 바이오에 약수·인천·프로필 링크',
+      '3) 하이라이트: 프로그램 · 약수점 · 인천점 · 1:1 공간 · 후기',
+      '4) Reels에 지점명 자막 · 면책 유지',
+      '제안: 지점별 계정을 새로 만들지 말고 공식 계정 기준으로 운영합니다.'
     ].join('\n');
     return { short: sns, full: sns, long: true };
   }
   if(byId === 'ops-y-7' || byId === 'ops-j-7'){
     var blogDir = [
-      '무엇을 하나요: 블로그 오시는 길 글을 플레이스·프로필과 동일 정보로 맞춥니다.',
+      '무엇을 하나요: 블로그 오시는 길 글로 지점 방문 안내를 맞춥니다.',
       '어떻게 하나요:',
-      '1) 주소·지하철·내비·주차·층수 상세 입력',
-      '2) 대표 사진(외관·입구) 삽입',
-      '3) 말미 예약 CTA·면책',
-      '4) 플레이스 찾아오기·프로필 지점 안내와 대조',
-      '제안: 기존 블로그 글이 있으면 수정, 없으면 함께 검토 초안으로 신규 발행.'
+      '1) 기존 글 URL 확인(또는 신규 발행)',
+      '2) 「작성 템플릿」을 펼쳐 필수·주의 확인',
+      '3) 주소·출구·내비·주차·층수 = 플레이스와 동일',
+      '4) 말미 CTA·면책 · 지도/플레이스 링크',
+      '제안: 템플릿은 기본 접힘 — 작성할 때만 펼치세요.'
     ].join('\n');
     return { short: blogDir, full: blogDir, long: true };
   }
@@ -2062,7 +2242,7 @@ window.focusOpsProposalTextarea_ = focusOpsProposalTextarea_;
 window.blurOpsProposalTextarea_ = blurOpsProposalTextarea_;
 function shouldRefreshOpsPlaceProposal_(itemId, saved){
   if(saved && saved.pinned) return false;
-  return /^(ops-[yjn]-(6|7|8|15|16|17|21))$/.test(String(itemId || ''));
+  return /^(ops-[yjn]-(6|7|8|15|16|17|20|21|22|23|24))$/.test(String(itemId || ''));
 }
 function normalizeOpsProposalItems_(itemId, savedItems, baseItems){
   baseItems = baseItems || [];
@@ -2180,12 +2360,12 @@ const OPS_MANUAL_SECTIONS = [
     opsBranchItem_('ops-g-11', '강사용·프로필·플래너 URL·동기화·배포 버전 점검',
       opsItemPurpose_('공개 URL·배포 파일·버전을 한곳에서 점검합니다.', '강사용·프로필·플래너 링크 오타·구버전 캐시를 배포 때마다 확인합니다.'))
   ]},
-  { id: 'ops-y-online', branch: 'yaksu', phase: '1. 온라인 필수', items: buildOpsBranchOnlineItems_('ops-y', 'yaksu') },
-  { id: 'ops-y-search', branch: 'yaksu', phase: '2. 검색·연결', items: buildOpsBranchSearchItems_('ops-y', 'yaksu') },
-  { id: 'ops-y-open', branch: 'yaksu', phase: '3. 운영', items: buildOpsBranchOpsItems_('ops-y') },
-  { id: 'ops-j-online', branch: 'jakjeon', phase: '1. 온라인 필수', items: buildOpsBranchOnlineItems_('ops-j', 'jakjeon') },
-  { id: 'ops-j-search', branch: 'jakjeon', phase: '2. 검색·연결', items: buildOpsBranchSearchItems_('ops-j', 'jakjeon') },
-  { id: 'ops-j-open', branch: 'jakjeon', phase: '3. 운영', items: buildOpsBranchOpsItems_('ops-j') },
+  { id: 'ops-y-online', branch: 'yaksu', phase: '지점 오픈 셋팅 · 순서대로', items: buildOpsBranchOnlineItems_('ops-y', 'yaksu') },
+  { id: 'ops-y-search', branch: 'yaksu', phase: '추가 연결', items: buildOpsBranchSearchItems_('ops-y', 'yaksu') },
+  { id: 'ops-y-open', branch: 'yaksu', phase: '운영', items: buildOpsBranchOpsItems_('ops-y') },
+  { id: 'ops-j-online', branch: 'jakjeon', phase: '지점 오픈 셋팅 · 순서대로', items: buildOpsBranchOnlineItems_('ops-j', 'jakjeon') },
+  { id: 'ops-j-search', branch: 'jakjeon', phase: '추가 연결', items: buildOpsBranchSearchItems_('ops-j', 'jakjeon') },
+  { id: 'ops-j-open', branch: 'jakjeon', phase: '운영', items: buildOpsBranchOpsItems_('ops-j') },
   { id: 'ops-n-plan', branch: 'new', phase: '1. 후보·기획', items: [
     opsBranchItem_('ops-n-1', '지역 후보·상권 조사 — 지점명·경쟁·임대료·상권 메모',
       opsItemPurpose_('신규 지점 후보 지역·상권을 조사·기록합니다.', '지점명·경쟁·임대료·타깃을 한곳에 모아 오픈 결정에 씁니다.')),
@@ -19579,24 +19759,76 @@ function buildOpsNaverKwCreativeGuideText_(branchKey){
   lines.push('· 표시 URL과 연결 URL은 동일하게 맞춰 검수 리스크를 줄임');
   return lines.join('\n');
 }
+function buildOpsKwCopyChipHTML_(text, opts){
+  opts = opts || {};
+  var t = String(text || '');
+  if(!t) return '';
+  var len = opts.showLen ? (' <em>' + t.length + '자</em>') : '';
+  var cls = 'ops-kw-chip' + (opts.wide ? ' wide' : '') + (opts.meta ? ' meta' : '');
+  return '<button type="button" class="' + cls + '" data-copy="' + escapeHtml(t) + '" title="클릭하면 복사" onclick="copyOpsKwChip_(this)">' +
+    '<span class="ops-kw-chip-text">' + escapeHtml(t) + '</span>' + len +
+  '</button>';
+}
+function ensureOpsKwChipStyles_(){
+  if(typeof document === 'undefined') return;
+  if(document.getElementById('ops-kw-chip-styles')) return;
+  var el = document.createElement('style');
+  el.id = 'ops-kw-chip-styles';
+  el.textContent = [
+    '.ops-kw-chip-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}',
+    '.ops-kw-chip{appearance:none;border:1px solid rgba(30,58,110,.22);background:#fff;color:#1e3a6e;border-radius:999px;padding:7px 12px;font:inherit;font-size:12.5px;line-height:1.35;cursor:pointer;text-align:left;box-shadow:0 1px 0 rgba(15,23,42,.04);transition:background .12s,border-color .12s,transform .12s}',
+    '.ops-kw-chip:hover{background:#eef4ff;border-color:rgba(30,58,110,.4)}',
+    '.ops-kw-chip:active,.ops-kw-chip.copied{background:#1e3a6e;color:#fff;border-color:#1e3a6e;transform:scale(.98)}',
+    '.ops-kw-chip.wide{border-radius:12px;width:100%;max-width:100%}',
+    '.ops-kw-chip.meta{border-radius:10px;background:rgba(255,255,255,.85)}',
+    '.ops-kw-chip em{font-style:normal;opacity:.55;margin-left:4px;font-size:11px}',
+    '.ops-kw-chip.copied em{opacity:.8}',
+    '.ops-kw-chip-hint{margin:6px 0 0;font-size:11.5px;opacity:.72}'
+  ].join('');
+  document.head.appendChild(el);
+}
+function copyOpsKwChip_(btn){
+  if(!btn) return;
+  var text = btn.getAttribute('data-copy') || '';
+  if(!text) return;
+  var done = function(ok){
+    if(!ok) return;
+    btn.classList.add('copied');
+    setTimeout(function(){ try{ btn.classList.remove('copied'); }catch(e){} }, 900);
+    if(typeof setAppToast === 'function'){
+      var tip = text.length > 28 ? (text.slice(0, 28) + '…') : text;
+      setAppToast('복사됨 · ' + tip, { duration: 1800, variant: 'ok' });
+    }
+  };
+  if(typeof copyTextOnly_ === 'function') copyTextOnly_(text, done);
+  else if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){ done(true); }).catch(function(){ done(false); });
+  } else {
+    try { window.prompt('복사할 내용:', text); done(true); } catch(e2){ done(false); }
+  }
+}
+window.copyOpsKwChip_ = copyOpsKwChip_;
 function buildOpsNaverKwCreativePanelHTML_(itemId){
+  ensureOpsKwChipStyles_();
   var branchKey = opsPlaceBranchKey_(itemId);
   var c = buildOpsNaverKwCreativeSeed_(branchKey);
-  var titleLines = c.titles.map(function(t, i){ return (i + 1) + '. ' + t; }).join('\n');
-  var descLines = c.descriptions.map(function(d, i){ return (i + 1) + '. ' + d; }).join('\n');
+  var titleChips = c.titles.map(function(t){ return buildOpsKwCopyChipHTML_(t, { showLen: true }); }).join('');
+  var descChips = c.descriptions.map(function(d){ return buildOpsKwCopyChipHTML_(d, { showLen: true, wide: true }); }).join('');
   return '<div class="ops-review-group ops-kw-group ops-kw-creative" style="border:1px solid rgba(30,58,110,.16);background:rgba(30,58,110,.03);padding:12px 14px;border-radius:10px">' +
-    '<div class="ops-review-group-title"><strong>파트 2 · 소재 기본값</strong> <span class="ops-review-group-hint">소재 만들기 화면에 그대로 붙여넣기 · 수정 가능</span></div>' +
+    '<div class="ops-review-group-title"><strong>파트 2 · 소재 기본값</strong> <span class="ops-review-group-hint">칩 클릭 → 복사 · 소재 만들기에 붙여넣기</span></div>' +
     '<div style="font-size:13px;line-height:1.55;margin-top:8px">' +
       '<div><strong>유형</strong> 반응형 소재 <span style="opacity:.75">(의료 업종 제한 시 → 단일형)</span></div>' +
-      '<div><strong>사이트 이름</strong> ' + escapeHtml(c.siteName) + '</div>' +
-      '<div><strong>표시·연결 URL</strong> ' + escapeHtml(c.displayUrlPc) + '</div>' +
-      '<div><strong>검토 요청</strong> 아니오</div>' +
+      '<div style="margin-top:6px"><strong>사이트 이름</strong></div>' +
+      '<div class="ops-kw-chip-row">' + buildOpsKwCopyChipHTML_(c.siteName, { meta: true, showLen: true }) + '</div>' +
+      '<div style="margin-top:6px"><strong>표시·연결 URL</strong></div>' +
+      '<div class="ops-kw-chip-row">' + buildOpsKwCopyChipHTML_(c.displayUrlPc, { meta: true, wide: true }) + '</div>' +
+      '<div style="margin-top:6px"><strong>검토 요청</strong> 아니오</div>' +
     '</div>' +
-    '<div class="ops-kw-preview-head" style="margin-top:10px">제목 ' + c.titles.length + '개 <span>각 ≤15자</span></div>' +
-    '<pre class="ops-kw-preview">' + escapeHtml(titleLines) + '</pre>' +
-    '<div class="ops-kw-preview-head">설명 ' + c.descriptions.length + '개 <span>20~45자</span></div>' +
-    '<pre class="ops-kw-preview">' + escapeHtml(descLines) + '</pre>' +
-    '<p style="margin:8px 0 0;font-size:12px;opacity:.8;line-height:1.45">상세 가이드·확장소재는 아래 제안 문장 「소재 만들기」「확장소재 만들기」를 참고하세요.</p>' +
+    '<div class="ops-kw-preview-head" style="margin-top:12px">제목 ' + c.titles.length + '개 <span>각 ≤15자 · 클릭 복사</span></div>' +
+    '<div class="ops-kw-chip-row">' + titleChips + '</div>' +
+    '<div class="ops-kw-preview-head" style="margin-top:12px">설명 ' + c.descriptions.length + '개 <span>20~45자 · 클릭 복사</span></div>' +
+    '<div class="ops-kw-chip-row">' + descChips + '</div>' +
+    '<p class="ops-kw-chip-hint">상세 가이드·확장소재는 아래 「소재 만들기」「확장소재 만들기」를 참고하세요.</p>' +
   '</div>';
 }
 function buildOpsNaverKwRegisterManualHTML_(){
@@ -19892,7 +20124,7 @@ function regenOpsNaverKwList_(itemId, field){
     }
     if(!window.confirm('일반 키워드를 정리본 시드(' + seed.length + '개)로 다시 불러올까요? 현재 목록은 덮어씁니다.')) return;
     st.keywords = seed;
-    var meta = opsNaverKwSeedMeta_();
+    var meta = opsNaverKwSeedMeta_(branchKey);
     if(!String(st.adGroupId || '').trim()) st.adGroupId = opsDefaultNaverAdGroupIds_(branchKey).join('\n') || meta.adGroupId;
     if(!String(st.adGroupIdBase || '').trim()) st.adGroupIdBase = meta.adGroupId;
     if(!st.bid) st.bid = meta.bid;
@@ -20066,12 +20298,13 @@ function downloadOpsNaverKwCsv_(itemId, mode){
 }
 window.downloadOpsNaverKwCsv_ = downloadOpsNaverKwCsv_;
 function renderOpsManualMainHTML_(){
+  try{ ensureOpsBrandStyles_(); }catch(eSt){}
   var om = getOpsManualState_();
   var branch = om.activeBranch;
   var prog = countOpsManualProgress_(branch);
   var branchLabel = (CAT_GROUP_OPS.find(function(o){ return o.branch === branch; }) || {}).label || OPS_BRANCH_LABELS[branch] || branch;
   var intro = '<div class="ops-manual-intro">' +
-    '<div class="ops-manual-title">브랜딩·지점 오픈 메뉴얼 · ' + escapeHtml(branchLabel) + '</div>' +
+    '<div class="ops-manual-title">지점 브랜딩 · 오픈 셋팅 · ' + escapeHtml(branchLabel) + '</div>' +
     '<p class="ops-manual-desc">' + escapeHtml(OPS_BRANCH_HINTS[branch] || '') + '</p>' +
     '<div class="ops-manual-progress"><span class="ops-manual-progress-label">진행</span><span class="ops-manual-progress-num">' + prog.done + ' / ' + prog.total + '</span></div>' +
   '</div>';
@@ -20096,27 +20329,31 @@ function renderOpsManualMainHTML_(){
       var proposalItems = review.proposalItems || [];
       var checks = review.placementChecks || [];
       var proposalHtml = proposalItems.map(function(p){
-        return '<div class="ops-review-proposal' + (p.done ? ' done' : '') + '" data-proposal-id="' + escapeHtml(p.id) + '">' +
+        var body = '<div class="ops-review-proposal' + (p.done ? ' done' : '') + '" data-proposal-id="' + escapeHtml(p.id) + '">' +
           '<div class="ops-review-proposal-head">' +
             '<label class="ops-review-proposal-check">' +
               '<input type="checkbox"' + (p.done ? ' checked' : '') + ' onchange="toggleOpsReviewProposalDone_(\'' + it.id + '\', \'' + p.id + '\', this.checked)" />' +
-              '<span class="ops-review-label">' + escapeHtml(p.title || '제안 문장') + '</span>' +
+              '<span class="ops-review-label">' + escapeHtml(p.title || '등록 가이드') + '</span>' +
             '</label>' +
             '<div class="ops-review-proposal-actions">' +
               '<button type="button" class="ops-review-pin' + (p.pinned ? ' active' : '') + '" onclick="toggleOpsReviewProposalPin_(\'' + it.id + '\', \'' + p.id + '\')">' + (p.pinned ? '고정됨' : '고정') + '</button>' +
               '<button type="button" class="ops-review-rewrite" data-rewrite-btn="' + it.id + '-' + p.id + '" onclick="rewriteOpsReviewProposal_(\'' + it.id + '\', \'' + p.id + '\', \'' + branch + '\')">재작성</button>' +
             '</div>' +
           '</div>' +
-          '<div class="ops-review-field">' +
+          '<div class="ops-review-field ops-review-brief-field">' +
             '<span class="ops-review-sublabel">목적 의도 알려주기</span>' +
             '<textarea class="ops-review-input ops-grow-textarea" rows="1" data-ops-brief="' + it.id + '-' + p.id + '" oninput="autoGrowTextarea_(this)" onchange="setOpsReviewProposalBrief_(\'' + it.id + '\', \'' + p.id + '\', this.value)">' + escapeHtml(p.brief || '') + '</textarea>' +
           '</div>' +
           '<div class="ops-review-field ops-proposal-field">' +
-            '<span class="ops-review-sublabel"><strong>제안 문장</strong>과 그 이유 <span class="ops-proposal-edit-hint">· 탭하여 수정</span></span>' +
+            '<span class="ops-review-sublabel"><strong>등록 가이드 · 기본값</strong> <span class="ops-proposal-edit-hint">· 탭하여 수정</span></span>' +
             '<div class="ops-proposal-preview" tabindex="0" role="button" aria-label="제안 문장 수정" onclick="focusOpsProposalTextarea_(this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();focusOpsProposalTextarea_(this);}">' + formatOpsProposalPreviewInnerHTML_(p.text || '') + '</div>' +
             '<textarea class="ops-review-input ops-grow-textarea ops-proposal-textarea" rows="1" data-ops-text="' + it.id + '-' + p.id + '" oninput="autoGrowTextarea_(this);syncOpsProposalPreview_(this)" onblur="blurOpsProposalTextarea_(this)" onchange="setOpsReviewProposalText_(\'' + it.id + '\', \'' + p.id + '\', this.value)">' + escapeHtml(p.text || '') + '</textarea>' +
           '</div>' +
         '</div>';
+        if(p.id === 'template'){
+          return '<details class="ops-guide-fold"><summary>작성 템플릿 · 필수·주의 (탭하여 펼치기)</summary>' + body + '</details>';
+        }
+        return body;
       }).join('');
       var proposalProgress = proposalItems.length ? ('<span class="ops-review-group-progress">' + proposalItems.filter(function(x){ return !!x.done; }).length + '/' + proposalItems.length + ' 완료</span>') : '';
       var checklistHtml = checks.map(function(c, idx){
@@ -20133,22 +20370,18 @@ function renderOpsManualMainHTML_(){
         '</div>' +
         '<div class="ops-review-panel' + (reviewOpen ? ' open' : '') + '" data-item-id="' + it.id + '">' +
           kwPanelHtml +
-          '<div class="ops-review-group"><div class="ops-review-group-title"><strong>제안 문장</strong> <span class="ops-review-group-hint">항목별로 기획·완료</span>' + proposalProgress + '</div>' + proposalHtml + '</div>' +
+          '<div class="ops-review-group"><div class="ops-review-group-title"><strong>등록 가이드</strong> <span class="ops-review-group-hint">순서대로 확인·완료</span>' + proposalProgress + '</div>' + proposalHtml + '</div>' +
           '<div class="ops-review-group"><div class="ops-review-group-title">생성된 내용을 어디에 반영할지(체크)</div><div class="ops-review-checklist">' + checklistHtml + '</div></div>' +
           '<div class="ops-review-actions">' +
             '<button type="button" class="ops-review-regen" onclick="regenOpsReview_(\'' + it.id + '\', \'' + branch + '\')">재생성</button>' +
           '</div>' +
         '</div>' +
       '</div>';
-      return '<li class="ops-check-item' + (checked ? ' done' : '') + '">' +
+      return '<li class="ops-check-item' + (checked ? ' done' : '') + (it.brand ? (' ops-ch-' + it.brand) : '') + '">' +
         '<label class="ops-check-row">' +
           '<input type="checkbox"' + (checked ? ' checked' : '') + ' onchange="toggleOpsCheck_(\'' + it.id + '\', this.checked)" />' +
-          '<span class="ops-check-text">' + escapeHtml(it.text) + '</span>' +
+          '<span class="ops-check-text">' + buildOpsItemTitleHTML_(it) + '</span>' +
         '</label>' +
-        (function(){
-          var purposeLine = String(it.purpose || it.hint || '').trim();
-          return purposeLine ? '<div class="ops-check-purpose">' + escapeHtml(purposeLine) + '</div>' : '';
-        })() +
         reviewHtml +
       '</li>';
     }).join('');

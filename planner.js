@@ -524,10 +524,10 @@ var OPS_NAVER_KW_BID_MIN = 70;
 var OPS_NAVER_KW_BID_MAX = 100000;
 /** 약수 지점: 네이버 광고그룹 현황(일반 첫 줄 · ID는 기본값·수정 가능) */
 var OPS_NAVER_KW_YAKSU_ADGROUP_SEED = {
-  version: 'yaksu-2026-03-09',
+  version: 'yaksu-2026-09-09',
   bid: '70',
-  pcUrl: 'https://realmovement.imweb.me/85',
-  mobileUrl: 'https://realmovement.imweb.me/85',
+  pcUrl: 'https://realmovement.imweb.me',
+  mobileUrl: 'https://realmovement.imweb.me',
   groups: [
     { name: '일반', id: 'grp-a001-01-000000073136704' },
     { name: '약수', id: 'grp-a001-01-000000073132456' },
@@ -546,10 +546,10 @@ var OPS_NAVER_KW_YAKSU_ADGROUP_SEED = {
 };
 /** 인천(작전) 지점: 약수와 동일 구조 · 네이버 광고그룹 ID 동기화 */
 var OPS_NAVER_KW_JAKJEON_ADGROUP_SEED = {
-  version: 'jakjeon-2026-09-09c',
+  version: 'jakjeon-2026-09-09d',
   bid: '70',
-  pcUrl: 'https://realmovement.imweb.me/85',
-  mobileUrl: 'https://realmovement.imweb.me/85',
+  pcUrl: 'https://realmovement.imweb.me',
+  mobileUrl: 'https://realmovement.imweb.me',
   groups: [
     { name: '일반', id: 'grp-a001-01-000000073169048' },
     { name: '작전', id: 'grp-a001-01-000000073169083' },
@@ -636,7 +636,7 @@ function opsNaverKwPreferredLandingUrl_(branchKey){
 function opsNaverKwSeedMeta_(branchKey){
   var seed = (typeof OPS_NAVER_KW_SEED !== 'undefined' && OPS_NAVER_KW_SEED) ? OPS_NAVER_KW_SEED : {};
   var pack = opsNaverKwBranchAdGroupPack_(branchKey) || OPS_NAVER_KW_YAKSU_ADGROUP_SEED;
-  var legacyHost = /htcenter\.co\.kr|breezefeel\.github\.io\/drpark/i;
+  var legacyHost = /htcenter\.co\.kr|breezefeel\.github\.io\/drpark|realmovement\.imweb\.me\/85/i;
   var pc = String((pack && pack.pcUrl) || seed.pcUrl || '').trim();
   var mo = String((pack && pack.mobileUrl) || seed.mobileUrl || '').trim();
   if(!pc || legacyHost.test(pc)) pc = opsNaverKwPreferredLandingUrl_(branchKey);
@@ -813,8 +813,8 @@ function getOpsNaverKwState_(itemId){
   if(!String(cur.bid || '').trim()) cur.bid = meta.bid;
   else cur.bid = normalizeOpsNaverKwBid_(cur.bid);
   // 구형 랜딩 URL 교체
-  if(!cur.pcUrl || /htcenter\.co\.kr|breezefeel\.github\.io\/drpark/i.test(cur.pcUrl)) cur.pcUrl = meta.pcUrl;
-  if(!cur.mobileUrl || /htcenter\.co\.kr|breezefeel\.github\.io\/drpark/i.test(cur.mobileUrl)) cur.mobileUrl = meta.mobileUrl || cur.pcUrl;
+  if(!cur.pcUrl || /htcenter\.co\.kr|breezefeel\.github\.io\/drpark|realmovement\.imweb\.me\/85/i.test(cur.pcUrl)) cur.pcUrl = meta.pcUrl;
+  if(!cur.mobileUrl || /htcenter\.co\.kr|breezefeel\.github\.io\/drpark|realmovement\.imweb\.me\/85/i.test(cur.mobileUrl)) cur.mobileUrl = meta.mobileUrl || cur.pcUrl;
   // 동네 수만큼 광고그룹ID 슬롯 정렬(빈 칸 유지)
   syncOpsNaverKwAdGroupIdsToHoods_(cur);
   if(!String(cur.adGroupIdBase || '').trim()) cur.adGroupIdBase = getOpsNaverKwBaseAdGroupId_(cur) || meta.adGroupId;
@@ -19693,7 +19693,8 @@ function countOpsManualProgress_(branchId){
 
 function buildOpsNaverKwCreativeSeed_(branchKey){
   branchKey = branchKey || 'yaksu';
-  var url = 'https://realmovement.imweb.me/85';
+  var displayUrl = 'https://realmovement.imweb.me';
+  var finalUrl = 'https://realmovement.imweb.me/85';
   var siteName = branchKey === 'jakjeon' ? '리얼무브먼트인천점' : '리얼무브먼트약수점';
   var area = branchKey === 'jakjeon' ? '작전' : '약수';
   var areaSt = branchKey === 'jakjeon' ? '작전역' : '약수역';
@@ -19702,10 +19703,10 @@ function buildOpsNaverKwCreativeSeed_(branchKey){
     type: 'responsive',
     typeNote: '가능하면 반응형(조합↑). 의료 업종으로 분류되면 단일형으로 전환.',
     siteName: siteName,
-    displayUrlPc: url,
-    finalUrlPc: url,
-    displayUrlMo: url,
-    finalUrlMo: url,
+    displayUrlPc: displayUrl,
+    finalUrlPc: finalUrl,
+    displayUrlMo: displayUrl,
+    finalUrlMo: finalUrl,
     titles: [
       '1:1 리:얼 움직임',
       area + ' 체형자세교정',
@@ -19873,7 +19874,7 @@ function buildOpsNaverKwExtensionGuideText_(branchKey){
     '· 전화걸기: ' + phone + ' (예약 안내와 동일 번호)',
     '· 위치 / 네이버 플레이스: ' + store + (placeUrl ? (' · ' + placeUrl) : ' 플레이스 연결'),
     '· 추가 링크(3~4개):',
-    '  - 프로필/랜딩: https://realmovement.imweb.me/85 (또는 플래너 채널 URL)',
+    '  - 프로필/랜딩: 노출 URL https://realmovement.imweb.me · 연결 URL /85 (또는 플래너 채널 URL)',
     '  - 오시는 길 블로그' + (blog ? (': ' + blog) : ''),
     '  - (선택) 증상별 가이드 · 상담/예약 안내',
     '· 이미지: 외관·내부·1:1 프로그램 (과장·의료 시술 연출 금지)',
@@ -20128,8 +20129,8 @@ function regenOpsNaverKwList_(itemId, field){
     if(!String(st.adGroupId || '').trim()) st.adGroupId = opsDefaultNaverAdGroupIds_(branchKey).join('\n') || meta.adGroupId;
     if(!String(st.adGroupIdBase || '').trim()) st.adGroupIdBase = meta.adGroupId;
     if(!st.bid) st.bid = meta.bid;
-    if(!st.pcUrl || /htcenter\.co\.kr|breezefeel\.github\.io\/drpark/i.test(st.pcUrl)) st.pcUrl = meta.pcUrl;
-    if(!st.mobileUrl || /htcenter\.co\.kr|breezefeel\.github\.io\/drpark/i.test(st.mobileUrl)) st.mobileUrl = meta.mobileUrl;
+    if(!st.pcUrl || /htcenter\.co\.kr|breezefeel\.github\.io\/drpark|realmovement\.imweb\.me\/85/i.test(st.pcUrl)) st.pcUrl = meta.pcUrl;
+    if(!st.mobileUrl || /htcenter\.co\.kr|breezefeel\.github\.io\/drpark|realmovement\.imweb\.me\/85/i.test(st.mobileUrl)) st.mobileUrl = meta.mobileUrl;
   }
   getOpsManualState_().updatedAt = new Date().toISOString();
   save({ skipDriveUpload: false, gasImmediate: true, driveImmediate: true });

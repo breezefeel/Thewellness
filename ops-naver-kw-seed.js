@@ -1,8 +1,8 @@
 /* 네이버 검색광고 일반 키워드 시드 — 정리 CSV에서 생성. 플래너 재생성 기본값. */
 var OPS_NAVER_KW_SEED = {
   adGroupId: 'grp-a001-01-000000073136704',
-  pcUrl: 'https://realmovement.imweb.me/85',
-  mobileUrl: 'https://realmovement.imweb.me/85',
+  pcUrl: 'https://realmovement.imweb.me',
+  mobileUrl: 'https://realmovement.imweb.me',
   bid: '70',
   keywords: [
     '1대1운동',

@@ -514,6 +514,16 @@ var OPS_NAVER_KW_CSV_HEADER_LINES = [
   '[중요] 7행부터 입력값이 시스템에 반영됩니다. 1~6행을 삭제하지 마세요. 엑셀에서 저장시 CSV 파일형식을 꼭 확인하시기 바랍니다.',
   '광고그룹ID(필수),키워드(필수),PC URL(선택),모바일 URL(선택),"키워드입찰가(선택,숫자만)"'
 ];
+/** 네이버 검색광고 반응형 소재 대량등록 — 공식 ko_add_rsa_ad_template 1~6행 */
+var OPS_NAVER_RSA_CSV_EMPTY_COLS = ',,,,,,,,,,,,,,,,,,,,,,,,,,';
+var OPS_NAVER_RSA_CSV_HEADER_LINES = [
+  '"광고그룹ID는 \'광고다운로드\' 파일에서 확인할 수 있으며, 입력은 최대 만(10000)개까지 가능합니다. "' + OPS_NAVER_RSA_CSV_EMPTY_COLS,
+  '"파워링크 캠페인의 광고그룹 1개당 등록 가능한 소재는 단일형 소재 5개, 반응형 소재 3개 총 8개 입니다. 이미 광고그룹에 소재가 등록되어 있는 경우, 입력하신 새 소재 일부가 등록되지 않을 수 있습니다. 예시) 소재를 추가 하려는 광고그룹에 1개의 소재가 등록된 상태에서, 소재 추가를 5개 입력한 경우 입력한 순서대로 맨 위의 4개 소재만 등록되고 마지막줄 소재 등록은 실패 처리 됩니다."' + OPS_NAVER_RSA_CSV_EMPTY_COLS,
+  '"소재의 연결 URL이 1개인 경우라도 PC/모바일 URL에 동일하게 2번 입력해주시고, PC/모바일 연결 URL을 별도로 가지고 있는 경우에만 URL을 PC /모바일 구분해서 입력하세요. URL은 http:// 등으로 시작하는 형식이어야 합니다."' + OPS_NAVER_RSA_CSV_EMPTY_COLS,
+  '"제목3개, 설명2개는 필수 입력입니다. 위치고정 제목/설명 번호만 입력하세요. 복수 제목/설명 위치고정 필요시 쉼표로 구분해주세요. (예시 1,2,3  4,5)"' + OPS_NAVER_RSA_CSV_EMPTY_COLS,
+  '[중요] 7행부터 입력값이 시스템에 반영됩니다. 1~6행을 삭제하지 마세요. 엑셀에서 저장시 CSV 파일형식을 꼭 확인하시기 바랍니다.' + OPS_NAVER_RSA_CSV_EMPTY_COLS,
+  '광고그룹ID(필수),PC URL(필수),모바일 URL(필수),제목1 (필수),제목2 (필수),제목3 (필수),제목4 (선택),제목5 (선택),제목6 (선택),제목7 (선택),제목8 (선택),제목9 (선택),제목10 (선택),제목11 (선택),제목12 (선택),제목13 (선택),제목14 (선택),제목15 (선택),설명1 (필수),설명2 (필수),설명3 (선택),설명4 (선택),첫 번째 제목 위치 고정(선택),두 번째 제목 위치 고정(선택),세 번째 제목 위치 고정(선택),첫 번째 설명 위치에 고정(선택),두 번째 설명 위치에 고정(선택)'
+];
 var OPS_NAVER_KW_MAX_ROWS = 10000;
 /** 네이버 검색광고: 광고그룹당 키워드 최대 */
 var OPS_NAVER_KW_PER_ADGROUP = 1000;
@@ -524,10 +534,10 @@ var OPS_NAVER_KW_BID_MIN = 70;
 var OPS_NAVER_KW_BID_MAX = 100000;
 /** 약수 지점: 네이버 광고그룹 현황(일반 첫 줄 · ID는 기본값·수정 가능) */
 var OPS_NAVER_KW_YAKSU_ADGROUP_SEED = {
-  version: 'yaksu-2026-09-10',
+  version: 'yaksu-2026-09-10b',
   bid: '70',
-  pcUrl: 'https://realmovement.imweb.me',
-  mobileUrl: 'https://realmovement.imweb.me',
+  pcUrl: 'https://realmovement.imweb.me/85',
+  mobileUrl: 'https://realmovement.imweb.me/85',
   groups: [
     { name: '일반', id: 'grp-a001-01-000000073177422' },
     { name: '약수', id: 'grp-a001-01-000000073199529' },
@@ -563,10 +573,10 @@ var OPS_NAVER_KW_YAKSU_ADGROUP_SEED = {
 };
 /** 인천(작전) 지점: 약수와 동일 구조 · 네이버 광고그룹 ID 동기화 */
 var OPS_NAVER_KW_JAKJEON_ADGROUP_SEED = {
-  version: 'jakjeon-2026-09-10',
+  version: 'jakjeon-2026-09-10b',
   bid: '70',
-  pcUrl: 'https://realmovement.imweb.me',
-  mobileUrl: 'https://realmovement.imweb.me',
+  pcUrl: 'https://realmovement.imweb.me/120',
+  mobileUrl: 'https://realmovement.imweb.me/120',
   groups: [
     { name: '일반', id: 'grp-a001-01-000000073199700' },
     { name: '작전', id: 'grp-a001-01-000000073199702' },
@@ -658,7 +668,7 @@ function opsNaverKwPreferredLandingUrl_(branchKey){
 function opsNaverKwSeedMeta_(branchKey){
   var seed = (typeof OPS_NAVER_KW_SEED !== 'undefined' && OPS_NAVER_KW_SEED) ? OPS_NAVER_KW_SEED : {};
   var pack = opsNaverKwBranchAdGroupPack_(branchKey) || OPS_NAVER_KW_YAKSU_ADGROUP_SEED;
-  var legacyHost = /htcenter\.co\.kr|breezefeel\.github\.io\/drpark|realmovement\.imweb\.me\/85/i;
+  var legacyHost = /htcenter\.co\.kr|breezefeel\.github\.io\/drpark|realmovement\.imweb\.me\/?$/i;
   var pc = String((pack && pack.pcUrl) || seed.pcUrl || '').trim();
   var mo = String((pack && pack.mobileUrl) || seed.mobileUrl || '').trim();
   if(!pc || legacyHost.test(pc)) pc = opsNaverKwPreferredLandingUrl_(branchKey);
@@ -850,9 +860,13 @@ function getOpsNaverKwState_(itemId){
   if(cur.adGroupIdBase == null) cur.adGroupIdBase = '';
   if(!String(cur.bid || '').trim()) cur.bid = meta.bid;
   else cur.bid = normalizeOpsNaverKwBid_(cur.bid);
-  // 구형 랜딩 URL 교체
-  if(!cur.pcUrl || /htcenter\.co\.kr|breezefeel\.github\.io\/drpark|realmovement\.imweb\.me\/85/i.test(cur.pcUrl)) cur.pcUrl = meta.pcUrl;
-  if(!cur.mobileUrl || /htcenter\.co\.kr|breezefeel\.github\.io\/drpark|realmovement\.imweb\.me\/85/i.test(cur.mobileUrl)) cur.mobileUrl = meta.mobileUrl || cur.pcUrl;
+  // 구형 랜딩 URL 교체(루트·구 호스트 → 지점별 /85·/120)
+  var legacyLanding = /htcenter\.co\.kr|breezefeel\.github\.io\/drpark|realmovement\.imweb\.me\/?$/i;
+  var wrongBranch = branchKey === 'jakjeon'
+    ? /realmovement\.imweb\.me\/85\/?$/i
+    : /realmovement\.imweb\.me\/120\/?$/i;
+  if(!cur.pcUrl || legacyLanding.test(cur.pcUrl) || wrongBranch.test(cur.pcUrl)) cur.pcUrl = meta.pcUrl;
+  if(!cur.mobileUrl || legacyLanding.test(cur.mobileUrl) || wrongBranch.test(cur.mobileUrl)) cur.mobileUrl = meta.mobileUrl || cur.pcUrl;
   // 동네 수만큼 광고그룹ID 슬롯 정렬(빈 칸 유지)
   syncOpsNaverKwAdGroupIdsToHoods_(cur);
   if(!String(cur.adGroupIdBase || '').trim()) cur.adGroupIdBase = getOpsNaverKwBaseAdGroupId_(cur) || meta.adGroupId;
@@ -19744,7 +19758,9 @@ function countOpsManualProgress_(branchId){
 function buildOpsNaverKwCreativeSeed_(branchKey){
   branchKey = branchKey || 'yaksu';
   var displayUrl = 'https://realmovement.imweb.me';
-  var finalUrl = 'https://realmovement.imweb.me/85';
+  var finalUrl = branchKey === 'jakjeon'
+    ? 'https://realmovement.imweb.me/120'
+    : 'https://realmovement.imweb.me/85';
   var siteName = branchKey === 'jakjeon' ? '리얼무브먼트인천점' : '리얼무브먼트약수점';
   var area = branchKey === 'jakjeon' ? '작전' : '약수';
   var areaSt = branchKey === 'jakjeon' ? '작전역' : '약수역';
@@ -19859,7 +19875,7 @@ function getOpsNaverAdAssetPack_(branchKey){
     version: (seed && seed.version) || ''
   };
 }
-/** 통합 템플릿: 등록팩(화면동일) + 여분 + 제외 + 선택그룹 대량등록 행 */
+/** 네이버 공식 ko_add_rsa_ad_template 형식 — 도구>대량관리>반응형 소재 등록 바로 업로드 */
 function buildOpsNaverAdAssetUnifiedCsv_(itemId){
   var st = syncOpsNaverKwPanelFromDom_(itemId);
   var branchKey = opsPlaceBranchKey_(itemId);
@@ -19868,60 +19884,27 @@ function buildOpsNaverAdAssetUnifiedCsv_(itemId){
   var hoods = st.neighborhoods || [];
   var hoodAdIds = syncOpsNaverKwAdGroupIdsToHoods_(st);
   var hoodSel = getOpsNaverKwHoodCsvSelected_(st);
-  var lines = [];
-  function row(){
-    var args = Array.prototype.slice.call(arguments);
-    lines.push(args.map(escapeOpsNaverKwCsvCell_).join(','));
-  }
-  lines.push('리얼무브먼트 네이버 반응형 소재 통합 템플릿 (화면 칩과 동일 소스)');
-  lines.push('버전: ' + (pack.version || '') + ' · 지점: ' + opsBranchShortLabel_(branchKey));
-  lines.push('표시URL(대표): ' + creative.displayUrlPc + ' · 연결URL: ' + creative.finalUrlPc + ' · 검토요청: 아니오');
-  lines.push('제목≤' + pack.titleMax + '자 · 설명 ' + pack.descMin + '~' + pack.descMax + '자 · 그룹당 반응형 최대 3개');
-  lines.push('※ 엑셀로 저장하면 탭으로 깨질 수 있음. 대량등록은 메모장 확인 후 업로드하거나, 아래 【대량등록】만 공식 템플릿에 복사');
-  lines.push('사이트이름,' + creative.siteName);
-
-  lines.push('');
-  row('섹션', '순번', '구분', '문구', '글자수', '등록팩', '비고');
-  pack.titles.forEach(function(t, i){
-    row('등록팩(화면동일)', String(i + 1), '제목', t, String(t.length), 'Y', 'rsa제목');
-  });
-  pack.descriptions.forEach(function(d, i){
-    row('등록팩(화면동일)', String(i + 1), '설명', d, String(d.length), 'Y', 'rsa설명');
-  });
-  (pack.inventory || []).forEach(function(item){
-    if(item.inPack) return;
-    row('여분풀', '', item.type === 'desc' ? '설명' : '제목', item.text, String(item.text.length), 'N', item.note || '');
-  });
-  (pack.excluded || []).forEach(function(item){
-    row('제외', '', '제외', item.text, String((item.text || '').length), 'N', item.reason || '');
-  });
-
-  lines.push('');
-  lines.push('【대량등록】선택 광고그룹 × 등록팩(제목15+설명4). 도구>대량관리>반응형 소재 등록 공식 템플릿에 열 맞춰 복사');
-  var head = ['광고그룹ID(필수)'];
-  for(var ti = 1; ti <= 15; ti++) head.push('제목' + ti + (ti <= 3 ? '(필수)' : ''));
-  for(var di = 1; di <= 4; di++) head.push('설명' + di + (di <= 2 ? '(필수)' : ''));
-  head.push('PC URL(연결)', '모바일 URL(연결)', '광고그룹명');
-  lines.push(head.join(','));
-
   var titles = pack.titles.slice();
   while(titles.length < 15) titles.push('');
   titles = titles.slice(0, 15);
   var descs = pack.descriptions.slice();
   while(descs.length < 4) descs.push('');
   descs = descs.slice(0, 4);
-  var pc = creative.finalUrlPc || 'https://realmovement.imweb.me/85';
-  var mo = creative.finalUrlMo || pc;
+  var pc = normalizeOpsNaverKwUrl_(st.pcUrl || creative.finalUrlPc);
+  var mo = normalizeOpsNaverKwUrl_(st.mobileUrl || creative.finalUrlMo || pc);
+  if(pc && !mo) mo = pc;
+  if(mo && !pc) pc = mo;
+  var pinCols = ['', '', '', '', '']; // 위치고정 5칸(선택)
+  var lines = OPS_NAVER_RSA_CSV_HEADER_LINES.slice();
   var rowCount = 0;
   hoods.forEach(function(hood, idx){
     if(!hoodSel[idx]) return;
     var gid = String(hoodAdIds[idx] || '').trim();
     if(!gid) return;
-    var cells = [gid].concat(titles).concat(descs).concat([pc, mo, hood]);
+    var cells = [gid, pc, mo].concat(titles).concat(descs).concat(pinCols);
     lines.push(cells.map(escapeOpsNaverKwCsvCell_).join(','));
     rowCount++;
   });
-
   return {
     text: lines.join('\r\n') + '\r\n',
     count: rowCount,
@@ -19968,28 +19951,28 @@ function downloadOpsNaverAdAssetCsv_(itemId, kind){
   kind = kind || 'unified';
   if(kind === 'inventory'){
     var inv = buildOpsNaverAdAssetInventoryCsv_(branchKey);
-    var invName = '네이버소재통합_' + place + '_등록팩여분.csv';
+    var invName = '네이버소재등록팩_' + place + '_참고용.csv';
     triggerOpsNaverKwFileDownload_(invName, inv);
     if(typeof setAppToast === 'function'){
-      var p0 = getOpsNaverAdAssetPack_(branchKey);
-      setAppToast(invName + '\n화면 등록팩 + 여분 + 제외 (대량등록 행 없음)', { duration: 5000, variant: 'ok' });
+      setAppToast(invName + '\n등록팩·여분·제외 참고용 (대량등록 업로드용 아님)', { duration: 5000, variant: 'ok' });
     }
     return;
   }
   var built = buildOpsNaverAdAssetUnifiedCsv_(itemId);
-  if(kind === 'rsa' && !built.count){
+  if(!built.count){
     if(typeof setAppToast === 'function') setAppToast('체크된 항목 중 광고그룹ID가 있는 칸이 없습니다.\n광고그룹을 체크하고 ID를 입력해 주세요.', { duration: 5200, variant: 'err' });
     else alert('체크된 항목 중 광고그룹ID가 없습니다.');
     return;
   }
-  var name = '네이버소재통합_' + place + '_제목' + built.titleCount + '_설명' + built.descCount +
-    (built.count ? ('_' + built.count + '그룹') : '') + '.csv';
+  if(built.titleCount < 3 || built.descCount < 2){
+    if(typeof setAppToast === 'function') setAppToast('반응형 소재는 제목 3개·설명 2개 이상 필요합니다.\n현재 제목 ' + built.titleCount + ' · 설명 ' + built.descCount, { duration: 5200, variant: 'err' });
+    else alert('제목 3개·설명 2개 이상이 필요합니다.');
+    return;
+  }
+  var name = 'ko_add_rsa_ad_' + place + '_' + built.count + '그룹.csv';
   triggerOpsNaverKwFileDownload_(name, built.text);
   if(typeof setAppToast === 'function'){
-    var tip = name + '\n화면과 동일한 등록팩 · ' +
-      (built.count ? ('대량등록 ' + built.count + '그룹') : '대량등록 행 없음(그룹 체크·ID)') +
-      '\n※ 엑셀 저장 금지 · 쉼표 CSV 유지';
-    setAppToast(tip, { duration: 7000, variant: 'ok' });
+    setAppToast(name + '\n공식 템플릿 형식 · ' + built.count + '그룹\n도구 → 대량관리 → 「반응형 소재 등록」에 바로 업로드', { duration: 7000, variant: 'ok' });
   }
 }
 window.downloadOpsNaverAdAssetCsv_ = downloadOpsNaverAdAssetCsv_;
@@ -20076,13 +20059,11 @@ function buildOpsNaverKwCreativePanelHTML_(itemId){
   var branchKey = opsPlaceBranchKey_(itemId);
   var c = buildOpsNaverKwCreativeSeed_(branchKey);
   var pack = getOpsNaverAdAssetPack_(branchKey);
-  var poolCount = (pack.inventory || []).filter(function(r){ return !r.inPack; }).length;
-  var exCount = (pack.excluded || []).length;
   var titleChips = c.titles.map(function(t){ return buildOpsKwCopyChipHTML_(t, { showLen: true }); }).join('');
   var descChips = c.descriptions.map(function(d){ return buildOpsKwCopyChipHTML_(d, { showLen: true, wide: true }); }).join('');
   return '<div class="ops-review-group ops-kw-group ops-kw-creative" style="border:1px solid rgba(30,58,110,.16);background:rgba(30,58,110,.03);padding:12px 14px;border-radius:10px">' +
-    '<div class="ops-review-group-title"><strong>파트 2 · 소재 · 애셋</strong> <span class="ops-review-group-hint">화면 칩 = 등록팩 = 통합 CSV (동일 소스)</span></div>' +
-    '<p style="margin:8px 0 0;font-size:12.5px;line-height:1.5;opacity:.85">아래 제목·설명이 곧 대량등록에 들어가는 <strong>등록팩</strong>입니다. 예전에 받은 「애셋 정리본」과 화면이 달랐던 이유는, 정리본에 여분·제외까지 섞여 있었기 때문입니다. 지금은 하나로 통합했습니다.</p>' +
+    '<div class="ops-review-group-title"><strong>파트 2 · 소재 · 애셋</strong> <span class="ops-review-group-hint">화면 칩 = 등록팩 = 대량등록 CSV (동일 소스)</span></div>' +
+    '<p style="margin:8px 0 0;font-size:12.5px;line-height:1.5;opacity:.85">아래 제목·설명이 곧 대량등록에 들어가는 <strong>등록팩</strong>입니다. 다운로드 CSV는 네이버 공식 <code>ko_add_rsa_ad_template</code> 형식입니다.</p>' +
     '<div style="font-size:13px;line-height:1.55;margin-top:10px">' +
       '<div><strong>유형</strong> 반응형 소재 <span style="opacity:.75">(의료 업종 제한 시 → 단일형)</span></div>' +
       '<div style="margin-top:6px"><strong>사이트 이름</strong></div>' +
@@ -20098,10 +20079,10 @@ function buildOpsNaverKwCreativePanelHTML_(itemId){
     '<div class="ops-kw-preview-head" style="margin-top:12px">등록팩 설명 ' + c.descriptions.length + '/4 <span>20~45자 · 화면=CSV</span></div>' +
     '<div class="ops-kw-chip-row">' + descChips + '</div>' +
     '<div class="ops-kw-actions ops-kw-dl-actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">' +
-      '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="downloadOpsNaverAdAssetCsv_(\'' + itemId + '\', \'unified\')">소재 통합 템플릿 CSV</button>' +
-      '<button type="button" class="ops-kw-btn ops-kw-btn-dl" onclick="downloadOpsNaverAdAssetCsv_(\'' + itemId + '\', \'inventory\')">등록팩·여분만</button>' +
+      '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="downloadOpsNaverAdAssetCsv_(\'' + itemId + '\', \'unified\')">반응형 소재 대량등록 CSV</button>' +
+      '<button type="button" class="ops-kw-btn ops-kw-btn-dl" onclick="downloadOpsNaverAdAssetCsv_(\'' + itemId + '\', \'inventory\')">등록팩·여분 참고용</button>' +
     '</div>' +
-    '<p class="ops-kw-chip-hint">통합 템플릿 = 등록팩(위와 동일) + 여분 ' + poolCount + '개 + 제외 ' + exCount + '개 + <strong>체크한 광고그룹 대량등록 행</strong>. 엑셀로 다시 저장하지 마세요(쉼표→탭 깨짐).</p>' +
+    '<p class="ops-kw-chip-hint">체크한 광고그룹마다 등록팩(제목' + c.titles.length + '+설명' + c.descriptions.length + ') 1행 · 그룹당 반응형 최대 3개. 도구 → 대량관리 → 「반응형 소재 등록」에 바로 업로드. 엑셀 재저장 금지.</p>' +
   '</div>';
 }
 function buildOpsNaverKwRegisterManualHTML_(){
@@ -20119,7 +20100,7 @@ function buildOpsNaverKwRegisterManualHTML_(){
     '<div style="margin-top:14px;font-size:12px;font-weight:800;letter-spacing:.02em;color:#1e3a6e">파트 2 · 소재 · 확장소재</div>' +
     '<ol class="ops-kw-manual-steps" start="1" style="margin:6px 0 0;padding-left:1.25em;line-height:1.55;font-size:13px">' +
       '<li>광고그룹(또는 캠페인)에서 <strong>소재 만들기</strong> — 반응형 권장 · 아래 애셋 칩 복사 또는 CSV</li>' +
-      '<li>플래너 <strong>소재 통합 템플릿 CSV</strong> → 도구 · 대량관리 · 「반응형 소재 등록」(엑셀 재저장 금지)</li>' +
+      '<li>플래너 <strong>반응형 소재 대량등록 CSV</strong> → 도구 · 대량관리 · 「반응형 소재 등록」에 바로 업로드 (엑셀 재저장 금지)</li>' +
       '<li>캠페인 <strong>확장 소재</strong> — 전화걸기 · 위치/플레이스 · 추가링크 · (선택) 이미지</li>' +
     '</ol>' +
     '<p style="margin:10px 0 0;font-size:12px;opacity:.8;line-height:1.45">CSV 1~6행은 삭제하지 마세요. 그룹당 ≤1,000 · 파일당 ≤10,000. 비즈채널 검토 중이면 키워드·소재 노출이 막힐 수 있습니다.</p>' +

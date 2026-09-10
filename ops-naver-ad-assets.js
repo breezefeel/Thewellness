@@ -6,7 +6,7 @@
  * 제목 ≤15자 · 설명 20~45자
  */
 var OPS_NAVER_AD_ASSET_SEED = {
-  version: 'assets-2026-09-09b',
+  version: 'assets-2026-09-10',
   titleMax: 15,
   descMin: 20,
   descMax: 45,
@@ -30,9 +30,9 @@ var OPS_NAVER_AD_ASSET_SEED = {
   ],
   rsaDescriptions: [
     '근골격 움직임 전문가와 1:1 리:얼 프로그램. 예약 후 방문하세요.',
-    '의료행위가 아닌 운동 웰니스입니다. 상담으로 시작하세요.',
+    '치료만? 근본적인 해결부터! 웰니스 운동센터입니다. 상담으로 시작하세요.',
     '{{areaSt}} 인근 1:1 맞춤 운동. 체형·자세·기능운동을 안내합니다.',
-    '리:얼은 편해지는 움직임, Re Alignment는 몸의 정렬입니다.'
+    '리얼 진짜 편해지는 움직임, Re-Alignment는 몸의 정렬입니다.'
   ],
   /** 등록팩에 못 넣은 여분(교체·추가 후보) */
   poolTitles: [

@@ -1,453 +1,1699 @@
 <!DOCTYPE html>
-
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
-<title>브랜딩 플래너</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Noto+Sans+KR:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>셀프 가이드 | REAL MOVEMENT</title>
+<meta name="description" content="호흡·자세와 폼롤러·12센티 마사지볼. 센터에서 배운 순서대로 집에서 따라 하세요.">
+<meta name="theme-color" content="#F6E4C4">
+<link rel="icon" href="리얼무브먼트_링크_로고.png">
+<link rel="apple-touch-icon" href="리얼무브먼트_링크_로고.png">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
-  /* 즉시 첫 화면 — planner.css/js(약 1MB) 기다리지 않음 */
-  html, body { margin: 0; background: #F7F5F0; font-family: "Noto Sans KR", "Apple SD Gothic Neo", sans-serif; }
-  #planner-boot-splash {
-    position: fixed; inset: 0; z-index: 9000;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 14px; background: #F7F5F0; color: #1F2937; text-align: center; padding: 24px;
+  :root {
+    --bg: #F6E4C4;
+    --paper: #fffdf8;
+    --ink: #0B2048;
+    --mute: #5c6b86;
+    --line: #e6d7bc;
+    --accent: #dc143c;
+    --navy: #1e3a6e;
   }
-  #planner-boot-splash .boot-brand { font-size: 22px; font-weight: 900; letter-spacing: -0.02em; }
-  #planner-boot-splash .boot-sub { font-size: 13px; color: #6B7280; line-height: 1.5; }
-  #planner-boot-splash .boot-spin {
-    width: 28px; height: 28px; border: 3px solid #E5E7EB; border-top-color: #111827;
-    border-radius: 50%; animation: plannerBootSpin .8s linear infinite;
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
-  @keyframes plannerBootSpin { to { transform: rotate(360deg); } }
-  html.planner-ready #planner-boot-splash { display: none !important; }
-  /* 기타 주제 필터 — planner.css 로드 전에도 기본 버튼으로 보이지 않게 */
-  .misc-topic-filters { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:2px 12px 12px 40px; }
-  .misc-topic-filter-btn {
-    -webkit-appearance:none; appearance:none; margin:0; border:none;
-    background:rgba(15,118,110,.08); color:#0F766E;
-    font:700 10px/1.2 inherit; padding:4px 8px; border-radius:999px;
-    cursor:pointer; display:inline-flex; align-items:center; gap:5px;
+  body { padding: calc(16px + env(safe-area-inset-top)) 16px calc(36px + env(safe-area-inset-bottom)); }
+  .wrap { width: 100%; max-width: 560px; margin: 0 auto; }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 14px;
   }
-  .misc-topic-filter-btn[data-status="published"] { background:#F3F4F6; color:#6B7280; }
-  .misc-topic-filter-btn[data-status="partial"] { background:#FEF3C7; color:#B45309; }
-  .misc-topic-filter-btn[data-status="hasDraft"] { background:#DBEAFE; color:#2563EB; }
-  .misc-topic-filter-btn.on { box-shadow:inset 0 0 0 1.5px currentColor; }
-  .misc-topic-filter-count {
-    display:inline-flex; align-items:center; justify-content:center;
-    min-width:15px; height:15px; padding:0 4px; border-radius:999px;
-    background:rgba(255,255,255,.72); font-size:9px; font-weight:800; color:inherit;
+  .brand img { width: 46px; height: 46px; object-fit: contain; background: #fff; border-radius: 50%; }
+  .brand b { font-size: 13px; letter-spacing: .04em; }
+  .brand span { display: block; font-size: 11px; color: var(--mute); font-weight: 600; }
+  h1 { font-size: 22px; font-weight: 800; letter-spacing: -.04em; line-height: 1.3; margin: 0 0 8px; }
+  .lead { font-size: 13.5px; line-height: 1.7; color: var(--mute); word-break: keep-all; margin-bottom: 18px; }
+  .warn {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 14px; font-size: 12.5px; line-height: 1.65; color: #5b3b12;
+    margin-bottom: 22px;
   }
-  .misc-topic-filter-clear {
-    -webkit-appearance:none; appearance:none; margin:0; border:none; background:transparent;
-    color:#64748B; font:700 10px/1.2 inherit; cursor:pointer; padding:4px 6px;
-    text-decoration:underline; text-underline-offset:2px;
+  .sec-title {
+    font-size: 12px; font-weight: 800; letter-spacing: .12em;
+    color: var(--navy); margin: 8px 0 10px;
   }
+  .sec-lead {
+    font-size: 12.5px; line-height: 1.65; color: var(--mute);
+    word-break: keep-all; margin: -2px 0 14px;
+  }
+  .sec-sub {
+    font-size: 13px; font-weight: 800; color: var(--ink);
+    margin: 2px 0 8px; letter-spacing: -.02em;
+  }
+  .cat {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .cat > summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 14px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+  }
+  .cat > summary::-webkit-details-marker { display: none; }
+  .cat-k {
+    font-size: 10px; font-weight: 800; letter-spacing: .08em;
+    min-width: 22px;
+  }
+  .cat-name {
+    font-size: 15px; font-weight: 800; letter-spacing: -.03em;
+    word-break: keep-all;
+  }
+  .cat-sub {
+    display: block; font-size: 11px; font-weight: 600; margin-top: 2px; opacity: .75;
+  }
+  .cat-chev {
+    margin-left: auto; font-size: 12px; transition: transform .2s ease;
+  }
+  .cat[open] .cat-chev { transform: rotate(180deg); }
+  .cat-tools > summary { background: #1e3a6e; color: #fff; }
+  .cat-lie > summary { background: #d8efe4; color: #1a5c40; }
+  .cat-sit > summary { background: #f3e6c4; color: #6b4e16; }
+  .cat-stand > summary { background: #dce6f5; color: #1e3a6e; }
+  .cat-face > summary { background: #f4dce0; color: #6b2433; }
+  .cat-body { padding: 12px 12px 6px; }
+  .cat-body .sec-lead { margin: 0 0 12px; }
+  .cat-body .grid { margin-bottom: 14px; }
+  .subcat {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .subcat > summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 12px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--navy);
+  }
+  .subcat > summary::-webkit-details-marker { display: none; }
+  .subcat .sub-chev {
+    margin-left: auto; font-size: 11px; transition: transform .2s ease;
+  }
+  .subcat[open] .sub-chev { transform: rotate(180deg); }
+  .subcat .grid { margin: 0; padding: 0 10px 10px; }
+  .subcat .sec-lead { margin: 0; padding: 0 12px 8px; font-size: 12px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; }
+  .card {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
+    overflow: hidden;
+  }
+  .card img { width: 100%; height: 132px; object-fit: cover; display: block; background: #eee; }
+  .card .meta { padding: 10px 11px 12px; }
+  .card .k { font-size: 11px; font-weight: 800; color: var(--accent); }
+  .card .n { font-size: 15px; font-weight: 800; letter-spacing: -.03em; margin-top: 2px; word-break: keep-all; }
+  .card .s { font-size: 11px; color: var(--mute); margin-top: 3px; }
+  .card.video .ph {
+    height: 132px; display: flex; align-items: center; justify-content: center;
+    background: #1e3a6e; color: #fff; font-size: 12px; font-weight: 800;
+  }
+  .card.video .ph.short { height: 88px; }
+  .back {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 13px; font-weight: 800; color: var(--navy);
+    text-decoration: none; margin-bottom: 12px;
+  }
+  .ex-kicker { font-size: 12px; font-weight: 800; color: var(--accent); letter-spacing: .06em; }
+  .ex-title { font-size: 24px; font-weight: 800; letter-spacing: -.04em; margin: 4px 0 12px; }
+  .note {
+    background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px 15px; margin-bottom: 16px;
+  }
+  .note p { font-size: 13.5px; line-height: 1.7; word-break: keep-all; margin: 0 0 8px; }
+  .note p:last-child { margin: 0; }
+  .note b { display: inline-block; min-width: 42px; color: var(--navy); }
+  .step {
+    background: var(--paper); border: 1px solid var(--line); border-radius: 16px;
+    overflow: hidden; margin-bottom: 14px;
+  }
+  .step img { width: 100%; display: block; background: #111; }
+  .hero-shot { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; margin-bottom: 16px; }
+  .hero-shot img { width: 100%; height: 200px; object-fit: cover; display: block; background: #111; }
+  .step figcaption {
+    padding: 11px 13px 13px; font-size: 13.5px; line-height: 1.6; word-break: keep-all;
+  }
+  .step .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 22px; height: 22px; border-radius: 999px;
+    background: var(--navy); color: #fff; font-size: 11px; font-weight: 800;
+    margin-right: 6px; vertical-align: 1px;
+  }
+  .step.text figcaption { padding: 14px 15px; }
+  .chain {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 14px;
+    padding: 12px 14px; margin-bottom: 16px;
+  }
+  .chain span {
+    font-size: 12.5px; font-weight: 800; color: var(--navy);
+    background: #fff; border: 1px solid var(--line); border-radius: 999px;
+    padding: 5px 10px;
+  }
+  .chain i {
+    font-style: normal; color: var(--mute); font-size: 12px; font-weight: 800;
+  }
+  .seq-hd {
+    font-size: 13px; font-weight: 800; color: var(--navy);
+    margin: 18px 0 8px; letter-spacing: -.02em;
+  }
+  .copy-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 18px; }
+  .copy-row button {
+    flex: 1; border: 0; background: var(--navy); color: #fff;
+    font: inherit; font-weight: 800; font-size: 13px;
+    padding: 12px 10px; border-radius: 10px; cursor: pointer;
+  }
+  .copy-row a {
+    flex: 1; text-align: center; text-decoration: none;
+    background: #fff; color: var(--navy); border: 1.5px solid var(--navy);
+    font-weight: 800; font-size: 13px; padding: 11px 10px; border-radius: 10px;
+  }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom));
+    transform: translateX(-50%) translateY(12px); opacity: 0;
+    background: #0B2048; color: #fff; font-size: 13px; font-weight: 700;
+    padding: 10px 16px; border-radius: 999px; pointer-events: none;
+    transition: .2s ease;
+  }
+  .toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .hidden { display: none !important; }
 </style>
-<script>
-(function(){
-  var h = location.hash || '';
-  if(h.indexOf('access_token=') === -1 && h.indexOf('error=') === -1) return;
-  try { sessionStorage.setItem('ht_drive_oauth_hash', h); } catch(e){}
-  try {
-    var qs = h.charAt(0) === '#' ? h.slice(1) : h;
-    var p = new URLSearchParams(qs);
-    var token = p.get('access_token');
-    if(token){
-      var sec = Math.max(parseInt(p.get('expires_in') || '3600', 10) || 3600, 300);
-      localStorage.setItem('ht_drive_oauth', JSON.stringify({
-        access_token: token,
-        expires_at: Date.now() + sec * 1000 - 60000
-      }));
-      localStorage.setItem('ht_drive_connected', '1');
-      sessionStorage.removeItem('ht_drive_oauth_started');
-      sessionStorage.removeItem('ht_drive_oauth_redirecting');
-    }
-  } catch(e2){}
-})();
-</script>
-<!-- CSS는 비차단 로드 — 렌더 막지 않음 -->
-<link rel="stylesheet" href="planner.css?v=158" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="planner.css?v=158"></noscript>
-<!-- 서비스워커는 head에서 등록하지 않음 — 문서 이동이 SW 대기(수십 초)에 걸리지 않게 함 -->
 </head>
 <body>
-
-<div id="planner-boot-splash" role="status" aria-live="polite">
-  <div class="boot-spin" aria-hidden="true"></div>
-  <div class="boot-brand">브랜딩 플래너</div>
-  <div class="boot-sub">화면을 여는 중이에요.<br>처음 한 번만 파일이 커서 조금 걸릴 수 있어요.</div>
-</div>
-
-<div id="drive-oauth-busy" aria-live="polite" aria-busy="true">
-  <div class="spin" aria-hidden="true"></div>
-  <div id="drive-oauth-busy-msg">Google 로그인 결과를 처리하는 중…</div>
-</div>
-
-<!-- API Modal: 기본은 닫힘. 설정 버튼·저장 시에만 연다 (로딩 중 전체 화면을 막지 않음) -->
-<div class="modal-overlay" id="api-modal" onclick="closeApiModalBackdrop(event)">
-  <div class="modal-box api-settings-box" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <div class="modal-title">브랜딩 플래너</div>
-      <button type="button" class="prompt-modal-close" onclick="closeApiModal()" aria-label="닫기">×</button>
-    </div>
-    <div class="modal-desc">Claude·Gemini·썸네일 AI 업스케일 키는 Apps Script의 <strong>스크립트 속성</strong>에서 관리합니다. 직원 브라우저에는 API 키가 저장되지 않습니다.<br><span style="color:#6B7280;">업스케일: <code style="font-size:10px;background:#E5E7EB;padding:1px 4px;border-radius:4px;">REPLICATE_API_TOKEN</code> (replicate.com)</span></div>
-    <div style="font-size:11px;font-weight:700;color:#6B7280;letter-spacing:.5px;margin-bottom:4px;">개인 Claude API (선택 · 서버 장애 시 대체용)</div>
-    <div class="api-key-wrap">
-      <input class="modal-input" type="password" id="api-input" placeholder="sk-ant-…" autocomplete="off" />
-      <button type="button" class="api-key-toggle" id="api-key-toggle" onclick="toggleApiKeyVisible()" aria-label="API 키 표시">보기</button>
-    </div>
-    <div class="modal-hint" style="margin-bottom:10px;"><a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></div>
-    <div id="gemini-server-status" style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:10px;padding:10px 12px;background:#F8F7F4;border-radius:8px;">유튜브 분석(Gemini): 확인 중…</div>
-    <div id="api-error" style="font-size:12px;color:#EF4444;min-height:18px;margin-bottom:8px;"></div>
-    <div style="margin-top:18px;padding-top:14px;border-top:1px solid #E5E7EB;">
-      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">망고보드 AI 디자이너 열기 주소 (선택)</div>
-      <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:8px;">이미지·상세페이지 작업 시 열 주소입니다. 기본값은 <strong>AI 디자인 만들기</strong>입니다. 비우면 <code style="font-size:10px;background:#F3F4F6;padding:2px 4px;border-radius:4px;">https://www.mangoboard.net/aichat/designer</code> 로 열립니다.</div>
-      <input class="modal-input" type="url" id="chatgpt-open-url" placeholder="https://www.mangoboard.net/aichat/designer" autocomplete="off" />
-    </div>
-    <div style="margin-top:14px;padding-top:14px;border-top:1px solid #E5E7EB;">
-      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">직원 이메일 (필수)</div>
-      <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:8px;">수정 기록과 충돌 내역에 표시할 업무 이메일을 입력하세요.</div>
-      <input class="modal-input" type="email" id="planner-employee-id" placeholder="name@company.com" autocomplete="email" />
-    </div>
-    <div style="margin-top:14px;padding-top:14px;border-top:1px solid #E5E7EB;">
-      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">서버 동기화 토큰 (관리자용)</div>
-      <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:8px;">직원은 공용 초대 링크로 접속하면 자동 저장되므로 직접 입력할 필요가 없습니다.</div>
-      <input class="modal-input" type="password" id="planner-sync-token" placeholder="PLANNER_SYNC_TOKEN" autocomplete="off" />
-      <button type="button" class="modal-btn-ghost" onclick="copyPlannerTeamInviteLink_()" style="margin-top:8px;">직원용 초대 링크 복사</button>
-    </div>
-    <div style="margin-top:14px;padding-top:14px;border-top:1px solid #E5E7EB;">
-      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:#374151;line-height:1.5;">
-        <input type="checkbox" id="daily-auto-enabled" style="margin-top:3px;width:16px;height:16px;accent-color:#16A34A;">
-        <span><strong>매일 8:30 자동 초안</strong> — 「다음 발행 추천」 주제를 API로 백그라운드 생성 (기본 끔)</span>
-      </label>
-    </div>
-    <button type="button" class="modal-btn" id="start-btn" onclick="saveKey()" style="margin-top:14px;">설정 저장</button>
-    <button type="button" class="modal-btn-ghost" onclick="closeApiModal()">닫기</button>
+<div class="wrap">
+  <div class="brand">
+    <img src="리얼무브먼트_링크_로고.png" alt="REAL MOVEMENT">
+    <div><b>REAL MOVEMENT</b><span>Better Movement, Better Life</span></div>
   </div>
-</div>
 
-<!-- Detail Overlay -->
+  <div id="hub">
+    <h1>셀프 가이드</h1>
+    <p class="lead">강사앱과 같은 순서입니다. 오늘 센터에서 한 카테고리만 열어, 장면으로 확인하고 영상으로 복습하세요.</p>
+    <div class="warn">통증 0~3 정도만 유지하세요. 찌릿함·저림·어지러움이 있으면 즉시 멈추고, 뼈 위는 누르지 마세요.</div>
 
-<div class="detail-overlay" id="detail-overlay">
-  <div class="detail-sheet" id="detail-sheet">
-    <div class="sheet-handle" title="시트 핸들" aria-hidden="true"></div>
-    <div class="sheet-header">
-      <div class="sheet-title" id="sheet-title"></div>
-      <button type="button" class="sheet-close" onclick="closeSheet(); event.stopPropagation();" aria-label="닫기">닫기</button>
-    </div>
-    <div class="sheet-body" id="sheet-body"></div>
-    <div class="sheet-actions" id="sheet-actions"></div>
-  </div>
-</div>
-
-<!-- Prompt Modal -->
-
-<div class="prompt-modal-overlay" id="prompt-modal-overlay" onclick="closePromptModal(event)">
-  <div class="prompt-modal" id="prompt-modal">
-    <div class="prompt-modal-handle"></div>
-    <div class="prompt-modal-header">
-      <button class="prompt-modal-close" onclick="closePromptModal()" aria-label="닫기">×</button>
-      <div class="prompt-modal-title" id="prompt-modal-title">프롬프트 설정</div>
-      <button type="button" class="btn-prompt-download-header" onclick="downloadLivePromptsForCursor_()" title="자동 재수정·수동 수정이 반영된 현재 프롬프트를 파일로 저장 · Cursor에서 개선할 때 사용">다운로드</button>
-    </div>
-    <div class="prompt-modal-body" id="prompt-modal-body"></div>
-    <div class="prompt-modal-footer">
-      <button type="button" class="btn-cancel-prompt" onclick="closePromptModal()">취소</button>
-      <button type="button" class="btn-prompt-cursor-copy" onclick="copyLivePromptsForCursor_()" title="자동 재수정·수동 수정이 반영된 현재 프롬프트를 클립보드에 복사">Cursor용 복사</button>
-      <button type="button" class="btn-prompt-cursor-file" onclick="downloadLivePromptsForCursor_()" title="홈페이지 폴더에 저장하면 Cursor가 읽을 수 있어요">파일</button>
-      <button type="button" class="btn-save-prompt" onclick="savePrompts()">저장하기</button>
-    </div>
-  </div>
-</div>
-
-<!-- Program color preview (이미지 탭 · 색상미리보기.html 베이스) -->
-<div class="modal-overlay color-preview-overlay" id="color-preview-overlay" onclick="closeProgramColorPreview_(event)">
-  <div class="color-preview-box" id="color-preview-box" role="dialog" aria-modal="true" aria-labelledby="color-preview-title" onclick="event.stopPropagation()">
-    <div class="color-preview-header">
-      <div class="color-preview-title" id="color-preview-title">프로그램 색상 미리보기</div>
-      <div class="color-preview-actions" id="color-preview-actions">
-        <button type="button" class="cp-action-btn cp-toggle-btn" id="cp-toggle-btn" onclick="toggleProgramColorPreviewCustom_()" disabled title="수정한 색과 기본 색을 번갈아 봅니다" aria-pressed="false">기본색</button>
-        <button type="button" class="cp-action-btn cp-download-btn" id="cp-download-btn" onclick="downloadProgramColorPreviewLive_()" title="현재 색상 코드를 JSON으로 저장 (Cursor 반영용)">저장</button>
+    <details class="cat cat-tools" id="catTools">
+      <summary>
+        <span class="cat-k">01</span>
+        <span><span class="cat-name">셀프 소도구 자극</span><span class="cat-sub">폼롤러 · 12센티 마사지볼</span></span>
+        <span class="cat-chev">▾</span>
+      </summary>
+      <div class="cat-body">
+        <p class="sec-lead">센터에서 배운 부위만, 사진 순서대로 따라 하세요.</p>
+        <details class="subcat" id="subFoam">
+          <summary>폼롤러<span class="sub-chev">▾</span></summary>
+          <div class="grid" id="foamGrid"></div>
+        </details>
+        <details class="subcat" id="subBall">
+          <summary>12센티 마사지볼<span class="sub-chev">▾</span></summary>
+          <div class="grid" id="ballGrid"></div>
+        </details>
       </div>
-      <button type="button" class="prompt-modal-close" onclick="forceCloseProgramColorPreview_()" aria-label="닫기">×</button>
-    </div>
-    <div class="color-preview-tabs-scroll">
-      <div class="color-preview-tabs" id="color-preview-tabs"></div>
-    </div>
-    <div class="color-preview-body" id="color-preview-body"></div>
-  </div>
-</div>
+    </details>
 
-<!-- Unified plan workshop modal (scrollable) -->
-
-<div class="modal-overlay" id="plan-workshop-overlay" onclick="requestClosePlanWorkshop_(event)">
-  <div class="plan-workshop-box" id="plan-workshop-box" onclick="event.stopPropagation()">
-    <div class="plan-workshop-header">
-      <div class="plan-workshop-title" id="plan-workshop-title">기획 함께하기</div>
-      <button type="button" class="prompt-modal-close" onclick="requestClosePlanWorkshop_()" aria-label="닫기">×</button>
-    </div>
-    <div class="plan-workshop-scroll" id="plan-workshop-body"></div>
-    <div class="plan-workshop-footer" id="plan-workshop-footer"></div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="plan-ws-leave-overlay" role="dialog" aria-modal="true" aria-labelledby="plan-ws-leave-title" onclick="planWorkshopLeaveStay_(event)">
-  <div class="plan-ws-leave-box" onclick="event.stopPropagation()">
-    <h2 id="plan-ws-leave-title" class="plan-ws-leave-title">저장하지 않고 나갈까요?</h2>
-    <p class="plan-ws-leave-msg">이대로 나가면 저장되지 않은 내용이 사라져요.</p>
-    <div class="plan-ws-leave-actions">
-      <button type="button" class="modal-btn" id="plan-ws-leave-save-btn" onclick="planWorkshopLeaveSave_()">저장하기</button>
-      <button type="button" class="modal-btn-ghost" onclick="planWorkshopLeaveStay_()">머무르기</button>
-      <button type="button" class="modal-btn-ghost plan-ws-leave-discard" onclick="planWorkshopLeaveDiscard_()">나가기</button>
-    </div>
-  </div>
-</div>
-
-<!-- Google Drive sync modal -->
-
-<div class="modal-overlay" id="sync-status-overlay" onclick="closeSyncStatusModal_(event)">
-  <div class="modal-box sync-status-box" onclick="event.stopPropagation()">
-    <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-      <div class="modal-title" style="margin:0;">동기화 및 설정</div>
-      <button type="button" class="prompt-modal-close" onclick="closeSyncStatusModal_()" aria-label="닫기">×</button>
-    </div>
-    <div class="modal-desc" style="font-size:12px;margin-bottom:12px;">서버·이 기기·Drive 상태와 AI 설정을 한곳에서 확인합니다. 기준본은 <strong>서버(GAS)</strong>이며 Drive는 개인 백업입니다.</div>
-    <div id="sync-status-body" class="sync-status-body">불러오는 중…</div>
-    <div id="sync-status-err" style="font-size:12px;color:#EF4444;min-height:18px;margin-top:8px;"></div>
-    <div class="sync-status-actions">
-      <button type="button" class="modal-btn" id="btn-sync-now" onclick="startManualSyncPreview_()">지금 동기화</button>
-      <button type="button" class="modal-btn" style="background:#F3F4F6;color:#374151;" onclick="closeSyncStatusModal_()">닫기</button>
-    </div>
-  </div>
-</div>
-
-<div class="sync-bootstrap-overlay" id="sync-bootstrap-overlay" role="dialog" aria-modal="true" aria-labelledby="sync-bootstrap-title">
-  <div class="sync-bootstrap-box">
-    <div class="sync-bootstrap-spinner" aria-hidden="true"></div>
-    <div class="sync-bootstrap-title" id="sync-bootstrap-title">서버 데이터 확인 중</div>
-    <div class="sync-bootstrap-message" id="sync-bootstrap-message">최신 데이터를 먼저 받은 뒤 편집을 시작합니다.</div>
-    <input type="text" inputmode="email" autocomplete="email" class="modal-input sync-bootstrap-employee" id="sync-bootstrap-employee" placeholder="직원 이메일">
-    <input type="password" class="modal-input sync-bootstrap-token" id="sync-bootstrap-token" placeholder="PLANNER_SYNC_TOKEN" autocomplete="off">
-    <button type="button" class="modal-btn sync-bootstrap-retry" id="sync-bootstrap-retry" onclick="retryPlannerBootstrapSync_()">다시 시도</button>
-    <button type="button" class="modal-btn sync-bootstrap-continue-local" id="sync-bootstrap-continue-local" style="background:#F3F4F6;color:#374151;margin-top:8px;" onclick="continuePlannerWithLocalData_()">이 기기 데이터로 열기</button>
-  </div>
-</div>
-
-<div class="modal-overlay" id="sync-bootstrap-choice-overlay" role="dialog" aria-modal="true" aria-labelledby="sync-bootstrap-choice-title">
-  <div class="modal-box sync-conflict-box sync-bootstrap-choice-box" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <div class="modal-title" id="sync-bootstrap-choice-title">접속 · 서버 내용 확인</div>
-    </div>
-    <div class="modal-desc">접속할 때마다 서버 내용을 확인합니다. <strong>먼저 내려받을 부분을 확인</strong>한 뒤 적용하세요. 기본은 서버(팀 기준본)입니다.</div>
-    <div class="sync-conflict-list" id="sync-bootstrap-choice-list"></div>
-    <div class="sync-conflict-actions">
-      <button type="button" class="modal-btn" id="sync-bootstrap-choice-apply" onclick="applyPlannerBootstrapChoice_()">확인 후 선택 내용 적용</button>
-      <button type="button" class="modal-btn" id="sync-bootstrap-choice-keep-local" style="background:#F3F4F6;color:#374151;margin-top:8px;" onclick="skipPlannerBootstrapChoiceKeepLocal_()">이번에 받지 않고 이 기기로 열기</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="sync-preview-overlay" onclick="closeSyncPreviewModal_(event)">
-  <div class="modal-box sync-preview-box" onclick="event.stopPropagation()">
-    <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-      <div class="modal-title" style="margin:0;">동기화 미리보기</div>
-      <button type="button" class="prompt-modal-close" onclick="closeSyncPreviewModal_()" aria-label="닫기">×</button>
-    </div>
-    <div class="modal-desc" style="font-size:12px;margin-bottom:12px;">서버와 이 기기를 비교한 결과예요. 실행 전에 어떤 쪽이 바뀌는지 확인한 뒤 진행하세요.</div>
-    <div id="sync-preview-body" class="sync-preview-body">비교 중…</div>
-    <div class="sync-status-actions">
-      <button type="button" class="modal-btn" id="sync-preview-confirm" onclick="confirmManualSyncFromPreview_()">선택 확인 후 동기화 시작</button>
-      <button type="button" class="modal-btn" style="background:#F3F4F6;color:#374151;" onclick="closeSyncPreviewModal_()">취소</button>
-    </div>
-  </div>
-</div>
-
-<div class="sync-progress-overlay" id="sync-progress-overlay" aria-live="polite">
-  <div class="sync-progress-box">
-    <div class="sync-bootstrap-spinner" aria-hidden="true"></div>
-    <div id="sync-progress-label" class="sync-progress-label">동기화 중…</div>
-    <div class="sync-progress-track"><div class="sync-progress-fill" id="sync-progress-bar"></div></div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="sync-conflict-overlay" role="dialog" aria-modal="true" aria-labelledby="sync-conflict-title">
-  <div class="modal-box sync-conflict-box" onclick="event.stopPropagation()">
-    <div class="modal-header">
-      <div class="modal-title" id="sync-conflict-title">동기화 충돌 확인</div>
-    </div>
-    <div class="modal-desc">같은 항목이 다른 기기에서도 수정되었습니다. 항목마다 적용할 내용을 선택해 주세요.</div>
-    <div class="sync-conflict-list" id="sync-conflict-list"></div>
-    <div class="sync-conflict-actions">
-      <button type="button" class="modal-btn" id="sync-conflict-apply">선택 내용 적용 후 동기화</button>
-      <button type="button" class="modal-btn" id="sync-conflict-keep-local" style="background:#F3F4F6;color:#374151;margin-top:8px;">전부 이 기기로 적용</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="drive-modal-overlay" onclick="closeDriveModal(event)">
-  <div class="modal-box" style="max-width:440px;" onclick="event.stopPropagation()">
-    <div class="modal-title">구글 Drive</div>
-    <div class="modal-desc" style="font-size:12px;">팀 데이터의 기준본은 GAS 서버입니다. Google Drive는 이 계정의 <strong>개인 백업</strong>으로만 사용하며, Drive 데이터가 팀 서버를 덮어쓰지 않습니다.</div>
-    <div id="drive-modal-err" style="font-size:12px;color:#EF4444;min-height:18px;margin-bottom:8px;"></div>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;">
-      <button type="button" class="modal-btn" onclick="driveLoginAndUpload()">Drive 로그인</button>
-      <button type="button" class="modal-btn" style="background:#fff;color:#6B7280;border:1px solid #E5E7EB;" onclick="driveDisconnect()">Drive 로그아웃</button>
-      <button type="button" class="modal-btn" style="background:#F3F4F6;color:#374151;" onclick="closeDriveModal()">닫기</button>
-    </div>
-  </div>
-</div>
-
-<!-- Links modal (external site shortcuts) -->
-
-<div class="modal-overlay" id="links-modal-overlay" onclick="closeLinksModal_(event)">
-  <div class="modal-box links-modal-box" onclick="event.stopPropagation()">
-    <div class="modal-header" style="margin-bottom:8px;">
-      <div class="modal-title" style="margin:0;">링크 모음</div>
-      <button type="button" class="prompt-modal-close" onclick="closeLinksModal_()" aria-label="닫기">×</button>
-    </div>
-    <div class="modal-desc" style="font-size:12px;margin-bottom:16px;">자주 쓰는 사이트를 새 탭으로 엽니다.</div>
-
-    <div class="links-group">
-      <div class="links-group-title">AI · 제작 · 개발</div>
-      <div class="links-grid">
-        <a class="link-card" href="https://chatgpt.com" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">🤖</span><span class="link-card-txt"><span class="link-card-name">ChatGPT</span><span class="link-card-sub">chatgpt.com</span></span></a>
-        <a class="link-card" href="https://gemini.google.com" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">✨</span><span class="link-card-txt"><span class="link-card-name">Gemini</span><span class="link-card-sub">gemini.google.com</span></span></a>
-        <a class="link-card" href="https://claude.ai" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">🧠</span><span class="link-card-txt"><span class="link-card-name">Claude</span><span class="link-card-sub">claude.ai</span></span></a>
-        <a class="link-card" href="https://www.mangoboard.net/" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">🎨</span><span class="link-card-txt"><span class="link-card-name">망고보드</span><span class="link-card-sub">디자인 제작</span></span></a>
-        <a class="link-card" href="https://github.com" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">💻</span><span class="link-card-txt"><span class="link-card-name">GitHub</span><span class="link-card-sub">github.com</span></span></a>
+    <details class="cat cat-lie" id="catLie">
+      <summary>
+        <span class="cat-k">02</span>
+        <span><span class="cat-name">Lying</span><span class="cat-sub">누움 · Passive · 호흡 · 기능 운동</span></span>
+        <span class="cat-chev">▾</span>
+      </summary>
+      <div class="cat-body">
+        <div class="sec-sub">Passive Stretching</div>
+        <div class="grid" id="pGrid"></div>
+        <div class="sec-sub">A · 생활습관</div>
+        <div class="grid" id="lieGrid"></div>
+        <div class="sec-sub">기능 운동</div>
+        <div class="grid" id="lieExGrid"></div>
       </div>
-    </div>
+    </details>
 
-    <div class="links-group">
-      <div class="links-group-title">콘텐츠 · 마케팅 채널</div>
-      <div class="links-grid">
-        <a class="link-card" href="https://blog.naver.com/allenjoy" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">📝</span><span class="link-card-txt"><span class="link-card-name">네이버 블로그</span><span class="link-card-sub">blog.naver.com/allenjoy</span></span></a>
-        <a class="link-card" href="https://www.instagram.com/dr.park_dc.pt/" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">📷</span><span class="link-card-txt"><span class="link-card-name">인스타그램</span><span class="link-card-sub">@dr.park_dc.pt</span></span></a>
-        <a class="link-card" href="https://www.threads.net/@dr.park_dc.pt" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">🧵</span><span class="link-card-txt"><span class="link-card-name">쓰레드</span><span class="link-card-sub">@dr.park_dc.pt</span></span></a>
-        <a class="link-card" href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">▶️</span><span class="link-card-txt"><span class="link-card-name">유튜브</span><span class="link-card-sub">youtube.com</span></span></a>
-        <a class="link-card" href="https://www.apartner.co.kr/" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">🏢</span><span class="link-card-txt"><span class="link-card-name">아파트너</span><span class="link-card-sub">힐자계 입주민 홍보 · 앱</span></span></a>
-        <a class="link-card" href="https://breezefeel.github.io/drpark/" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">🏠</span><span class="link-card-txt"><span class="link-card-name">프로필</span><span class="link-card-sub">고객용 허브 · 증상 가이드</span></span></a>
-        <a class="link-card" href="https://breezefeel.github.io/apply/self.html" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">🧘</span><span class="link-card-txt"><span class="link-card-name">셀프 소도구 가이드</span><span class="link-card-sub">폼롤러 · 마사지볼</span></span></a>
+    <details class="cat cat-sit" id="catSit">
+      <summary>
+        <span class="cat-k">03</span>
+        <span><span class="cat-name">Sitting / Quadruped</span><span class="cat-sub">앉기 · Active · 호흡 · 기능 운동</span></span>
+        <span class="cat-chev">▾</span>
+      </summary>
+      <div class="cat-body">
+        <div class="sec-sub">Active Stretching</div>
+        <div class="grid" id="aSitGrid"></div>
+        <div class="sec-sub">A · 생활습관</div>
+        <div class="grid" id="sitGrid"></div>
+        <div class="sec-sub">기능 운동</div>
+        <div class="grid" id="sitExGrid"></div>
       </div>
-    </div>
+    </details>
 
-    <div class="links-group">
-      <div class="links-group-title">네이버 카페</div>
-      <div class="links-grid">
-        <a class="link-card" href="https://cafe.naver.com/ifc" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">☕</span><span class="link-card-txt"><span class="link-card-name">IFC</span><span class="link-card-sub">cafe.naver.com/ifc</span></span></a>
-        <a class="link-card" href="https://cafe.naver.com/ksnim" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">☕</span><span class="link-card-txt"><span class="link-card-name">CMT 근막카이로</span><span class="link-card-sub">cafe.naver.com/ksnim</span></span></a>
-        <a class="link-card" href="https://cafe.naver.com/koreaposture" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">☕</span><span class="link-card-txt"><span class="link-card-name">Real Movement</span><span class="link-card-sub">cafe.naver.com/koreaposture</span></span></a>
-        <a class="link-card" href="https://cafe.naver.com/psjpt" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">☕</span><span class="link-card-txt"><span class="link-card-name">물리치료사 카페</span><span class="link-card-sub">PT HBDE</span></span></a>
+    <details class="cat cat-stand" id="catStand">
+      <summary>
+        <span class="cat-k">04</span>
+        <span><span class="cat-name">Standing</span><span class="cat-sub">서기 · Active · 호흡 · 걷기 · 밸런스</span></span>
+        <span class="cat-chev">▾</span>
+      </summary>
+      <div class="cat-body">
+        <div class="sec-sub">Active Stretching</div>
+        <div class="grid" id="aStandGrid"></div>
+        <div class="sec-sub">A · 생활습관</div>
+        <div class="grid" id="standGrid"></div>
+        <div class="sec-sub">기능 운동</div>
+        <div class="grid" id="standExGrid"></div>
       </div>
-    </div>
+    </details>
 
-    <div class="links-group">
-      <div class="links-group-title">약수점</div>
-      <div class="links-grid">
-        <a class="link-card" href="https://talk.naver.com/profile/c/real_movement_y" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">🟢</span><span class="link-card-txt"><span class="link-card-name">네이버 톡톡</span><span class="link-card-sub">상담 · 예약</span></span></a>
-        <a class="link-card" href="https://blog.naver.com/allenjoy/224307689748" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">🗺️</span><span class="link-card-txt"><span class="link-card-name">오시는 길</span><span class="link-card-sub">약수역 5·6·7번 · 블로그</span></span></a>
-        <a class="link-card" href="https://naver.me/x2YstInq" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">📍</span><span class="link-card-txt"><span class="link-card-name">스마트플레이스</span><span class="link-card-sub">정보 · 지도 · 예약</span></span></a>
-        <a class="link-card" href="https://breezefeel.github.io/apply/%EC%98%81%EC%88%98%EC%A6%9D.html?branch=%EC%95%BD%EC%88%98" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">📄</span><span class="link-card-txt"><span class="link-card-name">브로셔</span><span class="link-card-sub">상담앱에서 다운</span></span></a>
-        <a class="link-card" href="https://breezefeel.github.io/apply/%EA%B0%80%EA%B2%A9%ED%91%9C%20%20%EB%A6%AC%EC%96%BC%EB%AC%B4%EB%B8%8C%EB%A8%BC%ED%8A%B8%20%EC%95%BD%EC%88%98.jpg" target="_blank" rel="noopener noreferrer" download="가격표-약수.jpg"><span class="link-card-ico">💴</span><span class="link-card-txt"><span class="link-card-name">가격표</span><span class="link-card-sub">다운로드</span></span></a>
-        <a class="link-card" href="tel:0507-1359-4596"><span class="link-card-ico">📞</span><span class="link-card-txt"><span class="link-card-name">전화</span><span class="link-card-sub">0507-1359-4596</span></span></a>
+    <details class="cat cat-face" id="catFace">
+      <summary>
+        <span class="cat-k">05</span>
+        <span><span class="cat-name">리얼 페이스</span><span class="cat-sub">스마일 호흡 10단계 · 혀·호흡 기본 · 근력·삼킴 · 원데이 클래스</span></span>
+        <span class="cat-chev">▾</span>
+      </summary>
+      <div class="cat-body">
+        <p class="sec-lead">얼굴 요가 따라 하기가 아닙니다. 혀 바른 자세 · 코 호흡 · 씹기 · 삼킴을 평소 습관으로 만드는 순서입니다. 오늘 센터에서 한 단계만 엽니다.</p>
+        <details class="subcat" id="subSmile">
+          <summary>1 · 스마일 호흡 10단계<span class="sub-chev">▾</span></summary>
+          <div class="grid" id="smileGrid"></div>
+        </details>
+        <details class="subcat" id="subMft2">
+          <summary>2 · 혀 바른 자세 · 스트레칭<span class="sub-chev">▾</span></summary>
+          <p class="sec-lead">회원에게 가장 먼저 주는 단계입니다. 운동 횟수보다, 하루 종일 혀·입술·코 호흡이 그 자리에 있는지가 먼저입니다.</p>
+          <div class="grid" id="mft2Grid"></div>
+        </details>
+        <details class="subcat" id="subMft3">
+          <summary>3 · 혀 근력 · 입술 · 삼킴<span class="sub-chev">▾</span></summary>
+          <p class="sec-lead">2번 자세가 안정된 다음에 올립니다. 빨아들이기 → 입술 → 삼킴 → 씹기로, 하루 기능 안으로 넣습니다.</p>
+          <div class="grid" id="mft3Grid"></div>
+        </details>
+        <details class="subcat" id="subOnday">
+          <summary>4 · 원데이 클래스<span class="sub-chev">▾</span></summary>
+          <p class="sec-lead">50분. 스마일 트레이닝 → 리프팅 정렬운동 → 혀 인지하기 → 턱 바르게 쓰기. 한 부위를 평가한 뒤 바로 그 부위를 해결합니다.</p>
+          <div class="grid" id="ondayGrid"></div>
+        </details>
       </div>
-    </div>
-
-    <div class="links-group">
-      <div class="links-group-title">인천점</div>
-      <div class="links-grid">
-        <a class="link-card" href="https://talk.naver.com/profile/c/real_movement_i" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">🟢</span><span class="link-card-txt"><span class="link-card-name">네이버 톡톡</span><span class="link-card-sub">상담 · 예약</span></span></a>
-        <a class="link-card" href="https://blog.naver.com/allenjoy/224122998739" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">🗺️</span><span class="link-card-txt"><span class="link-card-name">오시는 길</span><span class="link-card-sub">작전역 7번 · 블로그</span></span></a>
-        <a class="link-card" href="https://naver.me/xYNbHrY9" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">📍</span><span class="link-card-txt"><span class="link-card-name">스마트플레이스</span><span class="link-card-sub">정보 · 지도 · 예약</span></span></a>
-        <a class="link-card" href="https://breezefeel.github.io/apply/%EC%98%81%EC%88%98%EC%A6%9D.html?branch=%EC%9D%B8%EC%B2%9C" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">📄</span><span class="link-card-txt"><span class="link-card-name">브로셔</span><span class="link-card-sub">상담앱에서 다운</span></span></a>
-        <a class="link-card" href="https://breezefeel.github.io/apply/%EA%B0%80%EA%B2%A9%ED%91%9C%20%20%EB%A6%AC%EC%96%BC%EB%AC%B4%EB%B8%8C%EB%A8%BC%ED%8A%B8%20%EC%9D%B8%EC%B2%9C.jpg" target="_blank" rel="noopener noreferrer" download="가격표-인천.jpg"><span class="link-card-ico">💴</span><span class="link-card-txt"><span class="link-card-name">가격표</span><span class="link-card-sub">다운로드</span></span></a>
-        <a class="link-card" href="tel:0507-1312-4596"><span class="link-card-ico">📞</span><span class="link-card-txt"><span class="link-card-name">전화</span><span class="link-card-sub">0507-1312-4596</span></span></a>
-      </div>
-    </div>
-
-    <div class="links-group">
-      <div class="links-group-title">회원 · 업무 운영</div>
-      <div class="links-grid">
-        <a class="link-card" href="https://breezefeel.github.io/apply" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">🧑‍🏫</span><span class="link-card-txt"><span class="link-card-name">리얼무브먼트 강사앱</span><span class="link-card-sub">회원 관리 · 상담 메뉴얼</span></span></a>
-        <a class="link-card" href="https://docs.google.com/spreadsheets/d/1I8zIUUaP-eIGpB2y4dMgZbDRiBBzjpAGEWU0RD3yk8g/edit" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">📊</span><span class="link-card-txt"><span class="link-card-name">구글 시트</span><span class="link-card-sub">운영 데이터</span></span></a>
-        <a class="link-card" href="https://console.solapi.com" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">💬</span><span class="link-card-txt"><span class="link-card-name">솔라피</span><span class="link-card-sub">문자 · 알림톡</span></span></a>
-        <a class="link-card" href="https://pf.kakao.com/_nVSxdn/chat" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">💬</span><span class="link-card-txt"><span class="link-card-name">카카오채널 채팅</span><span class="link-card-sub">고객 채팅창 열기</span></span></a>
-        <a class="link-card" href="https://business.kakao.com/_nVSxdn/chats" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">💛</span><span class="link-card-txt"><span class="link-card-name">카카오채널 관리</span><span class="link-card-sub">비즈니스 · 상담 관리</span></span></a>
-        <a class="link-card" href="https://new.smartplace.naver.com/" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">📍</span><span class="link-card-txt"><span class="link-card-name">스마트플레이스 관리</span><span class="link-card-sub">업체 · 리뷰 수정</span></span></a>
-        <a class="link-card" href="https://map.kakao.com" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">📌</span><span class="link-card-txt"><span class="link-card-name">카카오맵 매장관리</span><span class="link-card-sub">map.kakao.com</span></span></a>
-        <a class="link-card" href="https://business.google.com/" target="_blank" rel="noopener noreferrer"><span class="link-card-ico">🔵</span><span class="link-card-txt"><span class="link-card-name">구글 비즈니스</span><span class="link-card-sub">프로필 관리</span></span></a>
-      </div>
-    </div>
-
-    <div class="sync-status-actions" style="margin-top:18px;">
-      <button type="button" class="modal-btn" style="background:#F3F4F6;color:#374151;" onclick="closeLinksModal_()">닫기</button>
-    </div>
+    </details>
   </div>
+
+  <div id="detail" class="hidden"></div>
 </div>
+<div class="toast" id="toast"></div>
 
-<!-- 앱 루트: JS 로딩 전에도 inert 로 잠그지 않음 (3분 대기 체감 원인) -->
-<div id="planner-app-root">
-<div class="planner-head">
-  <div class="planner-head-left">
-    <div>
-      <div class="logo-text">브랜딩 플래너</div>
-      <div class="logo-sub">미카닥 박준규 DC PT</div>
-    </div>
-  </div>
-  <div class="planner-head-right">
-    <button type="button" class="btn-links" id="btn-links" onclick="openLinksModal_()" title="자주 쓰는 링크 모음" aria-label="링크 모음"><span class="btn-links-ico" aria-hidden="true">🔗</span><span class="btn-links-label">링크</span></button>
-    <button type="button" class="btn-sync-status" id="btn-sync-status" onclick="openSyncStatusModal_()" title="동기화 및 설정" aria-label="동기화 및 설정">
-      <span class="sync-btn-main"><span class="sync-dot" id="sync-dot"></span><span id="sync-status-label">동기화</span></span>
-      <span class="sync-btn-sub" id="sync-btn-sub">확인</span>
-    </button>
-    <button class="btn-prompt-settings" id="btn-prompt-settings" onclick="openPromptModal()">프롬프트</button>
-    <button class="btn-add" id="add-toggle-btn" onclick="toggleAdd()">추가</button>
-    <button type="button" class="btn-head-refresh" id="btn-head-refresh" onclick="reloadPlannerPage_()" title="새로고침" aria-label="새로고침">🔄</button>
-  </div>
-</div>
-
-<!-- Category tabs (sticky under viewport top) -->
-
-<div class="sticky-cat-nav">
-  <div id="gen-status-bar" class="gen-status-bar"></div>
-  <div class="cat-tabs-grid" id="cat-tabs-grid"></div>
-</div>
-
-<div id="app-toast" class="app-toast" role="status" aria-live="polite" aria-atomic="true"></div>
-
-<!-- Main content -->
-
-<div id="main-content"></div>
-</div>
-<script src="ops-naver-kw-seed.js?v=159"></script>
-<script src="ops-naver-ad-assets.js?v=3"></script>
-<script src="planner.js?v=188" defer></script>
 <script>
-function openLinksModal_(){
-  var o = document.getElementById('links-modal-overlay');
-  if(!o) return;
-  var alreadyOpen = o.classList.contains('open');
-  o.classList.add('open');
-  if(!alreadyOpen && typeof lockBodyScroll_ === 'function') lockBodyScroll_();
-}
-function closeLinksModal_(e){
-  if(e && e.target && e.target.id !== 'links-modal-overlay') return;
-  var o = document.getElementById('links-modal-overlay');
-  if(!o || !o.classList.contains('open')) return;
-  o.classList.remove('open');
-  if(typeof unlockBodyScroll_ === 'function') unlockBodyScroll_();
-}
-document.addEventListener('keydown', function(e){
-  if(e.key !== 'Escape') return;
-  // planner.js 로드 후에는 오버레이 스택이 처리. 그 전에는 링크 모달만 닫기.
-  if(typeof closeTopmostPlannerOverlay_ === 'function') return;
-  closeLinksModal_();
-});
-</script>
+var BASE = 'self-photos/';
+var GUIDE = [
+  {
+    id: 'p_supine_lower', tool: 'stretch', pos: 'passive', kind: 'stretch',
+    toolKo: 'Passive · 누움', name: 'Supine 하체',
+    video: 'https://www.youtube.com/watch?v=_-BQl8Zzfec', thumb: true, n: 0,
+    sequences: [
+      { title: '영상 장면', start: 1, imgStart: 2, captions: [
+        '무릎을 가슴·반대 어깨 쪽으로 당깁니다. 반대 다리는 테이블에 붙인 채, 골반이 들리지 않게.',
+        '한쪽 다리를 곧게 들어 뒤쪽(햄스트링)을 열어 줍니다. 무릎이 굽지 않게, 억지로 당기지 마세요.',
+        '무릎을 가슴 쪽으로 모아 고관절·무릎을 풀어 줍니다. 호흡을 멈추지 마세요.',
+        '한쪽 무릎을 바깥으로 열어 골반을 풀어 줍니다. 반대 다리는 바닥에 붙인 채.'
+      ]}
+    ],
+    videos: [
+      { url: 'https://www.youtube.com/watch?v=_-BQl8Zzfec', label: '영상 · 1편' },
+      { url: 'https://www.youtube.com/watch?v=xCfoLvzjido', label: '영상 · 2편' },
+      { url: 'https://www.youtube.com/watch?v=Tyyj13K1VS4', label: '영상 · 3편' }
+    ],
+    chain: ['발', '발목', '무릎', '고관절'],
+    note: [
+      ['준비', '오늘 누워서 하체를 풀어 준 동작입니다. 사진으로 장면을 확인하고, 디테일은 영상으로.'],
+      ['동작', '발 → 발목 → 무릎 → 고관절. 영상이 3편입니다.'],
+      ['포인트', '억지로 늘리지 마세요. 센터에서 받은 각도만.'],
+      ['주의', '찌릿함·날카로운 통증이 있으면 중단하고 다음 수업에 말씀하세요.']
+    ]
+  },
+  {
+    id: 'p_supine_upper', tool: 'stretch', pos: 'passive', kind: 'stretch',
+    toolKo: 'Passive · 누움', name: 'Supine 상체',
+    video: 'https://www.youtube.com/watch?v=-xMSIyh0XNE', thumb: true, n: 0,
+    sequences: [
+      { title: '영상 장면', start: 1, imgStart: 2, captions: [
+        '어깨를 고정한 채 손목·손을 잡고 팔을 옆으로 엽니다. 목이 긴장하지 않게.',
+        '팔을 약 90도로 벌리고, 손목과 팔꿈치를 받쳐 천천히 움직입니다.',
+        '위팔을 잡고 어깨가 열리는 범위를 찾습니다. 억지로 당기지 마세요.',
+        '팔을 머리 위쪽으로 올려 어깨·가슴이 늘어나게 합니다. 통증 없는 범위만.'
+      ]}
+    ],
+    chain: ['손가락', '손목', '팔꿈치', '어깨'],
+    note: [
+      ['준비', '오늘 누워서 상체를 풀어 준 동작입니다.'],
+      ['동작', '손가락 → 손목 → 팔꿈치 → 어깨.'],
+      ['포인트', '통증 없는 범위. 센터에서 받은 느낌이 기준입니다.'],
+      ['주의', '찌릿하면 멈추세요.']
+    ]
+  },
+  {
+    id: 'p_prone_lower', tool: 'stretch', pos: 'passive', kind: 'stretch',
+    toolKo: 'Passive · 누움', name: 'Prone 하체',
+    video: 'https://www.youtube.com/watch?v=kcsdkZazWFw', thumb: true, n: 0,
+    sequences: [
+      { title: '영상 장면', start: 1, imgStart: 2, captions: [
+        '엎드려 발목을 잡고 무릎을 굽힙니다. 얼굴·목은 편하게.',
+        '발뒤꿈치를 엉덩이 쪽으로 당기며 허벅지 앞을 열어 줍니다. 골반은 테이블에.',
+        '골반을 손으로 고정한 채 같은 방향으로 조금 더 굽힙니다. 허리가 젖혀지지 않게.',
+        '반대쪽도 같은 시간으로. 찌릿하면 각도를 줄이거나 멈추세요.'
+      ]}
+    ],
+    chain: ['발가락', '발목', '무릎', '고관절'],
+    note: [
+      ['준비', '오늘 엎드려 하체를 풀어 준 동작입니다.'],
+      ['동작', '발가락 → 발목 → 무릎 → 고관절.'],
+      ['포인트', '얼굴·목을 편하게. 허리에 힘을 주지 마세요.'],
+      ['주의', '찌릿하면 멈추세요.']
+    ]
+  },
+  {
+    id: 'p_prone_upper', tool: 'stretch', pos: 'passive', kind: 'stretch',
+    toolKo: 'Passive · 누움', name: 'Prone 상체',
+    video: 'https://www.youtube.com/watch?v=X3Fj3flL7PY', thumb: true, n: 0,
+    sequences: [
+      { title: '영상 장면', start: 1, imgStart: 2, captions: [
+        '엎드려 팔을 잡고 어깨·가슴이 열리게 합니다. 고개는 들지 마세요.',
+        '견갑·등 위를 안정시킨 채 어깨를 풀어 줍니다. 호흡을 멈추지 마세요.',
+        '굽힌 팔을 천천히 움직이며 어깨 가동 범위를 찾습니다.',
+        '등 중간을 열어 주며 상체를 풀어 줍니다. 한 번에 꺾지 마세요.',
+        '목·등 위를 편하게 둔 채, 센터에서 받은 범위만 유지합니다.'
+      ]}
+    ],
+    chain: ['손가락', '손목', '팔꿈치', '어깨', '척추'],
+    note: [
+      ['준비', '오늘 엎드려 상체를 풀어 준 동작입니다.'],
+      ['동작', '손가락 → 손목 → 팔꿈치 → 어깨 → 척추.'],
+      ['포인트', '척추는 한 번에 꺾지 말고, 센터에서 받은 범위만.'],
+      ['주의', '찌릿하면 멈추세요.']
+    ]
+  },
+  {
+    id: 'a_sit', tool: 'stretch', pos: 'sitA', kind: 'stretch',
+    toolKo: 'Active · 앉기', name: '경선별 4동작',
+    video: 'https://www.youtube.com/watch?v=AmRJNZGpIx4', thumb: true, n: 0,
+    sequences: [
+      { title: '경선별 4동작', start: 1, captions: [
+        '전방(앞라인) — 엎드려 손바닥을 어깨 옆에 두고, 팔꿈치를 펴며 상체를 천천히 듭니다. 곡선이 자연스러운지, 통증은 없는지 확인하세요.',
+        '후방(뒷라인) — 다리를 펴고 앉아, 내쉬며 앞으로 숙입니다. 손끝이 발끝에 닿고, 무릎이 펴지며 척추가 부드러운 곡선인지 보세요.',
+        '측방(옆라인) — 한 발은 양반다리, 한 발은 뒤로 두고 앉아 한팔을 들고 옆으로 숙입니다. 좌우를 바꿔 비교하세요.',
+        '회전 라인 — 무릎 꿇고 엎드려 팔꿈치로 지지한 뒤, 한손을 뒤통수(또는 허리)에 두고 고개·몸통을 같은 쪽으로 최대한 돌립니다. 좌우 비교.'
+      ]}
+    ],
+    note: [
+      ['준비', '앉아서 직접 움직이는 Active Stretching입니다. 사진으로 장면을 확인하고, 디테일은 영상으로.'],
+      ['동작', '영상과 같은 네 장면입니다. 앞라인(엎드려 들기) · 뒷라인(다리 펴고 숙이기) · 옆라인(한팔 들고 옆 숙이기) · 회전(무릎 꿇고 몸통 돌리기).'],
+      ['포인트', '통증 없는 범위. 좌우를 비교해 보세요.'],
+      ['주의', '어지럽거나 찌릿하면 멈추세요.']
+    ]
+  },
+  {
+    id: 'a_stand_upper', tool: 'stretch', pos: 'standA', kind: 'stretch',
+    toolKo: 'Active · 서기', name: '상체 4가지',
+    video: 'https://www.youtube.com/watch?v=r99GPLDSWlo', thumb: true, n: 0,
+    sequences: [
+      { title: '상체 4가지', start: 1, captions: [
+        '① 상지 — 팔을 앞으로 펴고 손목을 당겨 놓은 뒤, 좌우로 회전해 여러 섬유가 늘어나게 합니다.',
+        '② 목 — 깍지 끼고 고개를 숙인 뒤, 턱을 좌우로 밀거나 머리 잡고 아래·위를 봅니다. 어깨는 올라가지 않게.',
+        '③ 어깨 — 팔을 가로로 당기고 시선은 반대로, 늘려 놓은 상태에서 손을 회전합니다. 팔꿈치로 살짝 눌러 주세요.',
+        '④ 몸통 — 깍지를 위로 올린 뒤 손바닥을 축으로 팔꿈치·척추·골반까지 좌우로 틀어 줍니다.'
+      ]}
+    ],
+    note: [
+      ['준비', '서서 하는 상체 Active Stretching입니다.'],
+      ['동작', '손·손목·팔 → 목 → 어깨 → 몸통 순.'],
+      ['포인트', '밸런스를 잡고 천천히. 허리를 한 번에 꺾지 마세요.'],
+      ['주의', '어지러우면 멈추고 앉으세요.']
+    ]
+  },
+  {
+    id: 'a_stand_lower', tool: 'stretch', pos: 'standA', kind: 'stretch',
+    toolKo: 'Active · 서기', name: '하체 4가지',
+    video: 'https://www.youtube.com/watch?v=xBVvsnbTTuI', thumb: true, n: 0,
+    sequences: [
+      { title: '하체 4가지', start: 1, captions: [
+        '⑤ 고관절 — 발·발끝을 바깥으로 두고 앉아 안쪽을 밀거나, 옆으로 앉아 발끝을 안·밖으로 움직입니다.',
+        '⑥ 무릎 — 앉아 무릎을 지지한 채 누르고 좌우·회전으로 풀어 줍니다. 엉덩이가 뒤로 빠지지 않게.',
+        '⑦ 종아리 — 한 발을 앞에 두고 뒤꿈치는 바닥에 붙인 채 앞무릎을 굽힙니다. 몸통을 좌우로 틀면 다른 섬유가 늘어납니다.',
+        '⑧ 발목 — 발끝을 구부리고 바깥·안쪽으로 돌립니다. 돌아올 때는 엄지발가락이 꺾이지 않게.'
+      ]}
+    ],
+    note: [
+      ['준비', '서서 하는 하체 Active Stretching입니다.'],
+      ['동작', '고관절 → 무릎 → 종아리 → 발목 순.'],
+      ['포인트', '무릎과 발끝이 같은 방향을 보게.'],
+      ['주의', '균형이 무너지면 벽에 손을 가볍게.']
+    ]
+  },
+  {
+    id: 'lie_easy', tool: 'posture', pos: 'lie', kind: 'habit',
+    toolKo: '누움 · 생활습관', name: '편안한 호흡',
+    video: 'https://www.youtube.com/watch?v=K5ueK1AiWu0', thumb: true, n: 0, sequences: [],
+    steps: [
+      '무릎을 세우고 편하게 눕습니다.',
+      '한 손은 아랫배, 한 손은 윗배에 둡니다.',
+      '코로 천천히 들이쉴 때 아랫배가 먼저, 또는 위·아래가 비슷하게 부풀게 합니다.',
+      '앞배만 나오지 않게, 옆·뒤도 같이 부풀게 합니다. 배가 나오면서 허리가 들리면 안 됩니다.',
+      '내쉴 때는 완전히 힘을 빼세요. 허리 근육이 말랑해진 상태가 편안한 호흡입니다.'
+    ],
+    note: [
+      ['준비', '힘을 쓰는 운동이 아닙니다. 허리 힘을 빼고 숨 쉬는 연습입니다.'],
+      ['동작', '들이쉴 때 아랫배·옆·뒤가 같이 부풀고, 내쉴 때 완전히 힘 뺍니다.'],
+      ['포인트', '윗배만 먼저 올라오면, 아랫배를 살짝 밀어 내는 느낌을 먼저 익히세요.'],
+      ['주의', '하루 3~5분이면 충분합니다. 어지럽거나 허리가 세게 아프면 바로 멈추세요.']
+    ]
+  },
+  {
+    id: 'lie_breath', tool: 'posture', pos: 'lie', kind: 'ex',
+    toolKo: '누움 · 자세 교정', name: '호흡 운동',
+    video: 'https://www.youtube.com/watch?v=ghANSeGvJmg', thumb: true, n: 0, sequences: [],
+    steps: [
+      '들이쉴 때는 편안한 호흡과 같습니다.',
+      '내쉴 때 배 왕자를 만들며 끝까지 내뱉습니다. 갈비뼈가 모아지는 느낌이 나야 합니다.',
+      '숨을 참지 마세요. 내쉬면서 힘을 줍니다.',
+      '이게 되면, 조여 둔 상태를 호흡 3번 동안 유지했다가 마지막에 완전히 힘 뺍니다.'
+    ],
+    note: [
+      ['준비', '편안한 호흡이 된 다음에 하세요. 같은 날에 섞지 마세요.'],
+      ['동작', '들이쉬는 건 같고, 내쉴 때 힘을 씁니다. 편하면 운동이 아닙니다.'],
+      ['포인트', '갈비뼈가 모이는지 양손으로 확인해 보세요.'],
+      ['주의', '하루 5회 안팎이면 됩니다. 허리가 들리면 힘을 줄이거나 편안한 호흡으로 돌아가세요.']
+    ]
+  },
+  {
+    id: 'lie_align', tool: 'posture', pos: 'lie', kind: 'ex',
+    toolKo: '누움 · 자세 교정', name: '호흡 운동 + 등척성 정렬',
+    video: 'https://www.youtube.com/watch?v=2lUIWCMuBKE', thumb: true, n: 0, sequences: [],
+    chain: ['엉덩이', '발', '무릎', '척추', '어깨', '손끝'],
+    steps: [
+      '내쉴 때 호흡 운동(배 왕자)을 유지한 채, 아래부터 맞춰 갑니다.',
+      '양쪽 엉덩이·발끝이 비슷하게 맞춰지게 합니다.',
+      '턱을 살짝 당기며 목을 누르지 말고, 척추가 길어지는 느낌으로 둡니다.',
+      '어깨는 뒤로 밀지 말고 바깥으로 늘리고, 손끝은 발 쪽으로 뻗습니다.',
+      '그 자세를 호흡 3번 유지한 뒤, 내쉴 때 완전히 힘 뺍니다.'
+    ],
+    note: [
+      ['준비', '누워서 호흡 운동이 된 다음에 정렬을 얹습니다.'],
+      ['동작', '내쉴 때 힘을 주며 엉덩이 → 발 → 무릎 → 척추 → 어깨 → 손끝 순으로 맞춥니다.'],
+      ['포인트', '한쪽에만 신경 쓰이면 다른 쪽이 빠집니다. 한 호흡에 하나씩 더하세요.'],
+      ['주의', '턱을 누르거나 어깨를 뒤로 밀지 마세요. 길어지게, 바깥으로 늘립니다.']
+    ]
+  },
+  {
+    id: 'sit_habit', tool: 'posture', pos: 'sit', kind: 'habit',
+    toolKo: '앉기 · 생활습관', name: '바르게 앉는 법',
+    video: 'https://www.youtube.com/watch?v=htThowr2dRw', thumb: true, n: 0, sequences: [],
+    steps: [
+      '의자·바닥에 좌골(앉은뼈)로 앉습니다.',
+      '몸을 앞뒤로 살짝 움직여, 무게가 뼈의 앞·뒤로 이동하는 걸 느껴 보세요.',
+      '너무 앞(허리 힘줌)도, 너무 뒤(구부정)도 아닌 중간에서 허리 힘을 뺍니다.',
+      '좌우도 같이. 한쪽이 쉬우면 그쪽에 기대고 있는 겁니다. 초반에는 반대쪽이 조금 더 실리게 앉아 보세요.',
+      '자리를 찾았으면 편안한 호흡으로 유지합니다.'
+    ],
+    note: [
+      ['준비', '똑바로 힘주는 자세가 아닙니다. 힘을 뺄 수 있는 자리를 찾습니다.'],
+      ['동작', '앞뒤·좌우로 무게를 옮긴 뒤, 허리 힘이 빠지는 중간을 찾습니다.'],
+      ['포인트', '같은 자리라도 힘 준 것과 뺀 것이 다릅니다. 힘 빼는 것까지가 완성입니다.'],
+      ['주의', '오래 앉아 허리가 아픈 날은 자세를 세게 잡지 말고, 이 중간 자리를 다시 찾으세요.']
+    ]
+  },
+  {
+    id: 'sit_breath', tool: 'posture', pos: 'sit', kind: 'ex',
+    toolKo: '앉기 · 자세 교정', name: '바르게 앉아서 호흡 운동',
+    video: 'https://www.youtube.com/watch?v=Q_vVpCRiA7k', thumb: true, n: 0, sequences: [],
+    chain: ['골반', '척추', '어깨', '팔꿈치'],
+    steps: [
+      '바르게 앉은 다음, 내쉴 때 배 왕자로 끝까지 내뱉습니다.',
+      '턱을 살짝 당기며, 머리 꼭대기가 천장으로 끌려 올라가는 느낌으로 척추를 늘립니다.',
+      '어깨는 바깥으로 늘리고, 팔꿈치는 바닥 쪽으로 뻗습니다. 어깨를 귀 쪽으로 올리지 마세요.',
+      '호흡 3번 유지한 뒤 힘 빼고, 그 부드러운 자세로 앉아 있습니다.'
+    ],
+    note: [
+      ['준비', '바르게 앉는 법이 된 다음에 하세요. 누워서 하던 호흡 운동과 같고, 상체에 더 집중합니다.'],
+      ['동작', '내쉴 때 골반 → 척추 → 어깨 → 팔꿈치 순으로 맞춥니다.'],
+      ['포인트', '아래 등을 펴려고 배를 내밀면 안 됩니다. 배 힘을 먼저 잡고, 그다음 펴세요.'],
+      ['주의', '어깨가 이미 많이 내려가 있으면 밑으로 내리지 말고, 옆으로만 늘리세요.']
+    ]
+  },
+  {
+    id: 'stand_habit', tool: 'posture', pos: 'stand', kind: 'habit',
+    toolKo: '서기 · 생활습관', name: '바르게 서기',
+    video: 'https://www.youtube.com/watch?v=Eez9dWBshmU', thumb: true, n: 0, sequences: [],
+    steps: [
+      '발에서 앞·뒤, 안·밖, 좌우로 무게를 옮겨 본 뒤, 뒤꿈치 중앙보다 약 1cm 앞에 양쪽이 비슷하게 실리게 섭니다.',
+      '고개만 숙여 발등이 보이면 골반이 잘 온 겁니다. 발등이 안 보이면 배를 내밀고 있는 경우가 많습니다.',
+      '무릎은 굽히지 않으면서, 허리 힘을 뺄 수 있는 자리를 찾습니다.',
+      '들이쉴 때 허리가 살짝 부풀면 힘이 빠진 겁니다.',
+      '옆에서 보면 복숭아뼈–고관절–어깨–귀가 한 줄에 가깝게. 앞에서 보면 골반·어깨·머리가 한쪽으로 치우치지 않게.'
+    ],
+    note: [
+      ['준비', '라인만 맞추고 허리 힘을 빼는 것이 핵심입니다.'],
+      ['동작', '발 무게 → 골반 → 허리 힘 빼기 → 좌우 균형 순으로 찾습니다.'],
+      ['포인트', '라인이 잡혀도 허리가 올라가 있으면 다시 내려놓고 힘을 빼세요.'],
+      ['주의', '골반을 뒤로 둘 때 어깨까지 같이 뒤로 가면 넘어질 것 같습니다. 몸통은 두고 골반만 옮기세요.']
+    ]
+  },
+  {
+    id: 'stand_breath', tool: 'posture', pos: 'stand', kind: 'ex',
+    toolKo: '서기 · 자세 교정', name: '바르게 서서 호흡 운동',
+    video: 'https://www.youtube.com/watch?v=gMPxYOKGDgs', thumb: true, n: 0, sequences: [],
+    chain: ['발', '골반', '척추', '어깨', '목'],
+    steps: [
+      '들이쉴 때 허리도 같이 부풀게, 내쉴 때 배 왕자로 갈비뼈를 모읍니다.',
+      '엉덩이 힘, 뒤꿈치끼리 밀고, 무릎은 서로 모으되 무릎뼈가 앞을 보게 합니다.',
+      '엉덩이를 앞으로 밀지 마세요. 무게는 뒤에 두고 조입니다.',
+      '턱을 당기며 길어지고, 어깨는 바깥, 손끝은 아래로.',
+      '호흡 3번 유지 후 완전히 힘 뺍니다.'
+    ],
+    note: [
+      ['준비', '바르게 서기가 된 다음에 하세요. 이 자세를 유지하는 근육을 키우는 단계입니다.'],
+      ['동작', '내쉴 때 발 → 골반 → 척추 → 어깨 → 목 순으로 맞춥니다.'],
+      ['포인트', '엉덩이에 힘 준다고 허리가 꺾이면, 골반을 살짝 뒤로 두고 다시 하세요.'],
+      ['주의', '한쪽에만 골반이 튀어나오면 반대쪽이 덜 나온 겁니다. 양쪽을 비슷하게 맞추세요.']
+    ]
+  },
+  {
+    id: 'walk_habit', tool: 'posture', pos: 'stand', kind: 'habit',
+    toolKo: '걷기 · 생활습관', name: '바르게 걷기',
+    video: 'https://www.youtube.com/watch?v=UWrajCt_oaQ', thumb: true, n: 0, sequences: [],
+    steps: [
+      '바르게 선 뒤, 힘 빼고 시작합니다.',
+      '발은 자기 라인만 따라갑니다. 발이 바깥으로 열리지 않게.',
+      '발을 뗄 때 발목으로 들지 말고 무릎을 살짝 들어, 발목은 힘 빼 둡니다.',
+      '뒤꿈치가 먼저 닿고, 무게가 앞으로 옮길 때 엄지발가락 쪽이 바닥에 남는지 봅니다. 새끼발가락만 남으면 발목이 꺾인 겁니다.',
+      '무게가 오른발이면 오른쪽 골반이, 왼발이면 왼쪽 골반이 살짝 나옵니다. 한쪽만 나오면 그 패턴을 걸을 때도 쓰는 겁니다.',
+      '팔은 일부러 흔들지 마세요. 어깨·팔 힘만 빼면 반대쪽 발과 자연스럽게 같이 갑니다.'
+    ],
+    note: [
+      ['준비', '서기와 호흡이 된 다음에 하세요. 빨리 걷지 말고 한 걸음씩 확인합니다.'],
+      ['동작', '무릎으로 발을 떼고, 뒤꿈치 → 엄지발가락 순으로 무게를 옮깁니다.'],
+      ['포인트', '골반이 움직이는 사람은 머리·어깨가 덜 흔들립니다. 상체를 일부러 흔들지 마세요.'],
+      ['주의', '허리를 들고 걷던 분은, 걸을 때도 허리가 올라가는지 한 걸음마다 확인하세요.']
+    ]
+  },
+  {
+    id: 'move_situp', tool: 'posture', pos: 'lie', kind: 'move',
+    toolKo: '누움 · 기능 운동', name: 'Sit-up 6단계',
+    video: 'https://www.youtube.com/watch?v=-GWfCMCKGiE', thumb: true, n: 0,
+    videos: [
+      { url: 'https://www.youtube.com/watch?v=-GWfCMCKGiE', label: '영상 · 1단계' },
+      { url: 'https://www.youtube.com/watch?v=TL9Kmi5-3vA', label: '영상 · 2~6단계' }
+    ],
+    sequences: [
+      { title: 'Sit-up 6단계', start: 1, captions: [
+        '1단계 · 상체 — 무릎을 세우고 편하게 눕습니다. 상체를 약 45° 들어 올립니다. 견갑이 바닥에서 떨어질 정도면 됩니다. 목을 당기지 마세요.',
+        '2단계 · 하체 — 견갑을 살짝 띄운 채 다리를 한쪽씩 번갈아 든 뒤, 양쪽을 동시에 듭니다.',
+        '3단계 · 상체 — 무릎 굽혀 앉은 자세(90°)에서 45° 정도까지 내려갔다가 다시 올라옵니다.',
+        '4단계 · 하체 — 등(견갑·흉추)이 바닥에 닿은 상태에서 다리를 한쪽씩, 이어서 양쪽 동시에 듭니다.',
+        '5단계 · 정식 Sit-up — 통증 없는 범위에서 정상적인 Sit-up.',
+        '6단계 · 구르기 — 무릎을 잡고 앉은 뒤 천천히 뒤로 굴렀다가, 앞으로 돌아오며 무릎을 펴고 손끝으로 발끝에 닿습니다.'
+      ]}
+    ],
+    note: [
+      ['준비', '호흡·정렬이 된 다음에 하세요. 1단계가 안정된 뒤에 다음 단계로.'],
+      ['동작', '상체·하체를 번갈아 분절한 뒤, 정식 Sit-up과 구르기로 마무리합니다.'],
+      ['포인트', '매 단계에서 좌우·전후 밸런스를 확인합니다. 호흡을 멈추지 마세요.'],
+      ['주의', '목이 아프거나 허리가 들리면 각도를 줄이거나 이전 단계로 돌아가세요.']
+    ]
+  },
+  {
+    id: 'move_super', tool: 'posture', pos: 'lie', kind: 'move',
+    toolKo: '누움 · 기능 운동', name: 'Superman 6단계',
+    video: 'https://www.youtube.com/watch?v=UkIrqA9rAxk', thumb: true, n: 0,
+    videos: [
+      { url: 'https://www.youtube.com/watch?v=UkIrqA9rAxk', label: '영상 · 1단계' },
+      { url: 'https://www.youtube.com/watch?v=BfihGG8aNNY', label: '영상 · 2~6단계' }
+    ],
+    sequences: [
+      { title: 'Superman 6단계', start: 1, captions: [
+        '1단계 · 척추 — 엎드려 이마를 가볍게 둡니다. 경추부터 척추를 분절 순으로 천천히 들어 올립니다. 허리만 꺾지 마세요.',
+        '2단계 · 대각선 — 한 손과 반대 발을 동시에 듭니다. 좌·우 교대.',
+        '3단계 · 양손·양발 — 낮게 동시에 듭니다. (기본 Superman에 가깝습니다)',
+        '4단계 · 접영 — 양손·양발을 든 채 접영 동작과 발 벌림.',
+        '5단계 · 팔 신전·무릎 굴곡 — 든 상태에서 견갑을 모으고, 양쪽 무릎을 높게 굽힙니다.',
+        '6단계 · 팔꿈치·회전 — 든 상태에서 한쪽 팔꿈치부터 번갈아 더 높이 들며 몸통을 회전합니다.'
+      ]}
+    ],
+    note: [
+      ['준비', 'Sit-up이 된 다음, 엎드린 후방 경선 단계입니다. 한 단계씩.'],
+      ['동작', '목→등 분절 들기 → 대각선 → 양손양발 → 접영 → 무릎 밴딩 → 회전 순입니다.'],
+      ['포인트', '높이보다 좌우 대칭과 호흡이 먼저입니다. 허리를 한 번에 젖히지 마세요.'],
+      ['주의', '허리·목 통증이 세지면 즉시 멈추세요. 어깨가 귀로 올라가면 낮게, 천천히.']
+    ]
+  },
+  {
+    id: 'move_pushup', tool: 'posture', pos: 'sit', kind: 'move',
+    toolKo: '앉기 · 기능 운동', name: 'Push-up 6단계',
+    video: 'https://www.youtube.com/watch?v=aWdI65Sd-jY', thumb: true, n: 0,
+    sequences: [
+      { title: 'Push-up 6단계', start: 1, captions: [
+        '1단계 · 무릎 네발 — 머리→몸통→골반 웨이브로 하강·상승.',
+        '2단계 · 무릎 지지 — 몸통을 먼저 내린 뒤, 웨이브로 올라옵니다.',
+        '3단계 · 무릎 지지 — 몸통과 골반을 동시에 하강·상승.',
+        '4단계 · 무릎 뗀 네발 — 웨이브로 하강·상승.',
+        '5단계 · 무릎 뗀 네발 — 몸통을 먼저 내린 뒤 웨이브로 상승.',
+        '6단계 · 정상 Push-up — 통증 없는 범위에서 완성 동작.'
+      ]}
+    ],
+    note: [
+      ['준비', '무릎 지지 네발부터. 무릎을 뗀 네발은 그다음입니다.'],
+      ['동작', '웨이브(머리→몸통→골반)와 동시 하강을 번갈아 익힙니다.'],
+      ['포인트', '어깨가 귀로 올라가지 않게, 허리가 꺾이지 않게.'],
+      ['주의', '손목·어깨가 아프면 무릎 지지 단계에 머무르세요.']
+    ]
+  },
+  {
+    id: 'move_plank', tool: 'posture', pos: 'sit', kind: 'move',
+    toolKo: '앉기 · 기능 운동', name: 'Plank 6단계',
+    video: 'https://www.youtube.com/watch?v=LGlZysDLB44', thumb: true, n: 0,
+    sequences: [
+      { title: 'Plank 6단계', start: 1, captions: [
+        '1단계 · 무릎 대고 네발 — 머리 회전.',
+        '2단계 · 무릎 떼고 네발 — 머리 회전.',
+        '3단계 · 네발 — 골반 좌우 움직임.',
+        '4단계 · 한 팔을 앞으로 뻗었다가 복귀. 좌·우.',
+        '5단계 · 한 손을 뒤통수에 두고 몸통 회전. 좌·우.',
+        '6단계 · 다리를 접었다가 바깥 회전한 뒤 복귀. 좌·우.'
+      ]}
+    ],
+    note: [
+      ['준비', '어깨와 골반이 한 줄, 복부는 가볍게 잡아 둡니다. 호흡은 계속.'],
+      ['동작', '무릎 지지 → 정식 네발 → 골반 → 팔·몸통·다리 순으로 올립니다.'],
+      ['포인트', '오래 버티기보다 정렬과 호흡이 먼저입니다.'],
+      ['주의', '허리가 처지거나 엉덩이가 너무 올라가면 무릎 지지로 돌아가세요.']
+    ]
+  },
+  {
+    id: 'move_sideplank', tool: 'posture', pos: 'sit', kind: 'move',
+    toolKo: '앉기 · 기능 운동', name: 'Side Plank 6단계',
+    thumb: true, n: 0,
+    sequences: [
+      { title: 'Side Plank 6단계', start: 1, captions: [
+        '1단계 · 한발 지지 사이드. 좌·우.',
+        '2단계 · 지지 없이 사이드. 좌·우.',
+        '3단계 · 골반 좌우 움직임. 좌·우.',
+        '4단계 · 위쪽 다리를 벌렸다가 모읍니다. 좌·우.',
+        '5단계 · 위쪽 다리로 원을 그립니다.',
+        '6단계 · 다리를 앞·뒤로 스윙합니다. 달리기 동작. 좌·우.'
+      ]}
+    ],
+    note: [
+      ['준비', '골반을 들어 올리고 측면이 한 줄이 되게 합니다. 호흡은 계속.'],
+      ['동작', '한발 지지 → 완전 사이드 → 골반·다리 움직임 순으로 올립니다.'],
+      ['포인트', '높이보다 측면 일직선이 먼저입니다. 좌·우 같은 시간으로.'],
+      ['주의', '어깨·손목이 아프면 한발 지지 단계에 머무르세요.']
+    ]
+  },
+  {
+    id: 'move_spine', tool: 'posture', pos: 'sit', kind: 'ex',
+    toolKo: '앉기 · 생활습관', name: '척추+상지 분절 운동',
+    video: 'https://www.youtube.com/watch?v=j5dC_Y3wU_Y', thumb: true, n: 0, sequences: [],
+    steps: [
+      '바르게 앉아 양팔을 벌립니다. 호흡과 함께 천천히.',
+      '1단계 · 골반을 앞뒤로 굴리며 척추가 따라 움직이게 합니다.',
+      '2단계 · 1단계에 상지 움직임을 더합니다.',
+      '3단계 · 좌우로 숙이며, 머리에서 골반 방향으로 척추를 분절합니다.',
+      '4단계 · 3단계에 상지를 더합니다.',
+      '5단계 · 머리에서 골반 방향으로 척추를 분절하며 회전합니다.',
+      '6단계 · 5단계에 상지를 더합니다.'
+    ],
+    note: [
+      ['준비', '바르게 앉은 상태·앉아서 호흡 운동이 된 다음에 하세요.'],
+      ['동작', '골반 → 상지 → 좌우숙임 → 상지 → 회전 → 상지 순입니다.'],
+      ['포인트', '한 덩어리로 움직이지 말고, 척추를 마디마디 움직입니다.'],
+      ['주의', '허리에 힘을 주고 꺾지 마세요. 어지러우면 멈추세요.']
+    ]
+  },
+  {
+    id: 'move_squat', tool: 'posture', pos: 'sit', kind: 'move',
+    toolKo: '앉기 · 기능 운동', name: '스쿼트 6단계',
+    video: 'https://www.youtube.com/watch?v=M82gXAlC29M', thumb: true, n: 0,
+    sequences: [
+      { title: '스쿼트 6단계', start: 1, captions: [
+        '1단계 · 의자에 살짝 걸터앉아, 엉덩이를 앞으로 떼었다가 다시 앉습니다.',
+        '2단계 · 엉덩이를 앞으로 뗀 뒤 일어났다가 다시 앉습니다.',
+        '3단계 · 일어났다가 깊게 앉았다가, 의자 높이까지 일어난 뒤 다시 앉습니다.',
+        '4단계 · 한쪽 다리에 중심을 싣고 1번 동작. 좌·우.',
+        '5단계 · 한쪽 다리에 중심을 싣고 2번 동작. 좌·우.',
+        '6단계 · 한쪽 다리에 중심을 싣고 3번 동작. 좌·우.'
+      ]}
+    ],
+    note: [
+      ['준비', '의자 또는 벽을 활용합니다. 앉아서 바르게 일어설 힘을 만드는 단계입니다.'],
+      ['동작', '엉덩이 앞으로 떼기 → 기립 → 앉기 순으로 난이도를 올립니다.'],
+      ['포인트', '골반 중립, 무릎과 발끝이 같은 방향을 보게. 매 단계 확인.'],
+      ['주의', '무릎이 안쪽으로 무너지거나 허리가 꺾이면 이전 단계로.']
+    ]
+  },
+  {
+    id: 'move_balance', tool: 'posture', pos: 'stand', kind: 'move',
+    toolKo: '서기 · 기능 운동', name: '밸런스 6단계',
+    video: 'https://www.youtube.com/watch?v=4df-nhY-w_Y', thumb: true, n: 0,
+    sequences: [
+      { title: '밸런스 6단계', start: 1, captions: [
+        '1단계 · 일어선 채 한 발을 살짝 들고 돌리며 30초 유지. 발은 엄지·새끼·뒤꿈치 삼각으로 지지합니다.',
+        '2단계 · 무릎 높이까지 들어 올리고 돌리며 30초 유지.',
+        '3단계 · 한 발 지지, 반대 다리를 뒤로 뻗고(발은 바닥에 안 닿게) 후굴.',
+        '4단계 · 뒤뻗기(후굴)와 무릎 들기(전굴)를 사이클로.',
+        '5단계 · 무릎을 들고 몸통·골반 회전.',
+        '6단계 · 뒤뻗기 하며 몸통·골반 회전.'
+      ]}
+    ],
+    note: [
+      ['준비', '바르게 서기와 서서 호흡이 된 다음에 하세요. 벽 근처에 두세요.'],
+      ['동작', '한 발 지지 → 무릎 높이 → 뒤뻗기 → 전후 사이클 → 회전 순입니다.'],
+      ['포인트', '높이보다 발 삼각 지지와 골반이 정면을 유지하는지가 먼저입니다.'],
+      ['주의', '흔들려 넘어질 것 같으면 손을 벽에 가볍게. 어지러우면 멈추세요.']
+    ]
+  },
+  {
+    id: 'roller_hip', tool: 'foam', toolKo: '폼롤러', name: '엉덩이',
+    n: 7, sequences: [
+      { title: '한쪽', start: 1, captions: [
+        '바닥에 앉아 폼롤러를 한쪽 엉덩이(둔근) 아래에 둡니다. 손은 뒤로 짚어 체중을 조절해요.',
+        '같은 쪽 다리는 펴고, 반대 무릎은 가슴 쪽으로 당깁니다.',
+        '골반 옆을 손으로 잡아 롤러가 뼈(좌골)가 아닌 근육 위에 있게 해요.',
+        '통증 없는 범위에서 좌우·앞뒤로 천천히 굴리거나, 압이 느껴지는 지점에서 20~40초 유지합니다.'
+      ]},
+      { title: '반대쪽', start: 5, captions: [
+        '반대쪽 엉덩이 아래로 롤러를 옮겨 같은 자세를 만듭니다.',
+        '무릎을 당기며 호흡을 멈추지 마세요.',
+        '좌·우 같은 시간으로 마무리합니다. 찌릿하면 체중을 줄이거나 중단하세요.'
+      ]}
+    ],
+    note: [
+      ['준비', '바닥에 앉아 폼롤러를 엉덩이 아래에 두고, 손은 뒤로 짚어 체중을 조절해요.'],
+      ['동작', '통증 없는 범위에서 좌우·앞뒤로 천천히 굴리거나 20~40초 유지합니다.'],
+      ['포인트', '뼈가 아닌 근육 위에 올리고, 호흡을 멈추지 마세요.'],
+      ['주의', '찌릿하거나 통증이 세지면 체중을 줄이거나 중단합니다.']
+    ]
+  },
+  {
+    id: 'roller_waist', tool: 'foam', toolKo: '폼롤러', name: '허리',
+    n: 8, sequences: [
+      { title: '양 무릎', start: 1, captions: [
+        '폼롤러를 허리(천골) 아래에 가로로 두고 눕습니다.',
+        '양 무릎을 가슴 쪽으로 모아 올립니다.',
+        '양손으로 롤러 끝을 잡아 고정해요.',
+        '작은 범위로 유지하거나 아주 천천히 흔듭니다. 통증은 0~3 정도로요.'
+      ]},
+      { title: '좌우', start: 5, captions: [
+        '무릎을 조금 더 당겨 압을 조절합니다.',
+        '한쪽으로 기울여 허리 옆 근육만 자극해요. 척추 뼈 위는 피합니다.',
+        '반대쪽으로도 같은 각도로 기울입니다.',
+        '편한 지점에서 20~40초 유지한 뒤 천천히 내려옵니다.'
+      ]}
+    ],
+    note: [
+      ['준비', '옆으로 눕거나 기대어, 폼롤러를 허리 양쪽 근육에 둡니다.'],
+      ['동작', '체중을 천천히 실어 위아래로 작게 굴리거나, 편한 지점에서 20~40초 유지해요.'],
+      ['포인트', '척추 뼈가 아닌 옆 근육에 두고, 통증 0~3 정도로 유지합니다.'],
+      ['주의', '허리 중앙·뼈 위를 직접 누르지 마세요.']
+    ]
+  },
+  {
+    id: 'roller_back', tool: 'foam', toolKo: '폼롤러', name: '등',
+    n: 10, sequences: [
+      { title: '중간 등', start: 1, captions: [
+        '폼롤러를 등 중간(흉추)에 가로로 두고 눕습니다. 무릎은 세워요.',
+        '양손을 머리 뒤에 가볍게 받칩니다. 목을 당기지 마세요.',
+        '엉덩이는 바닥에 가깝게 둔 채 천천히 위아래로 굴립니다.',
+        '한 구간에서 멈추어 호흡해도 됩니다.',
+        '허리가 아니라 등 위·중간이 열리게 체중을 조절해요.'
+      ]},
+      { title: '위쪽 등', start: 6, captions: [
+        '롤러를 견갑 사이·등 위쪽으로 옮겨요.',
+        '머리 무게만으로 천천히 젖혀 봅니다.',
+        '좌우로 아주 작게 움직여 뭉친 지점을 찾습니다.',
+        '통증 부위·뼈 위는 피하고, 숨은 계속 쉬세요.',
+        '목 긴장이 느껴지면 손을 더 받쳐 주세요.'
+      ]}
+    ],
+    note: [
+      ['준비', '폼롤러를 등(견갑 사이·흉추 옆 근육)에 가로로 두고 눕거나 기대요.'],
+      ['동작', '엉덩이는 바닥에 가깝게 둔 채 천천히 위아래로 굴립니다.'],
+      ['포인트', '목은 긴장하지 않게, 허리보다 등 위·중간이 열리게 해요.'],
+      ['주의', '통증 부위·뼈 위는 피합니다.']
+    ]
+  },
+  {
+    id: 'roller_calf', tool: 'foam', toolKo: '폼롤러', name: '종아리',
+    n: 7, sequences: [
+      { title: '종아리', start: 1, captions: [
+        '앉아 손으로 몸을 지탱하고, 종아리 아래에 폼롤러를 둡니다.',
+        '반대 다리를 포개 올려 압을 조절해도 됩니다.',
+        '발목에서 무릎 쪽으로 천천히 굴려요.',
+        '뭉친 지점에서 잠시 멈추어 호흡합니다.',
+        '정강이뼈가 아닌 근육 위에 올렸는지 확인하세요.',
+        '발끝을 안·밖으로 살짝 돌려 다른 섬유를 자극합니다.',
+        '통증이 세면 포갠 다리를 내려 체중을 줄여요.'
+      ]}
+    ],
+    note: [
+      ['준비', '앉거나 손으로 몸을 지탱한 채 종아리 근육 아래에 폼롤러를 둡니다.'],
+      ['동작', '발목에서 무릎 쪽으로 천천히 굴리고, 뭉친 지점에서 호흡해요.'],
+      ['포인트', '정강이뼈가 아닌 근육 위에 올리고, 좌·우 같은 시간으로 합니다.'],
+      ['주의', '뼈·아킬레스 힘줄을 세게 누르지 마세요.']
+    ]
+  },
+  {
+    id: 'roller_hamstring', tool: 'foam', toolKo: '폼롤러', name: '햄스트링',
+    n: 4, sequences: [
+      { title: '햄스트링', start: 1, captions: [
+        '앉아 폼롤러를 허벅지 뒤(햄스트링) 아래에 둡니다. 손은 뒤로 짚어 체중을 조절해요.',
+        '무릎 뒤에서 골반 쪽으로 천천히 굴립니다. 무릎 관절은 피하세요.',
+        '뭉친 지점에서 잠시 멈추어 호흡합니다.',
+        '반대쪽도 같은 시간으로 반복하고, 찌릿하면 체중을 줄여요.'
+      ]}
+    ],
+    note: [
+      ['준비', '앉아 폼롤러를 허벅지 뒤 근육 아래에 두고, 손으로 체중을 조절해요.'],
+      ['동작', '무릎 뒤에서 골반 쪽으로 천천히 굴리고, 뭉친 지점에서 호흡합니다.'],
+      ['포인트', '무릎 관절이 아닌 근육 위에 올리고, 좌·우 같은 시간으로 해요.'],
+      ['주의', '뼈·무릎 뒤를 세게 누르지 마세요.']
+    ]
+  },
+  {
+    id: 'roller_thigh', tool: 'foam', toolKo: '폼롤러', name: '허벅지',
+    n: 10, sequences: [
+      { title: '앞면', start: 1, captions: [
+        '엎드려 팔꿈치로 상체를 지탱하고, 허벅지 앞에 롤러를 둡니다.',
+        '한쪽만 올리고 반대 발끝으로 체중을 조절해도 됩니다.',
+        '무릎 관절·뼈 위는 피합니다.',
+        '뭉친 지점에서 20~40초 구간을 반복해요.',
+        '호흡을 유지하고, 허리가 꺾이지 않게 하세요.',
+        '무릎을 살짝 굽혀 앞면 자극을 조절합니다.'
+      ]},
+      { title: '안쪽', start: 7, captions: [
+        '한쪽 다리를 옆으로 벌려 안쪽 허벅지 아래에 롤러를 둡니다.',
+        '작은 범위로 위아래·좌우로 굴려요.',
+        '무릎 안쪽 관절은 피하고 근육만 자극합니다.',
+        '반대쪽도 같은 시간으로 반복하세요.'
+      ]}
+    ],
+    note: [
+      ['준비', '앞·옆·안쪽 중 목표 근육을 정한 뒤 그 아래에 폼롤러를 둡니다.'],
+      ['동작', '천천히 위아래로 굴리며, 통증 없는 범위에서 20~40초 반복해요.'],
+      ['포인트', '무릎 관절·뼈 위는 피하고, 호흡을 유지합니다.'],
+      ['주의', '통증이 세면 체중을 줄이거나 중단하세요.']
+    ]
+  },
+  {
+    id: 'roller_shoulder', tool: 'foam', toolKo: '폼롤러', name: '어깨',
+    n: 3, sequences: [
+      { title: '옆구리·겨드랑이', start: 1, captions: [
+        '옆으로 누워 폼롤러를 겨드랑이·견갑 바깥 근육에 둡니다.',
+        '아래팔은 머리 쪽으로 뻗어 목을 편하게 해요.',
+        '작은 범위로 앞뒤·위아래로 천천히 굴립니다.'
+      ]}
+    ],
+    note: [
+      ['준비', '옆으로 누워 폼롤러를 어깨·견갑 주변 근육에 둡니다.'],
+      ['동작', '작은 범위로 앞뒤·위아래로 굴리거나, 뭉친 지점에서 20~40초 유지해요.'],
+      ['포인트', '어깨를 귀 쪽으로 올리지 않고, 호흡을 유지합니다.'],
+      ['주의', '관절·뼈를 직접 누르지 말고 근육만 자극하세요.']
+    ]
+  },
+  {
+    id: 'roller_neck', tool: 'foam', toolKo: '폼롤러', name: '목',
+    video: '', n: 0, sequences: [],
+    note: [
+      ['준비', '누운 자세에서 폼롤러를 목 뒤·옆 근육에 가볍게 둡니다. 머리 무게만으로 압을 조절해요.'],
+      ['동작', '아주 작은 범위로 좌우·위아래로 움직이거나, 편한 지점에서 15~30초 유지합니다.'],
+      ['포인트', '목뼈 위는 피하고, 옆·뒤 근육만 닿게 하세요.'],
+      ['주의', '압이 세거나 어지러움·저림이 있으면 즉시 중단합니다.']
+    ]
+  },
+  {
+    id: 'roller_abdomen', tool: 'foam', toolKo: '폼롤러', name: '복부',
+    n: 2, sequences: [
+      { title: '복부', start: 1, captions: [
+        '엎드려 폼롤러를 아랫배 아래에 가볍게 둡니다. 깊게 누르지 마세요.',
+        '호흡에 맞춰 작은 범위로 굴리거나 15~30초 유지해요.'
+      ]}
+    ],
+    note: [
+      ['준비', '엎드려 폼롤러를 복부 근육에 가볍게 둡니다.'],
+      ['동작', '깊게 누르지 말고 작은 범위로 굴리거나, 호흡에 맞춰 15~30초 유지해요.'],
+      ['포인트', '숨을 내쉴 때 배가 부드럽게 내려가게 하고, 힘을 과도하게 주지 마세요.'],
+      ['주의', '식사 직후·임신·복통이 있으면 하지 않습니다.']
+    ]
+  },
+  {
+    id: 'ball_scapula', tool: 'ball', toolKo: '12센티 마사지볼', name: '등',
+    n: 3, sequences: [
+      { title: '등', start: 1, captions: [
+        '기둥·벽에 등을 대고, 12센티 볼을 견갑 사이에 둡니다.',
+        '양팔을 가슴 앞에서 교차해 견갑이 열리게 해요.',
+        '무릎을 살짝 굽혀 체중을 볼에 천천히 실습니다.'
+      ]}
+    ],
+    extra: 'https://m.blog.naver.com/allenjoy/223449532242',
+    extraLabel: '블로그 참고',
+    note: [
+      ['준비', '벽에 등을 대고 볼을 견갑 사이에 둡니다. 팔은 가슴 앞에서 교차해요.'],
+      ['동작', '무릎을 굽혀 체중을 실어 위아래로 천천히 움직이거나 원을 그립니다.'],
+      ['포인트', '어깨를 귀 쪽으로 올리지 말고, 견갑이 열리는 느낌을 유지하세요.'],
+      ['주의', '척추 뼈 위는 피하고, 통증이 세면 체중을 줄입니다.']
+    ]
+  },
+  {
+    id: 'ball_shoulder', tool: 'ball', toolKo: '12센티 마사지볼', name: '견갑·어깨',
+    n: 5, sequences: [
+      { title: '뒤 어깨', start: 1, captions: [
+        '기둥 모서리에 볼을 두고, 뒤 어깨·견갑에 댑니다.',
+        '반대 손으로 같은 쪽 팔을 가슴 쪽으로 당겨 압을 조절해요.',
+        '작은 원·위아래로 천천히 움직입니다.',
+        '어깨를 으쓱하지 말고 호흡을 유지하세요.',
+        '찌릿하면 즉시 체중을 줄입니다.'
+      ]}
+    ],
+    extra: 'https://www.youtube.com/watch?v=drx2-P2OgpQ',
+    extraLabel: '영상 참고',
+    note: [
+      ['준비', '벽에 볼을 두고 뒤 어깨·견갑 근육에 댑니다.'],
+      ['동작', '통증 없는 범위에서 천천히 원을 그리거나 위아래로 움직입니다.'],
+      ['포인트', '호흡을 멈추지 않고, 어깨를 귀 쪽으로 올리지 마세요.'],
+      ['주의', '관절·뼈를 직접 누르지 않습니다.']
+    ]
+  },
+  {
+    id: 'ball_chest', tool: 'ball', toolKo: '12센티 마사지볼', name: '가슴',
+    n: 3, sequences: [
+      { title: '가슴', start: 1, captions: [
+        '볼을 앞 어깨·가슴 바깥(대흉근)에 두고 기둥에 기대요.',
+        '같은 쪽 팔은 뒤로 열어 앞면을 펴 줍니다.',
+        '정면에서 체중을 천천히 실어 압을 찾습니다. 쇄골·관절은 피하세요.'
+      ]}
+    ],
+    note: [
+      ['준비', '기둥에 볼을 두고 가슴 바깥·앞 어깨 근육에 댑니다.'],
+      ['동작', '팔을 뒤로 연 채 작은 범위로 위아래·원을 그립니다.'],
+      ['포인트', '호흡을 멈추지 않고, 어깨를 귀 쪽으로 올리지 마세요.'],
+      ['주의', '쇄골·관절이 아닌 근육에만 볼이 오게 해요.']
+    ]
+  },
+  {
+    id: 'ball_waist', tool: 'ball', toolKo: '12센티 마사지볼', name: '허리',
+    video: 'https://www.youtube.com/watch?v=PgKSRcIW9c4', n: 0, sequences: [],
+    note: [
+      ['준비', '요추 양쪽 근육에 볼을 댑니다. 척추 뼈 위가 아닌 근육에 두세요.'],
+      ['동작', '체중을 천천히 실어 작은 범위로 움직이거나 유지합니다.'],
+      ['포인트', '통증 0~3, 호흡은 계속 쉬어요.'],
+      ['주의', '허리 중앙 뼈 위는 누르지 마세요.']
+    ]
+  },
+  {
+    id: 'ball_abdomen', tool: 'ball', toolKo: '12센티 마사지볼', name: '복부',
+    n: 1, sequences: [
+      { title: '복부', start: 1, captions: [
+        '볼을 복부·옆구리 근육에 가볍게 두고, 깊게 누르지 마세요. 호흡에 맞춰 작은 범위로 자극해요.'
+      ]}
+    ],
+    extra: 'https://www.youtube.com/shorts/zjvXLTL9E5A',
+    extraLabel: '영상 참고',
+    note: [
+      ['준비', '볼을 복부 근육에 가볍게 둡니다.'],
+      ['동작', '깊게 누르지 말고 호흡에 맞춰 작은 범위로 자극해요.'],
+      ['포인트', '숨을 내쉴 때 배가 부드럽게 내려가게 합니다.'],
+      ['주의', '식사 직후·복통이 있으면 하지 않습니다.']
+    ]
+  },
+  {
+    id: 'ball_hip', tool: 'ball', toolKo: '12센티 마사지볼', name: '엉덩이',
+    n: 3, sequences: [
+      { title: '엉덩이', start: 1, captions: [
+        '기둥에 볼을 두고 한쪽 엉덩이(둔근)·윗엉덩이에 댑니다. 무릎은 살짝 굽혀요.',
+        '체중을 천천히 실어 작은 원·위아래로 움직입니다. 좌골이 아닌 근육 위에 올려요.',
+        '반대쪽도 같은 시간으로 하고, 찌릿하면 중단하세요.'
+      ]}
+    ],
+    extra: 'https://m.blog.naver.com/allenjoy/223442108509',
+    extraLabel: '블로그 참고',
+    note: [
+      ['준비', '기둥에 볼을 두고 한쪽 엉덩이 근육에 댑니다. 무릎은 굽혀요.'],
+      ['동작', '체중을 천천히 실어 원을 그리거나 유지합니다.'],
+      ['포인트', '좌골이 아닌 근육 위에 올려요.'],
+      ['주의', '찌릿하면 중단하세요.']
+    ]
+  },
+  {
+    id: 'ball_thigh', tool: 'ball', toolKo: '12센티 마사지볼', name: '허벅지',
+    n: 2, sequences: [
+      { title: '허벅지', start: 1, captions: [
+        '기둥에 볼을 두고 허벅지 근육에 댑니다. 무릎 관절은 피하세요.',
+        '작은 범위로 위아래·원을 그리고, 좌·우 같은 시간으로 마무리해요.'
+      ]}
+    ],
+    note: [
+      ['준비', '기둥에 볼을 두고 허벅지 앞·옆 근육에 댑니다.'],
+      ['동작', '통증 없는 범위에서 천천히 위아래·원을 그립니다.'],
+      ['포인트', '무릎이 아닌 근육 위에 올리고, 호흡을 유지하세요.'],
+      ['주의', '무릎 관절을 직접 누르지 않습니다.']
+    ]
+  },
+  {
+    id: 'face_ex_sb_1', tool: 'face', pos: 'faceSmile', kind: 'ex',
+    toolKo: '리얼 페이스 · 10단계', name: '① 스마일 호흡',
+    video: 'https://www.youtube.com/watch?v=Y1EwTrt1HnY', thumb: true, n: 8,
+    sequences: [{ title: '스마일 호흡', start: 1, captions: [
+      '내쉴 때 배에 왕자를 만들며 어깨를 바깥으로 엽니다. 얼굴을 먼저 쥐어짜지 마세요.',
+      '좌골로 앉아 호흡이 안정되면, 그 위에 스마일을 얹습니다.',
+      '3단계로 광대를 올립니다. 입꼬리만 올리지 마세요.',
+      '가볍게 스마일. 눈이 긴장하지 않게.',
+      '좌골(앉은뼈)로 앉았는지 옆에서 확인합니다.',
+      '들이쉴 때 갈비·옆구리가 같이 부풀게.',
+      '광대가 올라간 스마일을 호흡과 함께 유지합니다.',
+      '내쉴 때 배 왕자. 이 네 가지가 ①의 완성입니다.'
+    ]}],
+    chain: ['앉기', '호흡', '광대', '내쉴 때 배'],
+    note: [
+      ['준비', '스마일 호흡의 전체 맛보기입니다. 이후 단계는 이 장면을 나눠 익힙니다.'],
+      ['동작', '앉기 → 호흡 → 광대 올리기 → 내쉴 때 배 왕자.'],
+      ['포인트', '얼굴을 따로 만들지 말고, 날숨의 정렬 위에 스마일을 얹으세요.'],
+      ['주의', '턱을 내밀거나 이를 악물지 마세요.']
+    ]
+  },
+  {
+    id: 'face_ex_sb_2', tool: 'face', pos: 'faceSmile', kind: 'ex',
+    toolKo: '리얼 페이스 · 10단계', name: '② 호흡',
+    video: 'https://www.youtube.com/watch?v=PV7qD4CUaCs', thumb: true, n: 7,
+    sequences: [{ title: '호흡', start: 1, captions: [
+      '좌우로 무게를 옮겨 봅니다. 한쪽에 기대고 있지 않은지.',
+      '좌골에서 가장 돌출된 부위로 앉습니다.',
+      '들이쉴 때 아랫배·옆·뒤가 같이 부풀게.',
+      '내쉴 때 배 왕자로 갈비뼈가 모이게.',
+      '어깨는 뒤로 밀지 말고 바깥으로.',
+      '얼굴·목 힘은 뺍니다. 호흡만.',
+      '좌·우 같은 느낌인지 비교하세요.'
+    ]}],
+    note: [
+      ['준비', '스마일 없이 호흡만. 바르게 앉기가 먼저입니다.'],
+      ['동작', '좌골 자리 → 들이쉬며 옆구리 → 내쉬며 배 왕자.'],
+      ['포인트', '윗배만 나오면 아랫배부터.'],
+      ['주의', '어지러우면 멈추세요.']
+    ]
+  },
+  {
+    id: 'face_ex_sb_3', tool: 'face', pos: 'faceSmile', kind: 'ex',
+    toolKo: '리얼 페이스 · 10단계', name: '③ 스마일 트레이닝',
+    video: 'https://www.youtube.com/watch?v=baEC8uts9ak', thumb: true, n: 7,
+    sequences: [{ title: '스마일 트레이닝', start: 1, captions: [
+      '관골(광대)을 손가락으로 짚습니다.',
+      '앞 광대를 끌어올립니다. 입만 벌리지 마세요.',
+      '좌우 광대가 같은 높이인지 비교합니다.',
+      '눈이 같이 떠지는지 확인하세요.',
+      '호흡을 멈추지 마세요.',
+      '올렸다가 천천히 내립니다.',
+      '센터에서 받은 높이만.'
+    ]}],
+    note: [
+      ['준비', '호흡이 된 다음, 중안면만 분리해 익힙니다.'],
+      ['동작', '광대를 올리고, 입이 따라오게.'],
+      ['포인트', '입꼬리가 아니라 광대.'],
+      ['주의', '한쪽만 올리면 반대쪽을 먼저 느끼세요.']
+    ]
+  },
+  {
+    id: 'face_ex_sb_4', tool: 'face', pos: 'faceSmile', kind: 'ex',
+    toolKo: '리얼 페이스 · 10단계', name: '④ 유잉',
+    video: 'https://www.youtube.com/watch?v=5W2eF5Kf4HI', thumb: true, n: 7,
+    sequences: [{ title: '유잉', start: 1, captions: [
+      '윗니와 아랫니 사이 1mm 정도 간격을 둡니다.',
+      '혀는 입천장에, 이 사이로 혀가 나오지 않게.',
+      '입술은 다물고, 코로 숨 쉽니다.',
+      '코골이·입벌림·앞목 긴장이 있으면 이 자세부터.',
+      '입술이 가볍게 맞닿게.',
+      '혀가 입천장에 넓게 닿는지.',
+      '턱 아래(설골 앞)가 부드러워지는지 확인하세요.'
+    ]}],
+    note: [
+      ['준비', '이를 악무는 뮤잉이 아닙니다. 치아를 띄운 채 혀로 천장을 지지합니다.'],
+      ['동작', '1mm 간격 → 입술 봉인 → 혀를 입천장 → 코 호흡.'],
+      ['포인트', '혀끝만 대지 말고, 가운데·뒤도 같이.'],
+      ['주의', '턱을 앞으로 밀지 마세요.']
+    ]
+  },
+  {
+    id: 'face_ex_sb_5', tool: 'face', pos: 'faceSmile', kind: 'ex',
+    toolKo: '리얼 페이스 · 10단계', name: '⑤ 호흡 · 스마일 · 유잉 종합',
+    video: 'https://www.youtube.com/watch?v=_JTlqF54U8M', thumb: true, n: 7,
+    sequences: [{ title: '종합', start: 1, captions: [
+      '바르게 앉았는지부터 확인합니다.',
+      '호흡(②)을 유지한 채.',
+      '스마일(③)을 얹고.',
+      '유잉(④) 혀 자세를 같이.',
+      '한 호흡에 세 가지가 겹치는지.',
+      '어느 하나가 빠지면 그 부품으로 돌아가세요.',
+      '내쉴 때 배 왕자를 잊지 마세요.'
+    ]}],
+    note: [
+      ['준비', '②③④가 된 다음의 1차 통합입니다.'],
+      ['동작', '앉기·호흡 위에 광대와 혀를 한 호흡에.'],
+      ['포인트', '예쁘게 만들기보다, 세 가지가 동시에 유지되는지가 기준입니다.'],
+      ['주의', '숨이 짧아지면 스마일·혀를 줄이고 호흡만.']
+    ]
+  },
+  {
+    id: 'face_ex_sb_6', tool: 'face', pos: 'faceSmile', kind: 'ex',
+    toolKo: '리얼 페이스 · 10단계', name: '⑥ 호흡2 · 흉곽 열기',
+    video: 'https://www.youtube.com/watch?v=q1r0hWGn76k', thumb: true, n: 6,
+    sequences: [{ title: '호흡2', start: 1, captions: [
+      '한 손으로 갈비 옆을 확인합니다.',
+      '어깨를 최대한 바깥 방향으로 연다는 느낌.',
+      '뒤로 말지 마세요. 옆으로 엽니다.',
+      '좌우 흉곽이 같이 부푸는지.',
+      '목이 짧아지지 않게.',
+      '스마일은 가볍게만.'
+    ]}],
+    note: [
+      ['준비', '② 호흡의 심화입니다. 흉곽 옆·위까지.'],
+      ['동작', '갈비 옆을 열고, 어깨는 바깥으로.'],
+      ['포인트', '어깨를 뒤로 밀면 목이 긴장합니다.'],
+      ['주의', '한쪽으로만 열리면 반대쪽을 먼저.']
+    ]
+  },
+  {
+    id: 'face_ex_sb_7', tool: 'face', pos: 'faceSmile', kind: 'ex',
+    toolKo: '리얼 페이스 · 10단계', name: '⑦ 스마일2 · 좌우 · 눈',
+    video: 'https://www.youtube.com/watch?v=m24nPYeCQb8', thumb: true, n: 6,
+    sequences: [{ title: '스마일2', start: 1, captions: [
+      '입꼬리 좌우를 비교합니다.',
+      '낮은 쪽 광대를 먼저 올립니다.',
+      '눈까지 같이 떠지는지.',
+      '주먹 마디로 광대를 가볍게 확인할 수 있습니다.',
+      '호흡을 유지하세요.',
+      '좌·우 같은 시간으로.'
+    ]}],
+    note: [
+      ['준비', '③의 심화. 대칭과 눈입니다.'],
+      ['동작', '좌우 비교 → 광대 → 눈.'],
+      ['포인트', '높은 쪽을 더 올리지 말고, 낮은 쪽을 맞추세요.'],
+      ['주의', '눈을 부릅뜨지 마세요. 스마일에 눈이 따라오게.']
+    ]
+  },
+  {
+    id: 'face_ex_sb_8', tool: 'face', pos: 'faceSmile', kind: 'ex',
+    toolKo: '리얼 페이스 · 10단계', name: '⑧ 유잉2 · 혀 움직임 진행',
+    video: 'https://www.youtube.com/watch?v=5GBe_GU-7o8', thumb: true, n: 7,
+    sequences: [{ title: '유잉2', start: 1, captions: [
+      '혀의 좌·우·앞·뒤 부분을 나눠 느낍니다.',
+      '입천장에 혀 전체가 붙어 있는지.',
+      '혀끝만 닿고 뒤가 떨어지지 않게.',
+      '살짝 빨아 올리는 느낌을 더합니다.',
+      '혀 뿌리가 입천장 뒤를 향해 있는지.',
+      '좌우 혀 가장자리를 손가락으로 비교해 볼 수 있습니다.',
+      '턱 아래가 단단해지지 않게, 부드럽게.'
+    ]}],
+    note: [
+      ['준비', '④가 위치라면, ⑧은 혀를 분절해 전체 흡착으로 올립니다.'],
+      ['동작', '좌우앞뒤 → 전체 붙이기 → 살짝 빨아들이기.'],
+      ['포인트', '턱을 닫아 힘을 주지 마세요. 혀만.'],
+      ['주의', '구역질이 나면 앞쪽만, 범위를 줄이세요.']
+    ]
+  },
+  {
+    id: 'face_ex_sb_9', tool: 'face', pos: 'faceSmile', kind: 'ex',
+    toolKo: '리얼 페이스 · 10단계', name: '⑨ 스탠딩',
+    video: 'https://www.youtube.com/watch?v=5dK8duBjEnU', thumb: true, n: 5,
+    sequences: [{ title: '스탠딩', start: 1, captions: [
+      '뒷꿈치 중앙보다 약 1cm 앞에 무게가 오게.',
+      '발 삼각(엄지·새끼·뒤꿈치)으로 섭니다.',
+      '골반·허리 힘을 빼고.',
+      '앉아서 하던 호흡을 서서 유지합니다.',
+      '얼굴은 아직 얹지 않아도 됩니다. 발 자리가 먼저.'
+    ]}],
+    note: [
+      ['준비', '바르게 서기와 같습니다. 얼굴 전에 발.'],
+      ['동작', '뒤꿈치 앞 1cm → 삼각 지지 → 호흡.'],
+      ['포인트', '발등이 보이게 고개만 숙여 확인해 보세요.'],
+      ['주의', '어지러우면 앉으세요.']
+    ]
+  },
+  {
+    id: 'face_ex_sb_10', tool: 'face', pos: 'faceSmile', kind: 'ex',
+    toolKo: '리얼 페이스 · 10단계', name: '⑩ 스마일 호흡',
+    video: 'https://www.youtube.com/watch?v=Dno8sLoQA0o', thumb: true, n: 6,
+    sequences: [{ title: '서서 스마일 호흡', start: 1, captions: [
+      '⑨의 발 자리를 유지합니다.',
+      '뒤꿈치를 가볍게 모아 조입니다.',
+      '내쉴 때 배 왕자.',
+      '광대 스마일을 얹습니다.',
+      '혀는 입천장, 코로 숨.',
+      '①과 이름은 같고, 자세만 서서입니다.'
+    ]}],
+    note: [
+      ['준비', '앉기 스마일 호흡의 서서 완성형입니다.'],
+      ['동작', '발 → 호흡 → 스마일 → 유잉.'],
+      ['포인트', '높이보다 동시에 유지되는지가 먼저입니다.'],
+      ['주의', '균형이 무너지면 ⑨로 돌아가세요.']
+    ]
+  },
+  {
+    id: 'face_mft_posture', tool: 'face', pos: 'faceMft2', kind: 'habit',
+    toolKo: '리얼 페이스 · 기본', name: '① 혀 바른 자세',
+    video: 'https://youtu.be/B27EEAPqq0s', thumb: true, n: 5,
+    videos: [
+      { url: 'https://youtu.be/Sh0JSfPVG0I', label: '연구모임 1부 · 원리' },
+      { url: 'https://youtu.be/B27EEAPqq0s', label: '연구모임 2부' }
+    ],
+    sequences: [{ title: '하루 습관', start: 1, captions: [
+      '윗니·아랫니 사이는 약 1mm. 이를 악물지 마세요.',
+      '입술은 다물고, 코로 숨 쉽니다. 이게 쉬는 자세입니다.',
+      '입이 벌어지고 앞목이 긴장되면, 혀가 내려가 있는 경우가 많습니다.',
+      '혀는 입천장 오돌토돌한 부분에 넓게 닿게. 혀끝만 대지 마세요.',
+      '운동이 끝나면 이 자세로 돌아옵니다. 하루의 대부분이 여기입니다.'
+    ]}],
+    chain: ['혀 입천장', '입술 다물기', '코 호흡'],
+    note: [
+      ['준비', 'MFT의 기본 휴식 자세입니다. 하루 몇 번 운동보다, 나머지 시간이 이 자리인지가 핵심입니다.'],
+      ['동작', '혀 → 입천장, 입술 다물기, 코 호흡. 세 가지가 같이 있어야 합니다.'],
+      ['포인트', '혀가 내려가 있으면 입호흡·앞목 긴장·긴 얼굴 패턴과 연결될 수 있습니다.'],
+      ['주의', '코가 막혀 입으로 쉴 수밖에 없으면 무리하지 말고, 센터에 말씀하세요.']
+    ]
+  },
+  {
+    id: 'face_mft_spot', tool: 'face', pos: 'faceMft2', kind: 'ex',
+    toolKo: '리얼 페이스 · 기본', name: '② 혀 스팟 찾기',
+    video: 'https://youtu.be/B27EEAPqq0s', thumb: true, n: 3,
+    sequences: [{ title: 'Tongue spot', start: 1, captions: [
+      '혀 전체가 입천장에 닿는 그림입니다. 이 사이로 혀가 나오지 않게.',
+      '윗니 바로 뒤, 오돌토돌한 부분(절치유두 근처)에 혀끝을 둡니다. 이게 스팟입니다.',
+      '혀의 좌·우·앞·뒤를 나눠 느낀 뒤, 스팟을 중심으로 전체를 붙입니다.'
+    ]}],
+    note: [
+      ['준비', '①을 몸으로 찾는 첫 연습입니다. 연구모임 STEP 1/5 Find your spot.'],
+      ['동작', '윗니 뒤 오돌토돌한 지점에 혀끝 → 가운데·뒤도 천장에.'],
+      ['포인트', '혀끝을 이 사이에 끼우지 마세요. 이 뒤, 천장에.'],
+      ['주의', '구역질이 나면 혀끝을 조금 앞에, 범위를 줄이세요.']
+    ]
+  },
+  {
+    id: 'face_mft_stretch', tool: 'face', pos: 'faceMft2', kind: 'ex',
+    toolKo: '리얼 페이스 · 기본', name: '③ 스트레칭 · 혀-턱 분리',
+    video: 'https://youtu.be/B27EEAPqq0s', thumb: true, n: 4,
+    sequences: [{ title: '가동 · 분리', start: 1, captions: [
+      '입을 열고 턱관절만 움직여 봅니다. 혀는 천장 스팟에 그대로.',
+      '혀만 앞뒤로 미끄러집니다. 턱이 따라 나오면 분리가 안 된 겁니다.',
+      '혀 좌우 가장자리를 비교합니다. 턱을 옆으로 밀지 말고 혀만.',
+      '목이 짧아지지 않게. 혀를 내밀며 목을 꺾지 마세요.'
+    ]}],
+    note: [
+      ['준비', '근력 전에 가동입니다. 연구모임 STEP 3/5 Tongue–jaw dissociation.'],
+      ['동작', '턱은 두고 혀만, 혀는 두고 턱만. 서로 따라가지 않게.'],
+      ['포인트', '유아기처럼 혀를 앞으로 내밀며 삼키던 패턴이 남아 있으면, 이 분리가 먼저입니다.'],
+      ['주의', '턱에서 딱 소리가 크게 나거나 통증이 세면 각도를 줄이세요.']
+    ]
+  },
+  {
+    id: 'face_mft_suction', tool: 'face', pos: 'faceMft3', kind: 'ex',
+    toolKo: '리얼 페이스 · 기능', name: '① 혀 근력 · 빨아들이기',
+    video: 'https://youtu.be/HaygqANLNNU', thumb: true, n: 5,
+    sequences: [{ title: 'Suction hold', start: 1, captions: [
+      '입천장에 혀 전체를 붙입니다. 끝·가운데·뒤가 같이.',
+      '살짝 빨아 올립니다. 턱을 닫아 힘을 주지 마세요.',
+      '입술이 앞으로 나오며 빨아들이는 느낌이 와도, 이를 악물지는 않게.',
+      '혀가 천장에 붙어 있는지 옆에서 확인합니다.',
+      '구강 뒤(목젖 쪽)까지 공간이 열리는지. 억지로 보지 마세요.'
+    ]}],
+    note: [
+      ['준비', '② 스팟과 ③ 분리가 된 다음입니다. 연구모임 STEP 2/5 Suction hold.'],
+      ['동작', '혀 전체를 천장에 흡착해 몇 호흡 유지 → 완전히 힘 빼기.'],
+      ['포인트', '혀끝만 빨면 앞니를 밉니다. 가운데·뒤가 같이 올라와야 합니다.'],
+      ['주의', '구역·통증·턱 피로가 오면 즉시 멈추고 ① 바른 자세로 돌아가세요.']
+    ]
+  },
+  {
+    id: 'face_mft_lip', tool: 'face', pos: 'faceMft3', kind: 'ex',
+    toolKo: '리얼 페이스 · 기능', name: '② 입술 근력',
+    video: 'https://youtu.be/HaygqANLNNU', thumb: true, n: 3,
+    sequences: [{ title: '입술 봉인 · Lip pops', start: 1, captions: [
+      '입술이 가볍게 맞닿아 있는지. 힘을 줘 오므리지 마세요.',
+      '다물었다가 가볍게 톡, 터뜨리듯 엽니다(립 팝). 턱은 그대로.',
+      '다시 다물고 코 호흡으로 돌아옵니다. 입술이 벌어져 있지 않게.'
+    ]}],
+    note: [
+      ['준비', '혀가 천장에 있는 채로 입술만. 연구모임 STEP 4/5 Lip pops.'],
+      ['동작', '봉인 유지 → 가볍게 팝 → 다시 다물기.'],
+      ['포인트', '입술이 약하면 입이 벌어지고 혀가 내려갑니다. 하루 봉인이 근력보다 먼저입니다.'],
+      ['주의', '입술을 안쪽으로 말아 깨물지 마세요.']
+    ]
+  },
+  {
+    id: 'face_mft_swallow', tool: 'face', pos: 'faceMft3', kind: 'ex',
+    toolKo: '리얼 페이스 · 기능', name: '③ 삼킴 훈련',
+    video: 'https://youtu.be/HaygqANLNNU', thumb: true, n: 2,
+    sequences: [{ title: '삼킴', start: 1, captions: [
+      '침을 삼킬 때 혀가 앞으로 나오지 않게. 치아 사이로 혀가 보이면 옛 패턴입니다.',
+      '1mm 간격을 유지한 채, 혀는 천장 스팟에 두고 삼킵니다. 입술은 다문 채.'
+    ]}],
+    note: [
+      ['준비', '휴식 자세가 된 다음의 통합입니다. 연구모임 STEP 5/5 Swallow.'],
+      ['동작', '혀 천장 + 입술 봉인 + 코 호흡인 채로 침을 삼킵니다.'],
+      ['포인트', '유아기 삼킴이 남으면 혀를 내밀며 삼키게 되고, 치아·얼굴 형태에도 영향을 줄 수 있습니다.'],
+      ['주의', '사레·통증이 있으면 중단하세요. 물로 연습할 때는 소량만.']
+    ]
+  },
+  {
+    id: 'face_mft_chew', tool: 'face', pos: 'faceMft3', kind: 'habit',
+    toolKo: '리얼 페이스 · 기능', name: '④ 씹기 습관',
+    video: 'https://youtu.be/HaygqANLNNU', thumb: true, n: 1,
+    sequences: [{ title: '씹기', start: 1, captions: [
+      '한쪽으로만 씹고 있지 않은지. 혀는 천장, 입술은 다문 채 좌우를 번갈아 씹어 봅니다.'
+    ]}],
+    note: [
+      ['준비', '연습실 동작이 식사로 이어져야 합니다. 연구모임 후반의 기능 환경입니다.'],
+      ['동작', '입을 크게 벌리지 않고, 좌우를 번갈아, 혀가 이 사이로 나오지 않게.'],
+      ['포인트', '성인은 미용보다 턱 편안함·호흡·씹기 균형이 목표입니다.'],
+      ['주의', '턱 통증·클릭이 세면 부드러운 음식부터, 센터에 말씀하세요.']
+    ]
+  },
+  {
+    id: 'face_od_flow', tool: 'face', pos: 'faceOnday', kind: 'habit',
+    toolKo: '원데이 클래스', name: '① 오늘 순서 · 50분',
+    video: 'https://www.youtube.com/watch?v=vise3k4e9q0', thumb: true, n: 4,
+    chainTitle: '오늘 순서',
+    chain: ['스마일', '리프팅 정렬', '혀', '턱'],
+    sequences: [{ title: '평가 직후 그 부위 시퀀스', start: 1, captions: [
+      '앉기 — 의자에 좌골로. 매트에 오래 앉지 않습니다.',
+      '스마일(Smile) 트레이닝. 입꼬리·광대·눈을 체크한 뒤, 셀프 자극 · 습관 · 저항 운동.',
+      '리프팅(Lifting) 정렬운동. 몸통 정렬을 체크하고 스마일+리프팅+자세교정을 한 흐름으로.',
+      '혀(Tongue) 인지하기 → 턱(TMJ) 바르게 쓰기. 한 부위를 끝낸 다음 다음 부위로.'
+    ]}],
+    note: [
+      ['시간', '50분. 스마일 → 리프팅 정렬 → 혀 → 턱 순.'],
+      ['흐름', '전체를 먼저 평가하지 않습니다. 평가한 부위를 바로 풀어 씁니다.'],
+      ['자세', '스마일·혀·턱은 의자, 리프팅 정렬은 서기. 불편하면 의자에 앉거나 서세요.'],
+      ['주의', '어지럽거나 아프면 그 블록을 건너뛰고 강사에게 알리세요.']
+    ]
+  },
+  {
+    id: 'face_od_smile', tool: 'face', pos: 'faceOnday', kind: 'ex',
+    toolKo: '원데이 클래스', name: '② 스마일(Smile) 트레이닝',
+    video: 'https://www.youtube.com/watch?v=vise3k4e9q0', thumb: true, n: 8,
+    chainTitle: '스마일 블록',
+    chain: ['체크', '셀프 자극', '습관', '저항 운동'],
+    sequences: [{ title: '체크 → 셀프 자극 → 습관 → 저항 운동', start: 1, captions: [
+      '체크 · 입꼬리 — 좌우 높이를 비교합니다. 낮은 쪽만 기억하세요.',
+      '체크 · 광대근 — 관골을 짚고 올립니다. 입만 벌리지 마세요.',
+      '체크 · 눈 — 스마일할 때 눈이 같이 떠지는지. 여기까지가 체크입니다.',
+      'P — 목·얼굴 앞이 짧아지지 않게 가볍게 엽니다. 아프면 각도를 줄이세요.',
+      '셀프 자극 — 광대·앞 어깨 근육만. 관절·뼈는 피하고 20~30초.',
+      '생활습관 — 좌골로 앉기. 허리 힘을 뺀 중간 자리.',
+      '습관 · 호흡 — 내쉴 때 배 왕자, 어깨 바깥. 얼굴을 아직 쥐지 마세요.',
+      '저항 운동 — 광대 스마일 트레이닝. 체크에서 낮았던 쪽을 먼저. 예쁜 스마일을 만듭니다.'
+    ]}],
+    note: [
+      ['준비', '의자. 입꼬리·광대·눈을 체크한 뒤 다른 부위로 넘어가지 말고, 스마일 시퀀스를 끝냅니다.'],
+      ['동작', '입꼬리·광대·눈 체크 → 셀프 자극 → 습관 → 저항 운동.'],
+      ['포인트', '입꼬리가 아니라 광대. 눈을 부릅뜨지 마세요.'],
+      ['주의', '찌릿하면 자극을 멈추고 호흡만.']
+    ]
+  },
+  {
+    id: 'face_od_standbody', tool: 'face', pos: 'faceOnday', kind: 'ex',
+    toolKo: '원데이 클래스', name: '③ 리프팅(Lifting) 정렬운동',
+    video: 'https://www.youtube.com/watch?v=vise3k4e9q0', thumb: true, n: 7,
+    chainTitle: '리프팅 정렬 블록',
+    chain: ['몸통 체크', '스마일', '리프팅', '자세교정'],
+    sequences: [{ title: '몸통 정렬 체크 후 IFC 정렬운동', start: 1, captions: [
+      '체크 · 몸통 — 어깨·갈비·머리가 한쪽으로 가는지. 앉아서 본 스마일과 연결해 보세요.',
+      '체크 · 골반 — 무게 좌우, 볼록한 쪽. 뒤꿈치 중앙 앞 1cm인지도.',
+      'P · 상체 — 서서 목·어깨·몸통을 통증 없는 범위에서 엽니다.',
+      'P · 하체 — 고관절·무릎·종아리·발목. 무릎과 발끝이 같은 방향.',
+      '생활습관 — 바르게 서기. 허리 힘 빼고 호흡.',
+      '운동 — 스마일+리프팅+자세교정을 한 흐름으로. 앉아서 한 광대를 발 위에 가볍게.',
+      '한발 — 볼록한 골반 쪽을 지지. 불안하면 벽을 짚고, 앉지 마세요.'
+    ]}],
+    note: [
+      ['준비', '스마일 블록 다음. 몸통 정렬을 체크한 뒤 바로 IFC 정렬운동으로 갑니다.'],
+      ['동작', '몸통·골반 체크 → 서서 P → 서기 습관 → 스마일+리프팅+자세교정.'],
+      ['포인트', '얼굴에서 본 낮은 광대가, 선 자세에서도 같은지 한 번만 확인하세요.'],
+      ['주의', '어지러우면 의자에 앉으세요. 무릎이 아프면 한발은 건너뛰세요.']
+    ]
+  },
+  {
+    id: 'face_od_tongue', tool: 'face', pos: 'faceOnday', kind: 'ex',
+    toolKo: '원데이 클래스', name: '④ 혀(Tongue) 인지하기',
+    video: 'https://www.youtube.com/watch?v=vise3k4e9q0', thumb: true, n: 7,
+    chainTitle: '혀 블록',
+    chain: ['스팟', '천장', '근력', '세부 움직임'],
+    sequences: [{ title: '위치 · 근력 본 뒤 세부 움직임', start: 1, captions: [
+      '체크 · 천장 — 혀 전체가 입천장에 붙어 있는지. 이 사이로 나오면 내려가 있는 겁니다.',
+      '체크 · 스팟 — 윗니 뒤 오돌토돌한 부분에 혀끝. 찾기만.',
+      '체크 · 근력 — 살짝 빨아 올려 봅니다. 턱을 닫아 힘을 주지 마세요.',
+      '움직임 · 분리 — 턱만 벌리고 혀는 스팟에. 혀가 따라 나오면 분리가 안 된 겁니다.',
+      '움직임 · 앞뒤 — 혀만 앞뒤로. 턱이 따라가지 않게.',
+      '생활습관 — 1mm 간격, 입술 다물기, 혀는 천장, 코 호흡. 쉬는 자세.',
+      '세부 움직임 — 혀 전체를 천장에 붙이기. 오래 버티지 말고 2~3호흡만.'
+    ]}],
+    note: [
+      ['준비', '리프팅 정렬 다음. 의자에 앉아 혀만 인지합니다.'],
+      ['동작', '스팟 · 천장 · 근력 체크 → 세부 움직임 연습.'],
+      ['포인트', '힘을 주기보다, 혀가 어디에 있는지를 먼저 알게 합니다.'],
+      ['주의', '구역질이 나면 앞쪽만, 빨아들이기는 건너뛰세요.']
+    ]
+  },
+  {
+    id: 'face_od_lips', tool: 'face', pos: 'faceOnday', kind: 'ex',
+    toolKo: '원데이 클래스', name: '⑤ 턱(TMJ) 바르게 쓰기',
+    video: 'https://www.youtube.com/watch?v=vise3k4e9q0', thumb: true, n: 4,
+    chainTitle: '턱 블록',
+    chain: ['체크', 'P', 'A', 'R'],
+    sequences: [{ title: '바르게 쓰는지 체크 후 PAR', start: 1, captions: [
+      '체크 — 턱을 바르게 사용하는지. 한쪽으로만 씹거나 앞으로 내밀지 않는지.',
+      'P — 턱 힘을 빼고 통증 없는 범위에서 가볍게 엽니다.',
+      'A · 습관 — 치아 1mm, 입술 다물기, 혀는 천장. 이를 악물지 마세요.',
+      'R · 운동 — PAR 순으로 낮은 쪽·비대칭을 잡습니다. 아픈 쪽을 억지로 맞추지 마세요.'
+    ]}],
+    note: [
+      ['준비', '혀 인지 다음. 턱을 바르게 쓰는지 본 뒤 바로 PAR로 갑니다.'],
+      ['동작', '턱 사용 체크 → P → A(습관) → R(운동) 순으로 비대칭 잡기.'],
+      ['포인트', '성인은 미용보다 턱 편안함·좌우 균형이 목표입니다.'],
+      ['주의', '턱 통증·클릭이 세면 멈추고 강사에게 알리세요.']
+    ]
+  }
+];
 
+function $(id){ return document.getElementById(id); }
+function toast(msg){
+  var el = $('toast');
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function(){ el.classList.remove('on'); }, 1800);
+}
+function findGuide(id){
+  var aliases = {
+    move_situp1:'move_situp', move_situp26:'move_situp', move_super1:'move_super', move_super26:'move_super',
+    face_od_eval:'face_od_smile', face_od_chair:'face_od_smile',
+    face_od_align:'face_od_standbody', face_od_stand:'face_od_standbody',
+    face_od_lymph:'face_od_standbody', face_od_recheck:'face_od_standbody',
+    face_od_lie:'face_od_flow', face_od_swallow:'face_od_lips'
+  };
+  if (aliases[id]) id = aliases[id];
+  for (var i=0;i<GUIDE.length;i++) if (GUIDE[i].id===id) return GUIDE[i];
+  return null;
+}
+function cardHtml(g){
+  var hasImg = !!(g.n || g.thumb);
+  var ph = g.kind==='habit' ? '생활습관' : (g.kind==='move' ? '기능 운동' : ((g.kind==='ex' || g.kind==='stretch') ? '자세 교정' : (g.video ? '설명 + 영상' : '설명 가이드')));
+  var img = hasImg
+    ? '<img src="'+BASE+g.id+'/01.jpg" alt="'+g.toolKo+' '+g.name+'">'
+    : '<div class="ph">'+ph+'</div>';
+  var sub = g.n
+    ? ((g.pos==='faceOnday' ? '수업 중 · 사진 ' : '사진 ')+g.n+'장 · 순서대로')
+    : (g.kind==='stretch' ? '장면 확인 · 영상 복습' : (g.video ? '설명 · 영상 보기' : '설명 참고'));
+  return '<a class="card'+(hasImg?'':' video')+'" href="#'+g.id+'">'+
+    img+'<div class="meta"><div class="k">'+g.toolKo+'</div><div class="n">'+g.name+'</div><div class="s">'+sub+'</div></div></a>';
+}
+function renderHub(){
+  $('pGrid').innerHTML = GUIDE.filter(function(g){ return g.pos==='passive'; }).map(cardHtml).join('');
+  $('aSitGrid').innerHTML = GUIDE.filter(function(g){ return g.pos==='sitA'; }).map(cardHtml).join('');
+  $('aStandGrid').innerHTML = GUIDE.filter(function(g){ return g.pos==='standA'; }).map(cardHtml).join('');
+  $('lieGrid').innerHTML = GUIDE.filter(function(g){ return g.pos==='lie' && g.kind!=='move'; }).map(cardHtml).join('');
+  $('sitGrid').innerHTML = GUIDE.filter(function(g){ return g.pos==='sit' && g.kind!=='move'; }).map(cardHtml).join('');
+  $('standGrid').innerHTML = GUIDE.filter(function(g){ return g.pos==='stand' && g.kind!=='move'; }).map(cardHtml).join('');
+  $('lieExGrid').innerHTML = GUIDE.filter(function(g){ return g.pos==='lie' && g.kind==='move'; }).map(cardHtml).join('');
+  $('sitExGrid').innerHTML = GUIDE.filter(function(g){ return g.pos==='sit' && g.kind==='move'; }).map(cardHtml).join('');
+  $('standExGrid').innerHTML = GUIDE.filter(function(g){ return g.pos==='stand' && g.kind==='move'; }).map(cardHtml).join('');
+  $('foamGrid').innerHTML = GUIDE.filter(function(g){ return g.tool==='foam'; }).map(cardHtml).join('');
+  $('ballGrid').innerHTML = GUIDE.filter(function(g){ return g.tool==='ball'; }).map(cardHtml).join('');
+  $('smileGrid').innerHTML = GUIDE.filter(function(g){ return g.pos==='faceSmile'; }).map(cardHtml).join('');
+  $('mft2Grid').innerHTML = GUIDE.filter(function(g){ return g.pos==='faceMft2'; }).map(cardHtml).join('');
+  $('mft3Grid').innerHTML = GUIDE.filter(function(g){ return g.pos==='faceMft3'; }).map(cardHtml).join('');
+  $('ondayGrid').innerHTML = GUIDE.filter(function(g){ return g.pos==='faceOnday'; }).map(cardHtml).join('');
+}
+function noteHtml(g){
+  return '<div class="note">'+g.note.map(function(row){
+    return '<p><b>'+row[0]+'</b> '+row[1]+'</p>';
+  }).join('')+'</div>';
+}
+function renderDetail(id){
+  var g = findGuide(id);
+  if (!g) { location.hash=''; return; }
+  var videoBtns = '';
+  if (g.videos && g.videos.length) {
+    g.videos.forEach(function(v){
+      videoBtns += '<a href="'+v.url+'" target="_blank" rel="noopener">'+(v.label || '영상 보기')+'</a>';
+    });
+  } else {
+    var extraHref = g.extra || g.video || '';
+    var extraLabel = g.extraLabel || (g.video ? '영상 보기' : '');
+    if (extraHref) videoBtns = '<a href="'+extraHref+'" target="_blank" rel="noopener">'+extraLabel+'</a>';
+  }
+  var html = '<a class="back" href="#">← 목록</a>'+
+    '<div class="ex-kicker">'+g.toolKo+'</div>'+
+    '<h2 class="ex-title">'+g.name+'</h2>'+
+    '<div class="copy-row">'+
+      '<button type="button" onclick="copyLink()">이 링크 복사</button>'+
+      videoBtns+
+    '</div>';
+  var hasSeq = !!(g.sequences && g.sequences.length);
+  if (g.thumb && !hasSeq) {
+    html += '<figure class="hero-shot"><img src="'+BASE+g.id+'/01.jpg" alt="'+g.name+'"></figure>';
+  }
+  html += noteHtml(g);
+  if (g.chain && g.chain.length) {
+    html += '<div class="seq-hd">'+(g.chainTitle || (g.tool==='stretch' || g.tool==='face' ? '오늘 순서' : '내쉴 때 순서'))+'</div><div class="chain">';
+    g.chain.forEach(function(c, i){
+      if (i) html += '<i>→</i>';
+      html += '<span>'+c+'</span>';
+    });
+    html += '</div>';
+  }
+  if (g.steps && g.steps.length && !hasSeq) {
+    html += '<div class="seq-hd">순서</div>';
+    g.steps.forEach(function(cap, i){
+      html += '<figure class="step text"><figcaption><span class="num">'+(i+1)+'</span>'+cap+'</figcaption></figure>';
+    });
+  }
+  (g.sequences || []).forEach(function(seq){
+    html += '<div class="seq-hd">'+seq.title+'</div>';
+    seq.captions.forEach(function(cap, i){
+      var n = seq.start + i;
+      var imgN = (seq.imgStart != null ? seq.imgStart : seq.start) + i;
+      var nn = (imgN<10?'0':'')+imgN;
+      html += '<figure class="step"><img src="'+BASE+g.id+'/'+nn+'.jpg" alt="'+g.name+' '+n+'단계" loading="lazy">'+
+        '<figcaption><span class="num">'+n+'</span>'+cap+'</figcaption></figure>';
+    });
+  });
+  html += '<p class="lead" style="margin-top:8px">'+(g.tool==='stretch'
+    ? '사진으로 오늘 한 동작을 확인하고, 자세한 건 영상을 보세요. 통증 없는 범위만. 찌릿하면 멈추세요.'
+    : (g.tool==='face'
+    ? '강사 시범과 같은 장면입니다. 오늘 열린 카드만. 어지럽거나 아프면 멈추세요.'
+    : (g.tool==='posture'
+    ? '센터에서 배운 느낌이 기준입니다. 어지럽거나 통증이 세지면 바로 멈추세요.'
+    : '통증 0~3만. 뼈 위는 피하고, 불편하면 멈추세요.')))+'</p>';
+  html += '<a class="back" href="#">← 목록으로</a>';
+  $('detail').innerHTML = html;
+}
+function copyLink(){
+  var url = location.href;
+  function done(){ toast('링크를 복사했습니다'); }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done).catch(function(){ fallback(); });
+  } else fallback();
+  function fallback(){
+    var ta = document.createElement('textarea');
+    ta.value = url; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch(e) {}
+    document.body.removeChild(ta);
+  }
+}
+function catId(g){
+  if (!g) return '';
+  if (g.tool==='foam' || g.tool==='ball') return 'catTools';
+  if (g.pos==='passive' || g.pos==='lie') return 'catLie';
+  if (g.pos==='sitA' || g.pos==='sit') return 'catSit';
+  if (g.pos==='standA' || g.pos==='stand') return 'catStand';
+  if (g.tool==='face' || g.pos==='faceSmile' || g.pos==='faceMft2' || g.pos==='faceMft3' || g.pos==='faceOnday') return 'catFace';
+  return '';
+}
+function subCatId(g){
+  if (!g) return '';
+  if (g.tool==='foam') return 'subFoam';
+  if (g.tool==='ball') return 'subBall';
+  if (g.pos==='faceSmile') return 'subSmile';
+  if (g.pos==='faceMft2') return 'subMft2';
+  if (g.pos==='faceMft3') return 'subMft3';
+  if (g.pos==='faceOnday') return 'subOnday';
+  return '';
+}
+function openCat(cid, sid){
+  ['catTools','catLie','catSit','catStand','catFace'].forEach(function(id){
+    var el = $(id);
+    if (el) el.open = (id===cid);
+  });
+  ['subFoam','subBall','subSmile','subMft2','subMft3','subOnday'].forEach(function(id){
+    var el = $(id);
+    if (el) el.open = (id===sid);
+  });
+}
+function route(){
+  var id = (location.hash||'').replace(/^#/, '');
+  if (!id) {
+    $('hub').classList.remove('hidden');
+    $('detail').classList.add('hidden');
+    document.title = '셀프 가이드 | REAL MOVEMENT';
+    var cid = '', sid = '';
+    try {
+      cid = sessionStorage.getItem('selfCat') || '';
+      sid = sessionStorage.getItem('selfSubCat') || '';
+    } catch(e) {}
+    openCat(cid, sid);
+    window.scrollTo(0,0);
+    return;
+  }
+  var aliases = {
+    move_situp1:'move_situp', move_situp26:'move_situp', move_super1:'move_super', move_super26:'move_super',
+    face_od_eval:'face_od_smile', face_od_chair:'face_od_smile',
+    face_od_align:'face_od_standbody', face_od_stand:'face_od_standbody',
+    face_od_lymph:'face_od_standbody', face_od_recheck:'face_od_standbody',
+    face_od_lie:'face_od_flow', face_od_swallow:'face_od_lips'
+  };
+  if (aliases[id] && location.hash !== '#'+aliases[id]) {
+    location.replace('#'+aliases[id]);
+    return;
+  }
+  var g = findGuide(id);
+  if (!g) { location.hash=''; return; }
+  try {
+    sessionStorage.setItem('selfCat', catId(g));
+    sessionStorage.setItem('selfSubCat', subCatId(g));
+  } catch(e) {}
+  $('hub').classList.add('hidden');
+  $('detail').classList.remove('hidden');
+  renderDetail(id);
+  document.title = g.toolKo+' · '+g.name+' | REAL MOVEMENT';
+  window.scrollTo(0,0);
+}
+renderHub();
+window.addEventListener('hashchange', route);
+route();
+</script>
 </body>
 </html>

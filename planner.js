@@ -18731,7 +18731,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=169').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=170').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -31991,7 +31991,5 @@ window.genContent = async function(ev){
     await window.enqueueDraftGeneration(catId, draftId, { userInitiated: true, statusKind: statusKind });
   } finally {
     if(clickBtn && !clickBtn.classList.contains('btn-regen')) stopButtonCountdown_(clickBtn);
-  }
-};clickBtn.classList.contains('btn-regen')) stopButtonCountdown_(clickBtn);
   }
 };

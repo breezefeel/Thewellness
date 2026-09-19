@@ -9682,6 +9682,10 @@ var detailHashSyncLock_ = false;
 var searchDebounceTimer = null;
 var modalFocusTrap_ = null;
 var plannerAiBusy = false;
+var plannerAddFormTypedAt_ = 0;
+var plannerMainRenderDeferred_ = false;
+var plannerDeferredSyncTimer_ = null;
+var plannerDeferredSyncReason_ = '';
 
 // ── PSP 임상 프로토콜 (프로필.html · PROFILE_BRAND_URL 와 동기화) ──
 const DEFAULT_PSP_CLINICAL_FRAMEWORK = `
@@ -12513,6 +12517,85 @@ function getAppToastBottomChromeRects_(){
 
 function isEditableTextFieldFocused_(){
   return isEditableTextField_(document.activeElement);
+}
+
+function markPlannerComposeActivity_(){
+  plannerAddFormTypedAt_ = Date.now();
+}
+
+function isImeComposing_(){
+  var el = document.activeElement;
+  if(!el) return false;
+  if(el.isComposing || el._imeComposing) return true;
+  return false;
+}
+
+function isAddFormOpen_(){
+  return !!(state && state.showAdd);
+}
+
+function shouldProtectComposeUi_(){
+  if(isImeComposing_()) return true;
+  if(isEditableTextFieldFocused_()) return true;
+  if(isAddFormOpen_() && plannerAddFormTypedAt_ && (Date.now() - plannerAddFormTypedAt_ < 12000)) return true;
+  return false;
+}
+
+function isBackgroundSyncReason_(reason){
+  return reason === 'focus' || reason === 'visibility' || reason === 'idle' ||
+    reason === 'online' || reason === 'deferred' || reason === 'after-sync';
+}
+
+function flushNewItemFieldsFromDom_(){
+  if(!state || !state.newItem) return;
+  var topic = document.getElementById('new-item-topic-input');
+  if(topic) state.newItem.topic = topic.value;
+  var note = document.getElementById('new-item-ref-note-input');
+  if(note) state.newItem.refNote = note.value;
+  var thought = document.getElementById('new-item-daily-thought');
+  if(thought) state.newItem.dailyThought = thought.value;
+  var who = document.getElementById('new-item-daily-who');
+  if(who) state.newItem.dailyWho = who.value;
+  var what = document.getElementById('new-item-daily-what');
+  if(what) state.newItem.dailyWhat = what.value;
+  var body = document.getElementById('new-item-daily-body');
+  if(body) state.newItem.dailyBody = body.value;
+}
+
+function bindImeGuard_(el){
+  if(!el || el._imeGuardBound) return;
+  el._imeGuardBound = true;
+  el.addEventListener('compositionstart', function(){ el._imeComposing = true; });
+  el.addEventListener('compositionend', function(){
+    el._imeComposing = false;
+    markPlannerComposeActivity_();
+  });
+}
+
+function scheduleDeferredBackgroundSync_(reason){
+  plannerDeferredSyncReason_ = reason || plannerDeferredSyncReason_ || 'deferred';
+  if(plannerDeferredSyncTimer_) clearTimeout(plannerDeferredSyncTimer_);
+  plannerDeferredSyncTimer_ = setTimeout(function(){
+    plannerDeferredSyncTimer_ = null;
+    flushDeferredPlannerUi_(plannerDeferredSyncReason_ || 'deferred');
+  }, 1800);
+}
+
+function flushDeferredPlannerUi_(reason){
+  if(shouldProtectComposeUi_()){
+    scheduleDeferredBackgroundSync_(reason || plannerDeferredSyncReason_ || 'deferred');
+    return;
+  }
+  var needSync = !!plannerDeferredSyncReason_;
+  var syncReason = plannerDeferredSyncReason_ || reason || 'deferred';
+  plannerDeferredSyncReason_ = '';
+  if(needSync){
+    syncAllSourcesIfNewer_(syncReason).catch(function(e){ console.warn('[동기화 deferred]', e); });
+    return;
+  }
+  if(plannerMainRenderDeferred_){
+    try { renderMain({ force: true }); } catch(eR){}
+  }
 }
 
 function updateAppToastLift_(){
@@ -16641,6 +16724,10 @@ window.runManualFullSync_ = async function(opts){
   }
 };
 async function syncAllSourcesIfNewer_(reason){
+  if(isBackgroundSyncReason_(reason) && shouldProtectComposeUi_()){
+    scheduleDeferredBackgroundSync_(reason);
+    return false;
+  }
   return withPlannerSyncMutex_(function(){ return syncAllSourcesIfNewerCore_(reason); });
 }
 async function syncAllSourcesIfNewerCore_(reason){
@@ -16703,8 +16790,13 @@ async function syncAllSourcesIfNewerCore_(reason){
   } catch(e2){}
   save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
   updateApiBadge();
-  renderTabs();
-  renderMain();
+  if(shouldProtectComposeUi_()){
+    plannerMainRenderDeferred_ = true;
+    scheduleDeferredBackgroundSync_('after-sync');
+  } else {
+    renderTabs();
+    renderMain();
+  }
   updateDriveButtonState();
   markSyncReason_(reason || 'auto');
   if(remoteSource === '서버') markGasSyncOk_(state.syncRevision, remote.savedAt || remote.localSavedAt);
@@ -18731,7 +18823,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=170').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=171').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -18875,7 +18967,7 @@ window.onload = () => {
     if(hiddenAt){
       var sec = Math.floor((Date.now() - hiddenAt) / 1000);
       hiddenAt = 0;
-      if(sec >= 10 && typeof setAppToast === 'function'){
+      if(sec >= 10 && typeof setAppToast === 'function' && !state.showAdd && !isEditableTextFieldFocused_()){
         setAppToast('다른 앱/화면으로 전환하면 브라우저가 잠시 멈출 수 있어요.\n탭을 닫지 말고 그대로 두면, 다시 돌아왔을 때 이어서 동작합니다.', { duration: 5200 });
       }
     }
@@ -21006,19 +21098,36 @@ function regenOpsReview_(itemId, branchId){
 }
 window.regenOpsReview_ = regenOpsReview_;
 
-function renderMain() {
+function renderMain(opts) {
+  opts = opts || {};
+  if(!opts.force && isImeComposing_()){
+    plannerMainRenderDeferred_ = true;
+    return;
+  }
+  try { flushNewItemFieldsFromDom_(); } catch(eFlush){}
+  var focusSnap = captureTextFieldFocus_();
+  plannerMainRenderDeferred_ = false;
   syncPendingPlansOnRender_();
   const cat = CATEGORIES[state.currentCat];
   const mc = document.getElementById('main-content');
   updateAddButtonVisibility_();
+  try { document.body.classList.toggle('planner-adding', !!state.showAdd); } catch(eBody){}
 
   if(isOpsManualCategory(state.currentCat)){
     mc.innerHTML = renderOpsManualMainHTML_();
     scheduleOpsReviewTextareaGrow_(mc);
+    if(focusSnap) restoreTextFieldFocus_(focusSnap);
     return;
   }
 
-  if(state.showAdd){ mc.innerHTML = renderAddForm(); bindNewItemTopicInput_(); bindNewItemRefNoteInput_(); bindNewItemFlowInputs_(); return; }
+  if(state.showAdd){
+    mc.innerHTML = renderAddForm();
+    bindNewItemTopicInput_();
+    bindNewItemRefNoteInput_();
+    bindNewItemFlowInputs_();
+    if(focusSnap) restoreTextFieldFocus_(focusSnap);
+    return;
+  }
 
   const visibleDrafts = getVisibleDraftsInMain_(state.currentCat);
   const total = visibleDrafts.length;
@@ -21057,6 +21166,7 @@ function renderMain() {
 
   mc.innerHTML = statsHTML + searchHTML + bodyHTML;
   scheduleWorkshopTextareaGrow_(document.getElementById('main-content'));
+  if(focusSnap) restoreTextFieldFocus_(focusSnap);
   if(isAutoTopicReplenishEnabled_()){
     scheduleMinimumPendingDraftsForCat_(state.currentCat, 'render');
   }
@@ -21159,13 +21269,18 @@ function setSearch(v){
 }
 
 function toggleAdd(){
+  if(state.showAdd) try { flushNewItemFieldsFromDom_(); } catch(eFlush){}
   state.showAdd = !state.showAdd;
   if(state.showAdd){
     state.newItem.catId = state.currentCat;
     state.newItem.topic = state.newItem.topic || '';
   }
   document.getElementById('add-toggle-btn').textContent = state.showAdd ? '닫기' : '추가';
-  renderMain();
+  renderMain({ force: true });
+  if(!state.showAdd){
+    try { document.body.classList.remove('planner-adding'); } catch(eBody){}
+    flushDeferredPlannerUi_('after-add-close');
+  }
 }
 
 function normalizeRefImages_(imagePayload){
@@ -22224,6 +22339,7 @@ window.selectNewItemFlow = function(idx){
 };
 
 window.updateNewItemFlowField = function(idx, field, value){
+  markPlannerComposeActivity_();
   var flows = state.newItem.flowProposals || [];
   var i = parseInt(idx, 10) || 0;
   if(!flows[i]) return;
@@ -22231,6 +22347,7 @@ window.updateNewItemFlowField = function(idx, field, value){
 };
 
 window.updateNewItemFlowSteps = function(idx, value){
+  markPlannerComposeActivity_();
   var flows = state.newItem.flowProposals || [];
   var i = parseInt(idx, 10) || 0;
   if(!flows[i]) return;
@@ -22409,30 +22526,22 @@ window.onNewItemImage = async function(input){
 var newItemFlowInvalidateTimer_ = null;
 function invalidateNewItemFlowsFromInput_(){
   if(!(state.newItem.flowProposalsReady || (state.newItem.flowProposals || []).length)) return;
+  if(isImeComposing_()) return;
   clearTimeout(newItemFlowInvalidateTimer_);
   newItemFlowInvalidateTimer_ = setTimeout(function(){
     newItemFlowInvalidateTimer_ = null;
-    var activeId = null;
-    var sel = null;
-    var ae = document.activeElement;
-    if(ae && (ae.id === 'new-item-topic-input' || ae.id === 'new-item-ref-note-input' || ae.id === 'new-item-daily-thought')){
-      activeId = ae.id;
-      try { sel = ae.selectionStart; } catch(e0){}
+    if(isImeComposing_()){
+      invalidateNewItemFlowsFromInput_();
+      return;
     }
+    var snap = captureTextFieldFocus_();
     resetNewItemFlowProposals_();
-    renderMain();
-    if(activeId){
-      var el = document.getElementById(activeId);
-      if(el){
-        try {
-          el.focus();
-          if(sel != null) el.setSelectionRange(sel, sel);
-        } catch(e1){}
-      }
-    }
-  }, 400);
+    renderMain({ force: true });
+    if(snap) restoreTextFieldFocus_(snap);
+  }, 1200);
 }
 window.onNewItemTopicInput_ = function(el){
+  markPlannerComposeActivity_();
   state.newItem.topic = el ? el.value : '';
   maybeAutoPickArticleKind_();
   invalidateNewItemFlowsFromInput_();
@@ -22440,6 +22549,7 @@ window.onNewItemTopicInput_ = function(el){
 window.onNewItemDailyField_ = function(field, el){
   if(!state.newItem) return;
   if(field === 'dailyWho' || field === 'dailyWhat' || field === 'dailyBody' || field === 'dailyThought'){
+    markPlannerComposeActivity_();
     state.newItem[field] = el ? el.value : '';
     invalidateNewItemFlowsFromInput_();
   }
@@ -22466,6 +22576,7 @@ function dailyKindToggleHtml_(isThought, onclickName){
   '</div>';
 }
 window.onNewItemRefNoteInput_ = function(el){
+  markPlannerComposeActivity_();
   state.newItem.refNote = el ? el.value : '';
   maybeAutoPickArticleKind_();
   invalidateNewItemFlowsFromInput_();
@@ -22568,13 +22679,13 @@ function renderAddForm(){
       '<div style="font-size:11px;color:#9CA3AF;margin-top:4px;">뜻을 유지한 채 누구나 겪을 법한 순간에 비춥니다. 어떤 성향이 옳다고 가르지 않습니다.</div></div>')
     : (isDaily
     ? ('<div class="form-field"><label class="form-label">누구와</label>' +
-      '<input type="text" class="form-input" value="' + escapeHtml(state.newItem.dailyWho || '') + '" oninput="onNewItemDailyField_(\'dailyWho\', this)" placeholder="예: 혼자, 가족과, 입주민 분">' +
+      '<input type="text" class="form-input" id="new-item-daily-who" value="' + escapeHtml(state.newItem.dailyWho || '') + '" oninput="onNewItemDailyField_(\'dailyWho\', this)" placeholder="예: 혼자, 가족과, 입주민 분">' +
       '</div>' +
       '<div class="form-field"><label class="form-label">무엇을</label>' +
-      '<textarea class="form-input form-textarea" rows="2" oninput="onNewItemDailyField_(\'dailyWhat\', this)" placeholder="예: 폼롤러로 옆구리 풀었다, 매트에 누워 쉬었다">' + escapeHtml(state.newItem.dailyWhat || '') + '</textarea>' +
+      '<textarea id="new-item-daily-what" class="form-input form-textarea" rows="2" oninput="onNewItemDailyField_(\'dailyWhat\', this)" placeholder="예: 폼롤러로 옆구리 풀었다, 매트에 누워 쉬었다">' + escapeHtml(state.newItem.dailyWhat || '') + '</textarea>' +
       '</div>' +
       '<div class="form-field"><label class="form-label">오늘 몸 느낌</label>' +
-      '<textarea class="form-input form-textarea" rows="2" oninput="onNewItemDailyField_(\'dailyBody\', this)" placeholder="예: 나도 이쪽이 굳더라">' + escapeHtml(state.newItem.dailyBody || '') + '</textarea>' +
+      '<textarea id="new-item-daily-body" class="form-input form-textarea" rows="2" oninput="onNewItemDailyField_(\'dailyBody\', this)" placeholder="예: 나도 이쪽이 굳더라">' + escapeHtml(state.newItem.dailyBody || '') + '</textarea>' +
       '<div style="font-size:11px;color:#9CA3AF;margin-top:4px;">세 칸이 본문 재료입니다. 사진으로 채운 뒤 고칠 수 있어요. 없는 이야기는 만들지 않습니다.</div></div>')
     : ('<div class="form-field"><label class="form-label">' + kwLabel + '</label>' +
       '<textarea id="new-item-topic-input" class="form-input form-textarea" rows="6" oninput="onNewItemTopicInput_(this)" placeholder="' + kwPlaceholder + '">' + escapeHtml(state.newItem.topic) + '</textarea>' +
@@ -22689,11 +22800,13 @@ function scrollTextareaCaretIntoView_(ta){
   }
 }
 function bindNewItemTopicInput_(){
-  ['new-item-topic-input', 'new-item-daily-thought'].forEach(function(id){
+  ['new-item-topic-input', 'new-item-daily-thought', 'new-item-daily-who', 'new-item-daily-what', 'new-item-daily-body'].forEach(function(id){
     var el = document.getElementById(id);
-    if(!el || el._caretScrollBound) return;
+    if(!el) return;
+    bindImeGuard_(el);
+    if(el._caretScrollBound) return;
     el._caretScrollBound = true;
-    if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(el);
+    if(typeof autoGrowTextarea_ === 'function' && el.tagName === 'TEXTAREA') autoGrowTextarea_(el);
     var sync = function(){ scrollTextareaCaretIntoView_(el); };
     ['keyup','select','input'].forEach(function(ev){
       el.addEventListener(ev, function(){
@@ -22704,7 +22817,9 @@ function bindNewItemTopicInput_(){
 }
 function bindNewItemRefNoteInput_(){
   var el = document.getElementById('new-item-ref-note-input');
-  if(!el || el._caretScrollBound) return;
+  if(!el) return;
+  bindImeGuard_(el);
+  if(el._caretScrollBound) return;
   el._caretScrollBound = true;
   var sync = function(){ scrollTextareaCaretIntoView_(el); };
   ['keyup','select','input'].forEach(function(ev){
@@ -22718,7 +22833,9 @@ function bindNewItemFlowInputs_(){
   flows.forEach(function(flow, i){
     ['title', 'angle', 'steps'].forEach(function(kind){
       var el = document.getElementById('new-item-flow-' + kind + '-' + i);
-      if(!el || el._caretScrollBound) return;
+      if(!el) return;
+      bindImeGuard_(el);
+      if(el._caretScrollBound) return;
       el._caretScrollBound = true;
       if(el.tagName !== 'TEXTAREA') return;
       autoGrowTextarea_(el);
@@ -22732,11 +22849,12 @@ function bindNewItemFlowInputs_(){
   });
 }
 function setNewCat(v){
+  try { flushNewItemFieldsFromDom_(); } catch(eFlush){}
   state.newItem.catId = parseInt(v, 10);
   state.newItem.articleKindLocked = false;
   state.newItem.articleKind = listArticleKindsForCat_(state.newItem.catId)[0] || '';
   resetNewItemFlowProposals_();
-  renderMain();
+  renderMain({ force: true });
 }
 
 window.runNewItemFlowAction = async function(){

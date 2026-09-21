@@ -28834,30 +28834,30 @@ function sheetEditField_(label, id, value, opts){
 }
 
 /**
- * 긴 산문 가독성: 문단(문장) 사이에 빈 줄 + 문단 첫 줄 한 칸 들여쓰기.
+ * 긴 산문 가독성: 문단(문장) 사이에 빈 줄. 들여쓰기는 하지 않음.
  * 이미 문단 구분·목록·셀프케어(👉)가 있으면 문단 구분만 정리.
  */
 function ensureProseParagraphBreaks_(text){
   var t = String(text || '').replace(/\r\n/g, '\n').trim();
   if(!t) return '';
-  if(/(^|\n)\s*👉/.test(t)) return indentProseParagraphStarts_(t.replace(/\n{3,}/g, '\n\n'));
-  if(/(^|\n)\s*(?:[-•*]|\d+[.)])\s/.test(t)) return indentProseParagraphStarts_(t.replace(/\n{3,}/g, '\n\n'));
-  if(/\n[ \t]*\n/.test(t)) return indentProseParagraphStarts_(t.replace(/\n{3,}/g, '\n\n'));
+  if(/(^|\n)\s*👉/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
+  if(/(^|\n)\s*(?:[-•*]|\d+[.)])\s/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
+  if(/\n[ \t]*\n/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
   if(t.indexOf('\n') !== -1){
     var lines = t.split(/\n+/).map(function(l){ return l.trim(); }).filter(Boolean);
     if(lines.length >= 2){
       var avg = lines.reduce(function(s, l){ return s + l.length; }, 0) / lines.length;
-      if(avg >= 24) return indentProseParagraphStarts_(lines.join('\n\n'));
+      if(avg >= 24) return stripProseParagraphIndents_(lines.join('\n\n'));
     }
-    return indentProseParagraphStarts_(t);
+    return stripProseParagraphIndents_(t);
   }
-  if(t.length < 72) return indentProseParagraphStarts_(t);
+  if(t.length < 72) return stripProseParagraphIndents_(t);
   var sentences = splitProseSentences_(t);
-  if(sentences.length < 2) return indentProseParagraphStarts_(t);
-  return indentProseParagraphStarts_(sentences.join('\n\n'));
+  if(sentences.length < 2) return stripProseParagraphIndents_(t);
+  return stripProseParagraphIndents_(sentences.join('\n\n'));
 }
-/** 문단 시작 첫 글자 앞에 한 칸(공백) — 목록·셀프케어·해시태그는 제외 */
-function indentProseParagraphStarts_(text){
+/** 문단 시작 들여쓰기(앞 공백) 제거 — 목록·셀프케어·해시태그는 그대로 */
+function stripProseParagraphIndents_(text){
   var t = String(text || '').replace(/\r\n/g, '\n');
   if(!t.trim()) return '';
   return t.split(/\n\s*\n/).map(function(para){
@@ -28871,8 +28871,7 @@ function indentProseParagraphStarts_(text){
     }
     if(/^(?:[-•*]|\d+[.)])\s/.test(trimmed)) return para;
     if(/^#/.test(trimmed)) return para;
-    if(/^[ \t\u00A0\u3000]/.test(first)) return para;
-    lines[0] = ' ' + trimmed;
+    lines[0] = trimmed;
     return lines.join('\n');
   }).join('\n\n');
 }
@@ -29181,7 +29180,7 @@ function proseHtmlBlock_(text){
   return String(t).split(/\n\s*\n/).map(function(p){
     var body = String(p || '').replace(/^[ \t\u00A0\u3000]+/, '');
     if(!body.trim()) return '';
-    return '<p style="margin:0 0 12px;line-height:1.7;font-size:14px;color:#1F2937;word-break:keep-all;text-indent:1em;">' +
+    return '<p style="margin:0 0 12px;line-height:1.7;font-size:14px;color:#1F2937;word-break:keep-all;">' +
       escapeHtml(body).replace(/\n/g, '<br/>') + '</p>';
   }).filter(Boolean).join('');
 }

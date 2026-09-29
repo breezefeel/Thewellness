@@ -4492,7 +4492,7 @@ function renderPlannerSetupGuideHTML_(){
         (subDone ? '<span class="planner-setup-check">✓</span>' : '<button type="button" class="setup-step-btn" onclick="runProgramSetupWithAI_()">AI 기획</button>') +
       '</li>' +
       '<li class="planner-setup-step setup-tone-topic' + (topicsDone ? ' done' : ' pending') + '">' +
-        '<span class="planner-setup-step-label">③ 주제 · 단계별 5개</span>' +
+        '<span class="planner-setup-step-label">③ 주제 · 이번 분기 결론의 장면</span>' +
         (topicsDone ? '<span class="planner-setup-check">✓</span>' : (subDone ? '<button type="button" class="setup-step-btn" onclick="openTopicPlanningForActiveStep_()">기획</button>' : '<span class="planner-setup-hint">② 이후</span>')) +
       '</li>' +
     '</ol>' +
@@ -5648,15 +5648,14 @@ function getFirstUnpublishedDraftInStep_(drafts){
 }
 function renderSubGoalStepCardsHTML_(catId, drafts, collapsed){
   var cat = CATEGORIES[catId];
-  if(collapsed) return '';
-  var html = '<div class="subgoal-step-cards">';
-  if(drafts.length){
-    drafts.forEach(function(d){
-      html += draftCardHTML(d, cat, false, cat.drafts.indexOf(d), true);
-    });
-  } else {
-    html += '<div class="subgoal-step-topics empty">상단 <strong>주제 기획안 · 함께 검토</strong>에서 5개 주제를 채워 주세요.</div>';
-  }
+  if(collapsed && getTopicListMode_() !== 'published') return '';
+  var shown = filterDraftsByTopicListMode_(drafts, catId);
+  if(getTopicListMode_() === 'published' && !shown.length) return '';
+  if(!shown.length) return '';
+  var html = '<div class="subgoal-step-cards topic-lines">';
+  shown.forEach(function(d){
+    html += draftCardHTML(d, cat, false, cat.drafts.indexOf(d), true);
+  });
   html += '</div>';
   return html;
 }
@@ -7039,7 +7038,7 @@ function renderProgramWorkshopBodyHTML_(){
     return '<div class="ws-year-cta ' + getPlanTierClass_('program') + '" data-plan-tier="2">' +
       '<p class="ws-intro">분기별 <strong>마스터 목표</strong>를 이 프로그램의 <strong>3개월 여정</strong>으로 풀어 보세요.</p>' +
       (outcomeHint ? '<p class="ws-intro-ref ws-program-outcome">3개월 후 독자: ' + escapeHtml(outcomeHint) + '</p>' : '') +
-      '<p class="ws-intro-ref">주제 5개는 각 하위 목표마다 따로 기획합니다.</p>' +
+      '<p class="ws-intro-ref">주제는 각 단계에서 고르는 장면입니다. 칸을 다 채우지 않아도 됩니다.</p>' +
     '</div>';
   }
   var brandProfile = (p.plan && p.plan.brandProfile) ? String(p.plan.brandProfile).trim() : '';
@@ -7668,7 +7667,7 @@ function afterSubGoalPlanCommitted_(catId){
     if(!firstNeed) return;
     var targetId = String(firstNeed.id);
     if(targetId && state.apiKey){
-      if(confirm('아직 비어 있는 단계의 주제 5개를 기획할까요?')){
+      if(confirm('아직 비어 있는 단계의 주제를 기획할까요?')){
         openPlanWorkshop_('topic', targetId);
       }
     }
@@ -8078,6 +8077,118 @@ window.runProgramSetupWithAI_ = async function(){
     stopPlanGenTimer_('program');
   }
 };
+function planLayerParagraphsHTML_(text){
+  var parts = String(text || '').split(/\n+/).map(function(line){ return line.trim(); }).filter(Boolean);
+  if(!parts.length) return '';
+  return parts.map(function(line){ return '<p>' + escapeHtml(line) + '</p>'; }).join('');
+}
+function planLayerCardHTML_(num, title, bodyHtml, onclickJs, tone){
+  var btn = onclickJs
+    ? '<button type="button" class="plan-layer-edit" onclick="' + onclickJs + '">기획 하기</button>'
+    : '';
+  return '<section class="plan-layer-block tone-' + tone + '">' +
+    '<div class="plan-layer-head">' +
+      '<span class="plan-layer-kicker">' + num + ' · ' + escapeHtml(title) + '</span>' +
+      btn +
+    '</div>' +
+    '<div class="plan-layer-text">' + bodyHtml + '</div>' +
+  '</section>';
+}
+function renderPlanLayerYearHTML_(){
+  var meta = getYearPlanMeta_();
+  var text = String(meta.intent || '').trim();
+  var body = text ? planLayerParagraphsHTML_(text) : '<p class="plan-layer-empty">1년 목표와 의도를 아직 적지 않았습니다.</p>';
+  return planLayerCardHTML_('1', '1년 목표와 의도', body, 'openYearPlanWorkshop_()', 'year');
+}
+function renderPlanLayerQuarterHTML_(){
+  var plan = getYearPlan_();
+  var items = (plan.periods || []).map(function(p, i){
+    var range = formatPeriodRangeLabel_(p.start, p.end) || ((i + 1) + '분기');
+    var goal = String(p.topic || p.goal || '').trim();
+    var why = String(p.rationale || '').trim();
+    var html = '<div class="plan-layer-item ' + getQuarterToneClass_(i) + (i === 0 ? ' is-current' : '') + '">' +
+      '<div class="plan-layer-item-title">' + escapeHtml((i === 0 ? '이번 분기 · ' : '') + range) + '</div>';
+    if(goal) html += '<div class="plan-layer-item-goal">' + escapeHtml(goal) + '</div>';
+    if(why) html += '<div class="plan-layer-item-intent">' + planLayerParagraphsHTML_(why) + '</div>';
+    if(!goal && !why) html += '<div class="plan-layer-item-goal plan-layer-empty">목표 없음</div>';
+    html += '</div>';
+    return html;
+  }).join('');
+  if(!items) items = '<p class="plan-layer-empty">분기 목표가 아직 없습니다.</p>';
+  return planLayerCardHTML_('2', '분기별 목표와 의도', items, 'openYearPlanWorkshop_()', 'quarter');
+}
+function periodHasQuarterGoal_(p){
+  return !!(p && String(p.topic || p.goal || '').trim());
+}
+function plannedQuarterGroupCount_(){
+  var periods = (getYearPlan_().periods) || [];
+  var n = 0;
+  for(var i = 0; i < periods.length; i++){
+    if(!periodHasQuarterGoal_(periods[i])) break;
+    n++;
+  }
+  return n;
+}
+function monthStepGroups_(steps, opts){
+  opts = opts || {};
+  steps = steps || [];
+  var planned = plannedQuarterGroupCount_();
+  var groupTotal = Math.ceil(steps.length / 3);
+  if(opts.limitToPlanned && planned > 0) groupTotal = Math.min(groupTotal, planned);
+  var groups = [];
+  for(var g = 0; g < groupTotal; g++){
+    var slice = steps.slice(g * 3, g * 3 + 3);
+    if(!slice.length) continue;
+    groups.push({ index: g, steps: slice });
+  }
+  return groups;
+}
+function renderPlanLayerMonthHTML_(catId){
+  if(isDailyShareCategory(catId)){
+    var dp = getDailySharePlan_();
+    var bits = [];
+    if(dp && String(dp.intent || '').trim()){
+      bits.push('<div class="plan-layer-item"><div class="plan-layer-item-intent">' + planLayerParagraphsHTML_(dp.intent) + '</div></div>');
+    }
+    ((dp && dp.themes) || []).forEach(function(t, i){
+      if(!t) return;
+      var label = String(t.label || '').trim();
+      var note = String(t.note || '').trim();
+      if(!label && !note) return;
+      bits.push('<div class="plan-layer-item ' + getStepToneClass_(i) + '">' +
+        (label ? '<div class="plan-layer-item-title">' + escapeHtml(label) + '</div>' : '') +
+        (note ? '<div class="plan-layer-item-intent">' + planLayerParagraphsHTML_(note) + '</div>' : '') +
+      '</div>');
+    });
+    return planLayerCardHTML_('3', '매월 목표와 의도', bits.join('') || '<p class="plan-layer-empty">아직 없습니다.</p>', '', 'month');
+  }
+  var meta = getProgramPlanMeta_(catId);
+  var groups = monthStepGroups_(meta.steps || [], { limitToPlanned: true });
+  var parts = [];
+  groups.forEach(function(group, gi){
+    if(gi) parts.push('<div class="plan-layer-quarter-gap"></div>');
+    group.steps.forEach(function(s, j){
+      var i = group.index * 3 + j;
+      var why = String(s.rationale || s.summary || '').trim();
+      parts.push('<div class="plan-layer-item ' + getStepToneClass_(i) + '">' +
+        '<div class="plan-layer-item-title">' + escapeHtml((i + 1) + '. ' + (s.title || '단계')) + '</div>' +
+        (why ? '<div class="plan-layer-item-intent">' + planLayerParagraphsHTML_(why) + '</div>' : '') +
+      '</div>');
+    });
+  });
+  var items = parts.join('');
+  if(!items) items = '<p class="plan-layer-empty">이 프로그램의 월별 단계가 아직 없습니다.</p>';
+  return planLayerCardHTML_('3', '매월 목표와 의도', items, 'openProgramPlanWorkshop_()', 'month');
+}
+function renderPlanLayersHTML_(catId){
+  return '<section class="plan-layers">' +
+    '<div class="plan-layers-body">' +
+      renderPlanLayerYearHTML_() +
+      renderPlanLayerQuarterHTML_() +
+      renderPlanLayerMonthHTML_(catId) +
+    '</div>' +
+  '</section>';
+}
 function renderMainGoalCollapsedPreviewHTML_(plan, ymeta, current, rangeLabel){
   var yearGoal = (ymeta.intent || plan.intent || '').trim() || MASTER_BRAND_NORTH_STAR;
   var quarterGoal = String(current.topic || current.goal || '').trim() || '분기 목표 미설정';
@@ -8094,72 +8205,36 @@ function renderMainGoalCollapsedPreviewHTML_(plan, ymeta, current, rangeLabel){
 }
 function renderMainGoalPanelHTML_(){
   var plan = getYearPlan_();
-  var collapsed = state.mainGoalCollapsed !== false;
   var current = plan.periods[0] || {};
-  var goalText = current.goal || getBranding_().message || '분기별 목표를 설정해 주세요.';
   var rangeLabel = formatPeriodRangeLabel_(current.start, current.end) || getBranding_().quarterLabel;
-  var ymeta = getYearPlanMeta_();
-  var html = renderYearWorkshopStripHTML_() +
-    '<div class="planner-layer main-goal-layer ' + getPlanTierClass_('year') + (collapsed ? ' collapsed' : '') + '" data-plan-tier="1">' +
-    '<div class="planner-layer-head planner-layer-head-toggle" onclick="toggleMainGoalPanel_()" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleMainGoalPanel_();}" role="button" tabindex="0" aria-expanded="' + (!collapsed) + '">' +
-      '<div class="planner-layer-kicker">분기별 목표 · ' + escapeHtml(rangeLabel) + '</div>' +
-      '<div class="planner-layer-actions">' +
-        '<button type="button" class="layer-btn subtle" onclick="event.stopPropagation();toggleMainGoalPanel_()" aria-expanded="' + (!collapsed) + '">' + (collapsed ? '펼치기' : '접기') + '</button>' +
-      '</div>' +
-    '</div>';
-  if(collapsed){
-    html += renderMainGoalCollapsedPreviewHTML_(plan, ymeta, current, rangeLabel);
-  } else {
-    html += '<div class="main-goal-north-star">' + escapeHtml(MASTER_BRAND_NORTH_STAR) + '</div>';
-    if(ymeta.intent){
-      html += '<div class="main-goal-intent"><span class="main-goal-intent-label">1년 브랜드 목표</span>' + escapeHtml(ymeta.intent) + '</div>';
-    }
-    if(ymeta.currentRationale){
-      html += '<div class="main-goal-intent period"><span class="main-goal-intent-label">현재 분기 의도</span>' + escapeHtml(ymeta.currentRationale) + '</div>';
-    }
-    html += '<div class="year-period-timeline">';
-    plan.periods.forEach(function(p, idx){
-      var lbl = formatPeriodRangeLabel_(p.start, p.end);
-      html += '<div class="year-period-row ' + getQuarterToneClass_(idx) + (idx === 0 ? ' current' : '') + '">' +
-        '<span class="year-period-label">' + escapeHtml(lbl) + (idx === 0 ? ' · 지금' : '') + '</span>' +
-        '<span class="year-period-goal">' + escapeHtml(p.goal || p.topic || '(목표 미설정)') + '</span>' +
-      '</div>';
-    });
-    html += '</div>';
-  }
-  html += '</div>';
-  return html;
+  var text = String(current.topic || current.goal || '').trim() || '이번 분기 결론을 한 줄로 적어 주세요.';
+  return renderYearWorkshopStripHTML_() +
+    '<button type="button" class="quarter-conclusion ' + getQuarterToneClass_(0) + '" onclick="openYearPlanWorkshop_()">' +
+      '<span class="quarter-conclusion-label">이번 분기 · ' + escapeHtml(rangeLabel) + '</span>' +
+      '<span class="quarter-conclusion-text">' + escapeHtml(text) + '</span>' +
+      '<span class="quarter-conclusion-cta">자세히</span>' +
+    '</button>';
 }
 window.toggleMainGoalPanel_ = function(){
   state.mainGoalCollapsed = state.mainGoalCollapsed === false;
   renderMain();
 };
 function renderSubGoalStepBlockHTML_(catId, step, idx, activeId){
-  var cat = CATEGORIES[catId];
   var sid = String(step.id);
-  var collapsed = isSubGoalStepCollapsed_(catId, sid);
   var isActive = sid === String(activeId);
   var drafts = getDraftsForSubGoalStep_(catId, sid);
-  var pub = drafts.filter(function(d){ return draftIsPublished_(d.id); }).length;
-  var html = '<div class="subgoal-step-block ' + getPlanTierClass_('topic-plan') + (isActive ? ' active' : '') + (collapsed ? ' collapsed' : '') + '" data-plan-tier="3">' +
-    renderTopicWorkshopStripHTML_(catId, step, idx) +
+  var shown = filterDraftsByTopicListMode_(drafts, catId);
+  if(getTopicListMode_() === 'published' && !shown.length) return '';
+  var html = '<div class="subgoal-step-block ' + getPlanTierClass_('topic-plan') + (isActive ? ' active' : '') + '" data-plan-tier="3">' +
     '<div class="subgoal-step-block-head">' +
       '<div class="subgoal-step-head-static">' +
         '<span class="subgoal-step-num">' + (idx + 1) + '</span>' +
         '<span class="subgoal-step-main">' +
-          '<span class="subgoal-step-title">' + escapeHtml(step.title) + '</span>' +
-          (step.summary ? '<span class="subgoal-step-summary">' + escapeHtml(step.summary) + '</span>' : '') +
+          '<span class="subgoal-step-title">' + escapeHtml(step.title || '') + '</span>' +
         '</span>' +
-        '<span class="subgoal-step-stats">발행 ' + pub + '/' + Math.max(drafts.length, stepTopicSlotTotalForCount_(drafts.length)) + '</span>' +
-      '</div>' +
-      '<div class="subgoal-step-actions">' +
-        '<button type="button" class="layer-btn subtle"' + plannerStepActionAttrs_('toggleSubGoalStep_', subGoalStepKey_(catId, sid)) + ' aria-expanded="' + (!collapsed) + '">' + (collapsed ? '펼치기' : '접기') + '</button>' +
       '</div>' +
     '</div>';
-  if(!collapsed && step.rationale){
-    html += '<div class="main-goal-intent step"><span class="main-goal-intent-label">이 단계 의도</span>' + escapeHtml(step.rationale) + '</div>';
-  }
-  html += renderSubGoalStepCardsHTML_(catId, drafts, collapsed);
+  html += renderSubGoalStepCardsHTML_(catId, drafts, false);
   html += '</div>';
   return html;
 }
@@ -8206,35 +8281,36 @@ function renderDailySharePanelHTML_(catId){
   var cat = CATEGORIES[catId];
   if(!cat) return '';
   var drafts = getVisibleDraftsInMain_(catId);
-  var pubCount = drafts.filter(function(d){ return draftIsPublished_(d.id); }).length;
   var curMonth = getCurrentShareMonthKey_();
   var monthGroups = groupDailyShareDraftsByMonth_(drafts);
   if(!monthGroups.some(function(g){ return g.monthKey === curMonth; })){
     monthGroups.unshift({ monthKey: curMonth, label: formatShareMonthLabel_(curMonth), drafts: [] });
   }
-  var html = '<div class="daily-draft-section">' +
-    '<div class="daily-draft-head">' +
-      '<span class="daily-draft-title">일상 글 주제 · 달별</span>' +
-      '<span class="daily-draft-stats">발행 ' + pubCount + '/' + drafts.length + '</span>' +
-    '</div>';
+  var html = '<div class="daily-draft-section">';
+  var dailyShownAny = false;
   monthGroups.forEach(function(g){
-    var monthCollapsed = isDailyMonthCollapsed_(g.monthKey);
-    var mPub = g.drafts.filter(function(d){ return draftIsPublished_(d.id); }).length;
+    var shown = filterDraftsByTopicListMode_(g.drafts, catId);
     var isCurrent = g.monthKey === curMonth;
+    var writeMode = getTopicListMode_() !== 'published';
+    if(!shown.length && !(writeMode && isCurrent)) return;
+    dailyShownAny = true;
+    var monthCollapsed = writeMode && isDailyMonthCollapsed_(g.monthKey);
     html += '<div class="daily-month-group' + (monthCollapsed ? ' collapsed' : '') + (isCurrent ? ' is-current' : '') + '" data-month="' + escapeHtml(g.monthKey) + '">' +
       '<div class="daily-month-head-row">' +
         '<button type="button" class="daily-month-head" onclick="toggleDailyMonthGroup_(\'' + escapeHtml(g.monthKey) + '\')" aria-expanded="' + (!monthCollapsed) + '">' +
           '<span class="daily-month-label">' + escapeHtml(g.label) + (isCurrent ? ' · 이번 달' : '') + '</span>' +
-          '<span class="daily-month-stats">발행 ' + mPub + '/' + g.drafts.length + '</span>' +
+          '<span class="daily-month-stats">' + (writeMode ? ('준비 ' + shown.length) : ('올린 ' + shown.length)) + '</span>' +
           '<span class="daily-month-chevron">' + (monthCollapsed ? '▸' : '▾') + '</span>' +
         '</button>' +
       '</div>';
     if(!monthCollapsed){
       html += '<div class="subgoal-step-cards daily-draft-cards">';
-      if(g.drafts.length){
-        g.drafts.forEach(function(d){
+      if(shown.length){
+        shown.forEach(function(d){
           html += draftCardHTML(d, cat, false, cat.drafts.indexOf(d), false);
         });
+      } else if(g.drafts.some(function(d){ return draftShowsOnPublishedList_(d.id, catId); })){
+        html += '<div class="subgoal-step-topics empty">이 달의 글은 올린 글에 있습니다.</div>';
       } else {
         html += '<div class="subgoal-step-topics empty">아직 주제가 없어요. 위쪽 <strong>추가</strong>에서 사진·장면 또는 <strong>생각 한 줄</strong>을 적어 보세요.</div>';
       }
@@ -8242,6 +8318,9 @@ function renderDailySharePanelHTML_(catId){
     }
     html += '</div>';
   });
+  if(!dailyShownAny && getTopicListMode_() === 'published'){
+    html += '<div class="topic-list-mode-empty">아직 한 곳이라도 올린 글이 없습니다.</div>';
+  }
   html += '</div>';
   return html;
 }
@@ -8274,25 +8353,13 @@ function renderProgramRoadmapHTML_(catId){
   var plan = getEffectiveSubGoalPlan_(catId);
   var pendingPreview = usePendingProgramPreview_(catId);
   var activeId = plan ? getActiveSubGoalStepId_(catId) : null;
-  var strip = renderPlanWorkshopStripHTML_(catId);
   var isGenerating = state.subGoalPlanGenerating && sameCatId_(state.subGoalPlanGenerating.catId, catId);
-  var html = strip + '<div class="planner-layer program-layer ' + getPlanTierClass_('program') + (isGenerating ? ' is-generating' : '') + (pendingPreview ? ' pending-preview' : '') + '" data-plan-tier="2">' +
-    '<div class="planner-layer-head">' +
-      '<div class="planner-layer-kicker">' + escapeHtml(cat.name) + ' · ' + escapeHtml(cat.audience) + '</div>' +
-    '</div>';
+  var html = '<div class="planner-layer program-layer program-layer-plain ' + getPlanTierClass_('program') + (isGenerating ? ' is-generating' : '') + (pendingPreview ? ' pending-preview' : '') + '" data-plan-tier="2">';
   if(pendingPreview){
     html += '<div class="program-pending-banner">' +
       '<span class="program-pending-banner-label">적용 대기 중</span>' +
       '세부 목표 기획안 미리보기 — 워크숍에서 <strong>적용하기</strong>를 누르면 반영됩니다.' +
       '<button type="button" class="program-pending-banner-btn" onclick="openProgramPlanWorkshop_()">기획안 열기</button>' +
-    '</div>';
-  }
-  var emptyTopicCount = countTopicsWithoutDraft_(catId);
-  if(emptyTopicCount > 0){
-    html += '<div class="program-pending-banner program-prune-banner">' +
-      '<span class="program-pending-banner-label">주제 정리</span>' +
-      '초안·발행 본문이 없는 주제 카드가 <strong>' + emptyTopicCount + '개</strong> 있어요. 목록만 늘고 있으면 지우는 편이 좋아요.' +
-      '<button type="button" class="program-pending-banner-btn" onclick="pruneTopicsWithoutDraft_(' + catId + ')">초안 없는 주제 삭제</button>' +
     '</div>';
   }
   if(plan && plan.steps && plan.steps.length > 5){
@@ -8302,29 +8369,19 @@ function renderProgramRoadmapHTML_(catId){
       '<button type="button" class="program-pending-banner-btn" onclick="forceDedupeSubGoalSteps_(' + catId + ')">중복 단계 정리</button>' +
     '</div>';
   }
-  if(plan && plan.steps.length && plan.intent){
-    html += '<div class="main-goal-intent program" id="program-intent-block"><span class="main-goal-intent-label">프로그램 기획 의도</span>' + escapeHtml(plan.intent) + '</div>';
-  }
-  if(plan && plan.steps && plan.steps.length > 0 && plan.steps.length < 3){
-    html += '<div class="program-pending-banner" style="border-color:#F59E0B;background:#FFFBEB;color:#92400E;">' +
-      '<span class="program-pending-banner-label">단계 부족</span>' +
-      '3개월 여정은 보통 <strong>3~5단계</strong>인데 지금은 <strong>' + plan.steps.length + '단계</strong>만 있어요. 세부 목표에서 「단계 재생성」 후 적용해 주세요.' +
-      '<button type="button" class="program-pending-banner-btn" onclick="openProgramPlanWorkshop_()">기획안 열기</button>' +
-    '</div>';
-  }
   if(!plan || !plan.steps.length){
-    var legacyCards = (cat.drafts || []).map(function(d){
+    var legacyCards = filterDraftsByTopicListMode_(cat.drafts || [], catId).map(function(d){
       return draftCardHTML(d, cat, false, cat.drafts.indexOf(d), false);
     }).join('');
     var draftCount = (cat.drafts || []).filter(function(d){ return d && d.id; }).length;
     html += '<div class="program-setup-card' + (isGenerating ? ' is-generating' : '') + '">' +
       '<div class="program-setup-title">이 프로그램 기획</div>' +
-      '<p class="program-setup-desc">분기별 목표를 달성하기 위한 <strong>3개월 단계별 하위 목표</strong> 3~5개를 정리해요. 주제 5개는 각 하위 목표에서 따로 기획합니다.</p>';
+      '<p class="program-setup-desc">분기 결론을 이 카테고리의 <strong>단계</strong>로 나눕니다. 주제는 그 단계에서 고르는 장면이고, 칸이 비어 있어도 됩니다.</p>';
     if(isGenerating){
       var waitLeft = getCountdownSec_(state.subGoalPlanGenerating.startedAt, state.subGoalPlanGenerating.estimateSec);
       html += '<p class="program-setup-wait" id="program-setup-wait">기획 중 · ' + escapeHtml(formatCountdownShort_(waitLeft)) + ' · 상단 배너를 눌러 열 수 있어요</p>';
     } else {
-      html += '<p class="program-setup-desc">상단 <strong>세부 목표 기획안 · 함께 검토</strong>에서 시작해 주세요.</p>';
+      html += '<p class="program-setup-desc">위의 <strong>1년 기획안</strong>에서 매월 목표를 열어 시작해 주세요.</p>';
     }
     if(draftCount){
       html += '<button type="button" class="program-legacy-toggle" onclick="toggleLegacyDrafts_()">' +
@@ -8338,32 +8395,30 @@ function renderProgramRoadmapHTML_(catId){
     html += '</div>';
     return html;
   }
-  plan.steps.forEach(function(step, idx){
-    html += renderSubGoalStepBlockHTML_(catId, step, idx, activeId);
+  var stepGroups = monthStepGroups_(plan.steps);
+  stepGroups.forEach(function(group, gi){
+    if(gi) html += '<div class="subgoal-quarter-gap"></div>';
+    group.steps.forEach(function(step, j){
+      html += renderSubGoalStepBlockHTML_(catId, step, group.index * 3 + j, activeId);
+    });
   });
   var misc = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID);
-  if(misc.length){
-    var miscCollapsed = isSubGoalStepCollapsed_(catId, SUBGOAL_MISC_ID);
-    var miscFiltered = filterMiscDraftsByStatus_(misc, catId);
-    var miscShown = miscFiltered.length;
-    html += '<div class="subgoal-step-block misc step-tone-misc' + (miscCollapsed ? ' collapsed' : '') + '">' +
-      '<button type="button" class="subgoal-step-head"' + plannerStepActionAttrs_('toggleSubGoalStep_', subGoalStepKey_(catId, SUBGOAL_MISC_ID)) + '>' +
-        '<span class="subgoal-step-num">·</span>' +
-        '<span class="subgoal-step-main"><span class="subgoal-step-title">' + escapeHtml(getSubGoalMiscLabel_(plan)) + '</span></span>' +
-        '<span class="subgoal-step-stats">' + (miscShown === misc.length ? misc.length + '건' : miscShown + '/' + misc.length + '건') + '</span>' +
-        '<span class="subgoal-step-chevron">' + (miscCollapsed ? '▸' : '▾') + '</span>' +
-      '</button>';
-    if(!miscCollapsed){
-      html += renderMiscTopicFilterBarHTML_(catId, misc);
-      if(miscFiltered.length){
-        html += '<div class="subgoal-step-cards">' + miscFiltered.map(function(d){
-          return draftCardHTML(d, cat, false, cat.drafts.indexOf(d), true);
-        }).join('') + '</div>';
-      } else {
-        html += '<div class="subgoal-step-topics empty">선택한 상태 필터에 맞는 주제가 없어요. 필터를 바꿔 보세요.</div>';
-      }
-    }
-    html += '</div>';
+  var miscShown = filterDraftsByTopicListMode_(misc, catId);
+  if(miscShown.length){
+    html += '<div class="subgoal-step-block misc step-tone-misc">' +
+      '<div class="subgoal-step-block-head">' +
+        '<div class="subgoal-step-head-static">' +
+          '<span class="subgoal-step-num">·</span>' +
+          '<span class="subgoal-step-main"><span class="subgoal-step-title">' + escapeHtml(getSubGoalMiscLabel_(plan)) + '</span></span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="subgoal-step-cards topic-lines">' + miscShown.map(function(d){
+        return draftCardHTML(d, cat, false, cat.drafts.indexOf(d), true);
+      }).join('') + '</div>' +
+    '</div>';
+  }
+  if(getTopicListMode_() === 'published' && !filterDraftsByTopicListMode_(getVisibleDraftsInMain_(catId), catId).length){
+    html += '<div class="topic-list-mode-empty">아직 한 곳이라도 올린 글이 없습니다.</div>';
   }
   html += '</div>';
   return html;
@@ -9792,6 +9847,7 @@ let state = {
   yearPlanGenerating: null,
   subGoalPlanGenerating: null,
   mainGoalCollapsed: true,
+  topicListMode: 'write',
   dailyShareCollapsed: false,
   dailyMonthCollapsed: {},
   dailyTopicSuggestions: null,
@@ -19366,6 +19422,84 @@ function draftHasAnyPublish_(draftId){
   return false;
 }
 
+/** 한 채널이라도 발행 기록이 있으면 올린 글 목록. 단계 소속은 바꾸지 않는다. */
+function draftShowsOnPublishedList_(draftId, catId){
+  if(!draftId) return false;
+  if(getDraftPublishedChannelKeys_(draftId, catId).length) return true;
+  var pub = state.published && state.published[draftId];
+  return !!(pub && pub.date);
+}
+/** 주제 추가·일상·참고 메모가 있는 글. 초안이 없어도 쓸 글에 둔다. */
+function draftWasIntentionallyAdded_(d){
+  if(!d) return false;
+  if(String(d.articleKind || '').trim()) return true;
+  if(String(d.sourceNote || '').trim()) return true;
+  if(d.articleFlow && (d.articleFlow.title || (d.articleFlow.steps && d.articleFlow.steps.length))) return true;
+  if(String(d.dailyThought || d.dailyWho || d.dailyWhat || d.dailyBody || '').trim()) return true;
+  if(String(d.youtubeAnalysis || '').trim()) return true;
+  if(d.refImages && d.refImages.length) return true;
+  if(d.refImage && d.refImage.data) return true;
+  return false;
+}
+/** 기획으로 깔린 빈 칸. 초안·발행·직접 추가가 없으면 쓸 글 목록에서 뺀다. */
+function draftIsShelfEmpty_(d, catId){
+  if(!d || !d.id) return false;
+  if(draftWasIntentionallyAdded_(d)) return false;
+  if(catId == null) catId = getCatIdFromDraftId_(d.id);
+  if(draftShowsOnPublishedList_(d.id, catId)) return false;
+  if(draftHasContent(d) || draftIsPendingPublish_(d)) return false;
+  return true;
+}
+function getTopicListMode_(){
+  if(state.topicListMode === 'published') return 'published';
+  if(state.topicListMode === 'plan') return 'plan';
+  return 'write';
+}
+function draftMatchesTopicListMode_(d, catId){
+  if(!d || !d.id) return false;
+  if(getTopicListMode_() === 'plan') return false;
+  var onPub = draftShowsOnPublishedList_(d.id, catId);
+  if(getTopicListMode_() === 'published') return onPub;
+  if(onPub) return false;
+  return !draftIsShelfEmpty_(d, catId);
+}
+function filterDraftsByTopicListMode_(drafts, catId){
+  return (drafts || []).filter(function(d){ return draftMatchesTopicListMode_(d, catId); });
+}
+function renderTopicListModeBarHTML_(catId){
+  var drafts = getVisibleDraftsInMain_(catId);
+  var pubN = 0;
+  var writeN = 0;
+  drafts.forEach(function(d){
+    if(draftShowsOnPublishedList_(d.id, catId)) pubN++;
+    else if(!draftIsShelfEmpty_(d, catId)) writeN++;
+  });
+  var mode = getTopicListMode_();
+  return '<div class="topic-list-mode" role="tablist" aria-label="주제 목록">' +
+    '<button type="button" class="topic-list-mode-btn' + (mode === 'write' ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 'write' ? 'true' : 'false') + '" onclick="setTopicListMode_(\'write\')">준비 글 <span>' + writeN + '</span></button>' +
+    '<button type="button" class="topic-list-mode-btn' + (mode === 'published' ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 'published' ? 'true' : 'false') + '" onclick="setTopicListMode_(\'published\')">올린 글 <span>' + pubN + '</span></button>' +
+    '<button type="button" class="topic-list-mode-btn' + (mode === 'plan' ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 'plan' ? 'true' : 'false') + '" onclick="setTopicListMode_(\'plan\')">1년 기획안</button>' +
+  '</div>';
+}
+window.setTopicListMode_ = function(mode){
+  state.topicListMode = mode === 'published' ? 'published' : (mode === 'plan' ? 'plan' : 'write');
+  renderMain();
+};
+function getDraftChannelRemainHTML_(draftId, catId){
+  if(getTopicListMode_() !== 'published') return '';
+  var done = getDraftPublishedChannelKeys_(draftId, catId);
+  var required = getRequiredPublishKeysForCat_(catId);
+  var doneSet = {};
+  done.forEach(function(k){ doneSet[k] = true; });
+  var remain = required.filter(function(k){ return !doneSet[k]; });
+  if(!done.length){
+    return '<span class="card-ch-done">올림 · 날짜 기록</span>';
+  }
+  if(!remain.length) return '';
+  return '<span class="card-ch-left">남음 · ' +
+    escapeHtml(remain.map(getPublishChannelBadgeLabel_).join(' · ')) + '</span>';
+}
+
 function draftIsFullyPublished_(draftId, catId){
   if(catId == null) catId = getCatIdFromDraftId_(draftId);
   var keys = getRequiredPublishKeysForCat_(catId);
@@ -19411,12 +19545,7 @@ function draftHasContent(d) {
 function countTopicsWithoutDraft_(catId){
   var cat = CATEGORIES[catId];
   if(!cat || !cat.drafts) return 0;
-  return cat.drafts.filter(function(d){
-    if(!d || !d.id) return false;
-    if(draftIsPublished_(d.id)) return false;
-    if(typeof draftHasPartialPublish_ === 'function' && draftHasPartialPublish_(d.id, catId)) return false;
-    return !draftHasContent(d);
-  }).length;
+  return cat.drafts.filter(function(d){ return draftIsShelfEmpty_(d, catId); }).length;
 }
 
 /**
@@ -19431,11 +19560,8 @@ function pruneTopicsWithoutDraftCore_(catId, opts){
   var kept = [];
   (cat.drafts || []).forEach(function(d){
     if(!d || !d.id) return;
-    var keep = draftIsPublished_(d.id) ||
-      (typeof draftHasPartialPublish_ === 'function' && draftHasPartialPublish_(d.id, catId)) ||
-      draftHasContent(d);
-    if(keep) kept.push(d);
-    else removedIds.push(d.id);
+    if(draftIsShelfEmpty_(d, catId)) removedIds.push(d.id);
+    else kept.push(d);
   });
   if(!removedIds.length) return { removed: 0, kept: kept.length, saved: true, stripped: 0 };
   cat.drafts = kept;
@@ -19531,8 +19657,8 @@ window.pruneTopicsWithoutDraft_ = function(catId){
   var okConfirm = false;
   try {
     okConfirm = confirm(
-      name + '에서 초안·발행 본문이 없는 주제 ' + n + '개를 삭제할까요?\n' +
-      '(초안 있는 주제·발행 완료 주제는 그대로 둡니다)' + quotaHint
+      name + '에서 목록에 뺀 빈 주제 ' + n + '개를 삭제할까요?\n' +
+      '(추가한 주제, 초안 있는 주제, 올린 글은 그대로 둡니다)' + quotaHint
     );
   } catch(eConf){ okConfirm = false; }
   if(!okConfirm){
@@ -21129,17 +21255,13 @@ function renderMain(opts) {
     return;
   }
 
-  const visibleDrafts = getVisibleDraftsInMain_(state.currentCat);
-  const total = visibleDrafts.length;
-  const pubCount = visibleDrafts.filter(function(d){ return draftIsPublished_(d.id); }).length;
-  const statsHTML = '<div class="pub-count-row"><span class="pub-count-label">발행</span><span class="pub-count-num">' + pubCount + '/' + total + '</span></div>';
-
   const searchHTML = `
     <div class="search-wrap">
       <input class="search-input" value="${escapeHtml(state.searchQ)}" oninput="setSearch(this.value)" placeholder="주제 검색..." />
     </div>`;
 
   var bodyHTML = '';
+  var listHead = renderTopicListModeBarHTML_(state.currentCat);
   if(state.searchQ && String(state.searchQ).trim()){
     var q = state.searchQ;
     var hits = cat.drafts.filter(function(d){
@@ -21151,20 +21273,27 @@ function renderMain(opts) {
         (d.dailyWho && String(d.dailyWho).includes(q)) ||
         (d.dailyWhat && String(d.dailyWhat).includes(q));
     });
-    bodyHTML = renderMainGoalPanelHTML_() +
-      '<div class="search-mode-note">검색 중 · ' + (isDailyShareCategory(state.currentCat) ? '일상 주제 목록' : (isOpsManualCategory(state.currentCat) ? '메뉴얼' : '단계별 로드맵')) + '은 검색어를 지우면 다시 보여요.</div>' +
-      '<div class="cards-wrap search-results">' +
+    hits = hits.filter(function(d){
+      if(getTopicListMode_() === 'plan'){
+        return draftShowsOnPublishedList_(d.id, state.currentCat) || !draftIsShelfEmpty_(d, state.currentCat);
+      }
+      return draftMatchesTopicListMode_(d, state.currentCat);
+    });
+    bodyHTML = listHead +
+      '<div class="cards-wrap search-results topic-lines">' +
       (hits.length ? hits.map(function(d){ return draftCardHTML(d, cat, false, cat.drafts.indexOf(d), false); }).join('') :
         '<div class="empty-note">검색 결과가 없어요</div>') +
     '</div>';
   } else {
-    var planPanel = isDailyShareCategory(state.currentCat)
-      ? renderDailySharePanelHTML_(state.currentCat)
-      : renderProgramRoadmapHTML_(state.currentCat);
-    bodyHTML = renderPlannerSetupGuideHTML_() + renderMainGoalPanelHTML_() + planPanel;
+    var planPanel = getTopicListMode_() === 'plan'
+      ? renderPlanLayersHTML_(state.currentCat)
+      : (isDailyShareCategory(state.currentCat)
+        ? renderDailySharePanelHTML_(state.currentCat)
+        : renderProgramRoadmapHTML_(state.currentCat));
+    bodyHTML = listHead + planPanel;
   }
 
-  mc.innerHTML = statsHTML + searchHTML + bodyHTML;
+  mc.innerHTML = searchHTML + bodyHTML;
   scheduleWorkshopTextareaGrow_(document.getElementById('main-content'));
   if(focusSnap) restoreTextFieldFocus_(focusSnap);
   if(isAutoTopicReplenishEnabled_()){
@@ -21181,24 +21310,26 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
   const color = cat.color;
   const brandMeta = getDraftBrandMeta_(d, cat.id, draftIndex);
   const stepBadge = formatDraftStepBadgeForDisplay_(d, cat.id, draftIndex);
-  const audienceBadge = String(cat.audience || '').includes('전문가') ? '전문가' : (String(cat.audience || '').includes('일반') ? '일반인' : cat.audience);
   const createdDateLabel = getDraftCreatedDateLabel_(d);
   // 일부 발행이어도 첫 발행일이 있으면 날짜 표시 (이전엔 전부 미발행으로 잘못 표시됨)
   const dateLabel = (pub && pub.date)
     ? ('발행: ' + escapeHtml(String(pub.date)))
     : '미발행';
   const badges = [
-    `<span class="badge badge-aud">${escapeHtml(audienceBadge)}</span>`,
     isDailyThoughtDraft_(d) ? '<span class="badge badge-thought">생각</span>' : '',
     isRec && d.recType==='related' ? '<span class="badge badge-rec">관련</span>' : '',
-    compactInSeries && stepBadge ? '<span class="badge badge-step">' + escapeHtml(stepBadge) + '</span>' : '',
-    // 발행 배지가 있으면「초안있음」은 생략 (채널·발행완료로 충분)
-    (hasDraft && !publishBadges) ? '<span class="badge badge-gen">초안있음</span>' : '',
+    (hasDraft && !publishBadges && !draftShowsOnPublishedList_(d.id, cat.id)) ? '<span class="badge badge-gen">초안있음</span>' : '',
     publishBadges,
   ].filter(Boolean).join('');
-  const brandLine = compactInSeries
-    ? (brandMeta.pillar ? '<div class="card-brand-line compact">' + escapeHtml(brandMeta.pillar) + '</div>' : '')
-    : '<div class="card-brand-line">' + escapeHtml(brandMeta.series) + (stepBadge ? ' · ' + escapeHtml(stepBadge) : '') + (brandMeta.pillar ? ' · ' + escapeHtml(brandMeta.pillar) : '') + '</div>';
+  function oneLine_(value){
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+  var intentLines = [];
+  var seriesLine = [brandMeta.series, stepBadge, brandMeta.pillar].filter(Boolean).join(' · ');
+  if(seriesLine) intentLines.push('<div class="card-intent-line muted">' + escapeHtml(oneLine_(seriesLine)) + '</div>');
+  if(d.angle) intentLines.push('<div class="card-intent-line">' + escapeHtml(oneLine_(d.angle)) + '</div>');
+  if(brandMeta.rationale) intentLines.push('<div class="card-intent-line">' + escapeHtml(oneLine_(stripTopicRationaleStepPrefix_(brandMeta.rationale))) + '</div>');
+  var lineTitle = oneLine_(d.topic) || '(제목 없음)';
   var orderBtns = '';
   try {
     var stepIdForOrder = getDraftRoadmapStepId_(d, cat.id, draftIndex);
@@ -21218,28 +21349,30 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
         for(var uo = ordIdx - 1; uo >= 0; uo--){ if(slotMapOrd[uo]){ canUpCard = true; break; } }
         for(var do_ = ordIdx + 1; do_ < slotMapOrd.length; do_++){ if(slotMapOrd[do_]){ canDownCard = true; break; } }
         orderBtns =
-          '<span class="draft-card-order-btns">' +
-            '<button type="button" class="draft-card-order-mini"' + (canUpCard ? '' : ' disabled') + ' title="위로" onclick="event.stopPropagation();moveDraftCardOrder_(' + cat.id + ',\'' + d.id + '\',-1)">▲</button>' +
-            '<button type="button" class="draft-card-order-mini"' + (canDownCard ? '' : ' disabled') + ' title="아래로" onclick="event.stopPropagation();moveDraftCardOrder_(' + cat.id + ',\'' + d.id + '\',1)">▼</button>' +
+          '<span class="draft-card-order-btns" title="순서 변경"><span class="card-order-word">순서</span>' +
+            '<button type="button" class="draft-card-order-mini"' + (canUpCard ? '' : ' disabled') + ' title="순서 위로" onclick="event.stopPropagation();moveDraftCardOrder_(' + cat.id + ',\'' + d.id + '\',-1)">▲</button>' +
+            '<button type="button" class="draft-card-order-mini"' + (canDownCard ? '' : ' disabled') + ' title="순서 아래로" onclick="event.stopPropagation();moveDraftCardOrder_(' + cat.id + ',\'' + d.id + '\',1)">▼</button>' +
           '</span>';
       }
     }
   } catch(eOrd){}
-  return `<div class="draft-card plan-tier-topic${isPub?' published':''}${isPartialPub?' partial-published':''}${isRec?' recommended':''}" data-plan-tier="4" style="--cc:${color}" tabindex="0" role="button" aria-label="${escapeHtml(d.topic)}" onclick="openDetail('${d.id}',${cat.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetail('${d.id}',${cat.id});}">
-    <div class="draft-card-actions">
-      <button type="button" class="draft-card-delete-mini" title="이 주제 카드 삭제" onclick="event.stopPropagation();deleteDraft(${cat.id},'${d.id}')">삭제</button>
-      <button type="button" class="draft-card-refresh-mini" data-regen-draft="${d.id}" title="이 주제의 제목·각도만 다시 받기" onclick="event.stopPropagation();refreshTopicsForDraft(${cat.id},'${d.id}')">주제 변경</button>
-      ${orderBtns}
+  var moreBody =
+    intentLines.join('') +
+    '<div class="card-intent-foot">' +
+      '<div class="card-intent-dates"><span>' + dateLabel + '</span><span>생성 ' + createdDateLabel + '</span></div>' +
+      '<div class="card-more-actions">' +
+        '<button type="button" class="draft-card-delete-mini" title="이 주제 카드 삭제" onclick="event.stopPropagation();deleteDraft(' + cat.id + ',\'' + d.id + '\')">삭제</button>' +
+        '<button type="button" class="draft-card-refresh-mini" data-regen-draft="' + d.id + '" title="이 주제의 제목·각도만 다시 받기" onclick="event.stopPropagation();refreshTopicsForDraft(' + cat.id + ',\'' + d.id + '\')">주제 변경</button>' +
+        orderBtns +
+      '</div>' +
+    '</div>';
+  return `<div class="draft-card topic-line plan-tier-topic${isPub?' published':''}${isPartialPub?' partial-published':''}${isRec?' recommended':''}" data-plan-tier="4" style="--cc:${color}" tabindex="0" role="button" aria-label="${escapeHtml(lineTitle)}" onclick="openDetail('${d.id}',${cat.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetail('${d.id}',${cat.id});}">
+    <div class="topic-line-row">
+      <div class="card-topic">${escapeHtml(lineTitle)}</div>
+      <div class="topic-line-meta">${badges}${getDraftChannelRemainHTML_(d.id, cat.id)}</div>
+      <button type="button" class="topic-line-more" onclick="event.stopPropagation();var card=this.closest('.draft-card');card.classList.toggle('more-open');this.setAttribute('aria-expanded', card.classList.contains('more-open')?'true':'false');">기획 의도</button>
     </div>
-    <div class="card-badges">${badges}</div>
-    ${brandLine}
-    <div class="card-topic">${plannerClampTextHTML_(d.topic, { lines: 2, passive: true })}</div>
-    <div class="card-angle">${plannerClampTextHTML_(d.angle, { lines: 3, passive: true })}</div>
-    ${brandMeta.rationale ? '<div class="card-rationale">' + plannerClampTextHTML_(stripTopicRationaleStepPrefix_(brandMeta.rationale), { lines: 2, passive: true }) + '</div>' : ''}
-    <div class="card-footer">
-      <div class="card-date">${dateLabel}</div>
-      <div class="card-created-date">생성: ${createdDateLabel}</div>
-    </div>
+    <div class="card-more-body" onclick="event.stopPropagation()">${moreBody}</div>
   </div>`;
 }
 

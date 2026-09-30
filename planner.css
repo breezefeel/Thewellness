@@ -845,6 +845,11 @@ margin-left: 4px;
   background: #F0FDFA;
   color: #0F766E;
 }
+.topic-list-mode-btn-plan {
+  flex: 0.5;
+  padding-left: 6px;
+  padding-right: 6px;
+}
 .topic-list-mode-btn span {
   margin-left: 4px;
   font-size: 11px;
@@ -865,8 +870,96 @@ margin-left: 4px;
   font-weight: 700;
   line-height: 1.4;
 }
-.card-ch-left { color: #B45309; }
-.card-ch-done { color: #0F766E; }
+.published-channel-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -4px 14px 12px;
+}
+.published-channel-legend .badge { font-size: 11px; padding: 3px 8px; }
+.card-ch-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.card-ch-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.ch-dot-blog { background: #047857; }
+.ch-dot-insta { background: #BE185D; }
+.ch-dot-threads { background: #6B7280; }
+.ch-dot-image { background: #1D4ED8; }
+.ch-dot-community { background: #B45309; }
+.ch-dot-thread { background: #0F766E; }
+.card-move-picker {
+  display: none;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 8px;
+}
+.card-move-picker.open { display: flex; }
+.card-move-steps {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+}
+.card-move-step-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.card-move-programs {
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.card-move-programs.open { display: flex; }
+.card-move-empty {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94A3B8;
+  padding: 6px 0;
+}
+.card-move-opt,
+.card-move-program-btn {
+  border: 1px solid #E5E7EB;
+  background: #fff;
+  color: #334155;
+  border-radius: 999px;
+  font: 800 11px/1.2 inherit;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.card-move-program-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: #0F766E;
+  border-color: #99F6E4;
+  background: #F0FDFA;
+}
+.card-move-opt:hover,
+.card-move-program-btn:hover,
+.card-move-program-btn[aria-expanded="true"] { border-color: #94A3B8; color: #0F172A; }
+.card-move-opt.is-current,
+.card-move-opt:disabled {
+  background: #F1F5F9;
+  color: #94A3B8;
+  cursor: default;
+}
+.draft-card-tidy-mini { color: #6B7280; }
+.draft-card-tidy-mini:hover,
+.draft-card-tidy-mini[aria-expanded="true"] {
+  border-color: var(--cc, #2DD4BF);
+  color: #0F766E;
+}
 .main-goal-profile-ref .ws-ref-body {
   max-height: 220px;
   overflow-y: auto;
@@ -1149,12 +1242,87 @@ margin-left: 4px;
   align-items: flex-start;
   gap: 6px;
   padding-right: 8px;
+  cursor: pointer;
 }
 .subgoal-step-block-head .subgoal-step-head { flex: 1; }
 .subgoal-step-head-static {
   display: flex; align-items: flex-start; gap: 8px; flex: 1; min-width: 0;
   padding: 10px 0 10px 10px; text-align: left;
 }
+.subgoal-topic-gen-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+  align-self: center;
+  margin-right: 8px;
+  border: 1px solid #99F6E4;
+  background: #F0FDFA;
+  color: #0F766E;
+  border-radius: 8px;
+  font: 800 11px/1 inherit;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.subgoal-topic-gen-btn:hover { border-color: #5EEAD4; color: #115E59; }
+.subgoal-quarter-label,
+.plan-layer-quarter-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0F766E;
+  margin: 2px 2px 6px;
+}
+.quarter-pick-list { display: flex; flex-direction: column; gap: 8px; }
+.quarter-pick-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #99F6E4;
+  background: #F0FDFA;
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.quarter-pick-btn:hover { border-color: #5EEAD4; }
+.quarter-pick-kicker { font-size: 12px; font-weight: 800; color: #0F766E; }
+.quarter-pick-goal { font-size: 13px; font-weight: 600; color: #334155; line-height: 1.45; }
+.month-goal-list { display: flex; flex-direction: column; gap: 8px; }
+.month-goal-box {
+  position: relative;
+  border: 1px solid #99F6E4;
+  background: #F0FDFA;
+  border-radius: 12px;
+  padding: 12px 56px 12px 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.month-goal-box.is-empty {
+  border-style: dashed;
+  background: #fff;
+  cursor: default;
+}
+.month-goal-box.is-selected {
+  border-color: #0F766E;
+  box-shadow: inset 0 0 0 1px #0F766E;
+}
+.month-goal-del {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 1px solid #FECACA;
+  background: #fff;
+  color: #B91C1C;
+  border-radius: 8px;
+  font: 800 11px/1 inherit;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.month-goal-kicker { font-size: 12px; font-weight: 800; color: #0F766E; margin-bottom: 4px; }
+.month-goal-title { font-size: 14px; font-weight: 800; color: #1E293B; line-height: 1.45; }
+.month-goal-box.is-empty .month-goal-title { color: #94A3B8; font-weight: 700; }
+.month-goal-rationale { margin-top: 6px; font-size: 12px; font-weight: 600; color: #475569; line-height: 1.5; }
 .subgoal-step-actions {
   display: flex; gap: 4px; flex-shrink: 0; align-items: flex-start; padding: 8px 8px 8px 0;
   position: relative;
@@ -1211,7 +1379,15 @@ margin-left: 4px;
   color: #fff;
 }
 .subgoal-step-main { flex: 1; min-width: 0; }
-.subgoal-step-title { display: block; font-size: 12px; font-weight: 700; color: #1E293B; line-height: 1.35; }
+.subgoal-step-title { display: inline; font-size: 12px; font-weight: 700; color: #1E293B; line-height: 1.35; }
+.subgoal-step-count { display: inline; margin-left: 4px; font-size: 12px; font-weight: 800; color: #0F766E; }
+.ws-generating-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 10px;
+}
+.ws-gen-oneline { font-size: 14px; font-weight: 800; color: #0F766E; line-height: 1.4; }
 .subgoal-step-summary { display: block; font-size: 10px; color: #64748B; line-height: 1.45; margin-top: 2px; }
 .subgoal-step-rationale { display: block; font-size: 10px; color: #0F766E; line-height: 1.5; margin-top: 4px; }
 .subgoal-step-block[class*="step-tone-"] .subgoal-step-rationale { color: var(--st-accent); opacity: 0.92; }
@@ -1547,6 +1723,7 @@ pointer-events: auto;
   }
 }
 .draft-card-refresh-mini,
+.draft-card-tidy-mini,
 .draft-card-delete-mini,
 .draft-card-order-mini {
 font-size: 9px;
@@ -1594,6 +1771,7 @@ color: #DC2626;
 background: #FEF2F2;
 }
 .draft-card-refresh-mini:focus-visible,
+.draft-card-tidy-mini:focus-visible,
 .draft-card-delete-mini:focus-visible,
 .draft-card-order-mini:focus-visible {
 outline: 2px solid #2DD4BF; outline-offset: 1px;
@@ -2252,6 +2430,19 @@ max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,.2);
 .plan-workshop-box.plan-ws-tier-year { --pt-accent:#4338CA; --pt-bg:#EEF2FF; --pt-border:#C7D2FE; }
 .plan-workshop-box.plan-ws-tier-program { --pt-accent:#2563EB; --pt-bg:#EFF6FF; --pt-border:#BFDBFE; }
 .plan-workshop-box.plan-ws-tier-topic { --pt-accent:#0F766E; --pt-bg:#ECFDF5; --pt-border:#99F6E4; }
+.plan-workshop-box.plan-ws-tier-month .plan-workshop-header {
+  background: var(--pt-bg);
+  border-bottom-color: var(--pt-border);
+}
+.plan-workshop-box.plan-ws-tier-month .plan-workshop-title { color: var(--pt-accent); }
+.plan-workshop-box.plan-ws-tier-month { --pt-accent:#0F766E; --pt-bg:#F0FDFA; --pt-border:#99F6E4; }
+.plan-suggest-group { margin-top: 12px; }
+.plan-suggest-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0F766E;
+  margin-bottom: 6px;
+}
 .plan-workshop-header {
   flex-shrink: 0;
   display: flex;
@@ -4470,12 +4661,13 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .draft-card.topic-line .card-intent-line {
   font-size: 12px;
   font-weight: 600;
-  line-height: 1.45;
+  line-height: 1.55;
   color: #334155;
   text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 .draft-card.topic-line .card-intent-line + .card-intent-line { margin-top: 3px; }
 .draft-card.topic-line .card-intent-line.muted { color: #94A3B8; font-weight: 700; }
@@ -4498,9 +4690,11 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .draft-card.topic-line .card-more-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
   margin-left: auto;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
 }
 .draft-card.topic-line .card-order-word {
   font-size: 9px;

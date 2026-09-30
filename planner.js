@@ -2738,6 +2738,7 @@ function tickButtonCountdowns_(){
 }
 function isAnyPlannerWaitActive_(){
   return !!(state.yearPlanGenerating || state.subGoalPlanGenerating || state.plannerAiWait || activeButtonCountdowns_.length ||
+    (state.stepTopicSuggest && state.stepTopicSuggest.loading) ||
     (state.newItem && state.newItem.imageAnalyzing && state.newItem.imageAnalysisWait));
 }
 function ensurePlannerWaitTimer_(){
@@ -2804,6 +2805,17 @@ function tickPlannerWaitUi_(){
     if(elP) elP.textContent = '프로그램 기획 중 · ' + formatCountdownShort_(leftP);
     var waitEl = document.getElementById('program-setup-wait');
     if(waitEl) waitEl.textContent = '기획 중 · ' + formatCountdownShort_(leftP) + ' · 상단 배너를 눌러 열 수 있어요';
+  }
+  var topicSug = state.stepTopicSuggest;
+  if(topicSug && topicSug.loading){
+    var leftTopic = getCountdownSec_(topicSug.startedAt, topicSug.estimateSec || 20);
+    var topicCd = document.getElementById('ws-gen-countdown');
+    var topicBar = document.getElementById('ws-gen-progress');
+    if(topicCd) topicCd.textContent = '주제 5개 기획 중 · ' + formatCountdownLong_(leftTopic);
+    if(topicBar){
+      var topicEst = topicSug.estimateSec || 20;
+      topicBar.style.width = Math.min(98, Math.round(((topicEst - leftTopic) / topicEst) * 100)) + '%';
+    }
   }
   var gen = state.yearPlanGenerating || state.subGoalPlanGenerating;
   if(gen){
@@ -3801,6 +3813,7 @@ function migrateIndexedPlanEntityKeysInPayload_(payload, outboxArr){
 function sanitizeYearPlanObj_(plan){
   if(!plan) return plan;
   if(plan.intent != null) plan.intent = sanitizePersonalBrandText_(plan.intent);
+  if(plan.goal != null) plan.goal = sanitizePersonalBrandText_(plan.goal);
   (plan.periods || []).forEach(function(per, i){
     sanitizeYearPeriodFields_(per);
     if(per && !per.id){
@@ -4248,6 +4261,7 @@ function getYearPlan_(){
     return {
       anchorDate: yp.anchorDate || yp.periods[0].start || new Date().toISOString().slice(0, 10),
       intent: String(yp.intent || '').trim(),
+      goal: String(yp.goal || '').trim(),
       periods: yp.periods.map(function(p, i){
         return {
           id: p.id || ('yp_mig_' + i + '_' + String(p.start || '').replace(/-/g, '')),
@@ -4267,7 +4281,7 @@ function getYearPlan_(){
   var b = getBranding_();
   var anchor = new Date().toISOString().slice(0, 10);
   var goals = [b.message, '', '', ''];
-  return { anchorDate: anchor, periods: buildRollingPeriodsFromAnchor_(anchor, goals) };
+  return { anchorDate: anchor, goal: '', intent: '', periods: buildRollingPeriodsFromAnchor_(anchor, goals) };
 }
 function getCurrentMainGoal_(){
   var plan = getYearPlan_();
@@ -4279,20 +4293,26 @@ function getYearPlanMeta_(){
   var yp = brand.yearPlan || {};
   var pending = state.pendingYearPlan;
   var intent = '';
+  var goal = '';
   var currentRationale = '';
   var currentTopic = '';
   if(pending && pending.periods && pending.periods.length){
     intent = String(pending.intent || yp.intent || '').trim();
+    goal = String(pending.goal || yp.goal || '').trim();
     var cur = pending.periods[0] || {};
     currentRationale = String(cur.rationale || '').trim();
-    currentTopic = String(cur.topic || cur.goal || '').trim();
+    currentTopic = String(cur.goal || cur.topic || '').trim();
   } else if(yp.periods && yp.periods.length){
     intent = String(yp.intent || '').trim();
+    goal = String(yp.goal || '').trim();
     var cur2 = yp.periods[0] || {};
     currentRationale = String(cur2.rationale || '').trim();
-    currentTopic = String(cur2.topic || cur2.goal || '').trim();
+    currentTopic = String(cur2.goal || cur2.topic || '').trim();
+  } else if(pending){
+    intent = String(pending.intent || yp.intent || '').trim();
+    goal = String(pending.goal || yp.goal || '').trim();
   }
-  return { intent: intent, currentRationale: currentRationale, currentTopic: currentTopic };
+  return { intent: intent, goal: goal, currentRationale: currentRationale, currentTopic: currentTopic };
 }
 function buildMainGoalContextBlock_(){
   var goal = getCurrentMainGoal_();
@@ -5052,12 +5072,12 @@ function dedupeSubGoalPlanStepsInPlace_(plan, opts){
     }
     out.push(step);
   });
-  if(out.length > 5){
-    out.slice(5).forEach(function(step){
+  if(out.length > 12){
+    out.slice(12).forEach(function(step){
       var dropId = String(step && step.id != null ? step.id : '');
-      if(dropId && out[4]) idMap[dropId] = String(out[4].id);
+      if(dropId && out[11]) idMap[dropId] = String(out[11].id);
     });
-    out = out.slice(0, 5);
+    out = out.slice(0, 12);
     changed = true;
   }
   out.forEach(function(step, i){
@@ -5410,6 +5430,7 @@ function resolveUserAddedDraftStepAssignment_(draft, catId){
 }
 function applyResolvedUserAddedStepOrMisc_(draft, catId){
   if(!draft || !isUserAddedDraftId_(draft.id)) return false;
+  if(draft.miscLocked) return false;
   var plan = getSubGoalPlan_(catId);
   if(!plan) return false;
   // 고정 모드: 이미 유효한 단계/기타 배정이 있으면 로드·동기화 시 건드리지 않음
@@ -5664,8 +5685,12 @@ function isSubGoalStepCollapsed_(catId, stepId){
   if(state.collapsedSubGoalSteps && state.collapsedSubGoalSteps[key] != null){
     return !!state.collapsedSubGoalSteps[key];
   }
-  if(String(stepId) === SUBGOAL_MISC_ID) return true;
-  return String(stepId) !== String(getActiveSubGoalStepId_(catId));
+  return false;
+}
+function countFilledStepTopics_(drafts, catId){
+  return (drafts || []).filter(function(d){
+    return d && d.id && !draftIsShelfEmpty_(d, catId);
+  }).length;
 }
 window.toggleSubGoalStep_ = function(key){
   if(!state.collapsedSubGoalSteps) state.collapsedSubGoalSteps = {};
@@ -6187,6 +6212,7 @@ function snapshotYearPlanForCompare_(src){
   var pillars = src.pillars != null ? src.pillars : (brand.pillars || []);
   return {
     intent: String(src.intent || '').trim(),
+    goal: String(src.goal || '').trim(),
     pillars: (pillars || []).map(function(x){ return String(x || '').trim(); }),
     periods: (src.periods || []).map(function(per){
       return {
@@ -6218,6 +6244,7 @@ function isPendingYearPlanContentSameAsApplied_(){
   if(!p || !p.periods || !p.periods.length) return false;
   var applied = snapshotYearPlanContentForCompare_({
     intent: state.branding.yearPlan.intent,
+    goal: state.branding.yearPlan.goal,
     pillars: getBranding_().pillars,
     periods: state.branding.yearPlan.periods
   });
@@ -6231,6 +6258,7 @@ function refreshPendingYearPlanFromApplied_(){
     return sanitizeYearPeriodFields_(normalizeYearPeriod_(p, i, p.goal));
   });
   state.pendingYearPlan = sanitizeYearPlanObj_({
+    goal: plan.goal || (brand.yearPlan && brand.yearPlan.goal) || '',
     intent: plan.intent || (brand.yearPlan && brand.yearPlan.intent) || '',
     pillars: (brand.pillars || []).slice(),
     anchorDate: plan.anchorDate,
@@ -6245,6 +6273,7 @@ function isPendingYearPlanSameAsApplied_(){
   if(!p || !p.periods || !p.periods.length) return false;
   var applied = snapshotYearPlanForCompare_({
     intent: state.branding.yearPlan.intent,
+    goal: state.branding.yearPlan.goal,
     pillars: getBranding_().pillars,
     periods: state.branding.yearPlan.periods
   });
@@ -6715,9 +6744,22 @@ function refreshPlanWorkshopModal_(){
   if(!body || !footer) return;
   var mode = state.planWorkshopMode || 'year';
   if(mode === 'year'){
-    if(titleEl) titleEl.textContent = '1년 브랜드 기획';
+    if(titleEl) titleEl.textContent = state.planWorkshopFocus === 'quarter' ? '분기별 목표와 의도' : '1년 목표와 의도';
     body.innerHTML = renderYearWorkshopBodyHTML_();
     footer.innerHTML = renderYearWorkshopFooterHTML_();
+  } else if(mode === 'month'){
+    var sugM = state.monthPlanSuggest;
+    if(titleEl){
+      titleEl.textContent = (sugM && sugM.quarterIndex >= 0 && !sugM.picking)
+        ? ((parseInt(sugM.quarterIndex, 10) + 1) + '분기 매월 목표')
+        : '매월 목표';
+    }
+    body.innerHTML = renderMonthSuggestBodyHTML_();
+    footer.innerHTML = renderMonthSuggestFooterHTML_();
+  } else if(mode === 'stepTopics'){
+    if(titleEl) titleEl.textContent = '주제 5개';
+    body.innerHTML = renderStepTopicSuggestBodyHTML_();
+    footer.innerHTML = renderStepTopicSuggestFooterHTML_();
   } else if(mode === 'program'){
     if(titleEl) titleEl.textContent = '세부 목표 기획';
     ensurePendingSubGoalPlanFromCurrent_(state.currentCat);
@@ -6733,7 +6775,8 @@ function refreshPlanWorkshopModal_(){
   }
   var box = document.querySelector('#plan-workshop-overlay .plan-workshop-box');
   if(box){
-    box.className = 'plan-workshop-box plan-ws-tier-' + mode;
+    var tierMode = mode === 'stepTopics' ? 'month' : mode;
+    box.className = 'plan-workshop-box plan-ws-tier-' + tierMode;
   }
   scheduleWorkshopTextareaGrow_(body);
 }
@@ -6872,6 +6915,9 @@ function buildYearAiSuggestConfirmMsg_(stats){
 }
 function renderYearAiSuggestBtnHTML_(){
   ensurePendingYearPlanFromCurrent_();
+  if(state.planWorkshopFocus !== 'quarter'){
+    return '<button type="button" class="modal-btn ws-btn-ai" id="btn-year-regen" onclick="generateYearGoalWithAI_()">재생성</button>';
+  }
   var stats = getYearPeriodPinnedStats_(state.pendingYearPlan && state.pendingYearPlan.periods);
   var allPinned = stats.pinned >= stats.total;
   return '<button type="button" class="modal-btn ws-btn-ai' + (allPinned ? ' is-disabled' : '') + '" id="btn-year-regen"' +
@@ -6929,15 +6975,15 @@ function renderYearQuarterCardHTML_(per, idx){
             '<select class="ws-quarter-months" onchange="updatePendingYearPeriodMonths_(' + idx + ',this.value)"' + (per.pinned ? ' disabled' : '') + '>' + monthOpts + '</select>' +
           '</label>' +
         '</div>' +
-        '<label class="ws-quarter-field-label ws-quarter-topic-label">주제</label>' +
-        '<textarea class="ws-quarter-topic ws-grow-textarea" rows="1" placeholder="' + (idx + 1) + '분기 · 미카닥 박준규 브랜드 주제" oninput="updatePendingYearPeriodTopic_(' + idx + ',this.value);autoGrowTextarea_(this)" onchange="updatePendingYearPeriodTopic_(' + idx + ',this.value)">' + escapeHtml(per.topic || '') + '</textarea>' +
+        '<label class="ws-quarter-field-label ws-quarter-topic-label">목표</label>' +
+        '<textarea class="ws-quarter-topic ws-grow-textarea" rows="1" placeholder="' + (idx + 1) + '분기 · 이 기간에 도달할 목표" oninput="updatePendingYearPeriodTopic_(' + idx + ',this.value);autoGrowTextarea_(this)" onchange="updatePendingYearPeriodTopic_(' + idx + ',this.value)">' + escapeHtml(per.goal || per.topic || '') + '</textarea>' +
       '</div>' +
       '<div class="ws-quarter-tools">' +
         '<button type="button" class="ws-item-btn pin' + pinnedCls + '" onclick="togglePinYearPeriod_(' + idx + ')" title="고정">' + (per.pinned ? '고정됨' : '고정') + '</button>' +
         '<button type="button" class="ws-item-btn danger" onclick="clearYearPeriod_(' + idx + ')" title="삭제">삭제</button>' +
       '</div>' +
     '</div>' +
-    '<label class="ws-quarter-rationale-label">이 분기 주제에 대한 의도 · 수정 후 재생성에 반영</label>' +
+    '<label class="ws-quarter-rationale-label">이 분기 목표의 의도 · 수정 후 재생성에 반영</label>' +
     '<textarea class="ws-grow-textarea ws-quarter-rationale" rows="2" placeholder="이 분기에 이 주제를 두는 이유, 독자가 얻을 것" oninput="updatePendingYearPeriodRationale_(' + idx + ',this.value);autoGrowTextarea_(this)">' + escapeHtml(per.rationale || '') + '</textarea>' +
   '</div>';
 }
@@ -6963,6 +7009,7 @@ function ensurePendingYearPlanFromCurrent_(){
     return sanitizeYearPeriodFields_(normalizeYearPeriod_(p, i, p.goal));
   });
   state.pendingYearPlan = sanitizeYearPlanObj_({
+    goal: plan.goal || (brand.yearPlan && brand.yearPlan.goal) || '',
     intent: plan.intent || (brand.yearPlan && brand.yearPlan.intent) || '',
     pillars: (brand.pillars || []).slice(),
     anchorDate: plan.anchorDate,
@@ -6970,25 +7017,42 @@ function ensurePendingYearPlanFromCurrent_(){
   });
 }
 function renderYearWorkshopBodyHTML_(){
-  if(state.yearPlanGenerating) return renderWsGeneratingHTML_('미카닥 박준규 브랜드 <strong>4분기 주제</strong>와 순서를 제안하고 있어요.', YEAR_PLAN_GEN_ESTIMATE_SEC, state.yearPlanGenerating);
+  var focus = state.planWorkshopFocus === 'quarter' ? 'quarter' : 'year';
+  if(state.yearPlanGenerating){
+    var genLabel = focus === 'quarter'
+      ? '4개 분기의 <strong>목표와 의도</strong>를 제안하고 있어요.'
+      : '<strong>1년 목표</strong>와 기획 의도를 함께 제안하고 있어요.';
+    return renderWsGeneratingHTML_(genLabel, YEAR_PLAN_GEN_ESTIMATE_SEC, state.yearPlanGenerating);
+  }
   ensurePendingYearPlanFromCurrent_();
   var p = state.pendingYearPlan;
   if(!p) return '<p class="ws-intro">기획 데이터가 없어요.</p>';
-  var hasTopics = p.periods.some(function(per){ return String(per.topic || per.goal || '').trim(); });
   var html = '';
-  if(!hasTopics && !p.intent){
+  if(focus === 'year'){
+    if(!String(p.goal || '').trim() && !String(p.intent || '').trim()){
+      html += '<div class="ws-year-cta ' + getPlanTierClass_('year') + '" data-plan-tier="1">' +
+        '<p class="ws-intro"><strong>1년 목표</strong>와 그 목표를 이렇게 잡은 이유를 함께 제안합니다.</p>' +
+        '<p class="ws-intro-ref">북극성: ' + escapeHtml(MASTER_BRAND_NORTH_STAR) + '</p>' +
+      '</div>';
+    }
+    html += '<div class="ws-intent-block">' +
+      '<label class="ws-intent-label">1년 목표</label>' +
+      '<textarea class="ws-intent-input ws-grow-textarea" rows="3" placeholder="1년 뒤 브랜드와 독자가 도달할 상태" oninput="updatePendingYearGoal_(this.value);autoGrowTextarea_(this)">' + escapeHtml(p.goal || '') + '</textarea>' +
+    '</div>' +
+    '<div class="ws-intent-block">' +
+      '<label class="ws-intent-label">기획 의도 · 이 목표를 이렇게 잡은 이유 (3~5문장)</label>' +
+      '<textarea class="ws-intent-input ws-grow-textarea" rows="4" placeholder="왜 이 목표인지, 1년 동안 독자가 어떻게 달라지는지" oninput="updatePendingYearIntent_(this.value);autoGrowTextarea_(this)">' + escapeHtml(p.intent || '') + '</textarea>' +
+    '</div>';
+    return html;
+  }
+  var hasGoals = p.periods.some(function(per){ return String(per.goal || per.topic || '').trim(); });
+  if(!hasGoals){
     html += '<div class="ws-year-cta ' + getPlanTierClass_('year') + '" data-plan-tier="1">' +
-      '<p class="ws-intro">먼저 <strong>미카닥 박준규</strong> 마스터 브랜드의 4분기 방향을 AI와 함께 잡아 보세요.</p>' +
-      '<p class="ws-intro-ref brand-layer-note">' + escapeHtml(BRAND_DUAL_LAYER_HINT) + '</p>' +
-      '<p class="ws-intro-ref">북극성: ' + escapeHtml(MASTER_BRAND_NORTH_STAR) + '</p>' +
-      '<p class="ws-intro-ref">PSP·PAR·프로그램 구조: <a href="' + PROFILE_BRAND_URL + '" target="_blank" rel="noopener">미카닥 박준규 프로필 PSP 가이드</a></p>' +
+      '<p class="ws-intro">4개 분기의 <strong>목표</strong>와 그 분기에 이 목표를 두는 이유를 제안합니다.</p>' +
+      (p.goal ? '<p class="ws-intro-ref">1년 목표: ' + escapeHtml(p.goal) + '</p>' : '') +
     '</div>';
   }
-  html += '<div class="ws-intent-block">' +
-    '<label class="ws-intent-label">기획 의도 · 1년 순서를 이렇게 잡은 이유 (3~5문장)</label>' +
-    '<textarea class="ws-intent-input ws-grow-textarea" rows="4" placeholder="미카닥 박준규 마스터 브랜드(신뢰·왜·순서), 4분기 심리 변화(인식→이해→실천→공동체), 독자가 1년에 걸쳐 얻을 것. 프로그램별 주제는 각 탭에서 잡습니다." oninput="updatePendingYearIntent_(this.value);autoGrowTextarea_(this)">' + escapeHtml(p.intent || '') + '</textarea>' +
-  '</div>' +
-  '<div class="ws-items ws-items-full">';
+  html += '<div class="ws-items ws-items-full">';
   p.periods.forEach(function(per, idx){
     html += renderYearQuarterCardHTML_(per, idx);
   });
@@ -7228,9 +7292,587 @@ function renderYearWorkshopStripHTML_(){
     '<span class="plan-workshop-strip-label">1년 브랜드 기획안</span>' +
     '<span class="plan-workshop-strip-cta">함께 검토 →</span></button>';
 }
-window.openYearPlanWorkshop_ = function(){
+window.generateYearGoalWithAI_ = async function(opts){
+  opts = opts || {};
+  if(!state.apiKey){ openApiModal(); return; }
+  if(plannerAiBusy) return;
+  ensurePendingYearPlanFromCurrent_();
+  var p = state.pendingYearPlan;
+  if(!p) return;
+  var hasText = !!(String(p.goal || '').trim() || String(p.intent || '').trim());
+  if(!opts.skipConfirm && hasText && !confirm('1년 목표와 기획 의도를 새로 제안할까요?')) return;
+  plannerAiBusy = true;
+  state.planWorkshopFocus = 'year';
+  startPlanGenTimer_('year');
+  if(!document.getElementById('plan-workshop-overlay').classList.contains('open')) openPlanWorkshop_('year');
+  else refreshPlanWorkshopModal_();
+  try {
+    var prompt =
+buildBrandStrategyPromptPrefix_() + '\n\n' +
+'미카닥 박준규 마스터 브랜드의 **1년 목표**와 **기획 의도**를 함께 제안하세요. 분기 목표는 쓰지 마세요.\n' +
+'[마스터 북극성] ' + MASTER_BRAND_NORTH_STAR + '\n' +
+YEAR_BRAND_WRITING_RULE + '\n' +
+'현재 1년 목표: ' + (p.goal || '(없음)') + '\n' +
+'현재 기획 의도: ' + (p.intent || '(없음)') + '\n\n' +
+'- goal: 1년 목표 1~2문장. 1년 뒤 브랜드와 독자가 도달할 상태.\n' +
+'- intent: 기획 의도 3~5문장. 왜 이 목표인지, 1년 동안의 변화.\n' +
+'JSON: {"goal":"…","intent":"…"}';
+    var text = await callClaudePlanner_(prompt, { maxTokens: 1200 });
+    var obj = parsePlannerAiJsonObject_(text);
+    p.goal = sanitizePersonalBrandText_(String(obj.goal || '').trim());
+    p.intent = sanitizePersonalBrandText_(String(obj.intent || '').trim());
+    if(!p.goal && !p.intent) throw new Error('1년 목표를 찾지 못했어요');
+    sanitizeYearPlanObj_(p);
+    persistPendingYearPlan_();
+    refreshPlanWorkshopModal_();
+    renderMain();
+    if(typeof setAppToast === 'function') setAppToast('1년 목표와 기획 의도를 제안했어요. 확인 후 적용해 주세요.', { duration: 4000, variant: 'ok' });
+  } catch(e){
+    if(typeof setAppToast === 'function') setAppToast('1년 목표 기획 실패\n' + ((e && e.message) || e), { duration: 6000, variant: 'err' });
+  } finally {
+    plannerAiBusy = false;
+    stopPlanGenTimer_('year');
+  }
+};
+window.openYearPlanWorkshop_ = function(focus){
+  state.planWorkshopFocus = focus === 'quarter' ? 'quarter' : 'year';
   ensurePendingYearPlanFromCurrent_();
   openPlanWorkshop_('year');
+  var p = state.pendingYearPlan;
+  if(!p || plannerAiBusy || state.yearPlanGenerating) return;
+  if(state.planWorkshopFocus === 'quarter'){
+    var hasQuarter = (p.periods || []).some(function(per){ return String(per.goal || per.topic || '').trim(); });
+    if(!hasQuarter) generateYearPlanWorkshopWithAI_({ skipConfirm: true });
+    return;
+  }
+  if(!String(p.goal || '').trim()) generateYearGoalWithAI_({ skipConfirm: !String(p.intent || '').trim() });
+};
+function quarterStepRangeLabel_(qi){
+  return ['1~3단계', '4~6단계', '7~9단계', '10~12단계'][qi] || '';
+}
+function quarterStepBounds_(qi){
+  var start = qi * 3 + 1;
+  return { start: start, end: start + 2 };
+}
+function stepMonthIndex_(step, arrayIndex){
+  var n = parseInt(step && step.monthIndex, 10);
+  if(n >= 1 && n <= 12) return n;
+  return (arrayIndex || 0) + 1;
+}
+function monthGoalTitle_(n, title){
+  var t = String(title || '').trim();
+  if(/^\d+\s*단계/.test(t)) return t;
+  return n + '단계 · ' + t;
+}
+function quarterPlanContext_(qi){
+  var plan = getYearPlan_();
+  var p = (plan.periods || [])[qi] || {};
+  var year = getYearPlanMeta_();
+  return {
+    label: (qi + 1) + '분기',
+    range: quarterStepRangeLabel_(qi),
+    goal: String(p.goal || p.topic || '').trim(),
+    rationale: String(p.rationale || '').trim(),
+    yearGoal: String(year.goal || '').trim(),
+    yearIntent: String(year.intent || '').trim()
+  };
+}
+function assignMonthGoalStep_(plan, monthIndex, title, rationale){
+  var n = parseInt(monthIndex, 10);
+  if(!plan.steps) plan.steps = [];
+  plan.steps.forEach(function(s, i){
+    if(s && !(parseInt(s.monthIndex, 10) >= 1)) s.monthIndex = i + 1;
+  });
+  var step = null;
+  plan.steps.forEach(function(s){
+    if(s && parseInt(s.monthIndex, 10) === n) step = s;
+  });
+  if(step && step.pinned) return null;
+  if(!step){
+    step = { id: 's' + n, title: '', summary: '', rationale: '', pinned: false, monthIndex: n };
+    plan.steps.push(step);
+  }
+  step.monthIndex = n;
+  step.title = monthGoalTitle_(n, title);
+  step.rationale = rationale || '';
+  step.summary = String(rationale || title).replace(/\s+/g, ' ').trim().slice(0, 90);
+  plan.steps.sort(function(a, b){
+    return (parseInt(a.monthIndex, 10) || 99) - (parseInt(b.monthIndex, 10) || 99);
+  });
+  return step;
+}
+function monthGoalPlainTitle_(title){
+  return String(title || '').replace(/^\d+\s*단계\s*[·—\-:.]?\s*/u, '').trim();
+}
+function monthSlotsForQuarter_(catId, qi){
+  var bounds = quarterStepBounds_(qi);
+  var steps = (getProgramPlanMeta_(catId).steps) || [];
+  var byIndex = {};
+  steps.forEach(function(s, i){
+    var n = stepMonthIndex_(s, i);
+    if(n >= bounds.start && n <= bounds.end) byIndex[n] = s;
+  });
+  var slots = [];
+  for(var n = bounds.start; n <= bounds.end; n++){
+    var s = byIndex[n];
+    var title = s ? String(s.title || '').trim() : '';
+    var rationale = s ? String(s.rationale || s.summary || '').trim() : '';
+    slots.push({
+      index: n,
+      title: title,
+      rationale: rationale,
+      selected: !!title,
+      deleted: false
+    });
+  }
+  return slots;
+}
+function clearMonthGoalStep_(plan, monthIndex){
+  var n = parseInt(monthIndex, 10);
+  if(!plan || !plan.steps) return false;
+  plan.steps.forEach(function(s, i){
+    if(s && !(parseInt(s.monthIndex, 10) >= 1)) s.monthIndex = i + 1;
+  });
+  var step = null;
+  plan.steps.forEach(function(s){
+    if(s && parseInt(s.monthIndex, 10) === n) step = s;
+  });
+  if(!step || !String(step.title || '').trim()) return false;
+  step.title = '';
+  step.rationale = '';
+  step.summary = '';
+  return true;
+}
+function renderMonthQuarterPickerHTML_(){
+  var periods = (getYearPlan_().periods) || [];
+  var html = '<p class="ws-intro">분기를 누르면 매월 목표가 펼쳐집니다. 있는 목표는 그대로 보이고, 없는 칸은 비어 있습니다.</p>';
+  html += '<div class="quarter-pick-list">';
+  for(var i = 0; i < 4; i++){
+    var p = periods[i] || {};
+    var goal = String(p.goal || p.topic || '').trim();
+    html += '<button type="button" class="quarter-pick-btn" onclick="expandMonthQuarter_(' + i + ')">' +
+      '<span class="quarter-pick-kicker">' + (i + 1) + '분기 · ' + escapeHtml(quarterStepRangeLabel_(i)) + '</span>' +
+      '<span class="quarter-pick-goal">' + escapeHtml(goal || '분기 목표 없음') + '</span>' +
+    '</button>';
+  }
+  html += '</div>';
+  return html;
+}
+function renderMonthSuggestBodyHTML_(){
+  var sug = state.monthPlanSuggest;
+  if(sug && sug.loading && sameCatId_(sug.catId, state.currentCat)){
+    var qLabel = (parseInt(sug.quarterIndex, 10) + 1) + '분기 · ' + quarterStepRangeLabel_(sug.quarterIndex);
+    var emptyN = (sug.months || []).filter(function(it){ return !String(it && it.title || '').trim(); }).length;
+    var genWord = emptyN && emptyN < 3 ? '비어 있는 칸만' : '매월 목표';
+    return renderWsGeneratingHTML_(escapeHtml(qLabel) + '의 <strong>' + genWord + '</strong>를 이 프로그램에 맞춰 추천하고 있어요.', 22, { startedAt: sug.startedAt || Date.now(), estimateSec: 22 });
+  }
+  if(!sug || !sameCatId_(sug.catId, state.currentCat) || sug.picking || !(sug.quarterIndex >= 0)){
+    return renderMonthQuarterPickerHTML_();
+  }
+  var months = sug.months || [];
+  var ctx = quarterPlanContext_(sug.quarterIndex);
+  var html = '<p class="ws-intro"><strong>' + escapeHtml(ctx.label + ' · ' + ctx.range) + '</strong></p>';
+  if(ctx.goal) html += '<p class="ws-intro">분기 목표: ' + escapeHtml(ctx.goal) + '</p>';
+  html += '<div class="month-goal-list">';
+  months.forEach(function(it, idx){
+    var title = monthGoalPlainTitle_(it.title);
+    var empty = !title;
+    html += '<div class="month-goal-box' + (empty ? ' is-empty' : '') + (it.selected && !empty ? ' is-selected' : '') + '"' +
+      (empty ? '' : ' onclick="toggleMonthSuggestItem_(\'month\',' + idx + ')"') + '>' +
+      (empty ? '' : '<button type="button" class="month-goal-del" onclick="event.stopPropagation();deleteMonthSuggestSlot_(' + idx + ')">삭제</button>') +
+      '<div class="month-goal-kicker">' + (it.index || (idx + 1)) + '단계' + (it.selected && !empty ? ' · 적용' : '') + '</div>' +
+      '<div class="month-goal-title">' + escapeHtml(empty ? '비어 있음' : title) + '</div>' +
+      (!empty && it.rationale ? '<div class="month-goal-rationale">' + escapeHtml(it.rationale) + '</div>' : '') +
+    '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+function renderMonthSuggestFooterHTML_(){
+  var sug = state.monthPlanSuggest;
+  if(!sug || !sameCatId_(sug.catId, state.currentCat) || sug.picking || !(sug.quarterIndex >= 0)){
+    return '<div class="ws-actions"><button type="button" class="modal-btn-ghost" onclick="closePlanWorkshop_()">취소</button></div>';
+  }
+  if(sug.loading) return '';
+  var months = sug.months || [];
+  var filled = months.filter(function(it){ return String(it && it.title || '').trim(); }).length;
+  var monthN = months.filter(function(it){ return it && it.selected && String(it.title || '').trim(); }).length;
+  var clearedN = months.filter(function(it){ return it && it.deleted && !String(it.title || '').trim(); }).length;
+  var qi = parseInt(sug.quarterIndex, 10) || 0;
+  var genLabel = filled ? '재생성' : '생성';
+  var applyLabel = monthN ? ('선택 ' + monthN + '개 적용') : '비운 칸 적용';
+  return '<div class="ws-actions">' +
+    '<button type="button" class="modal-btn ws-btn-ai" onclick="generateMonthPlanSuggest_(' + qi + ')">' + genLabel + '</button>' +
+    '<button type="button" class="modal-btn" onclick="applySelectedMonthSuggest_()"' + ((monthN || clearedN) ? '' : ' disabled') + '>' + applyLabel + '</button>' +
+    '<button type="button" class="modal-btn-ghost" onclick="monthSuggestPickQuarter_()">다른 분기</button>' +
+  '</div>';
+}
+window.toggleMonthSuggestItem_ = function(kind, idx){
+  var sug = state.monthPlanSuggest;
+  if(!sug) return;
+  var list = kind === 'topic' ? sug.topics : sug.months;
+  if(!list || !list[idx]) return;
+  list[idx].selected = !list[idx].selected;
+  refreshPlanWorkshopModal_();
+};
+window.expandMonthQuarter_ = function(quarterIndex){
+  quarterIndex = parseInt(quarterIndex, 10);
+  if(!(quarterIndex >= 0 && quarterIndex <= 3)) return;
+  var catId = state.currentCat;
+  state.planWorkshopFocus = 'month';
+  state.planWorkshopMode = 'month';
+  state.monthPlanSuggest = {
+    catId: catId,
+    quarterIndex: quarterIndex,
+    picking: false,
+    loading: false,
+    months: monthSlotsForQuarter_(catId, quarterIndex)
+  };
+  refreshPlanWorkshopModal_();
+};
+window.deleteMonthSuggestSlot_ = function(idx){
+  var sug = state.monthPlanSuggest;
+  if(!sug || !sug.months || !sug.months[idx]) return;
+  var it = sug.months[idx];
+  it.title = '';
+  it.rationale = '';
+  it.selected = false;
+  it.deleted = true;
+  refreshPlanWorkshopModal_();
+};
+window.generateMonthPlanSuggest_ = async function(quarterIndex){
+  quarterIndex = parseInt(quarterIndex, 10);
+  if(!(quarterIndex >= 0 && quarterIndex <= 3)) quarterIndex = 0;
+  if(!state.apiKey){ openApiModal(); return; }
+  if(plannerAiBusy) return;
+  var catId = state.currentCat;
+  var cat = CATEGORIES[catId];
+  if(!cat || isOpsManualCategory(catId)) return;
+  var bounds = quarterStepBounds_(quarterIndex);
+  var ctx = quarterPlanContext_(quarterIndex);
+  var prev = (state.monthPlanSuggest && sameCatId_(state.monthPlanSuggest.catId, catId) && state.monthPlanSuggest.quarterIndex === quarterIndex && state.monthPlanSuggest.months && state.monthPlanSuggest.months.length)
+    ? state.monthPlanSuggest.months
+    : monthSlotsForQuarter_(catId, quarterIndex);
+  var need = prev.filter(function(it){ return !String(it && it.title || '').trim(); });
+  if(!need.length){
+    if(typeof setAppToast === 'function') setAppToast('채워진 목표는 그대로 둡니다.\n삭제하거나 비운 칸만 다시 만들어요.', { duration: 3600 });
+    return;
+  }
+  plannerAiBusy = true;
+  state.planWorkshopFocus = 'month';
+  state.monthPlanSuggest = { catId: catId, quarterIndex: quarterIndex, picking: false, loading: true, startedAt: Date.now(), months: prev };
+  if(!document.getElementById('plan-workshop-overlay').classList.contains('open')) openPlanWorkshop_('month');
+  else refreshPlanWorkshopModal_();
+  var keepLines = prev.filter(function(it){ return String(it && it.title || '').trim(); }).map(function(it){
+    return it.index + '. ' + monthGoalPlainTitle_(it.title) + (it.rationale ? ' — ' + it.rationale : '');
+  }).join('\n');
+  var needIndexes = need.map(function(it){ return it.index; });
+  try {
+    var prompt =
+buildBrandStrategyPromptPrefix_() + '\n\n' +
+buildProgramPlanContextBlock_(catId) + '\n\n' +
+'프로그램: ' + cat.name + '\n' +
+'[1년 목표] ' + (ctx.yearGoal || '(없음)') + '\n' +
+(ctx.yearIntent ? '[1년 의도] ' + ctx.yearIntent + '\n' : '') +
+'[' + ctx.label + ' · ' + ctx.range + ']\n' +
+'분기 목표: ' + (ctx.goal || '(없음)') + '\n' +
+'분기 의도: ' + (ctx.rationale || '(없음)') + '\n\n' +
+'이 분기에서 비어 있는 매월 목표만 추천하세요. 주제 글은 쓰지 마세요.\n' +
+(keepLines ? '[유지할 목표 — 출력하지 마세요]\n' + keepLines + '\n\n' : '') +
+'- months: 길이 ' + need.length + '. index는 ' + needIndexes.join(', ') + ' 만.\n' +
+'- title은 단계 번호 없이 그 달의 목표 한 줄. rationale은 의도 2문장.\n' +
+'JSON: {"months":[{"index":' + needIndexes[0] + ',"title":"…","rationale":"…"}]}';
+    var text = await callClaudePlanner_(prompt, { maxTokens: 1400 });
+    var obj = parsePlannerAiJsonObject_(text);
+    var used = {};
+    (obj.months || []).forEach(function(m, i){
+      var title = sanitizePersonalBrandText_(String((m && (m.title || m.goal)) || '').trim());
+      title = title.replace(/^\d+\s*단계\s*[·—\-:.]?\s*/u, '').trim();
+      if(!title) return;
+      var index = parseInt(m && m.index, 10);
+      var slot = null;
+      if(needIndexes.indexOf(index) >= 0 && !used[index]){
+        prev.forEach(function(it){ if(it.index === index) slot = it; });
+      }
+      if(!slot){
+        need.forEach(function(it){
+          if(slot || used[it.index]) return;
+          if(i === need.indexOf(it)) slot = it;
+        });
+      }
+      if(!slot || used[slot.index] || String(slot.title || '').trim()) return;
+      used[slot.index] = true;
+      slot.title = monthGoalTitle_(slot.index, title);
+      slot.rationale = sanitizePersonalBrandText_(String((m && m.rationale) || '').trim());
+      slot.selected = true;
+      slot.deleted = false;
+    });
+    var filledNow = Object.keys(used).length;
+    if(!filledNow) throw new Error('추천 결과를 찾지 못했어요');
+    state.monthPlanSuggest = { catId: catId, quarterIndex: quarterIndex, picking: false, loading: false, months: prev };
+    if(typeof setAppToast === 'function'){
+      setAppToast(ctx.label + '에서 빈 칸 ' + filledNow + '개를 채웠어요.\n적용할 항목을 고른 뒤 적용해 주세요.', { duration: 4500, variant: 'ok' });
+    }
+  } catch(e){
+    state.monthPlanSuggest = { catId: catId, quarterIndex: quarterIndex, picking: false, loading: false, months: prev };
+    if(typeof setAppToast === 'function') setAppToast('매월 기획 실패\n' + ((e && e.message) || e), { duration: 6500, variant: 'err' });
+  } finally {
+    plannerAiBusy = false;
+    if(document.getElementById('plan-workshop-overlay').classList.contains('open')) refreshPlanWorkshopModal_();
+    renderMain();
+  }
+};
+window.monthSuggestPickQuarter_ = function(){
+  var catId = state.currentCat;
+  state.monthPlanSuggest = { catId: catId, picking: true, loading: false, months: [] };
+  state.planWorkshopMode = 'month';
+  refreshPlanWorkshopModal_();
+};
+window.openMonthPlanSuggest_ = function(){
+  state.planWorkshopFocus = 'month';
+  state.monthPlanSuggest = { catId: state.currentCat, picking: true, loading: false, months: [] };
+  openPlanWorkshop_('month');
+};
+window.applySelectedMonthSuggest_ = function(){
+  var sug = state.monthPlanSuggest;
+  var catId = state.currentCat;
+  if(!sug || sug.loading || sug.picking || !sameCatId_(sug.catId, catId)) return;
+  var months = (sug.months || []).filter(function(it){ return it && it.selected && String(it.title || '').trim(); });
+  var cleared = (sug.months || []).filter(function(it){ return it && it.deleted && !String(it.title || '').trim(); });
+  if(!months.length && !cleared.length){
+    if(typeof setAppToast === 'function') setAppToast('적용할 월 목표를 선택해 주세요.', { duration: 3000, variant: 'err' });
+    return;
+  }
+  var ctx = quarterPlanContext_(sug.quarterIndex);
+  var confirmMsg = ctx.label + '에서 선택한 월 목표 ' + months.length + '개를 적용할까요?';
+  if(cleared.length) confirmMsg = ctx.label + '에서 월 목표 ' + months.length + '개를 적용하고, 비운 ' + cleared.length + '개를 지울까요?';
+  if(!confirm(confirmMsg)) return;
+  if(!state.branding || typeof state.branding !== 'object') state.branding = {};
+  if(!state.branding.subGoalPlans) state.branding.subGoalPlans = {};
+  var plan = peekSubGoalPlan_(catId);
+  if(!plan){
+    state.branding.subGoalPlans[String(catId)] = {
+      steps: [],
+      miscLabel: SUBGOAL_MISC_LABEL,
+      updatedAt: new Date().toISOString()
+    };
+    plan = state.branding.subGoalPlans[String(catId)];
+  }
+  var applied = 0;
+  var pinned = 0;
+  var removed = 0;
+  cleared.forEach(function(m){
+    if(clearMonthGoalStep_(plan, m.index)) removed++;
+  });
+  months.slice().sort(function(a, b){ return (a.index || 0) - (b.index || 0); }).forEach(function(m){
+    var step = assignMonthGoalStep_(plan, m.index, monthGoalPlainTitle_(m.title), m.rationale || '');
+    if(step) applied++;
+    else pinned++;
+  });
+  plan.updatedAt = new Date().toISOString();
+  state.monthPlanSuggest = null;
+  save({ driveImmediate: true, gasImmediate: true });
+  closePlanWorkshopForce_();
+  renderMain();
+  if(typeof setAppToast === 'function'){
+    var msg = ctx.label + ' 월 목표 ' + applied + '개를 적용했어요.';
+    if(removed) msg += '\n비운 ' + removed + '개는 지웠어요.';
+    if(pinned) msg += '\n고정된 단계 ' + pinned + '개는 그대로 두었어요.';
+    setAppToast(msg, { duration: 4200, variant: 'ok' });
+  }
+};
+function renderStepTopicSuggestBodyHTML_(){
+  var sug = state.stepTopicSuggest;
+  if(sug && sug.loading && sameCatId_(sug.catId, state.currentCat)){
+    var topicEst = sug.estimateSec || 20;
+    var topicLeft = getCountdownSec_(sug.startedAt || Date.now(), topicEst);
+    var topicPct = Math.min(98, Math.round(((topicEst - topicLeft) / topicEst) * 100));
+    return '<div class="ws-generating-line">' +
+      '<span class="subgoal-gen-spinner"></span>' +
+      '<span class="ws-gen-oneline" id="ws-gen-countdown">주제 5개 기획 중 · ' + escapeHtml(formatCountdownLong_(topicLeft)) + '</span>' +
+    '</div>' +
+    '<div class="subgoal-gen-bar"><span id="ws-gen-progress" style="width:' + topicPct + '%"></span></div>';
+  }
+  if(!sug || !sameCatId_(sug.catId, state.currentCat)){
+    return '<p class="ws-intro">주제 추천을 준비하지 못했어요.</p>';
+  }
+  var topics = sug.topics || [];
+  var html = '<p class="ws-intro"><strong>' + escapeHtml(sug.stepLabel || '이 단계') + '</strong>에 넣을 주제입니다. 적용할 항목만 남겨 주세요.</p>';
+  if(sug.quarterGoal) html += '<p class="ws-intro">분기 목표: ' + escapeHtml(sug.quarterGoal) + '</p>';
+  if(!topics.length){
+    html += '<button type="button" class="modal-btn ws-btn-ai" onclick="generateStepTopicSuggest_()">다시 추천</button>';
+    return html;
+  }
+  html += '<div class="plan-suggest-group"><div class="plan-suggest-label">주제 5개</div><div class="daily-suggest-list">';
+  topics.forEach(function(it, idx){
+    html += '<label class="daily-suggest-item' + (it.selected ? ' selected' : '') + '" onclick="toggleStepTopicSuggestItem_(' + idx + ')">' +
+      '<input type="checkbox"' + (it.selected ? ' checked' : '') + ' tabindex="-1" onclick="event.preventDefault()" />' +
+      '<span class="daily-suggest-body">' +
+        '<span class="daily-suggest-topic">' + escapeHtml(it.topic || '') + '</span>' +
+        (it.angle ? '<span class="daily-suggest-angle">' + escapeHtml(it.angle) + '</span>' : '') +
+        (it.rationale ? '<span class="daily-suggest-angle">' + escapeHtml(it.rationale) + '</span>' : '') +
+      '</span></label>';
+  });
+  html += '</div></div>';
+  return html;
+}
+function renderStepTopicSuggestFooterHTML_(){
+  var sug = state.stepTopicSuggest;
+  if(!sug || sug.loading || !sameCatId_(sug.catId, state.currentCat)){
+    return '<div class="ws-actions"><button type="button" class="modal-btn-ghost" onclick="closePlanWorkshop_()">취소</button></div>';
+  }
+  var n = (sug.topics || []).filter(function(it){ return it && it.selected; }).length;
+  return '<div class="ws-actions">' +
+    '<button type="button" class="modal-btn ws-btn-ai" onclick="generateStepTopicSuggest_()">다시 추천</button>' +
+    '<button type="button" class="modal-btn" onclick="applySelectedStepTopics_()"' + (n ? '' : ' disabled') + '>선택 ' + n + '개 적용</button>' +
+    '<button type="button" class="modal-btn-ghost" onclick="closePlanWorkshop_()">취소</button>' +
+  '</div>';
+}
+window.toggleStepTopicSuggestItem_ = function(idx){
+  var sug = state.stepTopicSuggest;
+  if(!sug || !sug.topics || !sug.topics[idx]) return;
+  sug.topics[idx].selected = !sug.topics[idx].selected;
+  refreshPlanWorkshopModal_();
+};
+window.generateStepTopicSuggest_ = async function(){
+  var sug = state.stepTopicSuggest;
+  if(!sug || !sug.stepId) return;
+  if(!state.apiKey){ openApiModal(); return; }
+  if(plannerAiBusy) return;
+  var catId = sug.catId;
+  var cat = CATEGORIES[catId];
+  if(!cat) return;
+  var stepId = String(sug.stepId);
+  plannerAiBusy = true;
+  sug.loading = true;
+  sug.startedAt = Date.now();
+  sug.estimateSec = 20;
+  sug.topics = [];
+  ensurePlannerWaitTimer_();
+  if(!document.getElementById('plan-workshop-overlay').classList.contains('open')) openPlanWorkshop_('stepTopics');
+  else refreshPlanWorkshopModal_();
+  tickPlannerWaitUi_();
+  try {
+    var prompt =
+buildTopicPlanPromptPrefix_(catId, stepId) + '\n\n' +
+'[' + (sug.quarterLabel || '분기') + ' 목표]\n' + (sug.quarterGoal || '(없음)') + '\n' +
+(sug.quarterRationale ? '분기 의도: ' + sug.quarterRationale + '\n' : '') +
+'[이 단계의 매월 목표]\n' + (sug.stepLabel || '') + '\n' +
+(sug.stepRationale ? '단계 의도: ' + sug.stepRationale + '\n' : '') +
+'\n프로그램 「' + cat.name + '」의 이 단계에 쓸 블로그·콘텐츠 주제 5개만 추천하세요.\n' +
+'- topic은 글 제목, angle은 각도 한 줄, rationale은 왜 이 단계인지 한 문장.\n' +
+'JSON: {"topics":[{"topic":"…","angle":"…","rationale":"…"}]}';
+    var text = await callClaudePlanner_(prompt, { maxTokens: 1400 });
+    var obj = parsePlannerAiJsonObject_(text);
+    var topics = (obj.topics || []).map(function(t){
+      var topic = sanitizePersonalBrandText_(String((t && t.topic) || '').trim());
+      if(!topic) return null;
+      return {
+        topic: topic,
+        angle: sanitizePersonalBrandText_(String((t && t.angle) || '').trim()),
+        rationale: sanitizePersonalBrandText_(String((t && t.rationale) || '').trim()),
+        selected: true
+      };
+    }).filter(Boolean).slice(0, 5);
+    if(!topics.length) throw new Error('추천 결과를 찾지 못했어요');
+    sug.loading = false;
+    sug.topics = topics;
+    if(typeof setAppToast === 'function'){
+      setAppToast('주제 ' + topics.length + '개를 추천했어요.\n적용할 항목만 선택한 뒤 적용해 주세요.', { duration: 4200, variant: 'ok' });
+    }
+  } catch(e){
+    sug.loading = false;
+    sug.topics = [];
+    if(typeof setAppToast === 'function') setAppToast('주제 추천 실패\n' + ((e && e.message) || e), { duration: 6500, variant: 'err' });
+  } finally {
+    plannerAiBusy = false;
+    stopPlannerWaitTimerIfIdle_();
+    if(document.getElementById('plan-workshop-overlay').classList.contains('open')) refreshPlanWorkshopModal_();
+  }
+};
+window.openStepTopicSuggest_ = function(catId, stepId){
+  catId = parseInt(catId, 10);
+  stepId = String(stepId || '');
+  var plan = getSubGoalPlan_(catId);
+  if(!plan || !plan.steps) return;
+  var step = null;
+  var stepPos = -1;
+  plan.steps.forEach(function(s, i){
+    if(s && String(s.id) === stepId){ step = s; stepPos = i; }
+  });
+  if(!step){
+    if(typeof setAppToast === 'function') setAppToast('단계를 찾을 수 없어요.', { duration: 3000, variant: 'err' });
+    return;
+  }
+  var num = stepMonthIndex_(step, stepPos);
+  var qi = Math.floor((num - 1) / 3);
+  var ctx = quarterPlanContext_(qi);
+  state.currentCat = catId;
+  state.stepTopicSuggest = {
+    catId: catId,
+    stepId: stepId,
+    stepLabel: step.title || (num + '단계'),
+    stepRationale: String(step.rationale || step.summary || '').trim(),
+    quarterIndex: qi,
+    quarterLabel: ctx.label + ' · ' + ctx.range,
+    quarterGoal: ctx.goal,
+    quarterRationale: ctx.rationale,
+    loading: false,
+    topics: []
+  };
+  openPlanWorkshop_('stepTopics');
+  generateStepTopicSuggest_();
+};
+window.applySelectedStepTopics_ = function(){
+  var sug = state.stepTopicSuggest;
+  var catId = state.currentCat;
+  if(!sug || sug.loading || !sameCatId_(sug.catId, catId)) return;
+  var topics = (sug.topics || []).filter(function(it){ return it && it.selected && it.topic; });
+  if(!topics.length){
+    if(typeof setAppToast === 'function') setAppToast('적용할 주제를 선택해 주세요.', { duration: 3000, variant: 'err' });
+    return;
+  }
+  if(!confirm('선택한 주제 ' + topics.length + '개를 이 단계에 넣을까요?')) return;
+  var cat = CATEGORIES[catId];
+  var plan = getSubGoalPlan_(catId);
+  if(!cat || !plan) return;
+  var step = (plan.steps || []).find(function(s){ return s && String(s.id) === String(sug.stepId); });
+  if(!step) return;
+  var existingTopics = {};
+  (cat.drafts || []).forEach(function(d){
+    var key = String((d && d.topic) || '').replace(/\s+/g, '').toLowerCase();
+    if(key) existingTopics[key] = true;
+  });
+  var added = 0;
+  var skipped = 0;
+  topics.forEach(function(it){
+    var topic = String(it.topic).trim();
+    var key = topic.replace(/\s+/g, '').toLowerCase();
+    if(existingTopics[key]){ skipped++; return; }
+    existingTopics[key] = true;
+    var draft = {
+      id: makeExtraDraftId_(catId, added),
+      topic: topic,
+      angle: it.angle || '',
+      rationale: it.rationale || '',
+      createdAt: new Date().toISOString(),
+      series: getDefaultSeriesForCat_(catId),
+      pillar: getDefaultPillarForCat_(catId)
+    };
+    cat.drafts.push(draft);
+    var order = getDraftsForSubGoalStep_(catId, step.id, { live: true }).length + 1;
+    applyDraftRoadmapAssignment_(draft, catId, step.id, step.title, order, Math.max(order, 1));
+    added++;
+  });
+  state.stepTopicSuggest = null;
+  save({ driveImmediate: true, gasImmediate: true });
+  closePlanWorkshopForce_();
+  renderMain();
+  if(typeof setAppToast === 'function'){
+    var msg = '주제 ' + added + '개를 이 단계에 넣었어요.';
+    if(skipped) msg += '\n이미 있는 주제 ' + skipped + '개는 건너뛰었어요.';
+    setAppToast(msg, { duration: 4200, variant: 'ok' });
+  }
 };
 function startPlanGenTimer_(kind, catId){
   var est = kind === 'year' ? YEAR_PLAN_GEN_ESTIMATE_SEC : SUBGOAL_PLAN_GEN_ESTIMATE_SEC;
@@ -7291,6 +7933,11 @@ window.updatePendingPlanStrategyGuide_ = function(value){
 window.updatePendingYearIntent_ = function(value){
   if(!state.pendingYearPlan) return;
   state.pendingYearPlan.intent = sanitizePersonalBrandText_(String(value || ''));
+  persistPendingYearPlan_();
+};
+window.updatePendingYearGoal_ = function(value){
+  if(!state.pendingYearPlan) return;
+  state.pendingYearPlan.goal = sanitizePersonalBrandText_(String(value || ''));
   persistPendingYearPlan_();
 };
 window.updatePendingYearPeriodTopic_ = function(idx, value){
@@ -7391,7 +8038,8 @@ window.removePendingStep_ = function(stepIdx){
   persistPendingSubGoalPlan_();
   refreshPlanWorkshopOrMain_();
 };
-window.generateYearPlanWorkshopWithAI_ = async function(){
+window.generateYearPlanWorkshopWithAI_ = async function(opts){
+  opts = opts || {};
   if(!state.apiKey){ openApiModal(); return; }
   if(plannerAiBusy) return;
   ensurePendingYearPlanFromCurrent_();
@@ -7403,7 +8051,7 @@ window.generateYearPlanWorkshopWithAI_ = async function(){
     return;
   }
   var confirmMsg = buildYearAiSuggestConfirmMsg_(stats);
-  if(confirmMsg && !confirm(confirmMsg)) return;
+  if(!opts.skipConfirm && confirmMsg && !confirm(confirmMsg)) return;
   plannerAiBusy = true;
   startPlanGenTimer_('year');
   if(!document.getElementById('plan-workshop-overlay').classList.contains('open')) openPlanWorkshop_('year');
@@ -7438,7 +8086,8 @@ buildBrandStrategyPromptPrefix_() + '\n\n' +
 YEAR_BRAND_WRITING_RULE + '\n' +
 '- intent·pillars는 응답 JSON에 넣지 마세요.\n' +
 '- periods[].index: 1~4 분기 번호\n' +
-'- periods[].rationale: 2~4문장\n' +
+'- periods[].goal: 그 분기 목표 한 줄\n' +
+'- periods[].rationale: 의도 2~4문장\n' +
 'JSON: {"periods":[{"index":2,"topic":"…","goal":"…","rationale":"…"}]}';
     } else {
       var currentBlock = p.periods.map(function(per, i){
@@ -7449,15 +8098,17 @@ YEAR_BRAND_WRITING_RULE + '\n' +
       }).join('\n\n');
       prompt =
 buildBrandStrategyPromptPrefix_() + '\n\n' +
-'미카닥 박준규 **마스터 브랜드** 1년 기획을 4분기(각 3개월) 주제로 제안하세요. (프로그램별 콘텐츠 로드맵은 각 탭에서 별도 기획)\n' +
+'미카닥 박준규 **마스터 브랜드**의 4분기(각 3개월) **목표**를 제안하세요. 1년 목표·의도는 유지하고, 프로그램별 월 목표는 건드리지 마세요.\n' +
 '[마스터 북극성] ' + MASTER_BRAND_NORTH_STAR + '\n' +
 YEAR_BRAND_WRITING_RULE + '\n' +
 '현재 기획 의도(반드시 반영·클리닉명이 있으면 미카닥 박준규로 바꿔 작성): ' + sanitizePersonalBrandText_(p.intent || '') + '\n\n' +
 '[현재 분기별 수정 내용 참고]\n' + currentBlock + '\n\n' +
-'- intent: 전체 1년 기획 의도 3~5문장(순서 이유·브랜드 메시지·독자 변화)\n' +
-'- periods[].topic: 분기별 브랜드 주제 한 줄\n' +
-'- periods[].rationale: 그 분기 의도 2~4문장(왜 이 시기에 이 주제·독자가 얻을 것)\n' +
-'JSON: {"intent":"…","pillars":["…"],"periods":[{"topic":"…","goal":"…","rationale":"…"},…4개]}';
+'1년 목표(유지): ' + (p.goal || '(없음)') + '\n' +
+'- periods[].goal: 그 분기 목표 한 줄(3개월 뒤 독자·브랜드가 도달할 상태)\n' +
+'- periods[].topic: goal과 같은 한 줄\n' +
+'- periods[].rationale: 그 분기 의도 2~4문장(왜 이 시기에 이 목표인지)\n' +
+'- intent는 응답 JSON에 넣지 마세요. 1년 목표는 바꾸지 마세요.\n' +
+'JSON: {"periods":[{"topic":"…","goal":"…","rationale":"…"},…4개]}';
     }
     var text = await callClaudePlanner_(prompt, { maxTokens: isPartial ? 1800 : 2200 });
     var obj = parsePlannerAiJsonObject_(text);
@@ -7490,7 +8141,8 @@ YEAR_BRAND_WRITING_RULE + '\n' +
       });
       while(defs.length < 4) defs.push({ topic: '', goal: '', rationale: '', months: 3, createdAt: now, pinned: false });
       state.pendingYearPlan = sanitizeYearPlanObj_({
-        intent: String(p.intent || obj.intent || '').trim(),
+        goal: String(p.goal || '').trim(),
+        intent: String(p.intent || '').trim(),
         pillars: (obj.pillars && obj.pillars.length) ? obj.pillars.map(String) : brand.pillars.slice(),
         anchorDate: plan.anchorDate,
         periods: buildRollingPeriodsWithMonths_(plan.anchorDate, defs)
@@ -7498,7 +8150,7 @@ YEAR_BRAND_WRITING_RULE + '\n' +
       persistPendingYearPlan_();
       refreshPlanWorkshopModal_();
       renderMain();
-      if(typeof setAppToast === 'function') setAppToast('기획 의도와 4분기 주제를 제안했어요.', { duration: 4000, variant: 'ok' });
+      if(typeof setAppToast === 'function') setAppToast('4분기 목표와 의도를 제안했어요. 고친 뒤 적용해 주세요.', { duration: 4000, variant: 'ok' });
     }
   } catch(e){
     if(typeof setAppToast === 'function') setAppToast('1년 기획 실패\n' + ((e && e.message) || e), { duration: 6000, variant: 'err' });
@@ -7512,9 +8164,11 @@ function commitPendingYearPlan_(){
   if(!p || !p.periods || !p.periods.length) return false;
   sanitizeYearPlanObj_(p);
   if(!state.branding || typeof state.branding !== 'object') state.branding = {};
-  state.branding.yearPlan = {
-    anchorDate: p.anchorDate || new Date().toISOString().slice(0, 10),
-    periods: p.periods.map(function(per, i){
+  var prev = (state.branding.yearPlan && typeof state.branding.yearPlan === 'object') ? state.branding.yearPlan : {};
+  var focus = state.planWorkshopFocus === 'quarter' ? 'quarter' : 'year';
+  var periods = (focus === 'year' && prev.periods && prev.periods.length)
+    ? prev.periods
+    : p.periods.map(function(per, i){
       return {
         index: i,
         start: per.start,
@@ -7526,9 +8180,13 @@ function commitPendingYearPlan_(){
         months: parseInt(per.months, 10) || 3,
         createdAt: per.createdAt || ''
       };
-    }),
+    });
+  state.branding.yearPlan = {
+    anchorDate: (focus === 'year' && prev.anchorDate) ? prev.anchorDate : (p.anchorDate || prev.anchorDate || new Date().toISOString().slice(0, 10)),
+    periods: periods,
     confirmed: true,
-    intent: p.intent || '',
+    goal: focus === 'quarter' ? (prev.goal || p.goal || '') : (p.goal || ''),
+    intent: focus === 'quarter' ? (prev.intent || p.intent || '') : (p.intent || ''),
     updatedAt: new Date().toISOString()
   };
   if(p.pillars && p.pillars.length) state.branding.pillars = p.pillars.slice();
@@ -7538,13 +8196,18 @@ function commitPendingYearPlan_(){
   save({ driveImmediate: true, gasImmediate: true });
   closePlanWorkshopForce_();
   renderMain();
-  if(typeof setAppToast === 'function') setAppToast('1년 브랜드 기획을 적용했어요.', { duration: 3500, variant: 'ok' });
+  if(typeof setAppToast === 'function'){
+    setAppToast(focus === 'quarter' ? '분기별 목표를 적용했어요.' : '1년 목표와 의도를 적용했어요.', { duration: 3500, variant: 'ok' });
+  }
   return true;
 }
 window.applyPendingYearPlan_ = function(){
   var p = state.pendingYearPlan;
   if(!p || !p.periods || !p.periods.length) return;
-  var confirmMsg = hasYearPlanApplied_() ? '수정 사항을 적용할까요?' : '1년 브랜드 기획안을 적용할까요?';
+  var focus = state.planWorkshopFocus === 'quarter' ? 'quarter' : 'year';
+  var confirmMsg = focus === 'quarter'
+    ? '분기별 목표와 의도를 적용할까요?'
+    : '1년 목표와 기획 의도를 적용할까요?';
   if(!confirm(confirmMsg)) return;
   commitPendingYearPlan_();
 };
@@ -8096,15 +8759,19 @@ function planLayerCardHTML_(num, title, bodyHtml, onclickJs, tone){
 }
 function renderPlanLayerYearHTML_(){
   var meta = getYearPlanMeta_();
+  var goal = String(meta.goal || '').trim();
   var text = String(meta.intent || '').trim();
-  var body = text ? planLayerParagraphsHTML_(text) : '<p class="plan-layer-empty">1년 목표와 의도를 아직 적지 않았습니다.</p>';
-  return planLayerCardHTML_('1', '1년 목표와 의도', body, 'openYearPlanWorkshop_()', 'year');
+  var body = '';
+  if(goal) body += '<div class="plan-layer-item-goal">' + escapeHtml(goal) + '</div>';
+  if(text) body += '<div class="plan-layer-item-intent">' + planLayerParagraphsHTML_(text) + '</div>';
+  if(!body) body = '<p class="plan-layer-empty">1년 목표와 의도를 아직 적지 않았습니다.</p>';
+  return planLayerCardHTML_('1', '1년 목표와 의도', body, 'openYearPlanWorkshop_(\'year\')', 'year');
 }
 function renderPlanLayerQuarterHTML_(){
   var plan = getYearPlan_();
   var items = (plan.periods || []).map(function(p, i){
     var range = formatPeriodRangeLabel_(p.start, p.end) || ((i + 1) + '분기');
-    var goal = String(p.topic || p.goal || '').trim();
+    var goal = String(p.goal || p.topic || '').trim();
     var why = String(p.rationale || '').trim();
     var html = '<div class="plan-layer-item ' + getQuarterToneClass_(i) + (i === 0 ? ' is-current' : '') + '">' +
       '<div class="plan-layer-item-title">' + escapeHtml((i === 0 ? '이번 분기 · ' : '') + range) + '</div>';
@@ -8115,7 +8782,7 @@ function renderPlanLayerQuarterHTML_(){
     return html;
   }).join('');
   if(!items) items = '<p class="plan-layer-empty">분기 목표가 아직 없습니다.</p>';
-  return planLayerCardHTML_('2', '분기별 목표와 의도', items, 'openYearPlanWorkshop_()', 'quarter');
+  return planLayerCardHTML_('2', '분기별 목표와 의도', items, 'openYearPlanWorkshop_(\'quarter\')', 'quarter');
 }
 function periodHasQuarterGoal_(p){
   return !!(p && String(p.topic || p.goal || '').trim());
@@ -8133,14 +8800,25 @@ function monthStepGroups_(steps, opts){
   opts = opts || {};
   steps = steps || [];
   var planned = plannedQuarterGroupCount_();
-  var groupTotal = Math.ceil(steps.length / 3);
-  if(opts.limitToPlanned && planned > 0) groupTotal = Math.min(groupTotal, planned);
+  var buckets = [[], [], [], []];
+  steps.forEach(function(step, i){
+    if(!step || !String(step.title || '').trim()) return;
+    var n = stepMonthIndex_(step, i);
+    var q = Math.floor((n - 1) / 3);
+    if(q < 0 || q > 3) return;
+    if(opts.limitToPlanned && planned > 0 && q >= planned) return;
+    buckets[q].push({ step: step, num: n });
+  });
   var groups = [];
-  for(var g = 0; g < groupTotal; g++){
-    var slice = steps.slice(g * 3, g * 3 + 3);
-    if(!slice.length) continue;
-    groups.push({ index: g, steps: slice });
-  }
+  buckets.forEach(function(slice, q){
+    if(!slice.length) return;
+    slice.sort(function(a, b){ return a.num - b.num; });
+    groups.push({
+      index: q,
+      steps: slice.map(function(x){ return x.step; }),
+      nums: slice.map(function(x){ return x.num; })
+    });
+  });
   return groups;
 }
 function renderPlanLayerMonthHTML_(catId){
@@ -8163,22 +8841,23 @@ function renderPlanLayerMonthHTML_(catId){
     return planLayerCardHTML_('3', '매월 목표와 의도', bits.join('') || '<p class="plan-layer-empty">아직 없습니다.</p>', '', 'month');
   }
   var meta = getProgramPlanMeta_(catId);
-  var groups = monthStepGroups_(meta.steps || [], { limitToPlanned: true });
+  var groups = monthStepGroups_(meta.steps || []);
   var parts = [];
   groups.forEach(function(group, gi){
     if(gi) parts.push('<div class="plan-layer-quarter-gap"></div>');
+    parts.push('<div class="plan-layer-quarter-label">' + (group.index + 1) + '분기 · ' + escapeHtml(quarterStepRangeLabel_(group.index)) + '</div>');
     group.steps.forEach(function(s, j){
-      var i = group.index * 3 + j;
+      var num = (group.nums && group.nums[j]) || (group.index * 3 + j + 1);
       var why = String(s.rationale || s.summary || '').trim();
-      parts.push('<div class="plan-layer-item ' + getStepToneClass_(i) + '">' +
-        '<div class="plan-layer-item-title">' + escapeHtml((i + 1) + '. ' + (s.title || '단계')) + '</div>' +
+      parts.push('<div class="plan-layer-item ' + getStepToneClass_(num - 1) + '">' +
+        '<div class="plan-layer-item-title">' + escapeHtml(num + '. ' + (s.title || '단계')) + '</div>' +
         (why ? '<div class="plan-layer-item-intent">' + planLayerParagraphsHTML_(why) + '</div>' : '') +
       '</div>');
     });
   });
   var items = parts.join('');
   if(!items) items = '<p class="plan-layer-empty">이 프로그램의 월별 단계가 아직 없습니다.</p>';
-  return planLayerCardHTML_('3', '매월 목표와 의도', items, 'openProgramPlanWorkshop_()', 'month');
+  return planLayerCardHTML_('3', '매월 목표와 의도', items, 'openMonthPlanSuggest_()', 'month');
 }
 function renderPlanLayersHTML_(catId){
   return '<section class="plan-layers">' +
@@ -8209,7 +8888,7 @@ function renderMainGoalPanelHTML_(){
   var rangeLabel = formatPeriodRangeLabel_(current.start, current.end) || getBranding_().quarterLabel;
   var text = String(current.topic || current.goal || '').trim() || '이번 분기 결론을 한 줄로 적어 주세요.';
   return renderYearWorkshopStripHTML_() +
-    '<button type="button" class="quarter-conclusion ' + getQuarterToneClass_(0) + '" onclick="openYearPlanWorkshop_()">' +
+    '<button type="button" class="quarter-conclusion ' + getQuarterToneClass_(0) + '" onclick="openYearPlanWorkshop_(\'quarter\')">' +
       '<span class="quarter-conclusion-label">이번 분기 · ' + escapeHtml(rangeLabel) + '</span>' +
       '<span class="quarter-conclusion-text">' + escapeHtml(text) + '</span>' +
       '<span class="quarter-conclusion-cta">자세히</span>' +
@@ -8225,16 +8904,20 @@ function renderSubGoalStepBlockHTML_(catId, step, idx, activeId){
   var drafts = getDraftsForSubGoalStep_(catId, sid);
   var shown = filterDraftsByTopicListMode_(drafts, catId);
   if(getTopicListMode_() === 'published' && !shown.length) return '';
-  var html = '<div class="subgoal-step-block ' + getPlanTierClass_('topic-plan') + (isActive ? ' active' : '') + '" data-plan-tier="3">' +
-    '<div class="subgoal-step-block-head">' +
+  var collapsed = isSubGoalStepCollapsed_(catId, sid);
+  var stepKey = subGoalStepKey_(catId, sid).replace(/'/g, '');
+  var html = '<div class="subgoal-step-block ' + getPlanTierClass_('topic-plan') + (isActive ? ' active' : '') + (collapsed ? ' collapsed' : '') + '" data-plan-tier="3">' +
+    '<div class="subgoal-step-block-head" role="button" tabindex="0" onclick="toggleSubGoalStep_(\'' + stepKey + '\')">' +
       '<div class="subgoal-step-head-static">' +
         '<span class="subgoal-step-num">' + (idx + 1) + '</span>' +
         '<span class="subgoal-step-main">' +
           '<span class="subgoal-step-title">' + escapeHtml(step.title || '') + '</span>' +
+          '<span class="subgoal-step-count">(' + countFilledStepTopics_(drafts, catId) + ')</span>' +
         '</span>' +
       '</div>' +
+      '<button type="button" class="subgoal-topic-gen-btn" onclick="event.stopPropagation();openStepTopicSuggest_(' + catId + ',\'' + sid.replace(/'/g, '') + '\')">주제 생성</button>' +
     '</div>';
-  html += renderSubGoalStepCardsHTML_(catId, drafts, false);
+  html += renderSubGoalStepCardsHTML_(catId, drafts, collapsed);
   html += '</div>';
   return html;
 }
@@ -8362,7 +9045,7 @@ function renderProgramRoadmapHTML_(catId){
       '<button type="button" class="program-pending-banner-btn" onclick="openProgramPlanWorkshop_()">기획안 열기</button>' +
     '</div>';
   }
-  if(plan && plan.steps && plan.steps.length > 5){
+  if(plan && plan.steps && plan.steps.length > 12){
     html += '<div class="program-pending-banner program-prune-banner">' +
       '<span class="program-pending-banner-label">단계 중복</span>' +
       '같은 단계가 <strong>' + plan.steps.length + '줄</strong>로 쌓여 있어요. 동기화 잔재를 정리합니다.' +
@@ -8398,23 +9081,27 @@ function renderProgramRoadmapHTML_(catId){
   var stepGroups = monthStepGroups_(plan.steps);
   stepGroups.forEach(function(group, gi){
     if(gi) html += '<div class="subgoal-quarter-gap"></div>';
+    html += '<div class="subgoal-quarter-label">' + (group.index + 1) + '분기 · ' + escapeHtml(quarterStepRangeLabel_(group.index)) + '</div>';
     group.steps.forEach(function(step, j){
-      html += renderSubGoalStepBlockHTML_(catId, step, group.index * 3 + j, activeId);
+      var num = (group.nums && group.nums[j]) || (group.index * 3 + j + 1);
+      html += renderSubGoalStepBlockHTML_(catId, step, num - 1, activeId);
     });
   });
   var misc = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID);
   var miscShown = filterDraftsByTopicListMode_(misc, catId);
   if(miscShown.length){
-    html += '<div class="subgoal-step-block misc step-tone-misc">' +
-      '<div class="subgoal-step-block-head">' +
+    var miscCollapsed = isSubGoalStepCollapsed_(catId, SUBGOAL_MISC_ID);
+    var miscKey = subGoalStepKey_(catId, SUBGOAL_MISC_ID).replace(/'/g, '');
+    html += '<div class="subgoal-step-block misc step-tone-misc' + (miscCollapsed ? ' collapsed' : '') + '">' +
+      '<div class="subgoal-step-block-head" role="button" tabindex="0" onclick="toggleSubGoalStep_(\'' + miscKey + '\')">' +
         '<div class="subgoal-step-head-static">' +
           '<span class="subgoal-step-num">·</span>' +
-          '<span class="subgoal-step-main"><span class="subgoal-step-title">' + escapeHtml(getSubGoalMiscLabel_(plan)) + '</span></span>' +
+          '<span class="subgoal-step-main"><span class="subgoal-step-title">' + escapeHtml(getSubGoalMiscLabel_(plan)) + '</span><span class="subgoal-step-count">(' + countFilledStepTopics_(misc, catId) + ')</span></span>' +
         '</div>' +
       '</div>' +
-      '<div class="subgoal-step-cards topic-lines">' + miscShown.map(function(d){
+      (miscCollapsed ? '' : '<div class="subgoal-step-cards topic-lines">' + miscShown.map(function(d){
         return draftCardHTML(d, cat, false, cat.drafts.indexOf(d), true);
-      }).join('') + '</div>' +
+      }).join('') + '</div>') +
     '</div>';
   }
   if(getTopicListMode_() === 'published' && !filterDraftsByTopicListMode_(getVisibleDraftsInMain_(catId), catId).length){
@@ -16929,6 +17616,7 @@ function collectExtraDrafts(){
       if(d.articleKind) row.articleKind = d.articleKind;
       if(d.previousRoadmapStepId) row.previousRoadmapStepId = d.previousRoadmapStepId;
       if(d.previousSeries) row.previousSeries = d.previousSeries;
+      if(d.miscLocked) row.miscLocked = true;
       return row;
     });
   });
@@ -16965,6 +17653,7 @@ function mergeExtraDrafts(byCat){
       if(d.dailyWho) merged.dailyWho = d.dailyWho;
       if(d.dailyWhat) merged.dailyWhat = d.dailyWhat;
       if(d.dailyBody) merged.dailyBody = d.dailyBody;
+      if(d.miscLocked) merged.miscLocked = true;
       if(merged && !merged.previousRoadmapStepId) delete merged.previousRoadmapStepId;
       if(merged && !merged.previousSeries) delete merged.previousSeries;
       // 저장돼 있던 roadmapStepId(주제 기획안 단계)를 존중. 없을 때만 기타로.
@@ -19274,7 +19963,7 @@ function renderTabs() {
       '<select class="cat-group-select" onclick="event.stopPropagation()" onchange="selectCat(parseInt(this.value,10))" aria-label="' + groupLabel + ' 프로그램 선택">' +
       options +
       '</select>' +
-      '<span class="cat-group-badge" title="현재 선택 프로그램의 진행 중 주제 수">' + activeCount + '</span>' +
+      '<span class="cat-group-badge" title="준비 글과 올린 글의 합">' + activeCount + '</span>' +
     '</div>';
   }
   function opsGroupSelectorHTML(){
@@ -19466,38 +20155,62 @@ function draftMatchesTopicListMode_(d, catId){
 function filterDraftsByTopicListMode_(drafts, catId){
   return (drafts || []).filter(function(d){ return draftMatchesTopicListMode_(d, catId); });
 }
-function renderTopicListModeBarHTML_(catId){
+function countTopicListBuckets_(catId){
   var drafts = getVisibleDraftsInMain_(catId);
   var pubN = 0;
   var writeN = 0;
   drafts.forEach(function(d){
+    if(!d || !d.id) return;
     if(draftShowsOnPublishedList_(d.id, catId)) pubN++;
     else if(!draftIsShelfEmpty_(d, catId)) writeN++;
   });
+  return { pubN: pubN, writeN: writeN, total: pubN + writeN };
+}
+function renderTopicListModeBarHTML_(catId){
+  var buckets = countTopicListBuckets_(catId);
+  var pubN = buckets.pubN;
+  var writeN = buckets.writeN;
   var mode = getTopicListMode_();
   return '<div class="topic-list-mode" role="tablist" aria-label="주제 목록">' +
     '<button type="button" class="topic-list-mode-btn' + (mode === 'write' ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 'write' ? 'true' : 'false') + '" onclick="setTopicListMode_(\'write\')">준비 글 <span>' + writeN + '</span></button>' +
     '<button type="button" class="topic-list-mode-btn' + (mode === 'published' ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 'published' ? 'true' : 'false') + '" onclick="setTopicListMode_(\'published\')">올린 글 <span>' + pubN + '</span></button>' +
-    '<button type="button" class="topic-list-mode-btn' + (mode === 'plan' ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 'plan' ? 'true' : 'false') + '" onclick="setTopicListMode_(\'plan\')">1년 기획안</button>' +
+    '<button type="button" class="topic-list-mode-btn topic-list-mode-btn-plan' + (mode === 'plan' ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 'plan' ? 'true' : 'false') + '" onclick="setTopicListMode_(\'plan\')">기획</button>' +
+  '</div>' +
+  (mode === 'published' ? renderPublishedChannelLegendHTML_(catId) : '');
+}
+function getPublishedLegendKeys_(catId){
+  if(isBlogInstaCategory(catId)) return ['blog', 'insta', 'image', 'threads'];
+  if(isDailyShareCategory(catId)) return ['image', 'thread'];
+  if(isHeiljagyaeCategory(catId)) return ['community', 'image'];
+  return getRequiredPublishKeysForCat_(catId);
+}
+function renderPublishedChannelLegendHTML_(catId){
+  var keys = getPublishedLegendKeys_(catId);
+  if(!keys.length) return '';
+  return '<div class="published-channel-legend" aria-label="올린 채널">' +
+    keys.map(function(k){
+      return '<span class="badge badge-channel badge-ch-' + k + '">' +
+        escapeHtml(getPublishChannelBadgeLabel_(k)) + '</span>';
+    }).join('') +
   '</div>';
+}
+function getDraftPublishedDotsHTML_(draftId, catId){
+  var keys = getDraftPublishedChannelKeys_(draftId, catId);
+  if(!keys.length) return '';
+  var labels = keys.map(getPublishChannelBadgeLabel_);
+  return '<span class="card-ch-dots" aria-label="' + escapeHtml(labels.join(', ')) + '">' +
+    keys.map(function(k){
+      return '<span class="card-ch-dot ch-dot-' + k + '" title="' +
+        escapeHtml(getPublishChannelBadgeLabel_(k)) + '"></span>';
+    }).join('') +
+  '</span>';
 }
 window.setTopicListMode_ = function(mode){
   state.topicListMode = mode === 'published' ? 'published' : (mode === 'plan' ? 'plan' : 'write');
   renderMain();
 };
-function getDraftChannelRemainHTML_(draftId, catId){
-  if(getTopicListMode_() !== 'published') return '';
-  var done = getDraftPublishedChannelKeys_(draftId, catId);
-  var required = getRequiredPublishKeysForCat_(catId);
-  var doneSet = {};
-  done.forEach(function(k){ doneSet[k] = true; });
-  var remain = required.filter(function(k){ return !doneSet[k]; });
-  if(!done.length){
-    return '<span class="card-ch-done">올림 · 날짜 기록</span>';
-  }
-  if(!remain.length) return '';
-  return '<span class="card-ch-left">남음 · ' +
-    escapeHtml(remain.map(getPublishChannelBadgeLabel_).join(' · ')) + '</span>';
+function getDraftChannelRemainHTML_(){
+  return '';
 }
 
 function draftIsFullyPublished_(draftId, catId){
@@ -19748,12 +20461,10 @@ window.forceDedupeSubGoalSteps_ = function(catId){
   }
 };
 
-/** 상단 탭 배지 — 메인 화면에 보이는 미발행 주제 수 */
+/** 상단 탭 배지 — 준비 글 + 올린 글 (빈 칸·기타 빈 주제는 제외) */
 function countUnpublishedTopicsForCat_(catIdx) {
   if(isOpsManualCategory(catIdx)) return countOpsManualUnchecked_(catIdx);
-  return getVisibleDraftsInMain_(catIdx).filter(function (d) {
-    return !draftIsPublished_(d.id);
-  }).length;
+  return countTopicListBuckets_(catIdx).total;
 }
 
 function countPendingDraftsInCat_(catId) {
@@ -19843,7 +20554,7 @@ function renderMiscTopicFilterBarHTML_(catId, drafts){
   var items = [
     { key: 'published', label: '발행완료' },
     { key: 'partial', label: '일부발행' },
-    { key: 'hasDraft', label: '초안있음' },
+    { key: 'hasDraft', label: '초안' },
     { key: 'noDraft', label: '초안 없음' }
   ];
   var html = '<div class="misc-topic-filters" role="group" aria-label="기타 주제 상태 필터" onclick="event.stopPropagation()">';
@@ -21306,7 +22017,9 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
   const hasDraft = draftIsPendingPublish_(d);
   const isPub = draftIsPublished_(d.id);
   const isPartialPub = !isPub && draftHasPartialPublish_(d.id, cat.id);
-  const publishBadges = getDraftPublishBadgesHTML_(d.id, cat.id);
+  const onPublishedList = getTopicListMode_() === 'published';
+  const publishDots = onPublishedList ? getDraftPublishedDotsHTML_(d.id, cat.id) : '';
+  const publishBadges = onPublishedList ? '' : getDraftPublishBadgesHTML_(d.id, cat.id);
   const color = cat.color;
   const brandMeta = getDraftBrandMeta_(d, cat.id, draftIndex);
   const stepBadge = formatDraftStepBadgeForDisplay_(d, cat.id, draftIndex);
@@ -21318,14 +22031,15 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
   const badges = [
     isDailyThoughtDraft_(d) ? '<span class="badge badge-thought">생각</span>' : '',
     isRec && d.recType==='related' ? '<span class="badge badge-rec">관련</span>' : '',
-    (hasDraft && !publishBadges && !draftShowsOnPublishedList_(d.id, cat.id)) ? '<span class="badge badge-gen">초안있음</span>' : '',
+    (hasDraft && !onPublishedList && !publishBadges && !draftShowsOnPublishedList_(d.id, cat.id)) ? '<span class="badge badge-gen">초안</span>' : '',
     publishBadges,
+    publishDots,
   ].filter(Boolean).join('');
   function oneLine_(value){
     return String(value || '').replace(/\s+/g, ' ').trim();
   }
   var intentLines = [];
-  var seriesLine = [brandMeta.series, stepBadge, brandMeta.pillar].filter(Boolean).join(' · ');
+  var seriesLine = compactInSeries ? '' : [brandMeta.series, stepBadge, brandMeta.pillar].filter(Boolean).join(' · ');
   if(seriesLine) intentLines.push('<div class="card-intent-line muted">' + escapeHtml(oneLine_(seriesLine)) + '</div>');
   if(d.angle) intentLines.push('<div class="card-intent-line">' + escapeHtml(oneLine_(d.angle)) + '</div>');
   if(brandMeta.rationale) intentLines.push('<div class="card-intent-line">' + escapeHtml(oneLine_(stripTopicRationaleStepPrefix_(brandMeta.rationale))) + '</div>');
@@ -21349,7 +22063,7 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
         for(var uo = ordIdx - 1; uo >= 0; uo--){ if(slotMapOrd[uo]){ canUpCard = true; break; } }
         for(var do_ = ordIdx + 1; do_ < slotMapOrd.length; do_++){ if(slotMapOrd[do_]){ canDownCard = true; break; } }
         orderBtns =
-          '<span class="draft-card-order-btns" title="순서 변경"><span class="card-order-word">순서</span>' +
+          '<span class="draft-card-order-btns" title="순서 변경">' +
             '<button type="button" class="draft-card-order-mini"' + (canUpCard ? '' : ' disabled') + ' title="순서 위로" onclick="event.stopPropagation();moveDraftCardOrder_(' + cat.id + ',\'' + d.id + '\',-1)">▲</button>' +
             '<button type="button" class="draft-card-order-mini"' + (canDownCard ? '' : ' disabled') + ' title="순서 아래로" onclick="event.stopPropagation();moveDraftCardOrder_(' + cat.id + ',\'' + d.id + '\',1)">▼</button>' +
           '</span>';
@@ -21363,14 +22077,16 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
       '<div class="card-more-actions">' +
         '<button type="button" class="draft-card-delete-mini" title="이 주제 카드 삭제" onclick="event.stopPropagation();deleteDraft(' + cat.id + ',\'' + d.id + '\')">삭제</button>' +
         '<button type="button" class="draft-card-refresh-mini" data-regen-draft="' + d.id + '" title="이 주제의 제목·각도만 다시 받기" onclick="event.stopPropagation();refreshTopicsForDraft(' + cat.id + ',\'' + d.id + '\')">주제 변경</button>' +
+        '<button type="button" class="draft-card-tidy-mini" title="다른 단계로 옮기기" aria-expanded="false" onclick="event.stopPropagation();toggleMoveDraftPicker_(this)">정리</button>' +
         orderBtns +
       '</div>' +
-    '</div>';
+    '</div>' +
+    renderMoveDraftPickerHTML_(cat.id, d.id);
   return `<div class="draft-card topic-line plan-tier-topic${isPub?' published':''}${isPartialPub?' partial-published':''}${isRec?' recommended':''}" data-plan-tier="4" style="--cc:${color}" tabindex="0" role="button" aria-label="${escapeHtml(lineTitle)}" onclick="openDetail('${d.id}',${cat.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetail('${d.id}',${cat.id});}">
     <div class="topic-line-row">
       <div class="card-topic">${escapeHtml(lineTitle)}</div>
-      <div class="topic-line-meta">${badges}${getDraftChannelRemainHTML_(d.id, cat.id)}</div>
-      <button type="button" class="topic-line-more" onclick="event.stopPropagation();var card=this.closest('.draft-card');card.classList.toggle('more-open');this.setAttribute('aria-expanded', card.classList.contains('more-open')?'true':'false');">기획 의도</button>
+      <div class="topic-line-meta">${badges}</div>
+      <button type="button" class="topic-line-more" onclick="event.stopPropagation();var card=this.closest('.draft-card');card.classList.toggle('more-open');this.setAttribute('aria-expanded', card.classList.contains('more-open')?'true':'false');">자세히</button>
     </div>
     <div class="card-more-body" onclick="event.stopPropagation()">${moreBody}</div>
   </div>`;
@@ -23268,6 +23984,166 @@ window.deleteDraft = function(catId, draftId){
   renderMain();
   if(state.planWorkshopMode === 'topic') refreshTopicWorkshop_();
   if(typeof setAppToast === 'function') setAppToast('「' + short + '」을(를) 삭제했어요. 서버에도 반영 중…', { duration: 3600, variant: 'ok' });
+};
+
+function renderMoveDraftPickerHTML_(fromCatId, draftId){
+  var cat = CATEGORIES[fromCatId];
+  var draft = cat && (cat.drafts || []).find(function(d){ return d && d.id === draftId; });
+  var draftIndex = draft && cat.drafts ? cat.drafts.indexOf(draft) : -1;
+  var currentStepId = draft ? String(getDraftRoadmapStepId_(draft, fromCatId, draftIndex) || '') : '';
+  var plan = getSubGoalPlan_(fromCatId);
+  var steps = (plan && plan.steps) ? plan.steps : [];
+  var stepBtns = steps.map(function(step, idx){
+    if(!step) return '';
+    var sid = String(step.id);
+    var label = (idx + 1) + '단계';
+    var current = sid === currentStepId;
+    var tip = String(step.title || '').trim();
+    return '<button type="button" class="card-move-opt' + (current ? ' is-current' : '') + '"' +
+      (current ? ' disabled' : '') +
+      (tip ? ' title="' + escapeHtml(tip) + '"' : '') +
+      ' onclick="event.stopPropagation();moveDraftToStep_(' + fromCatId + ',\'' + draftId + '\',\'' + sid.replace(/'/g, '') + '\')">' +
+      escapeHtml(label) + '</button>';
+  }).join('');
+  if(!stepBtns) stepBtns = '<span class="card-move-empty">생성된 단계가 없어요</span>';
+  var programs = ADD_FORM_CAT_ORDER.map(function(id){
+    if(id === fromCatId || !CATEGORIES[id] || isOpsManualCategory(id)) return '';
+    var name = CAT_TAB_SHORT[id] || CATEGORIES[id].name;
+    return '<button type="button" class="card-move-opt" onclick="event.stopPropagation();moveDraftToCategory_(' +
+      fromCatId + ',\'' + draftId + '\',' + id + ')">' + escapeHtml(name) + '</button>';
+  }).join('');
+  return '<div class="card-move-picker" onclick="event.stopPropagation()">' +
+    '<div class="card-move-steps">' +
+      '<div class="card-move-step-list">' + stepBtns + '</div>' +
+      '<button type="button" class="card-move-program-btn" aria-expanded="false" onclick="event.stopPropagation();toggleMoveProgramList_(this)">프로그램</button>' +
+    '</div>' +
+    '<div class="card-move-programs">' + programs + '</div>' +
+  '</div>';
+}
+window.toggleMoveDraftPicker_ = function(btn){
+  var body = btn && btn.closest ? btn.closest('.card-more-body') : null;
+  var picker = body ? body.querySelector('.card-move-picker') : null;
+  if(!picker) return;
+  var open = !picker.classList.contains('open');
+  document.querySelectorAll('.card-move-picker.open').forEach(function(el){
+    el.classList.remove('open');
+    var programs = el.querySelector('.card-move-programs');
+    if(programs) programs.classList.remove('open');
+    var progBtn = el.querySelector('.card-move-program-btn');
+    if(progBtn) progBtn.setAttribute('aria-expanded', 'false');
+    var other = el.parentElement && el.parentElement.querySelector('.draft-card-tidy-mini');
+    if(other) other.setAttribute('aria-expanded', 'false');
+  });
+  if(open){
+    picker.classList.add('open');
+    btn.setAttribute('aria-expanded', 'true');
+  }
+};
+window.toggleMoveProgramList_ = function(btn){
+  var picker = btn && btn.closest ? btn.closest('.card-move-picker') : null;
+  var list = picker ? picker.querySelector('.card-move-programs') : null;
+  if(!list) return;
+  var open = !list.classList.contains('open');
+  list.classList.toggle('open', open);
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+};
+window.moveDraftToStep_ = function(catId, draftId, stepId){
+  catId = parseInt(catId, 10);
+  stepId = String(stepId || '');
+  var cat = CATEGORIES[catId];
+  if(!cat || !draftId || !stepId) return;
+  var draft = (cat.drafts || []).find(function(d){ return d && d.id === draftId; });
+  if(!draft){
+    if(typeof setAppToast === 'function') setAppToast('주제를 찾을 수 없어요.', { duration: 3200 });
+    return;
+  }
+  var plan = getSubGoalPlan_(catId);
+  if(!plan || !plan.steps) return;
+  var step = null;
+  var stepIdx = -1;
+  plan.steps.forEach(function(s, i){
+    if(s && String(s.id) === stepId){ step = s; stepIdx = i; }
+  });
+  if(!step) return;
+  var di = cat.drafts.indexOf(draft);
+  var current = String(getDraftRoadmapStepId_(draft, catId, di) || '');
+  var label = (stepIdx + 1) + '단계';
+  if(current === String(step.id)){
+    if(typeof setAppToast === 'function') setAppToast('이미 ' + label + '에 있어요.', { duration: 2800 });
+    return;
+  }
+  var existing = getDraftsForSubGoalStep_(catId, step.id, { live: true }).filter(function(d){
+    return d && d.id !== draftId;
+  });
+  var order = existing.length + 1;
+  applyDraftRoadmapAssignment_(draft, catId, step.id, step.title || label, order, Math.max(order, 1));
+  try { ensurePendingAssignmentForDraft_(catId, step.id, order, draftId); } catch(eAsg){}
+  save({ driveImmediate: true, gasImmediate: true });
+  renderMain();
+  if(typeof setAppToast === 'function'){
+    var t0 = draft.topic || '주제';
+    var short = t0.length > 24 ? t0.slice(0, 24) + '…' : t0;
+    setAppToast('「' + short + '」을(를) ' + label + '로 옮겼어요.', { duration: 3200, variant: 'ok' });
+  }
+};
+window.moveDraftToCategory_ = function(fromCatId, draftId, toCatId){
+  fromCatId = parseInt(fromCatId, 10);
+  toCatId = parseInt(toCatId, 10);
+  var from = CATEGORIES[fromCatId];
+  var to = CATEGORIES[toCatId];
+  if(!from || !to || fromCatId === toCatId || isOpsManualCategory(toCatId)) return;
+  var src = null;
+  var idx = -1;
+  (from.drafts || []).forEach(function(d, i){
+    if(d && d.id === draftId){ src = d; idx = i; }
+  });
+  if(!src){
+    if(typeof setAppToast === 'function') setAppToast('주제를 찾을 수 없어요.', { duration: 3200 });
+    return;
+  }
+  var destName = CAT_TAB_SHORT[toCatId] || to.name;
+  var t0 = src.topic || '주제';
+  var short = t0.length > 28 ? t0.slice(0, 28) + '…' : t0;
+  if(!confirm('「' + short + '」을(를) 「' + destName + '」으로 옮길까요?')) return;
+  var newId = makeExtraDraftId_(toCatId);
+  var copy = cloneSyncValue_(src) || {};
+  copy.id = newId;
+  copy.updatedAt = new Date().toISOString();
+  if(!copy.createdAt) copy.createdAt = copy.updatedAt;
+  var ov = state.draftBrandOverrides && state.draftBrandOverrides[draftId];
+  if(ov){
+    ['topic', 'angle', 'pillar', 'rationale', 'writingBrief'].forEach(function(key){
+      if(ov[key] != null && String(ov[key]).trim()) copy[key] = ov[key];
+    });
+  }
+  delete copy.previousRoadmapStepId;
+  delete copy.previousSeries;
+  from.drafts.splice(idx, 1);
+  if(!to.drafts) to.drafts = [];
+  to.drafts.push(copy);
+  function moveKeyed_(map, oldId, nextId){
+    if(!map || !Object.prototype.hasOwnProperty.call(map, oldId)) return;
+    map[nextId] = map[oldId];
+    delete map[oldId];
+  }
+  moveKeyed_(state.published, draftId, newId);
+  moveKeyed_(state.generatedOnly, draftId, newId);
+  moveKeyed_(state.pinnedDraftIds, draftId, newId);
+  if(state.draftBrandOverrides) delete state.draftBrandOverrides[draftId];
+  if(typeof instaBgByDraft !== 'undefined') moveKeyed_(instaBgByDraft, draftId, newId);
+  if(typeof threadsBgByDraft !== 'undefined') moveKeyed_(threadsBgByDraft, draftId, newId);
+  if(!state.deletedDraftIds) state.deletedDraftIds = {};
+  state.deletedDraftIds[draftId] = new Date().toISOString();
+  var plan = (typeof peekSubGoalPlan_ === 'function' && peekSubGoalPlan_(toCatId)) || getSubGoalPlan_(toCatId);
+  applyDraftRoadmapAssignment_(copy, toCatId, SUBGOAL_MISC_ID, getSubGoalMiscLabel_(plan), 1, 1, { dropRescueHints: true });
+  if(state.selectedId === draftId){
+    try { closeSheetUiOnly_(); } catch(eClose){}
+    try { clearOpenDetailHash_(); } catch(eHash){}
+  }
+  save({ driveImmediate: true, gasImmediate: true });
+  renderTabs();
+  renderMain();
+  if(typeof setAppToast === 'function') setAppToast('「' + short + '」을(를) ' + destName + ' 기타 주제로 옮겼어요.', { duration: 4200, variant: 'ok' });
 };
 
 window.refreshTopicsForDraft = async function(catId, draftId){

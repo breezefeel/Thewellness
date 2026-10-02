@@ -2881,9 +2881,9 @@ const CATEGORY_THREE_MONTH_OUTCOME = {
   '0': '통증을 부위가 아니라 구조·연부조직으로 이해하고, 치료·운동 순서(why first)를 납득한다.',
   '1': 'PAR·Position으로 스스로 움직임·자세를 조절하고, 일상 동작·보행에 연결한다.',
   '2': '얼굴·비대칭을 경축·골격 구조로 이해하고, 기대치를 현실적으로 잡는다.',
-  '3': '평가(촉진·History)가 치료보다 먼저임을 체득하고, 임상 사고·치료 순서를 갖춘다.',
-  '4': '얼굴 교정을 경축·구조 접근으로 이해하고, 표면 마사지와 다른 IFC 관점을 갖는다.',
-  '5': 'PAR·Position 철학으로 치료→기능운동 연결, 동료에게 설명·지도할 언어를 갖춘다.',
+  '3': 'CMT를 Philosophy(컨셉)·Science(평가)·Practice(연부조직·관절, Passive 메뉴얼)로 나눠 설명한다.',
+  '4': 'IFC를 Philosophy(컨셉)·Science(평가·얼굴 해부학)·Practice(수기·운동·고주파·괄사, Passive 메뉴얼)로 나눠 설명한다.',
+  '5': 'Re:Al을 Philosophy(컨셉)·Science(평가)·Practice(패시브 움직임→Assisted Active→Resistive, 생활습관·기능운동)로 나눠 설명한다.',
   '6': '전문 강의·홍보 없이도 「믿을 만한 사람·공감되는 전문가」로 기억된다.',
   '7': '입주민이 부담 없이 P-스트레칭·자세·가벼운 기능을 일상에 붙인다.'
 };
@@ -2919,33 +2919,41 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
     ]
   },
   '3': {
-    brandProfile: 'CMT 전문가는 치료 테크닉보다 평가 사고(촉진·히스토리·판단 순서)를 우선 학습해야 합니다. 교과서 지식을 임상 언어로 번역하는 능력이 핵심 경쟁력입니다. "잘한다"보다 "왜 그렇게 판단했는가"를 설명하는 훈련 중심으로 설계합니다.',
-    strategyGuide: '기준:\n- 단계는 평가 기준 정렬 → 촉진 정확도 강화 → 치료 선택 논리화 → 케이스 재현 순으로 구성한다.\n- 모든 단계는 "판단 근거 한 문장"을 남기게 한다.\n- 기법 소개보다 임상 의사결정 프레임을 우선한다.\n\n의도:\n- 수강생이 테크닉 의존에서 벗어나 평가 중심 사고를 체득하게 한다.\n- 임상에서 재현 가능한 치료 판단 언어를 확보하게 한다.\n- 교육 후 실제 케이스 적용률을 높인다.',
+    pspLayout: 'v1',
+    brandProfile: 'CMT는 Passive 안의 메뉴얼을 가르치는 전문가 과정입니다. 글은 Philosophy(왜 이 순서인지), Science(골반·허리·흉추·경추 평가), Practice(연부조직, 관절 테크닉) 중 하나를 고릅니다. 테크닉은 손으로 조직과 관절을 다루는 단계이고, 움직임 이후는 Re:Al이 맡습니다.',
+    strategyGuide: '기준:\n- Philosophy는 컨셉, Science는 이론과 평가, Practice는 테크닉이다.\n- 평가는 History·Inspection·Movement·Palpation 한 칸이다. 보는 곳은 골반·허리·흉추·경추.\n- Practice는 연부조직, 그다음 관절 테크닉. 둘 다 Passive 메뉴얼이다.\n- 한 글은 알리고 싶은 카테고리 하나에만 둔다. 다른 칸도 닿으면 각도에만 적고, 같은 주제를 복제하지 않는다.\n\n의도:\n- 수강생이 기법 나열 대신, 이번 글이 컨셉인지 평가인지 손기술인지 알게 한다.',
     steps: [
-      { id: '1', title: '1단계 · 평가 프레임 정렬', summary: 'History-Inspection-Movement-Palpation 기준 통일', rationale: '평가 순서가 흔들리면 치료 결과도 흔들립니다. 공통 프레임을 먼저 맞춰 팀 전체 판단 품질을 올립니다.' },
-      { id: '2', title: '2단계 · 촉진 정확도 강화', summary: '핵심 구조를 빠르게 찾는 촉진 기준 훈련', rationale: '촉진 정확도는 치료 방향의 출발점입니다. 반복 가능한 기준점을 통해 임상 속도와 신뢰를 동시에 높입니다.' },
-      { id: '3', title: '3단계 · 치료 선택 논리화', summary: '기법 선택 이유를 환자 상태와 연결해 설명', rationale: '기법 자체보다 선택 근거가 중요합니다. 수강생이 치료 결정을 설명할 수 있어야 임상 재현성이 생깁니다.' },
-      { id: '4', title: '4단계 · 케이스 재현 적용', summary: '복합 케이스에서 평가-치료-운동 연결 완성', rationale: '실전에서는 단일 문제보다 복합 패턴이 많습니다. 케이스 재현으로 교육 내용을 임상 행동으로 전환합니다.' }
+      { id: '1', layer: 'philosophy', title: '메뉴얼을 먼저 가르치는 이유', summary: 'CMT가 움직임보다 손의 판단부터 시작하는 컨셉', rationale: '왜 평가와 메뉴얼이 움직임보다 앞인지가 과정의 첫인상입니다.' },
+      { id: '2', layer: 'science', title: '평가', summary: '골반·허리·흉추·경추를 History·Inspection·Movement·Palpation으로 좁힌다', rationale: '네 가지 평가는 테크닉 선택이 아니라, 어디를 볼지 정하는 이론입니다.' },
+      { id: '3', layer: 'practice', title: '연부조직', summary: '근막에서 근육으로, Passive 메뉴얼의 첫 손', rationale: '관절을 움직이기 전에 연부조직을 다루는 순서입니다.' },
+      { id: '4', layer: 'practice', title: '관절 테크닉', summary: '연부조직 다음의 관절 접근. Passive 메뉴얼', rationale: '관절 테크닉은 연부조직 소견이 있을 때 고릅니다.' }
     ]
   },
   '4': {
-    brandProfile: 'IFC 얼굴교육은 표면 자극이 아닌 구조·경축·기능 연결을 설명하는 전문가 과정입니다. 경추·턱관절·교합 관점을 함께 보며 기대치를 조율합니다. 카이로·도수치료 기법 나열보다 **구조 이해·기능 연결·교육 현장**을 중심에 두세요.',
-    strategyGuide: '기준:\n- 단계는 구조 평가 → 핵심 경축 완화 → 기기·도수 통합 프로토콜 → 케이스 피드백 순으로 구성한다.\n- 각 단계는 상담 문구(기대치 조율)를 포함한다.\n- 단순 before/after보다 기능·편안함 지표를 함께 본다.\n\n의도:\n- 수강생이 "미용 중심"에서 "구조 기반" 설명으로 전환하게 한다.\n- 상담 단계에서 과도한 기대를 안전하게 조율하게 한다.\n- 프로토콜의 재현성과 안전성을 높인다.',
+    pspLayout: 'v1',
+    brandProfile: 'IFC는 얼굴의 Passive 메뉴얼을 가르치는 전문가 과정입니다. 글은 Philosophy(왜 구조로 보는지), Science(얼굴 비대칭·윤곽 평가, 얼굴 해부학), Practice(얼굴 수기·얼굴 운동·고주파·괄사) 중 하나를 고릅니다. 움직임 훈련의 Passive 이후 단계는 Re:Al이 맡습니다.',
+    strategyGuide: '기준:\n- Philosophy는 컨셉, Science는 평가와 얼굴 해부학, Practice는 테크닉이다.\n- 평가는 History·Inspection·Movement·Palpation. 보는 것은 얼굴 비대칭·윤곽.\n- Practice는 얼굴 수기, 얼굴 운동, 고주파, 괄사. 메뉴얼 단계다.\n- 한 글은 알리고 싶은 카테고리 하나에만 둔다. 다른 칸도 닿으면 각도에만 적고, 같은 주제를 복제하지 않는다.\n\n의도:\n- 수강생이 표면 마사지와 IFC를 가르고, 이번 글이 설명인지 손기술인지 알게 한다.',
     steps: [
-      { id: '1', title: '1단계 · 구조 평가 정렬', summary: '안면·경추·턱관절 평가 순서 표준화', rationale: '평가 기준이 없으면 기법 적용이 흔들립니다. 공통 평가 루틴으로 케이스 판단의 정확도를 확보합니다.' },
-      { id: '2', title: '2단계 · 경축 핵심 완화', summary: '우선 완화할 조직과 순서를 명확히 하기', rationale: '경축 우선순위를 잘못 잡으면 결과 체감이 떨어집니다. 주요 긴장 포인트를 선별해 효율을 높입니다.' },
-      { id: '3', title: '3단계 · 통합 프로토콜 적용', summary: 'IFC + 도수 접근을 단계별로 연결하기', rationale: '기기와 도수의 순서를 명확히 해야 일관된 결과가 나옵니다. 상황별 프로토콜 선택 기준을 확립합니다.' },
-      { id: '4', title: '4단계 · 케이스 피드백 루프', summary: '결과 기록과 재계획 기준으로 완성도 높이기', rationale: '케이스 피드백이 있어야 교육이 실력으로 남습니다. 결과 기록을 바탕으로 다음 개입을 설계하도록 마무리합니다.' }
+      { id: '1', layer: 'philosophy', title: '구조로 얼굴을 보는 이유', summary: '표면 마사지가 아닌 IFC의 컨셉', rationale: '무엇을 약속하지 않는지가 과정의 첫 설명입니다.' },
+      { id: '2', layer: 'science', title: '평가', summary: '얼굴 비대칭·윤곽을 History·Inspection·Movement·Palpation으로 좁힌다', rationale: '평가는 시술 선택이 아니라, 어디가 다른지 정하는 이론입니다.' },
+      { id: '3', layer: 'science', title: '얼굴 해부학', summary: '수기 전에 층과 연결을 설명한다', rationale: '해부학은 테크닉이 아니라, 손이 닿는 이유를 밝히는 이론입니다.' },
+      { id: '4', layer: 'practice', title: '얼굴 수기', summary: '손으로 조직에 닿는 Passive 메뉴얼', rationale: '수기는 평가와 해부가 정해진 뒤에 고릅니다.' },
+      { id: '5', layer: 'practice', title: '얼굴 운동', summary: '수기 다음, 얼굴에서 직접 쓰는 움직임', rationale: '운동은 손을 대신하는 단계가 아니라, 수기 뒤에 붙는 메뉴얼입니다.' },
+      { id: '6', layer: 'practice', title: '고주파', summary: '기기와 손의 순서. Passive 메뉴얼', rationale: '고주파는 손의 순서를 바꿀 때가 아니라, 그 순서 안의 도구입니다.' },
+      { id: '7', layer: 'practice', title: '괄사', summary: '도구로 조직을 다루는 Passive 메뉴얼', rationale: '괄사는 평가된 쪽과 방향이 있을 때 씁니다.' }
     ]
   },
   '5': {
-    brandProfile: 'Re:Al 움직임 과정은 **임상가가 기능·움직임으로 연결하는** 전문가 교육입니다. PAR·Position을 현장 코칭 언어로 번역하는 능력이 핵심입니다. 도수·카이로 시술 장면을 주인공처럼 부각하지 말고, 안전한 progression·환자 순응도·기능재활 지도 언어를 강조하세요.',
-    strategyGuide: '기준:\n- 단계는 상태 분류 → 기본 패턴 재학습 → 기능 과제 확장 → 지도·코칭 고도화 순으로 구성한다.\n- 각 단계는 "중단 기준/진행 기준"을 함께 제시한다.\n- 운동 처방은 통증 감소보다 기능 회복 지표를 우선한다.\n\n의도:\n- 치료실에서 운동실로 이어지는 단절을 줄인다.\n- 수강생이 환자 상태별 progression을 설명·적용하게 만든다.\n- 교육 후 실제 지도 자신감을 높인다.',
+    pspLayout: 'v1',
+    brandProfile: 'Re:Al은 Passive 움직임부터 Active(Assisted Active), Resistive까지를 가르치는 전문가 과정입니다. 글은 Philosophy(왜 이 순서인지), Science(통증·가동범위, 그 자세에서 움직일 수 있는지), Practice(패시브 스트레칭, 액티브 스트레칭, 생활습관, 기능운동) 중 하나를 고릅니다. 손의 메뉴얼은 CMT·IFC가 맡습니다.',
+    strategyGuide: '기준:\n- Philosophy는 컨셉, Science는 이론과 평가, Practice는 테크닉이다.\n- 평가는 History·Inspection·Movement·Palpation. 보는 것은 통증·가동범위와, 그 자세에서 움직일 수 있는지.\n- Practice 순서는 패시브 스트레칭(Passive 움직임) → 액티브 스트레칭(Assisted Active) → 기능운동(Resistive). 생활습관은 그 사이를 일상에 붙이는 칸이다.\n- 한 글은 알리고 싶은 카테고리 하나에만 둔다. 다른 칸도 닿으면 각도에만 적고, 같은 주제를 복제하지 않는다.\n\n의도:\n- 수강생이 지금 움직임이 어느 단계인지 말하고, 그 단계만 가르치게 한다.',
     steps: [
-      { id: '1', title: '1단계 · 상태 분류', summary: 'PAR 관점으로 현재 기능 수준을 분류하기', rationale: '현재 수준을 정확히 구분해야 과부하를 피할 수 있습니다. 상태 분류는 안전한 처방의 출발점입니다.' },
-      { id: '2', title: '2단계 · 기본 패턴 재학습', summary: '호흡·정렬·기초 움직임 패턴 재구성', rationale: '기초 패턴이 무너지면 고급 동작에서 보상이 커집니다. 가장 작은 단위부터 안정적으로 재학습합니다.' },
-      { id: '3', title: '3단계 · 기능 과제 확장', summary: '일상/직무 동작으로 점진적 난이도 확장', rationale: '실전 기능으로 연결해야 교육 가치가 완성됩니다. 과제 확장을 통해 현장 적용력을 높입니다.' },
-      { id: '4', title: '4단계 · 코칭 언어 고도화', summary: '순응도를 높이는 설명·피드백 스크립트 구축', rationale: '좋은 처방도 전달이 약하면 지속되지 않습니다. 코칭 언어를 정교화해 수행률과 결과를 함께 높입니다.' }
+      { id: '1', layer: 'philosophy', title: '움직임을 순서로 쌓는 이유', summary: 'Passive 움직임에서 Resistive로 가는 컨셉', rationale: '왜 힘을 넣기 전에 움직여 주는 단계가 있는지 설명하는 칸입니다.' },
+      { id: '2', layer: 'science', title: '평가', summary: '통증·가동범위, 그 자세에서 움직일 수 있는지를 네 가지 평가로 본다', rationale: '평가는 운동 처방이 아니라, 어느 단계에서 시작할지 정하는 이론입니다.' },
+      { id: '3', layer: 'practice', title: '패시브 스트레칭', summary: 'Passive 움직임. 강사가 움직여 주는 단계', rationale: '스스로 못 가는 범위를 먼저 열어 주는 테크닉입니다.' },
+      { id: '4', layer: 'practice', title: '액티브 스트레칭', summary: 'Assisted Active. 같이 움직이며 가동을 회복', rationale: '열어 준 범위를 스스로 쓰기 시작하는 테크닉입니다.' },
+      { id: '5', layer: 'practice', title: '생활습관', summary: '그 자세와 움직임을 하루에 붙이는 법', rationale: '세션 밖에서도 같은 단계가 유지되게 하는 칸입니다.' },
+      { id: '6', layer: 'practice', title: '기능운동', summary: 'Resistive. 저항을 더해 그 기능을 쓴다', rationale: '가동이 된 뒤에 힘을 더하는 테크닉입니다.' }
     ]
   },
   '6': {
@@ -3063,92 +3071,93 @@ const PROGRAM_INITIAL_STEP_TOPICS = {
   },
   '3': {
     '1': [
-      { topic: '촉진이 치료보다 먼저인 이유', angle: '평가 우선 철학' },
-      { topic: 'History에서 놓치면 치료가 흔들리는 질문', angle: '문진 프레임 정렬' },
-      { topic: 'Inspection·Movement·Palpation 순서를 지키는 법', angle: '4평가 기준 통일' },
-      { topic: '"좋아졌다"는 주관 보고를 어떻게 검증할까', angle: '객관 지표 연결' },
-      { topic: '교과서 순서와 임상 순서가 어긋날 때', angle: '임상 사고 훈련' }
+      { topic: 'CMT는 왜 움직임보다 메뉴얼부터 가르치나', angle: 'Philosophy · Passive 메뉴얼이 먼저인 컨셉' },
+      { topic: '테크닉을 잘 보여주는 수업과, 판단을 설명하는 수업', angle: 'Philosophy · 손이 아니라 이유' },
+      { topic: '교과서 순서를 임상 순서로 바꾸는 기준', angle: 'Philosophy · 교육의 컨셉' }
     ],
     '2': [
-      { topic: '핵심 구조 촉진, 초보가 먼저 익힐 랜드마크', angle: '촉진 기준점 훈련' },
-      { topic: '같은 부위를 만져도 정보가 다른 이유', angle: '촉진 질 향상 포인트' },
-      { topic: '통증 유발점과 관절 이상을 빠르게 가르는 법', angle: '감별 촉진' },
-      { topic: '촉진 소견을 한 문장으로 기록하는 템플릿', angle: '임상 언어화' },
-      { topic: '손끝 감각을 올리는 매일 5분 드릴', angle: '반복 훈련 루틴' }
+      { topic: '골반·허리, History에서 먼저 가를 질문', angle: 'Science · 평가. 함께: 연부조직' },
+      { topic: '흉추·경추를 Inspection과 Movement로 보는 순서', angle: 'Science · 평가' },
+      { topic: 'Palpation은 왜 세 검사 다음인가', angle: 'Science · 평가. 네 가지를 한 칸에서' }
     ],
     '3': [
-      { topic: '잘 치료하는 것과 제대로 치료하는 것의 차이', angle: '선택 논리 정립' },
-      { topic: 'HVLA와 LVLA, 언제 무엇을 고르나?', angle: '기법 선택 기준' },
-      { topic: '관절가동술을 쓰는 타이밍 판단법', angle: '적응증·금기 사고' },
-      { topic: '촉진·가동 검사 결과를 치료 선택 문장으로 바꾸는 법', angle: '평가 결과의 임상 언어화' },
-      { topic: '치료 전후 비교를 설득력 있게 남기는 법', angle: '근거 기록' }
+      { topic: '연부조직, 근막에서 근육으로 가는 손', angle: 'Practice · Passive 메뉴얼' },
+      { topic: '관절 전에 연부조직을 끝내는 기준', angle: 'Practice · 연부조직. 함께: 관절 테크닉' },
+      { topic: '촉진에서 연부조직 선택을 한 문장으로', angle: 'Practice · 연부조직. 함께: 평가' }
     ],
     '4': [
-      { topic: '복합 케이스에서 평가-치료-운동 연결하기', angle: '케이스 재현' },
-      { topic: '재발 환자에서 다시 볼 평가 포인트', angle: '피드백 루프' },
-      { topic: '실습생에게 케이스 사고과정을 시연·피드백하는 법', angle: '교육·슈퍼비전 운영' },
-      { topic: '"효과 없는 세션"을 다음 계획으로 바꾸는 법', angle: '재계획 기준' },
-      { topic: '한 달 후 내 임상 습관을 바꿀 체크리스트', angle: '적용 고정' }
+      { topic: '관절 테크닉은 연부조직 다음에 고른다', angle: 'Practice · Passive 메뉴얼' },
+      { topic: 'HVLA와 가동술, 오늘 무엇을 보류하나', angle: 'Practice · 관절 테크닉' },
+      { topic: '관절에 손을 대기 전 멈추는 선', angle: 'Practice · 관절 테크닉. 함께: 평가' }
     ]
   },
   '4': {
     '1': [
-      { topic: 'IFC 얼굴교정, 단순 마사지와 다른 점', angle: '구조 접근 vs 표면 접근' },
-      { topic: '얼굴 교정에서 경추를 반드시 평가하는 이유', angle: '경추-두개 연결' },
-      { topic: '턱관절·교합을 빼먹으면 생기는 공백', angle: '평가 순서 표준화' },
-      { topic: '상담 시 고객이 원하는 것과 필요한 것', angle: '기대치 조율 입문' },
-      { topic: '평가 기록 템플릿으로 케이스를 표준화하기', angle: '공통 평가 루틴' }
+      { topic: 'IFC는 왜 마사지와 다른 말로 시작하나', angle: 'Philosophy · 구조로 보는 컨셉' },
+      { topic: '작아 보이게, 를 기능 이야기로 내리는 상담', angle: 'Philosophy · 기대의 컨셉' },
+      { topic: '얼굴 수업에서 먼저 약속하지 않는 것', angle: 'Philosophy · 과정의 경계' }
     ],
     '2': [
-      { topic: '먼저 풀어야 할 경축, 우선순위 정하는 법', angle: '핵심 긴장 선별' },
-      { topic: '안면 비대칭에서 놓치기 쉬운 평가 포인트', angle: '복합 평가 체크' },
-      { topic: '과한 자극이 결과를 떨어뜨리는 순간', angle: '강도·순서 주의' },
-      { topic: '경축 완화 전후에 확인할 기능 지표', angle: '체감·기능 지표' },
-      { topic: '"이쪽만 풀어주세요" 요청을 구조로 번역하기', angle: '상담→평가 연결' }
+      { topic: '얼굴 비대칭, History에서 듣는 세 가지', angle: 'Science · 평가' },
+      { topic: '윤곽을 Inspection으로 보는 기준', angle: 'Science · 평가. 함께: 얼굴 해부학' },
+      { topic: 'Movement와 Palpation으로 비대칭을 좁히는 법', angle: 'Science · 평가' }
     ],
     '3': [
-      { topic: 'INDIBA와 IFC를 같이 쓸 때 프로토콜', angle: '기기+도수 시너지' },
-      { topic: '세션 안에서 순서 바꾸면 결과가 달라지는 이유', angle: '프로토콜 논리' },
-      { topic: '초기·중기·유지기 프로토콜을 나누는 기준', angle: '단계별 적용' },
-      { topic: '안전 경고를 명확히 전달하는 상담 문장', angle: '기대치·안전 조율' },
-      { topic: '시술 직후 설명해야 할 자기관리 3가지', angle: '홈케어 연결' }
+      { topic: '얼굴 수기 전에 알아야 할 층', angle: 'Science · 얼굴 해부학' },
+      { topic: '경추·턱·저작이 윤곽에 닿는 길', angle: 'Science · 얼굴 해부학. 함께: 평가' },
+      { topic: '표면과 심부, 수업에서 어디까지 설명하나', angle: 'Science · 얼굴 해부학' }
     ],
     '4': [
-      { topic: '케이스 전후를 사진 말고 기능으로 기록하기', angle: '피드백 지표' },
-      { topic: '결과가 기대에 못 미쳤을 때 재계획 기준', angle: '재평가 루프' },
-      { topic: '고객 피드백을 다음 세션에 반영하는 법', angle: '상담 피드백' },
-      { topic: '교육 후 임상에서 바로 쓸 체크리스트', angle: '현장 적용' },
-      { topic: '한 달간 프로토콜 완성도를 올리는 리뷰법', angle: '성장 루프' }
+      { topic: '얼굴 수기, 어느 층에 손이 머물나', angle: 'Practice · Passive 메뉴얼' },
+      { topic: '비대칭 쪽에서 손을 시작하는 순서', angle: 'Practice · 얼굴 수기. 함께: 평가' },
+      { topic: '수기를 멈추는 통증과 저항의 선', angle: 'Practice · 얼굴 수기' }
+    ],
+    '5': [
+      { topic: '얼굴 운동은 수기 다음에 붙는다', angle: 'Practice · 얼굴 운동' },
+      { topic: '스스로 못 만드는 표정을 같이 만드는 법', angle: 'Practice · 얼굴 운동. 함께: 얼굴 수기' },
+      { topic: '운동으로 바꾸면 안 되는 수기 소견', angle: 'Practice · 얼굴 운동. 함께: 평가' }
+    ],
+    '6': [
+      { topic: '고주파는 손의 순서를 대신하지 않는다', angle: 'Practice · 고주파' },
+      { topic: '기기 전에 손이 끝나야 하는 이유', angle: 'Practice · 고주파. 함께: 얼굴 수기' },
+      { topic: '고주파를 빼는 날의 기준', angle: 'Practice · 고주파. 함께: 평가' }
+    ],
+    '7': [
+      { topic: '괄사, 방향은 평가가 정한다', angle: 'Practice · 괄사. 함께: 평가' },
+      { topic: '도구 압이 손의 소견을 지우기 전에', angle: 'Practice · 괄사. 함께: 얼굴 수기' },
+      { topic: '괄사를 얼굴 운동과 같은 날에 두지 않는 경우', angle: 'Practice · 괄사. 함께: 얼굴 운동' }
     ]
   },
   '5': {
     '1': [
-      { topic: '패시브 스트레칭을 언제 어떻게 써야 하나', angle: '상태 분류·타이밍' },
-      { topic: '환자 기능 수준을 PAR로 빠르게 나누는 법', angle: '분류 프레임' },
-      { topic: '통증 없는 환자가 더 위험한 처방 실수', angle: '과부하 방지' },
-      { topic: '진행·중단 기준을 세션 전에 정하는 이유', angle: '안전 progression' },
-      { topic: '치료실에서 운동실로 넘기기 전 체크리스트', angle: '전환 평가' }
+      { topic: '힘을 넣기 전에 움직여 주는 이유', angle: 'Philosophy · Passive 움직임이 먼저인 컨셉' },
+      { topic: 'PAR을 네 단계가 아니라 세 칸으로 말하는 법', angle: 'Philosophy · Passive 움직임, Assisted Active, Resistive' },
+      { topic: '도수 장면을 이 수업의 주인공으로 두지 않는 이유', angle: 'Philosophy · 메뉴얼은 CMT·IFC' }
     ],
     '2': [
-      { topic: '기능운동, 치료의 끝이 아닌 연결이다', angle: '치료→운동 철학' },
-      { topic: '호흡·정렬이 무너진 채 근력운동을 하면', angle: '기초 패턴 재학습' },
-      { topic: '자세 교정에 "좋은 자세"가 없는 이유', angle: '동적 안정성' },
-      { topic: '고관절 가동성 vs 안정성, 무엇이 먼저인가', angle: '우선순위 처방' },
-      { topic: '초보 환자에게 첫 과제로 줄 동작 고르기', angle: '기초 과제 설계' }
+      { topic: '통증과 가동범위, 평가에서 먼저 나누는 것', angle: 'Science · 평가' },
+      { topic: '그 자세에서 움직일 수 있는지를 Movement로 확인', angle: 'Science · 평가. 함께: 패시브 스트레칭' },
+      { topic: '진행과 중단은 세션 전 평가에서 적는다', angle: 'Science · 평가' }
     ],
     '3': [
-      { topic: '일상·직무 동작으로 난이도를 올리는 법', angle: '기능 과제 확장' },
-      { topic: '집에서 지속 가능한 홈프로그램 설계', angle: '순응도 높은 처방' },
-      { topic: '통증이 줄었을 때 강도를 올리는 타이밍', angle: 'progression 기준' },
-      { topic: 'PAR 단계별 코칭 큐로 수행률 높이는 법', angle: '동기·설명 전략' },
-      { topic: '재발 위험 동작을 일상에 안전하게 재도입하기', angle: '회귀·적용' }
+      { topic: '패시브 스트레칭, 당기지 않고 데려가는 손', angle: 'Practice · Passive 움직임' },
+      { topic: '스스로 못 가는 범위만 패시브로 연다', angle: 'Practice · 패시브 스트레칭. 함께: 평가' },
+      { topic: '패시브를 끝내고 액티브로 넘기는 신호', angle: 'Practice · 패시브 스트레칭. 함께: 액티브 스트레칭' }
     ],
     '4': [
-      { topic: '환자에게 "왜 이 운동인지" 한 문장으로 말하기', angle: '코칭 언어' },
-      { topic: '피드백을 교정으로 바꾸지 않고 유도하는 법', angle: '큐잉 기술' },
-      { topic: '못 하는 날을 위한 regression 스크립트', angle: '유연한 지도' },
-      { topic: '동료 지도자가 같은 처방을 재현하게 만들기', angle: '교육 전달력' },
-      { topic: '4주 코칭 루틴으로 수행률 올리는 방법', angle: '습관·피드백 고정' }
+      { topic: '액티브 스트레칭은 같이 움직이는 단계다', angle: 'Practice · Assisted Active' },
+      { topic: '열어 준 범위를 스스로 쓰게 하는 큐', angle: 'Practice · 액티브 스트레칭. 함께: 패시브 스트레칭' },
+      { topic: '아직 저항을 넣으면 안 되는 액티브', angle: 'Practice · 액티브 스트레칭. 함께: 기능운동' }
+    ],
+    '5': [
+      { topic: '세션에서 연 범위를 하루 자세에 붙이기', angle: 'Practice · 생활습관' },
+      { topic: '집에서 같은 단계를 유지하는 한 가지', angle: 'Practice · 생활습관. 함께: 액티브 스트레칭' },
+      { topic: '습관이 다음 단계로 앞서가면 멈추는 기준', angle: 'Practice · 생활습관. 함께: 평가' }
+    ],
+    '6': [
+      { topic: '기능운동은 저항을 더하는 단계다', angle: 'Practice · Resistive' },
+      { topic: '누움에서 앉기, 서기로 올리는 조건', angle: 'Practice · 기능운동. 함께: 움직임을 순서로 쌓는 이유' },
+      { topic: '가동이 되기 전에 힘을 넣지 않는 이유', angle: 'Practice · 기능운동. 함께: 패시브 스트레칭' }
     ]
   },
   '6': {
@@ -3234,10 +3243,12 @@ function getInitialProgramPlanDraft_(catId){
   return {
     brandProfile: String(seed.brandProfile || '').trim(),
     strategyGuide: normalizeProgramStrategyGuideTemplate_(String(seed.strategyGuide || '').trim()),
+    pspLayout: String(seed.pspLayout || '').trim(),
     steps: (seed.steps || []).map(function(step, idx){
       var legacyId = String(step.id != null ? step.id : (idx + 1));
       return {
         id: 's' + (idx + 1),
+        layer: String(step.layer || '').trim(),
         title: String(step.title || '').trim(),
         summary: String(step.summary || '').trim(),
         rationale: String(step.rationale || '').trim(),
@@ -3246,6 +3257,175 @@ function getInitialProgramPlanDraft_(catId){
       };
     })
   };
+}
+function expertPspLayerLabel_(layer){
+  if(layer === 'philosophy') return 'Philosophy · 컨셉';
+  if(layer === 'science') return 'Science · 이론';
+  if(layer === 'practice') return 'Practice · 테크닉';
+  return '';
+}
+function planUsesExpertPsp_(plan){
+  if(!plan || String(plan.pspLayout || '') !== 'v1') return false;
+  return (plan.steps || []).some(function(s){ return s && s.layer; });
+}
+function expertPspHomeStepId_(catId, blob){
+  var t = String(blob || '').toLowerCase();
+  var id = parseInt(catId, 10);
+  function has(){
+    for(var i = 0; i < arguments.length; i++){
+      if(t.indexOf(String(arguments[i]).toLowerCase()) >= 0) return true;
+    }
+    return false;
+  }
+  if(id === 3){
+    if(has('hvla', 'lvla', '관절', '가동술', 'joint')) return 's4';
+    if(has('연부', '근막', '근육', 'fascia')) return 's3';
+    if(has('먼저인 이유', '철학', '컨셉', '메뉴얼부터', '메뉴얼을 먼저')) return 's1';
+    if(has('history', 'inspection', 'palpation', '촉진', '문진', '평가', '골반', '흉추')) return 's2';
+    return '';
+  }
+  if(id === 4){
+    if(has('괄사')) return 's7';
+    if(has('고주파', 'indiba', '기기')) return 's6';
+    if(has('얼굴 운동', '표정')) return 's5';
+    if(has('수기', '도수', '손으로', '경축')) return 's4';
+    if(has('해부', '층', '심부', '저작')) return 's3';
+    if(has('history', 'inspection', 'palpation', '평가', '비대칭', '윤곽', '문진')) return 's2';
+    if(has('마사지', '철학', '컨셉', '약속', '기대')) return 's1';
+    return '';
+  }
+  if(id === 5){
+    if(has('par') && has('순서')) return 's1';
+    if(has('액티브', 'assisted', '같이 움직')) return 's4';
+    if(has('패시브', 'passive', 'p-스트레칭', '움직여 주')) return 's3';
+    if(has('기능운동', 'resistive', '저항', 'supine', 'sitting', 'standing')) return 's6';
+    if(has('생활', '습관', '홈프로그램', '하루')) return 's5';
+    if(has('평가', 'history', '가동범위', '상태 분류', '진행', '중단', '통증')) return 's2';
+    if(has('철학', '컨셉', '이유', '코칭')) return 's1';
+    return '';
+  }
+  return '';
+}
+function expertPspFallbackStepId_(catId, oldText){
+  var t = String(oldText || '');
+  var id = parseInt(catId, 10);
+  if(id === 3){
+    if(/평가|촉진|프레임|history/i.test(t)) return 's2';
+    if(/치료 선택|논리|기법/.test(t)) return 's3';
+    return '';
+  }
+  if(id === 4){
+    if(/해부/.test(t)) return 's3';
+    if(/평가|구조 평가/.test(t)) return 's2';
+    if(/경축|수기|도수/.test(t)) return 's4';
+    if(/운동/.test(t)) return 's5';
+    if(/고주파|indiba|프로토콜|기기/i.test(t)) return 's6';
+    if(/괄사/.test(t)) return 's7';
+    return '';
+  }
+  if(id === 5){
+    if(/코칭|철학|순서/.test(t)) return 's1';
+    if(/상태 분류|평가|진행|중단/.test(t)) return 's2';
+    if(/패턴|패시브|passive/i.test(t)) return 's3';
+    if(/액티브|assisted/i.test(t)) return 's4';
+    if(/습관|홈/.test(t)) return 's5';
+    if(/기능|과제/.test(t)) return 's6';
+    return '';
+  }
+  return '';
+}
+function migrateExpertPspCurriculum_(){
+  if(!state || !state.branding) return false;
+  if(!state.branding.subGoalPlans) state.branding.subGoalPlans = {};
+  var changed = false;
+  [3, 4, 5].forEach(function(catId){
+    var key = String(catId);
+    var prev = state.branding.subGoalPlans[key];
+    if(prev && planUsesExpertPsp_(prev)) return;
+    var cat = CATEGORIES[catId];
+    var snapshots = [];
+    if(cat && cat.drafts){
+      cat.drafts.forEach(function(d){
+        if(!d || !d.id) return;
+        snapshots.push({
+          id: d.id,
+          blob: [d.topic, d.angle, d.series, d.rationale].join('\n'),
+          oldSeries: String(d.series || '')
+        });
+      });
+    }
+    var seed = getInitialProgramPlanDraft_(catId);
+    if(!seed || !seed.steps || !seed.steps.length) return;
+    state.branding.subGoalPlans[key] = {
+      steps: seed.steps.map(function(s){
+        return {
+          id: String(s.id),
+          layer: s.layer || '',
+          title: s.title || '',
+          summary: s.summary || '',
+          rationale: s.rationale || '',
+          pinned: false
+        };
+      }),
+      miscLabel: SUBGOAL_MISC_LABEL,
+      brandProfile: seed.brandProfile || '',
+      strategyGuide: seed.strategyGuide || '',
+      criteria: seed.strategyGuide || '',
+      intent: seed.strategyGuide || '',
+      pspLayout: 'v1',
+      updatedAt: new Date().toISOString()
+    };
+    var plan = state.branding.subGoalPlans[key];
+    var buckets = {};
+    plan.steps.forEach(function(s){ buckets[String(s.id)] = []; });
+    withDraftStepReassignAllowed_(function(){
+      snapshots.forEach(function(snap){
+        var draft = cat && cat.drafts ? cat.drafts.find(function(d){ return d && d.id === snap.id; }) : null;
+        if(!draft) return;
+        var sid = expertPspHomeStepId_(catId, snap.blob) || expertPspFallbackStepId_(catId, snap.oldSeries + '\n' + snap.blob);
+        if(!buckets[sid]) sid = SUBGOAL_MISC_ID;
+        if(!buckets[sid]) buckets[sid] = [];
+        buckets[sid].push(draft);
+      });
+      Object.keys(buckets).forEach(function(sid){
+        var title = getSubGoalStepTitle_(plan, sid);
+        var list = buckets[sid];
+        var total = String(sid) === SUBGOAL_MISC_ID ? Math.max(list.length, 1) : stepTopicSlotTotalForCount_(Math.min(list.length, STEP_TOPIC_SLOTS_MAX));
+        list.forEach(function(draft, idx){
+          var order = idx + 1;
+          if(String(sid) !== SUBGOAL_MISC_ID && order > STEP_TOPIC_SLOTS_MAX){
+            var miscTitle = getSubGoalMiscLabel_(plan);
+            applyDraftRoadmapAssignment_(draft, catId, SUBGOAL_MISC_ID, miscTitle, order, Math.max(order, 1));
+            return;
+          }
+          applyDraftRoadmapAssignment_(draft, catId, sid, title, order, total);
+        });
+      });
+      seed.steps.forEach(function(step){
+        var sid = String(step.id);
+        var live = getDraftsForSubGoalStep_(catId, sid, { live: true });
+        if(live.length) return;
+        (step.topics || []).forEach(function(topic, i){
+          applyTopicToStepSlot_(catId, sid, i + 1, topic);
+        });
+      });
+      snapshots.forEach(function(snap){
+        var draft = cat && cat.drafts ? cat.drafts.find(function(d){ return d && d.id === snap.id; }) : null;
+        if(!draft) return;
+        stampDraftBrandOverride_(draft.id, {
+          series: draft.series || '',
+          step: draft.step || '',
+          roadmapStepId: draft.roadmapStepId || SUBGOAL_MISC_ID
+        });
+      });
+    });
+    if(state.pendingSubGoalPlan && sameCatId_(state.pendingSubGoalPlan.catId, catId)){
+      state.pendingSubGoalPlan = null;
+      try { persistPendingSubGoalPlan_(); } catch(ePend){}
+    }
+    changed = true;
+  });
+  return changed;
 }
 function getProgramSeedBrandProfile_(catId){
   var seed = PROGRAM_INITIAL_PLAN_DRAFTS[String(catId)];
@@ -3258,6 +3438,7 @@ function getProgramSeedStrategyGuide_(catId){
 /** 1~2단계만 남은 깨진 로드맵을 시드 3~4단계로 보완 (커스텀 1단계는 유지) */
 function repairIncompleteSubGoalPlan_(catId){
   catId = normalizePendingCatId_(catId);
+  if(isExpertCourseCategory(catId)) return false;
   if(!state.branding || typeof state.branding !== 'object') return false;
   if(!state.branding.subGoalPlans) state.branding.subGoalPlans = {};
   var key = String(catId);
@@ -3324,6 +3505,7 @@ function ensureProgramIdentityPlan_(catId){
     steps: seed.steps.map(function(s){
       return {
         id: String(s.id),
+        layer: s.layer || '',
         title: s.title || '',
         summary: s.summary || '',
         rationale: s.rationale || '',
@@ -3335,6 +3517,7 @@ function ensureProgramIdentityPlan_(catId){
     strategyGuide: seed.strategyGuide || '',
     criteria: seed.strategyGuide || '',
     intent: seed.strategyGuide || '',
+    pspLayout: seed.pspLayout || '',
     updatedAt: new Date().toISOString()
   };
   return state.branding.subGoalPlans[key];
@@ -4355,8 +4538,9 @@ function getProgramPlanMeta_(catId){
       brandProfile: String(pending.plan.brandProfile || '').trim(),
       strategyGuide: strategyText(pending.plan),
       steps: (pending.plan.steps || []).map(function(s){
-        return { id: s.id, title: s.title, summary: s.summary || '', rationale: s.rationale || '', pinned: !!s.pinned };
-      })
+        return { id: s.id, layer: s.layer || '', title: s.title, summary: s.summary || '', rationale: s.rationale || '', pinned: !!s.pinned };
+      }),
+      pspLayout: pending.plan.pspLayout || ''
     };
   }
   var plan = getSubGoalPlan_(catId);
@@ -4366,8 +4550,9 @@ function getProgramPlanMeta_(catId){
     brandProfile: String(plan.brandProfile || '').trim(),
     strategyGuide: strategyText(plan),
     steps: (plan.steps || []).map(function(s){
-      return { id: s.id, title: s.title, summary: s.summary || '', rationale: s.rationale || '', pinned: !!s.pinned };
-    })
+      return { id: s.id, layer: s.layer || '', title: s.title, summary: s.summary || '', rationale: s.rationale || '', pinned: !!s.pinned };
+    }),
+    pspLayout: plan.pspLayout || ''
   };
 }
 function getProgramBrandProfile_(catId){
@@ -5915,7 +6100,12 @@ function buildDraftStageContextLines_(draft, catId, draftIndex){
     var stepId = getDraftRoadmapStepId_(draft, catId, draftIndex);
     var stepIdx = plan.steps.findIndex(function(s){ return String(s.id) === String(stepId); });
     if(meta.series) lines.push(meta.series + (meta.step ? ' (' + meta.step + ')' : ''));
-    if(stepIdx >= 0){
+    if(stepIdx >= 0 && planUsesExpertPsp_(plan)){
+      var cur = plan.steps[stepIdx];
+      var home = expertPspLayerLabel_(cur.layer);
+      if(home) lines.push(home + (cur.title ? ' · ' + cur.title : ''));
+      if(cur.summary) lines.push('- ' + String(cur.summary).trim());
+    } else if(stepIdx >= 0){
       for(var i = 0; i <= stepIdx; i++){
         var s = plan.steps[i];
         var bit = String(s.title || '').trim();
@@ -5953,7 +6143,7 @@ function buildDefaultWritingBrief_(draft, catId, draftIndex){
   var parts = [];
   if(meta.pillar) parts.push('【브랜드 기둥】\n' + meta.pillar);
   var stageLines = buildDraftStageContextLines_(draft, catId, draftIndex);
-  if(stageLines.length) parts.push('【분기 → 현재 단계】\n' + stageLines.join('\n'));
+  if(stageLines.length) parts.push('【' + (isExpertCourseCategory(catId) ? 'PSP · 카테고리' : '분기 → 현재 단계') + '】\n' + stageLines.join('\n'));
   var rationale = stripTopicRationaleStepPrefix_(meta.rationale) || buildDraftRationaleFromRoadmap_(draft, catId, draftIndex);
   if(rationale) parts.push('【왜 지금 이 글인가】\n' + rationale);
   var angle = String(draft.angle || '').trim();
@@ -7236,9 +7426,10 @@ function ensurePendingSubGoalPlanFromCurrent_(catId){
     catId: catId,
     plan: {
       steps: plan.steps.map(function(s){
-        return { id: String(s.id), title: s.title || '', summary: s.summary || '', rationale: s.rationale || '', pinned: !!s.pinned };
+        return { id: String(s.id), layer: s.layer || '', title: s.title || '', summary: s.summary || '', rationale: s.rationale || '', pinned: !!s.pinned };
       }),
       miscLabel: plan.miscLabel || SUBGOAL_MISC_LABEL,
+      pspLayout: plan.pspLayout || '',
       brandProfile: plan.brandProfile ? String(plan.brandProfile).trim() : '',
       strategyGuide: plan.strategyGuide ? String(plan.strategyGuide).trim() : String(plan.criteria || plan.intent || '').trim(),
       criteria: plan.criteria ? String(plan.criteria).trim() : '',
@@ -7628,7 +7819,16 @@ window.monthSuggestPickQuarter_ = function(){
   state.planWorkshopMode = 'month';
   refreshPlanWorkshopModal_();
 };
+window.openExpertCategoryNote_ = function(){
+  if(typeof setAppToast === 'function'){
+    setAppToast('전문가 과정은 분기 대신 Philosophy · Science · Practice 카테고리입니다.\n주제는 각 칸의 「주제 생성」으로 쓰거나 추천받으세요.\n여러 칸에 걸치면, 이번에 알릴 칸 하나에만 둡니다.', { duration: 6500 });
+  }
+};
 window.openMonthPlanSuggest_ = function(){
+  if(isExpertCourseCategory(state.currentCat)){
+    openExpertCategoryNote_();
+    return;
+  }
   state.planWorkshopFocus = 'month';
   state.monthPlanSuggest = { catId: state.currentCat, picking: true, loading: false, months: [] };
   openPlanWorkshop_('month');
@@ -7636,6 +7836,10 @@ window.openMonthPlanSuggest_ = function(){
 window.applySelectedMonthSuggest_ = function(){
   var sug = state.monthPlanSuggest;
   var catId = state.currentCat;
+  if(isExpertCourseCategory(catId)){
+    openExpertCategoryNote_();
+    return;
+  }
   if(!sug || sug.loading || sug.picking || !sameCatId_(sug.catId, catId)) return;
   var months = (sug.months || []).filter(function(it){ return it && it.selected && String(it.title || '').trim(); });
   var cleared = (sug.months || []).filter(function(it){ return it && it.deleted && !String(it.title || '').trim(); });
@@ -7698,6 +7902,7 @@ function renderStepTopicSuggestBodyHTML_(){
   }
   var topics = sug.topics || [];
   var html = '<p class="ws-intro"><strong>' + escapeHtml(sug.stepLabel || '이 단계') + '</strong>에 넣을 주제입니다. 적용할 항목만 남겨 주세요.</p>';
+  if(sug.pspLayer && sug.quarterLabel) html += '<p class="ws-intro">' + escapeHtml(sug.quarterLabel) + (sug.pspRule ? ' · 여러 칸에 걸치면 이 칸 하나만' : '') + '</p>';
   if(sug.quarterGoal) html += '<p class="ws-intro">분기 목표: ' + escapeHtml(sug.quarterGoal) + '</p>';
   if(!topics.length){
     html += '<button type="button" class="modal-btn ws-btn-ai" onclick="generateStepTopicSuggest_()">다시 추천</button>';
@@ -7753,15 +7958,26 @@ window.generateStepTopicSuggest_ = async function(){
   else refreshPlanWorkshopModal_();
   tickPlannerWaitUi_();
   try {
-    var prompt =
-buildTopicPlanPromptPrefix_(catId, stepId) + '\n\n' +
-'[' + (sug.quarterLabel || '분기') + ' 목표]\n' + (sug.quarterGoal || '(없음)') + '\n' +
-(sug.quarterRationale ? '분기 의도: ' + sug.quarterRationale + '\n' : '') +
-'[이 단계의 매월 목표]\n' + (sug.stepLabel || '') + '\n' +
-(sug.stepRationale ? '단계 의도: ' + sug.stepRationale + '\n' : '') +
-'\n프로그램 「' + cat.name + '」의 이 단계에 쓸 블로그·콘텐츠 주제 5개만 추천하세요.\n' +
-'- topic은 글 제목, angle은 각도 한 줄, rationale은 왜 이 단계인지 한 문장.\n' +
-'JSON: {"topics":[{"topic":"…","angle":"…","rationale":"…"}]}';
+    var expertHome = isExpertCourseCategory(catId) && sug.pspLayer;
+    var prompt = expertHome
+      ? (buildTopicPlanPromptPrefix_(catId, stepId) + '\n\n' +
+        '[이번 글이 설 곳]\n' + (sug.quarterLabel || '') + '\n카테고리: ' + (sug.stepLabel || '') + '\n' +
+        (sug.stepRationale ? '이 칸의 의도: ' + sug.stepRationale + '\n' : '') +
+        (sug.pspRule ? sug.pspRule + '\n' : '') +
+        '\n프로그램 「' + cat.name + '」의 이 카테고리만 알리는 주제 5개를 추천하세요.\n' +
+        '- Philosophy는 컨셉, Science는 이론(평가는 여기), Practice는 테크닉.\n' +
+        '- CMT·IFC 테크닉은 Passive 메뉴얼. Re:Al 테크닉은 Passive 움직임 → Assisted Active → Resistive.\n' +
+        '- 다른 카테고리도 닿으면 angle 끝에 「함께: 그 카테고리」만 적고, 그 칸용 주제를 따로 만들지 마세요.\n' +
+        '- topic은 글 제목, angle은 각도 한 줄, rationale은 왜 이 칸인지 한 문장.\n' +
+        'JSON: {"topics":[{"topic":"…","angle":"…","rationale":"…"}]}')
+      : (buildTopicPlanPromptPrefix_(catId, stepId) + '\n\n' +
+        '[' + (sug.quarterLabel || '분기') + ' 목표]\n' + (sug.quarterGoal || '(없음)') + '\n' +
+        (sug.quarterRationale ? '분기 의도: ' + sug.quarterRationale + '\n' : '') +
+        '[이 단계의 매월 목표]\n' + (sug.stepLabel || '') + '\n' +
+        (sug.stepRationale ? '단계 의도: ' + sug.stepRationale + '\n' : '') +
+        '\n프로그램 「' + cat.name + '」의 이 단계에 쓸 블로그·콘텐츠 주제 5개만 추천하세요.\n' +
+        '- topic은 글 제목, angle은 각도 한 줄, rationale은 왜 이 단계인지 한 문장.\n' +
+        'JSON: {"topics":[{"topic":"…","angle":"…","rationale":"…"}]}');
     var text = await callClaudePlanner_(prompt, { maxTokens: 1400 });
     var obj = parsePlannerAiJsonObject_(text);
     var topics = (obj.topics || []).map(function(t){
@@ -7807,6 +8023,8 @@ window.openStepTopicSuggest_ = function(catId, stepId){
   var num = stepMonthIndex_(step, stepPos);
   var qi = Math.floor((num - 1) / 3);
   var ctx = quarterPlanContext_(qi);
+  var layerLabel = expertPspLayerLabel_(step.layer);
+  var expertHome = isExpertCourseCategory(catId) && !!layerLabel;
   state.currentCat = catId;
   state.stepTopicSuggest = {
     catId: catId,
@@ -7814,9 +8032,11 @@ window.openStepTopicSuggest_ = function(catId, stepId){
     stepLabel: step.title || (num + '단계'),
     stepRationale: String(step.rationale || step.summary || '').trim(),
     quarterIndex: qi,
-    quarterLabel: ctx.label + ' · ' + ctx.range,
-    quarterGoal: ctx.goal,
-    quarterRationale: ctx.rationale,
+    quarterLabel: expertHome ? layerLabel : (ctx.label + ' · ' + ctx.range),
+    quarterGoal: expertHome ? '' : ctx.goal,
+    quarterRationale: expertHome ? '' : ctx.rationale,
+    pspLayer: expertHome ? step.layer : '',
+    pspRule: expertHome ? '한 주제는 이 카테고리 하나만. 다른 칸도 닿으면 각도에 「함께: 」만 적고 복제하지 않는다.' : '',
     loading: false,
     topics: []
   };
@@ -8231,6 +8451,7 @@ function applySubGoalRoadmapPlan_(payload){
     if(oldId && oldId !== newId) prevIdMap[oldId] = newId;
     return {
       id: newId,
+      layer: String(s.layer || ((prevPlan && prevPlan.steps && prevPlan.steps[i] && prevPlan.steps[i].layer) || '')).trim(),
       title: s.title || '',
       summary: s.summary || '',
       rationale: s.rationale || '',
@@ -8265,6 +8486,7 @@ function applySubGoalRoadmapPlan_(payload){
   state.branding.subGoalPlans[String(catId)] = {
     steps: nextSteps,
     miscLabel: payload.plan.miscLabel || SUBGOAL_MISC_LABEL,
+    pspLayout: payload.plan.pspLayout || (prevPlan && prevPlan.pspLayout) || '',
     brandProfile: payload.plan.brandProfile ? String(payload.plan.brandProfile).trim() : '',
     strategyGuide: payload.plan.strategyGuide ? String(payload.plan.strategyGuide).trim() : '',
     criteria: payload.plan.strategyGuide ? String(payload.plan.strategyGuide).trim() : (payload.plan.criteria ? String(payload.plan.criteria).trim() : ''),
@@ -8361,7 +8583,8 @@ window.applyPendingSubGoalPlan_ = function(){
   var p = state.pendingSubGoalPlan;
   if(!p) return;
   var stepCount = (p.plan && p.plan.steps) ? p.plan.steps.length : 0;
-  if(stepCount < 3 || stepCount > 5){
+  var expertPsp = isExpertCourseCategory(p.catId) && planUsesExpertPsp_(p.plan);
+  if(!expertPsp && (stepCount < 3 || stepCount > 5)){
     if(typeof setAppToast === 'function') setAppToast('하위 목표는 3~5단계여야 해요. 「단계 재생성」으로 채워 주세요. (현재 ' + stepCount + '단계)', { duration: 4500, variant: 'err' });
     return;
   }
@@ -8488,6 +8711,10 @@ window.regenerateProgramWorkshop_ = async function(){
   var catId = normalizePendingCatId_(state.currentCat);
   var cat = CATEGORIES[catId];
   if(!cat) return;
+  if(isExpertCourseCategory(catId)){
+    openExpertCategoryNote_();
+    return;
+  }
   if(!getCurrentMainGoal_()){
     if(typeof setAppToast === 'function') setAppToast('먼저 분기별 목표를 설정해 주세요.', { duration: 4500, variant: 'err' });
     openPlanWorkshop_('year');
@@ -8841,6 +9068,26 @@ function renderPlanLayerMonthHTML_(catId){
     return planLayerCardHTML_('3', '매월 목표와 의도', bits.join('') || '<p class="plan-layer-empty">아직 없습니다.</p>', '', 'month');
   }
   var meta = getProgramPlanMeta_(catId);
+  if(isExpertCourseCategory(catId) && planUsesExpertPsp_(meta)){
+    var pspParts = [];
+    var pspSeq = 0;
+    ['philosophy', 'science', 'practice'].forEach(function(layer){
+      var layerSteps = (meta.steps || []).filter(function(s){ return s && s.layer === layer; });
+      if(!layerSteps.length) return;
+      if(pspParts.length) pspParts.push('<div class="plan-layer-quarter-gap"></div>');
+      pspParts.push('<div class="plan-layer-quarter-label subgoal-psp-label psp-' + layer + '">' + escapeHtml(expertPspLayerLabel_(layer)) + '</div>');
+      layerSteps.forEach(function(s){
+        pspSeq++;
+        var why = String(s.rationale || s.summary || '').trim();
+        pspParts.push('<div class="plan-layer-item ' + getStepToneClass_(pspSeq - 1) + '">' +
+          '<div class="plan-layer-item-title">' + escapeHtml(pspSeq + '. ' + (s.title || '카테고리')) + '</div>' +
+          (why ? '<div class="plan-layer-item-intent">' + planLayerParagraphsHTML_(why) + '</div>' : '') +
+        '</div>');
+      });
+    });
+    var pspItems = pspParts.join('') || '<p class="plan-layer-empty">카테고리가 아직 없습니다.</p>';
+    return planLayerCardHTML_('3', 'PSP 카테고리', pspItems, 'openExpertCategoryNote_()', 'month');
+  }
   var groups = monthStepGroups_(meta.steps || []);
   var parts = [];
   groups.forEach(function(group, gi){
@@ -9078,15 +9325,31 @@ function renderProgramRoadmapHTML_(catId){
     html += '</div>';
     return html;
   }
-  var stepGroups = monthStepGroups_(plan.steps);
-  stepGroups.forEach(function(group, gi){
-    if(gi) html += '<div class="subgoal-quarter-gap"></div>';
-    html += '<div class="subgoal-quarter-label">' + (group.index + 1) + '분기 · ' + escapeHtml(quarterStepRangeLabel_(group.index)) + '</div>';
-    group.steps.forEach(function(step, j){
-      var num = (group.nums && group.nums[j]) || (group.index * 3 + j + 1);
-      html += renderSubGoalStepBlockHTML_(catId, step, num - 1, activeId);
+  if(isExpertCourseCategory(catId) && planUsesExpertPsp_(plan)){
+    var pspSeq = 0;
+    var pspStarted = false;
+    ['philosophy', 'science', 'practice'].forEach(function(layer){
+      var layerSteps = (plan.steps || []).filter(function(s){ return s && s.layer === layer; });
+      if(!layerSteps.length) return;
+      if(pspStarted) html += '<div class="subgoal-quarter-gap"></div>';
+      pspStarted = true;
+      html += '<div class="subgoal-quarter-label subgoal-psp-label psp-' + layer + '">' + escapeHtml(expertPspLayerLabel_(layer)) + '</div>';
+      layerSteps.forEach(function(step){
+        html += renderSubGoalStepBlockHTML_(catId, step, pspSeq, activeId);
+        pspSeq++;
+      });
     });
-  });
+  } else {
+    var stepGroups = monthStepGroups_(plan.steps);
+    stepGroups.forEach(function(group, gi){
+      if(gi) html += '<div class="subgoal-quarter-gap"></div>';
+      html += '<div class="subgoal-quarter-label">' + (group.index + 1) + '분기 · ' + escapeHtml(quarterStepRangeLabel_(group.index)) + '</div>';
+      group.steps.forEach(function(step, j){
+        var num = (group.nums && group.nums[j]) || (group.index * 3 + j + 1);
+        html += renderSubGoalStepBlockHTML_(catId, step, num - 1, activeId);
+      });
+    });
+  }
   var misc = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID);
   var miscShown = filterDraftsByTopicListMode_(misc, catId);
   if(miscShown.length){
@@ -11078,6 +11341,7 @@ function closeTopmostPlannerOverlay_(){
 
 
 const EXT_NAVER_BLOG = 'https://blog.naver.com/allenjoy';
+const EXT_NAVER_BLOG_WRITE = 'https://blog.naver.com/PostWriteForm.naver?blogId=allenjoy';
 /** 기본(폴백) — 도수치료·CMT. 실제 이동은 getInstagramUrlForCat_ 사용 */
 const EXT_INSTAGRAM_WEB = 'https://www.instagram.com/dr.park_dc.pt/';
 const EXT_THREADS = 'https://www.threads.com/@dr.park_dc.pt';
@@ -11128,6 +11392,27 @@ function withRealMovementBlogFooter_(text, catId){
   if(!footer) return body;
   if(body.indexOf(REAL_MOVEMENT_TALK_YAKSU_URL) !== -1) return body;
   return body + '\n\n' + footer;
+}
+function getExpertCourseBlogFooterText_(catId){
+  var id = parseInt(catId, 10);
+  if(id === 3) return 'CMT 도수치료 과정\nhttps://breezefeel.github.io/academy#cmt';
+  if(id === 4) return 'IFC 얼굴교정 과정\nhttps://breezefeel.github.io/academy#ifc';
+  if(id === 5) return 'Re:Al 움직임 과정\nhttps://breezefeel.github.io/academy#real';
+  return '';
+}
+function withExpertCourseBlogFooter_(text, catId){
+  var body = String(text || '').trim();
+  var footer = getExpertCourseBlogFooterText_(catId);
+  if(!body || !footer) return body;
+  if(body.indexOf('breezefeel.github.io/academy') !== -1) return body;
+  return body + '\n\n' + footer;
+}
+function expertCourseBlogFooterSheetHtml_(catId){
+  var t = getExpertCourseBlogFooterText_(catId);
+  if(!t) return '';
+  return '<div class="cb"><div class="cb-label">말미 링크 (고정 · 복사·발행완료 시 글 끝에 붙음)</div>' +
+    '<div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">' +
+    escapeHtml(t) + '</div></div>';
 }
 function realMovementBlogFooterHtml_(){
   var t = getRealMovementBlogFooterText_();
@@ -11181,7 +11466,7 @@ function openIOSAppScheme_(schemeUrl){
   } catch(e){}
 }
 function openNaverBlogAppOnIOS_(){
-  openIOSAppScheme_('naverblog://');
+  openIOSAppScheme_('naverblog://write');
 }
 function getThreadsProfileUsername(){
   const m = String(EXT_THREADS).match(/@([^/?#]+)/);
@@ -13291,18 +13576,31 @@ function isBackgroundSyncReason_(reason){
 
 function flushNewItemFieldsFromDom_(){
   if(!state || !state.newItem) return;
-  var topic = document.getElementById('new-item-topic-input');
-  if(topic) state.newItem.topic = topic.value;
-  var note = document.getElementById('new-item-ref-note-input');
-  if(note) state.newItem.refNote = note.value;
-  var thought = document.getElementById('new-item-daily-thought');
-  if(thought) state.newItem.dailyThought = thought.value;
-  var who = document.getElementById('new-item-daily-who');
-  if(who) state.newItem.dailyWho = who.value;
-  var what = document.getElementById('new-item-daily-what');
-  if(what) state.newItem.dailyWhat = what.value;
-  var body = document.getElementById('new-item-daily-body');
-  if(body) state.newItem.dailyBody = body.value;
+  // 분석 중 disabled 칸은 화면이 옛 값이라, 메모리에 쌓인 분석 결과를 빈 칸으로 덮으면 안 된다.
+  function take_(id, key){
+    var el = document.getElementById(id);
+    if(!el || el.disabled) return;
+    state.newItem[key] = el.value;
+  }
+  take_('new-item-topic-input', 'topic');
+  take_('new-item-ref-note-input', 'refNote');
+  take_('new-item-daily-thought', 'dailyThought');
+  take_('new-item-daily-who', 'dailyWho');
+  take_('new-item-daily-what', 'dailyWhat');
+  take_('new-item-daily-body', 'dailyBody');
+}
+function paintNewItemAnalysisFieldsToDom_(){
+  if(!state || !state.newItem) return;
+  function put_(id, value){
+    var el = document.getElementById(id);
+    if(!el || document.activeElement === el) return;
+    el.value = value == null ? '' : String(value);
+  }
+  put_('new-item-ref-note-input', state.newItem.refNote);
+  put_('new-item-daily-thought', state.newItem.dailyThought);
+  put_('new-item-daily-who', state.newItem.dailyWho);
+  put_('new-item-daily-what', state.newItem.dailyWhat);
+  put_('new-item-daily-body', state.newItem.dailyBody);
 }
 
 function bindImeGuard_(el){
@@ -17528,9 +17826,6 @@ async function syncAllSourcesIfNewerCore_(reason){
     updateSyncStatusUI_();
     return false;
   }
-  try {
-    if(remote.dailyAutoLast) localStorage.setItem('ht_daily_auto_last', remote.dailyAutoLast);
-  } catch(e2){}
   save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
   updateApiBadge();
   if(shouldProtectComposeUi_()){
@@ -17547,12 +17842,7 @@ async function syncAllSourcesIfNewerCore_(reason){
   if(mode === 'merged' && hasPendingLocalSyncChanges_() && plannerSyncBootstrapReady_){
     schedulePlannerGasPush_(true);
   }
-  if(remote.plannerLastAuto && remote.plannerLastAuto.draftId != null){
-    handleServerPlannerAuto_(remote);
-    setTimeout(function(){
-      openNextPublishRecommendationFromEntry_(remote.plannerLastAuto.draftId, remote.plannerLastAuto.catId);
-    }, 400);
-  } else if(mode === 'adopted' && reason === 'online' && typeof setAppToast === 'function'){
+  if(mode === 'adopted' && reason === 'online' && typeof setAppToast === 'function'){
     setAppToast((remoteSource || '서버') + ' 최신 데이터로 맞췄어요.', { duration: 3200, variant: 'ok' });
   }
   return true;
@@ -17560,19 +17850,6 @@ async function syncAllSourcesIfNewerCore_(reason){
 
 async function plannerGasPullIfNewer_(reason){
   return syncAllSourcesIfNewer_(reason);
-}
-function handleServerPlannerAuto_(payload){
-  var auto = payload && payload.plannerLastAuto;
-  if(!auto || !auto.draftId || auto.catId == null) return;
-  if(draftIsPublished_(auto.draftId)) return;
-  var seenKey = 'ht_server_auto_seen_' + (auto.at || auto.draftId);
-  try {
-    if(localStorage.getItem(seenKey)) return;
-    localStorage.setItem(seenKey, '1');
-  } catch(e){}
-  if(typeof tryNotifyDraftDone === 'function'){
-    tryNotifyDraftDone(auto.topic || '오늘의 발행 초안', true, auto.draftId, auto.catId, true);
-  }
 }
 function isUserAddedDraftId_(id){
   return /^d\d+-c\d+$/.test(String(id || ''));
@@ -17736,6 +18013,7 @@ function applyPersistPayload(s, opts){
     ? { skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true }
     : { skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true };
   var migrated = false;
+  if(migrateExpertPspCurriculum_()) migrated = true;
   if(sanitizeBrandingClinicRefs_()) migrated = true;
   if(ensureYearPlanMigrated_()) migrated = true;
   var planKeyPayload = {
@@ -18659,7 +18937,6 @@ async function finishDrivePendingAction_(pendingAction){
   if(pendingAction === 'upload'){
     await driveUploadNow();
     if(typeof setAppToast === 'function') setAppToast('Drive에 저장했어요.', { duration: 4500, variant: 'ok' });
-    maybeRequestNotificationAfterDrive();
   } else if(pendingAction === 'pull'){
     var token = await getDriveAccessToken({ forcePrompt: false });
     var dl = await driveDownloadCloudPayload_(token);
@@ -18781,7 +19058,6 @@ async function driveLoginInteractive_(pendingAction, promptMode){
   if(pendingAction === 'upload'){
     await driveUploadNow();
     if(typeof setAppToast === 'function') setAppToast('Drive에 저장했어요. 이후 저장은 자동으로 올라가요.', { duration: 4500, variant: 'ok' });
-    maybeRequestNotificationAfterDrive();
   } else if(pendingAction === 'pull'){
     if(PLANNER_TEAM_MODE) throw new Error('팀 모드에서는 Drive 복원을 사용할 수 없습니다.');
     var token = await getDriveAccessToken({ forcePrompt: false, desktopPopup: true });
@@ -19126,26 +19402,6 @@ function markDriveSyncOk_(){
   updateDriveButtonState();
   updateSyncStatusUI_();
 }
-function maybeRequestNotificationAfterDrive(){
-  try{
-    if(localStorage.getItem('ht_notif_drive_prompt_done')) return;
-    if(typeof Notification === 'undefined'){
-      localStorage.setItem('ht_notif_drive_prompt_done', '1');
-      return;
-    }
-    if(Notification.permission !== 'default'){
-      localStorage.setItem('ht_notif_drive_prompt_done', '1');
-      return;
-    }
-    localStorage.setItem('ht_notif_drive_prompt_done', '1');
-    if(typeof setAppToast === 'function'){
-      setAppToast('초안 완료를 기기 알림으로도 받으려면, 곧 뜨는 창에서 허용을 눌러 주세요.\n(건너뛰어도 화면 안내는 그대로예요)', { duration: 5200, variant: 'ok' });
-    }
-    setTimeout(function(){
-      try { Notification.requestPermission(); } catch(e2){}
-    }, 650);
-  } catch(e3){}
-}
 window.openDriveModal = function(){
   if(location.protocol === 'file:'){
     alert('Drive 연동은 https 또는 http로 이 페이지를 연 뒤에만 동작합니다.');
@@ -19181,14 +19437,12 @@ window.driveLoginAndUpload = async function(){
     if(!readCachedDriveToken_()){
       var ok = await driveLoginInteractive_('upload', firstConnect ? 'consent' : getDriveInteractivePrompt_());
       if(!ok) return;
-      maybeRequestNotificationAfterDrive();
       return;
     }
     await driveUploadNow();
     closeDriveModal();
     if(typeof setAppToast === 'function') setAppToast('Drive에 저장했어요. 이후 저장은 자동으로 올라가요.', { duration: 4500, variant: 'ok' });
     else alert('Drive에 저장했습니다.');
-    maybeRequestNotificationAfterDrive();
   } catch(e5){
     hideDriveOAuthBusy_();
     if(errEl) errEl.textContent = String(e5.message || e5);
@@ -19318,6 +19572,8 @@ function runDeferredBootMigrations_(){
     restorePendingSubGoalPlan_();
     restorePendingYearPlan_();
     var migrated = false;
+    var expertMigrated = false;
+    if(migrateExpertPspCurriculum_()){ migrated = true; expertMigrated = true; }
     if(dedupeAllSubGoalPlanSteps_()) migrated = true;
     if(sanitizeBrandingClinicRefs_()) migrated = true;
     if(ensureYearPlanMigrated_()) migrated = true;
@@ -19347,6 +19603,9 @@ function runDeferredBootMigrations_(){
       state.syncDirty = true;
       state.syncNeedsSnapshot = true;
       save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+    }
+    if(expertMigrated){
+      try { renderTabs(); renderMain(); } catch(eExpertRender){}
     }
   } catch(eMig){
     console.warn('[boot migrate]', eMig);
@@ -19676,9 +19935,6 @@ window.onload = () => {
     reconcileInstaPendingJobs_('load');
     reconcileThreadsPendingJobs_('load');
   }, 600);
-  scheduleDailyAutoDraft_();
-  setInterval(function(){ maybeRunDailyAutoDraft_('interval'); }, 2 * 60 * 1000);
-  setTimeout(function(){ maybeRunDailyAutoDraft_('load'); }, 4000);
   var onToastViewportChange_ = function(){
     if(isEditableTextFieldFocused_()) return;
     scheduleAppToastLift_();
@@ -19691,7 +19947,6 @@ window.onload = () => {
   }
   window.addEventListener('focus', function(){
     syncAllSourcesIfNewer_('focus');
-    maybeRunDailyAutoDraft_('focus');
     reconcileInstaPendingJobs_('focus');
     reconcileThreadsPendingJobs_('focus');
   });
@@ -19705,7 +19960,6 @@ window.onload = () => {
       return;
     }
     syncAllSourcesIfNewer_('visibility');
-    maybeRunDailyAutoDraft_('visibility');
     onReturnFromBackgroundForInsta_();
     reconcileInstaPendingJobs_('visibility');
     reconcileThreadsPendingJobs_('visibility');
@@ -19872,8 +20126,6 @@ function saveKey() {
   }
   var syncTokEl = document.getElementById('planner-sync-token');
   if(syncTokEl) setPlannerSyncToken_(syncTokEl.value);
-  var dailyAutoEl = document.getElementById('daily-auto-enabled');
-  if(dailyAutoEl) setDailyAutoEnabled_(!!dailyAutoEl.checked);
   save();
   closeApiModal();
   updateApiBadge();
@@ -19906,8 +20158,6 @@ function openApiModal() {
   if(syncTokEl) syncTokEl.value = getPlannerSyncToken_();
   var employeeEl = document.getElementById('planner-employee-id');
   if(employeeEl) employeeEl.value = getPlannerEmployeeId_();
-  var dailyAutoEl = document.getElementById('daily-auto-enabled');
-  if(dailyAutoEl) dailyAutoEl.checked = isDailyAutoEnabled_();
   updateGeminiServerStatusUI_();
   refreshPlannerServerCaps_();
   var apiModal = document.getElementById('api-modal');
@@ -23294,6 +23544,7 @@ window.onNewItemImage = async function(input){
   }
   var startIndex = existingImages.length;
   var analysisOk = false;
+  var analysisEmpty = false;
   var filledDailyFacts = false;
   var imgEstSec = REF_IMAGE_ANALYSIS_PREP_SEC + (files.length * REF_IMAGE_ANALYSIS_ESTIMATE_SEC_PER);
   state.newItem.imageAnalysisWait = {
@@ -23342,8 +23593,10 @@ window.onNewItemImage = async function(input){
         state.newItem.refNote = prevMemo ? (prevMemo + '\n\n' + analysis) : analysis;
       }
       var filledDaily = applyDailyFactsFromPhotoIfEmpty_(analysisPack && analysisPack.dailyFacts);
-      analysisOk = true;
       filledDailyFacts = !!filledDaily;
+      if(analysis || filledDailyFacts) analysisOk = true;
+      else analysisEmpty = true;
+      paintNewItemAnalysisFieldsToDom_();
     } else {
       if(typeof setAppToast === 'function') setAppToast('사진은 저장됐어요. AI 메모 자동 작성은 API 키 설정 후 다시 선택해 주세요.', { duration: 5200, variant: 'err' });
       else openApiModal();
@@ -23368,6 +23621,8 @@ window.onNewItemImage = async function(input){
           : '사진 분석을 정리했어요. 내용을 확인한 뒤 「글의 흐름 만들기」를 눌러 주세요.',
         { duration: 5200, variant: 'ok' }
       );
+    } else if(analysisEmpty && typeof setAppToast === 'function'){
+      setAppToast('사진 분석 결과가 비어 있어요. 사진을 다시 선택해 주세요.', { duration: 5200, variant: 'err' });
     }
   }
 };
@@ -24226,77 +24481,11 @@ ${avoidTopics.map(t=>' - '+t).join('\n')}
   }
 };
 
-// ── 알림 · 딥링크 · 매일 8:30 자동 초안 ──
-const DAILY_AUTO_HOUR = 8;
-const DAILY_AUTO_MINUTE = 30;
-const DAILY_AUTO_LAST_KEY = 'ht_daily_auto_last';
-const DAILY_AUTO_ENABLED_KEY = 'ht_daily_auto_enabled';
 const AUTO_TOPIC_REPLENISH_ENABLED_KEY = 'ht_auto_topic_replenish_enabled';
-var dailyAutoTimer = null;
-
-function isDailyAutoEnabled_(){
-  try {
-    var v = localStorage.getItem(DAILY_AUTO_ENABLED_KEY);
-    if(v === '1') return true;
-    return false;
-  } catch(e){ return false; }
-}
-function setDailyAutoEnabled_(on){
-  try { localStorage.setItem(DAILY_AUTO_ENABLED_KEY, on ? '1' : '0'); } catch(e){}
-}
 function isAutoTopicReplenishEnabled_(){
   try {
     return localStorage.getItem(AUTO_TOPIC_REPLENISH_ENABLED_KEY) === '1';
   } catch(e){ return false; }
-}
-function getSeoulMinutesNow_(){
-  try {
-    var parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
-    var h = 0, m = 0;
-    parts.forEach(function(p){
-      if(p.type === 'hour') h = parseInt(p.value, 10);
-      if(p.type === 'minute') m = parseInt(p.value, 10);
-    });
-    return h * 60 + m;
-  } catch(e2){
-    var d = new Date(Date.now() + 9 * 60 * 60 * 1000);
-    return d.getUTCHours() * 60 + d.getUTCMinutes();
-  }
-}
-function getSeoulDateKey_(fromDate){
-  if(fromDate){
-    try {
-      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(fromDate);
-    } catch(e2){}
-  }
-  try {
-    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-  } catch(e3){
-    var d = new Date(Date.now() + 9 * 60 * 60 * 1000);
-    return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
-  }
-}
-function dailyAutoAlreadyRanToday_(){
-  try { return localStorage.getItem(DAILY_AUTO_LAST_KEY) === getSeoulDateKey_(); } catch(e){ return false; }
-}
-function markDailyAutoRanToday_(){
-  try { localStorage.setItem(DAILY_AUTO_LAST_KEY, getSeoulDateKey_()); } catch(e){}
-}
-function msUntilNextDailyAuto_(){
-  var target = DAILY_AUTO_HOUR * 60 + DAILY_AUTO_MINUTE;
-  var now = getSeoulMinutesNow_();
-  var diffMin = target - now;
-  if(diffMin <= 0) diffMin += 24 * 60;
-  return diffMin * 60 * 1000 + 1500;
-}
-function scheduleDailyAutoDraft_(){
-  if(dailyAutoTimer) clearTimeout(dailyAutoTimer);
-  if(!isDailyAutoEnabled_()) return;
-  dailyAutoTimer = setTimeout(function(){
-    dailyAutoTimer = null;
-    maybeRunDailyAutoDraft_('schedule');
-    scheduleDailyAutoDraft_();
-  }, msUntilNextDailyAuto_());
 }
 function withDetailHashSyncLock_(fn){
   detailHashSyncLock_ = true;
@@ -24421,74 +24610,6 @@ function consumeDeepLinkFromHash_(){
 function focusPlannerAndOpenDraft_(draftId, catId){
   try { window.focus(); } catch(e){}
   openDetailFromDeepLink_(draftId, catId);
-}
-function tryNotifyDraftDone(topic, ok, draftId, catId, isDaily){
-  try {
-    if(typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-    var title = ok
-      ? (isDaily ? '오늘의 발행 초안 완료' : '초안 생성 완료')
-      : (isDaily ? '오늘의 발행 초안 실패' : '초안 생성 실패');
-    var payload = { draftId: draftId, catId: catId };
-    var opts = {
-      body: topic,
-      tag: 'ht-draft-' + String(draftId),
-      data: payload,
-      requireInteraction: !!ok && !!isDaily
-    };
-    if(document.hidden && navigator.serviceWorker){
-      navigator.serviceWorker.ready.then(function(reg){
-        return reg.showNotification(title, opts);
-      }).catch(function(){
-        var n = new Notification(title, opts);
-        n.onclick = function(){ n.close(); focusPlannerAndOpenDraft_(draftId, catId); };
-      });
-      return;
-    }
-    var n = new Notification(title, opts);
-    n.onclick = function(){
-      n.close();
-      focusPlannerAndOpenDraft_(draftId, catId);
-    };
-  } catch (e) { }
-}
-var dailyAutoRunning = false;
-function serverDailyAutoRanToday_(){
-  try {
-    var raw = plannerLastDiskPayloadStr_ || localStorage.getItem(SK);
-    if(!raw || isPlannerLsIdbStubRaw_(raw)) return false;
-    var s = JSON.parse(raw);
-    var auto = s && s.plannerLastAuto;
-    if(!auto || !auto.at) return false;
-    var d = new Date(auto.at);
-    return getSeoulDateKey_() === getSeoulDateKey_(d);
-  } catch(e){ return false; }
-}
-async function maybeRunDailyAutoDraft_(reason){
-  if(!isDailyAutoEnabled_()) return;
-  if(dailyAutoRunning || genPendingCount > 0 || genActiveJob) return;
-  if(serverDailyAutoRanToday_()) return;
-  if(!state.apiKey) return;
-  if(dailyAutoAlreadyRanToday_()) return;
-  var target = DAILY_AUTO_HOUR * 60 + DAILY_AUTO_MINUTE;
-  if(getSeoulMinutesNow_() < target && reason !== 'schedule') return;
-  var rec = getNextPublishRecommendation();
-  if(!rec || !rec.draft || !rec.draft.id) return;
-  if(draftHasContent(rec.draft)) {
-    markDailyAutoRanToday_();
-    return;
-  }
-  dailyAutoRunning = true;
-  try {
-    if(typeof setAppToast === 'function'){
-      setAppToast('오전 8:30 · 「다음 발행 추천」 초안을 백그라운드에서 만들고 있어요.', { duration: 4200, variant: 'ok' });
-    }
-    await window.enqueueDraftGeneration(rec.cat.id, rec.draft.id, { dailyAuto: true });
-    markDailyAutoRanToday_();
-  } catch(e){
-    console.warn('[매일 자동 초안]', e);
-  } finally {
-    dailyAutoRunning = false;
-  }
 }
 function buildSheetTabsHTML(tab){
   const cid = state.selectedCatId;
@@ -28565,7 +28686,7 @@ function renderSheetContent(content) {
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         (isRealMovementBlogCategory_(blogCatId) ? realMovementBlogFooterSheetHtml_() : '') +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요. <strong>수정된 블로그 최종본</strong>으로 인스타 캡션이 백그라운드에서 만들어져요.' +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. <strong>수정된 블로그 최종본</strong>으로 인스타 캡션이 백그라운드에서 만들어져요.' +
         (isRealMovementBlogCategory_(blogCatId) ? ' 하단 <strong>말미 링크</strong>는 고정으로 붙어요.' : '') + '</p>'
       );
     } else if(isExpertCourseCategory(blogCatId)){
@@ -28577,7 +28698,8 @@ function renderSheetContent(content) {
         sheetEditField_('원리 설명', 'sheet-blog-draft', b.draft, { rows: 12, help: '본문의 중심. 왜 이렇게 하는지·짧은 메커니즘', regen: 'blog.draft', copy: true, paragraphs: true }) +
         sheetEditField_('마무리', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분 · 3~5개 권장', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>발행완료</strong>를 누르면 저장·복사돼요.</p>'
+        expertCourseBlogFooterSheetHtml_(blogCatId) +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>발행완료</strong>를 누르면 저장·복사되고 글쓰기로 이동해요. 하단 <strong>말미 링크</strong>는 해당 과정 안내로 고정해서 붙어요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다.</p>'
       );
     } else {
       bodyHTML = composeSheetTabLayout_(tab,
@@ -28588,7 +28710,7 @@ function renderSheetContent(content) {
         sheetEditField_('본문 초안', 'sheet-blog-draft', b.draft, { rows: 14, regen: 'blog.draft', copy: true, paragraphs: true }) +
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 앱으로 이동해요.</p>'
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다.</p>'
       );
     }
   } else if(tab==='insta'){
@@ -28680,7 +28802,7 @@ window.getFullCopy = function(){
   if(b && b.title){
     t = blogUsesStructuredGeneralFormat_(copyCatId, b)
       ? '[블로그]\n' + formatGeneralBlogPostText(b, copyCatId)
-      : withRealMovementBlogFooter_('[블로그]\n제목: ' + b.title + '\n\n' + b.hook + '\n\n' + b.draft + '\n\n' + b.cta + '\n\n' + (b.hashtags||[]).map(h=>'#'+h).join(' '), copyCatId);
+      : withExpertCourseBlogFooter_(withRealMovementBlogFooter_('[블로그]\n제목: ' + b.title + '\n\n' + b.hook + '\n\n' + b.draft + '\n\n' + b.cta + '\n\n' + (b.hashtags||[]).map(h=>'#'+h).join(' '), copyCatId), copyCatId);
   }
   const th = normalizeThreadBlock(content.thread);
   if(th && th.summary){
@@ -28719,7 +28841,7 @@ function getTabCopyText(tab, content){
     if(!b) return '';
     if(blogUsesStructuredGeneralFormat_(catId, b)) return formatGeneralBlogPostText(b, catId);
     const outline = (b.outline || []).map(function(o, i){ return (i + 1) + '. ' + o; }).join('\n');
-    return withRealMovementBlogFooter_('[블로그]\n제목: ' + b.title + '\n\n' + (b.hook || '') + '\n\n' + outline + '\n\n' + (b.draft || '') + '\n\n' + (b.cta || '') + '\n\n' + (b.hashtags || []).map(function(h){ return '#' + h; }).join(' '), catId);
+    return withExpertCourseBlogFooter_(withRealMovementBlogFooter_('[블로그]\n제목: ' + b.title + '\n\n' + (b.hook || '') + '\n\n' + outline + '\n\n' + (b.draft || '') + '\n\n' + (b.cta || '') + '\n\n' + (b.hashtags || []).map(function(h){ return '#' + h; }).join(' '), catId), catId);
   }
   if(tab === 'insta'){
     const ig = content.insta;
@@ -28766,29 +28888,24 @@ window.copyCurrentTab = function(btn){
 };
 
 window.openExternalNaverBlog = function(){
-  const u = EXT_NAVER_BLOG;
+  var writeUrl = EXT_NAVER_BLOG_WRITE;
   if(!isPhoneOrTablet()){
-    window.open(u, '_blank', 'noopener,noreferrer');
+    window.open(writeUrl, '_blank', 'noopener,noreferrer');
     return;
   }
   if(isAndroidDevice()){
-    window.location.href = 'intent://blog.naver.com/allenjoy#Intent;scheme=https;package=com.nhn.android.blog;S.browser_fallback_url=' + encodeURIComponent(u) + ';end';
+    window.location.href = 'intent://write#Intent;scheme=naverblog;package=com.nhn.android.blog;S.browser_fallback_url=' + encodeURIComponent(writeUrl) + ';end';
     return;
   }
   if(isIOSLikeDevice()){
     openNaverBlogAppOnIOS_();
+    setTimeout(function(){
+      if(document.hidden) return;
+      window.open(writeUrl, '_blank', 'noopener,noreferrer');
+    }, 1000);
     return;
   }
-  const naverApp = 'naversearchapp://inappbrowser?url=' + encodeURIComponent(u) + '&target=new&version=6';
-  window.location.href = naverApp;
-  setTimeout(function(){
-    if(document.hidden) return;
-    window.location.href = u;
-  }, 450);
-  setTimeout(function(){
-    if(document.hidden) return;
-    window.open(u, '_blank', 'noopener,noreferrer');
-  }, 1100);
+  window.open(writeUrl, '_blank', 'noopener,noreferrer');
 };
 
 function buildBlogPasteTextForPublish_(b, catId){
@@ -28799,7 +28916,7 @@ function buildBlogPasteTextForPublish_(b, catId){
   if(isExpertCourseCategory(catId)){
     var expertParts = [b.title, b.hook, outline, b.draft, b.cta];
     if(tags) expertParts.push(tags);
-    return withRealMovementBlogFooter_(expertParts.filter(function(p){ return String(p || '').trim(); }).join('\n\n'), catId);
+    return withExpertCourseBlogFooter_(expertParts.filter(function(p){ return String(p || '').trim(); }).join('\n\n'), catId);
   }
   var parts = [b.title, b.hook, outline, b.draft, b.cta];
   if(tags) parts.push(tags);
@@ -30983,7 +31100,10 @@ window.onSheetPublishComplete = async function(){
       renderTabs();
       renderMain();
       copyTextOnly_(quickText, function(){
-        setAppToast('수정본 저장 후 복사했어요.', { duration: 3600, variant: 'ok' });
+        if(tab === 'blog') openExternalNaverBlog();
+        setAppToast(tab === 'blog'
+          ? (isPhoneOrTablet() ? '수정본 저장 · 복사 · 글쓰기 앱으로 이동' : '수정본 저장 · 복사 · 글쓰기 페이지로 이동')
+          : '수정본 저장 후 복사했어요.', { duration: 3600, variant: 'ok' });
       });
     } catch(err){
       setAppToast(((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
@@ -31023,7 +31143,10 @@ window.onSheetPublishComplete = async function(){
       renderMain();
       copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId));
       afterTabPublishSaved_(saveResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
-      setAppToast('블로그 저장 · 복사 · 앱 이동\n수정본으로 인스타 캡션을 만들고 있어요.', { duration: 5500, variant: 'ok' });
+      setAppToast((isPhoneOrTablet()
+        ? '블로그 저장 · 복사 · 글쓰기 앱으로 이동'
+        : '블로그 저장 · 복사 · 글쓰기 페이지로 이동') +
+        '\n수정본으로 인스타 캡션을 만들고 있어요.', { duration: 5500, variant: 'ok' });
     } catch(err){
       console.warn('[블로그 발행]', err);
       setAppToast(((err && err.message) || String(err)), { duration: 9000, variant: 'err' });
@@ -32600,23 +32723,23 @@ window.genAllMissingForCurrentCat = async function(forceRegen){
 
 window.enqueueDraftGeneration = async function(jobCatId, jobDraftId, opts){
 opts = opts || {};
-if(!state.apiKey){
-  if(!opts.dailyAuto && !opts.batch) openApiModal();
+  if(!state.apiKey){
+  if(!opts.batch) openApiModal();
   return false;
 }
 var cat0 = CATEGORIES[jobCatId];
 if(!cat0){
-  if(!opts.dailyAuto && !opts.batch && typeof setAppToast === 'function') setAppToast('카테고리를 찾을 수 없어요.', { duration: 4000, variant: 'err' });
+  if(!opts.batch && typeof setAppToast === 'function') setAppToast('카테고리를 찾을 수 없어요.', { duration: 4000, variant: 'err' });
   return false;
 }
 var draft0 = cat0.drafts.find(function(d){ return d.id === jobDraftId; });
 if(!draft0){
-  if(!opts.dailyAuto && !opts.batch && typeof setAppToast === 'function') setAppToast('선택된 초안을 찾을 수 없어요. 카드를 다시 눌러 주세요.', { duration: 4000, variant: 'err' });
+  if(!opts.batch && typeof setAppToast === 'function') setAppToast('선택된 초안을 찾을 수 없어요. 카드를 다시 눌러 주세요.', { duration: 4000, variant: 'err' });
   return false;
 }
 if(state.selectedId === jobDraftId){
   flushDraftBrandFieldsFromDom_();
-  save({ skipDriveUpload: !!(opts.batch || opts.dailyAuto), skipGasPush: !!(opts.batch || opts.dailyAuto) });
+  save({ skipDriveUpload: !!opts.batch, skipGasPush: !!opts.batch });
 }
 var jobTopic = draft0.topic;
 
@@ -32916,19 +33039,15 @@ try {
   if(opts.openDetailOnComplete){
     var detailTab = opts.openDetailTab || (isThreadCategory(jobCatId) ? 'thread' : (isHeiljagyaeCategory(jobCatId) ? 'community' : 'blog'));
     openDetail(jobDraftId, jobCatId, detailTab);
-  } else if(opts.dailyAuto){
-    setAppToast('오늘의 발행 초안 완료\n«' + jobTopic + '»\n알림을 누르면 바로 열어요.', { duration: 7500, variant: 'ok' });
   } else if(!opts.batch){
     setAppToast('초안 생성 완료\n«' + jobTopic + '»', { duration: 6500, variant: 'ok' });
   }
-  if(!opts.batch && !opts.openDetailOnComplete) tryNotifyDraftDone(jobTopic, true, jobDraftId, jobCatId, !!opts.dailyAuto);
   return true;
 } catch (e) {
   var errMsg = (e && e.message) ? e.message : String(e);
-  if(!opts.dailyAuto && !opts.batch){
+  if(!opts.batch){
     setAppToast('초안 생성에 실패했어요.\n' + errMsg + '\n\n같은 화면에서 다시 시도해 주세요.', { duration: 9000, variant: 'err' });
   }
-  if(!opts.batch) tryNotifyDraftDone(jobTopic, false, jobDraftId, jobCatId, !!opts.dailyAuto);
   return false;
 } finally {
   endGenIndicator();

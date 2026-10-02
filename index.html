@@ -70,8 +70,8 @@
 })();
 </script>
 <!-- CSS는 비차단 로드 — 렌더 막지 않음 -->
-<link rel="stylesheet" href="planner.css?v=172" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="planner.css?v=172"></noscript>
+<link rel="stylesheet" href="planner.css?v=173" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="planner.css?v=173"></noscript>
 <!-- 서비스워커는 head에서 등록하지 않음 — 문서 이동이 SW 대기(수십 초)에 걸리지 않게 함 -->
 </head>
 <body>
@@ -118,12 +118,6 @@
       <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:8px;">직원은 공용 초대 링크로 접속하면 자동 저장되므로 직접 입력할 필요가 없습니다.</div>
       <input class="modal-input" type="password" id="planner-sync-token" placeholder="PLANNER_SYNC_TOKEN" autocomplete="off" />
       <button type="button" class="modal-btn-ghost" onclick="copyPlannerTeamInviteLink_()" style="margin-top:8px;">직원용 초대 링크 복사</button>
-    </div>
-    <div style="margin-top:14px;padding-top:14px;border-top:1px solid #E5E7EB;">
-      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:#374151;line-height:1.5;">
-        <input type="checkbox" id="daily-auto-enabled" style="margin-top:3px;width:16px;height:16px;accent-color:#16A34A;">
-        <span><strong>매일 8:30 자동 초안</strong> — 「다음 발행 추천」 주제를 API로 백그라운드 생성 (기본 끔)</span>
-      </label>
     </div>
     <button type="button" class="modal-btn" id="start-btn" onclick="saveKey()" style="margin-top:14px;">설정 저장</button>
     <button type="button" class="modal-btn-ghost" onclick="closeApiModal()">닫기</button>
@@ -425,7 +419,7 @@
 </div>
 <script src="ops-naver-kw-seed.js?v=159"></script>
 <script src="ops-naver-ad-assets.js?v=3"></script>
-<script src="planner.js?v=211" defer></script>
+<script src="planner.js?v=217" defer></script>
 <script>
 function openLinksModal_(){
   var o = document.getElementById('links-modal-overlay');

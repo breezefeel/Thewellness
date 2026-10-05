@@ -2295,6 +2295,21 @@ white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; flex: 1 1 
 background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 12px; padding: 16px 14px;
 font-size: 13px; color: #166534; line-height: 1.65; margin-top: 8px;
 }
+.sheet-news-channels {
+display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 14px; align-items: center;
+}
+.sheet-news-chip {
+-webkit-appearance: none; appearance: none; margin: 0; cursor: pointer; font-family: inherit;
+border: 1px solid #E5E7EB; background: #F8F7F4; color: #6B7280;
+border-radius: 999px; padding: 7px 14px; font-size: 12px; font-weight: 700;
+}
+.sheet-news-chip:hover { background: #F3F4F6; color: #374151; }
+.sheet-news-chip.active {
+background: #111827; color: #fff; border-color: #111827;
+}
+.sheet-news-chip.has:not(.active) {
+border-color: #93C5FD; background: #EFF6FF; color: #1D4ED8;
+}
 .sheet-insta-pending-countdown {
 display: inline-flex; align-items: center; gap: 4px; margin: 8px 0 4px; padding: 5px 9px;
 border-radius: 999px; background: rgba(22, 101, 52, 0.08); color: #14532D;

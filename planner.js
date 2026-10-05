@@ -10782,6 +10782,7 @@ let state = {
   chatgptOpenUrl: '',
   selectedId: null,
   activeTab: 'blog',
+  newsChannel: 'naver',
   prompts: null, // null이면 DEFAULT_PROMPTS 사용
   promptsUpdatedAt: '', // 프롬프트 마지막 수정 시각 (수동·자동 재수정)
   promptTab: 'blog',
@@ -10901,7 +10902,7 @@ function getDefaultCatPrompt_(catId, type){
   return String(def[type]);
 }
 function getPromptTypeLabelKr_(type){
-  var labels = { blog: '블로그', insta: '인스타', threads: '쓰레드', image: '이미지', community: '아파트너 게시판', thread: '일상 공유' };
+  var labels = { blog: '블로그', insta: '인스타', threads: '쓰레드', image: '이미지', community: '아파트너 게시판', thread: '일상 공유', news: '소식' };
   return labels[type] || type;
 }
 /** 저장본에 해당 프로그램에 없는 채널 키가 남아 있으면 제거 */
@@ -11223,6 +11224,73 @@ function getStepToneClass_(idx){ return 'step-tone-' + (Math.max(0, parseInt(idx
 function getPlanTierClass_(tier){ return 'plan-tier-' + tier; }
 /** 블로그·인스타·이미지 워크플로 — 도수·리:얼·뷰티·교육 탭 */
 function isBlogInstaCategory(catId){ return catId !== 6 && catId !== 7 && catId !== 8; }
+
+/** 소식 채널(네이버 플레이스·카카오·당근) — 같은 주제, 채널별 톤만 다름 */
+var NEWS_CHANNEL_DEFS_ = [
+  { id: 'naver', label: '네이버' },
+  { id: 'kakao', label: '카카오' },
+  { id: 'karrot', label: '당근' }
+];
+function normalizeNewsChannel_(ch){
+  ch = String(ch || '').toLowerCase();
+  if(ch === 'naver' || ch === 'kakao' || ch === 'karrot') return ch;
+  return 'naver';
+}
+function getNewsChannel_(){
+  return normalizeNewsChannel_(state.newsChannel);
+}
+function ensureNewsBlock_(content){
+  if(!content) return null;
+  if(!content.news || typeof content.news !== 'object') content.news = {};
+  NEWS_CHANNEL_DEFS_.forEach(function(d){
+    if(!content.news[d.id] || typeof content.news[d.id] !== 'object'){
+      content.news[d.id] = { title: '', body: '', cta: '' };
+    }
+  });
+  return content.news;
+}
+function getNewsChannelItem_(content, ch){
+  var news = ensureNewsBlock_(content);
+  if(!news) return { title: '', body: '', cta: '' };
+  ch = normalizeNewsChannel_(ch || getNewsChannel_());
+  return news[ch] || { title: '', body: '', cta: '' };
+}
+function newsChannelHasContent_(item){
+  if(!item) return false;
+  return !!(String(item.title || '').trim() || String(item.body || '').trim() || String(item.cta || '').trim());
+}
+function newsHasAnyContent_(content){
+  if(!content || !content.news) return false;
+  return NEWS_CHANNEL_DEFS_.some(function(d){ return newsChannelHasContent_(content.news[d.id]); });
+}
+function formatNewsChannelText_(item, ch){
+  item = item || {};
+  ch = normalizeNewsChannel_(ch);
+  var label = ({ naver: '네이버 소식', kakao: '카카오 채널', karrot: '당근 소식' })[ch] || '소식';
+  var parts = ['[' + label + ']'];
+  if(item.title) parts.push(String(item.title).trim());
+  if(item.body) parts.push('', String(item.body).trim());
+  if(item.cta) parts.push('', String(item.cta).trim());
+  return parts.join('\n').trim();
+}
+var DEFAULT_NEWS_CHANNELS_PROMPT = `[소식 공통 — 네이버 플레이스·카카오 채널·당근]
+같은 주제·각도를 세 채널용으로 쓰되, 길이·말투·CTA만 다르게 합니다.
+- 존댓말(해요체). 과장·즉효·기적 표현 금지.
+- 치료행위 수행 암시 금지(해당 채널이 도수 외인 경우).
+- URL은 cta에 넣지 말고, 방문·톡·예약 유도 문장만.
+
+【메시지 축 — 반드시 적용】
+- 신규 고객: CTA는 확신(맞는 사람·기대치·다음 행동 1개).
+- 기존 회원·학회원: CTA는 이어짐(다음 수업·멤버·연구모임·특별함).
+- 원데이·저관여·일정 공지: 앞부분 = 날짜·가격·오는 길(약수/인천).
+- 정규·고가·교육 모집: 앞부분 = 문제·적합성·변화 → 가격·신청은 말미.
+- 주제에서 축을 판단할 수 없으면, 일반인 대상이면 신규·저관여, 전문가 과정이면 정규·고가 규칙을 기본으로 합니다.
+
+채널별 톤:
+1) naver(네이버 플레이스 소식): 정보·신뢰. 제목 한 줄 + 본문 4~7문장 + CTA 1~2문장. 일정·장소(약수/인천)를 자연스럽게.
+2) kakao(카카오 채널): 짧고 친근. 제목(또는 첫 줄) + 본문 3~5문장 + 「궁금하면 톡」형 CTA.
+3) karrot(당근): 동네·생활형. 제목 한 줄 + 본문 3~6문장. 「근처에서」「이번에」 뉘앙스. 과장 판매 톤 금지.`;
+
 /** 본문 삽입용 사진 슬롯 수 (일반·전문가 3장 / 힐자계 2장 / 일상 0) */
 function getImageSlotCount(catId){
   if(isOpsManualCategory(catId) || isDailyShareCategory(catId)) return 0;
@@ -20309,7 +20377,11 @@ function getPublishChannelBadgeLabel_(key){
     threads: '쓰레드',
     community: '게시판',
     thread: '일상',
-    image: '이미지'
+    image: '이미지',
+    news: '소식',
+    newsNaver: '네이버',
+    newsKakao: '카카오',
+    newsKarrot: '당근'
   };
   return map[key] || key;
 }
@@ -20321,7 +20393,7 @@ function getDraftPublishedChannelKeys_(draftId, catId){
   if(!pub || !pub.tabPublished) return [];
   var tp = pub.tabPublished;
   var required = getRequiredPublishKeysForCat_(catId);
-  var known = ['blog', 'insta', 'threads', 'image', 'community', 'thread'];
+  var known = ['blog', 'insta', 'threads', 'image', 'community', 'thread', 'newsNaver', 'newsKakao', 'newsKarrot'];
   var seen = {};
   var out = [];
   required.forEach(function(k){
@@ -24504,7 +24576,7 @@ function normalizeSheetTabForCategory_(tab, catId){
   tab = String(tab || '').toLowerCase();
   if(isThreadCategory(catId)) return (tab === 'thread' || tab === 'images') ? tab : '';
   if(isHeiljagyaeCategory(catId)) return (tab === 'community' || tab === 'images') ? tab : '';
-  if(isBlogInstaCategory(catId)) return (tab === 'blog' || tab === 'insta' || tab === 'threads' || tab === 'images') ? tab : '';
+  if(isBlogInstaCategory(catId)) return (tab === 'blog' || tab === 'insta' || tab === 'threads' || tab === 'images' || tab === 'news') ? tab : '';
   return '';
 }
 function setOpenDetailHash_(draftId, catId, tab){
@@ -24630,6 +24702,7 @@ function buildSheetTabsHTML(tab){
     <button type="button" class="sheet-tab${tab==='blog'?' active':''}" onclick="switchTab('blog')">블로그</button>
     <button type="button" class="sheet-tab${tab==='insta'?' active':''}" onclick="switchTab('insta')">인스타</button>
     <button type="button" class="sheet-tab${tab==='threads'?' active':''}" onclick="switchTab('threads')">쓰레드</button>
+    <button type="button" class="sheet-tab${tab==='news'?' active':''}" onclick="switchTab('news')">소식</button>
   </div></div>`;
 }
 function composeSheetTabLayout_(tab, restHtml){
@@ -28620,10 +28693,10 @@ function renderSheetEmpty(draft, cat) {
     : isHeiljagyaeCategory(cat.id)
     ? 'AI가 <strong>아파트너 게시판 글</strong>을 만들어드려요'
     : isGeneralAudienceCategory(cat.id)
-    ? 'AI가 <strong>블로그(문제 제기·셀프 케어·원리)</strong>와 <strong>망고보드용 제품명·소개</strong>를 만들어드려요.<br>블로그 <strong>발행완료</strong> → 인스타 초안, 인스타 <strong>발행완료</strong> → 쓰레드 초안 순으로 만들어져요'
+    ? 'AI가 <strong>블로그(문제 제기·셀프 케어·원리)</strong>와 <strong>망고보드용 제품명·소개</strong>를 만들어드려요.<br>블로그 <strong>발행완료</strong> → 인스타 초안, 인스타 <strong>발행완료</strong> → 쓰레드 초안 순으로 만들어져요.<br><strong>소식</strong> 탭에서 같은 주제로 네이버·카카오·당근용 글도 만들 수 있어요.'
     : isExpertCourseCategory(cat.id)
-    ? '교육·강의 <strong>영상 링크</strong> 또는 <strong>실습 사진</strong>을 먼저 올리면, AI가 그에 맞춰<br><strong>영상·사진 맥락 → 시연 포인트 → 원리 설명</strong> 글과 <strong>망고보드용 제품명·소개</strong>를 만들어요.<br>블로그 <strong>발행완료</strong> → 인스타, 인스타 <strong>발행완료</strong> → 쓰레드 순으로 만들어져요'
-    : 'AI가 <strong>블로그</strong>와 <strong>망고보드용 제품명·소개</strong>를 만들어드려요.<br>블로그 <strong>발행완료</strong> → 인스타 초안, 인스타 <strong>발행완료</strong> → 쓰레드 초안 순으로 만들어져요';
+    ? '교육·강의 <strong>영상 링크</strong> 또는 <strong>실습 사진</strong>을 먼저 올리면, AI가 그에 맞춰<br><strong>영상·사진 맥락 → 시연 포인트 → 원리 설명</strong> 글과 <strong>망고보드용 제품명·소개</strong>를 만들어요.<br>블로그 <strong>발행완료</strong> → 인스타, 인스타 <strong>발행완료</strong> → 쓰레드 순으로 만들어져요.<br><strong>소식</strong> 탭에서 네이버·카카오·당근용 글도 만들 수 있어요.'
+    : 'AI가 <strong>블로그</strong>와 <strong>망고보드용 제품명·소개</strong>를 만들어드려요.<br>블로그 <strong>발행완료</strong> → 인스타 초안, 인스타 <strong>발행완료</strong> → 쓰레드 초안 순으로 만들어져요.<br><strong>소식</strong> 탭에서 네이버·카카오·당근용 글도 만들 수 있어요.';
   const sourceNoteHtml = buildDraftReferencePreviewHTML_(draft, { catId: cat.id });
   const ytAnalysisHtml = draft.youtubeAnalysis
     ? `<div style="margin-bottom:16px;padding:12px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;">
@@ -28747,6 +28820,31 @@ function renderSheetContent(content) {
         sheetEditField_('댓글 (재게시)', 'sheet-threads-comment', getThreadsCommentText_(ths), { rows: 12, regen: 'threads.comment', copy: true, help: '본문에 대한 해설·근거·과정·철학. 게시 후 본인 댓글(재게시)로 올리세요.', paragraphs: true }) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">먼저 <strong>본문</strong>을 게시한 뒤, <strong>댓글</strong> 박스 내용을 본인 댓글(재게시)로 붙여넣으세요. <strong>발행완료</strong>는 본문을 복사·저장합니다.</p>';
     }
+  } else if(tab==='news'){
+    ensureNewsBlock_(content);
+    var newsCh = getNewsChannel_();
+    var newsItem = getNewsChannelItem_(content, newsCh);
+    var newsChips = '<div class="sheet-news-channels" role="tablist" aria-label="소식 채널">' +
+      NEWS_CHANNEL_DEFS_.map(function(d){
+        var has = newsChannelHasContent_(content.news && content.news[d.id]);
+        return '<button type="button" class="sheet-news-chip' + (newsCh === d.id ? ' active' : '') + (has ? ' has' : '') + '" onclick="switchNewsChannel_(\'' + d.id + '\')">' + d.label + '</button>';
+      }).join('') +
+      '</div>';
+    if(!newsHasAnyContent_(content)){
+      bodyHTML = tabsHTML + addSourceHtml + newsChips +
+        '<div class="sheet-insta-pending"><strong>소식 초안이 아직 없어요.</strong><br>같은 주제로 네이버·카카오·당근용 글을 한 번에 만들어요. 블로그 초안이 있으면 그걸 참고합니다.</div>' +
+        '<button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin-top:12px;">소식 3채널 만들기</button>';
+    } else {
+      var chLabel = ({ naver: '네이버 플레이스', kakao: '카카오 채널', karrot: '당근' })[newsCh] || '소식';
+      bodyHTML = composeSheetTabLayout_(tab,
+        addSourceHtml + newsChips + sheetFullCopyBar_() +
+        sheetEditField_('제목 · 첫 줄', 'sheet-news-title', newsItem.title || '', { rows: 2, title: true, regen: 'news.title', copy: true }) +
+        sheetEditField_('본문', 'sheet-news-body', newsItem.body || '', { rows: 10, regen: 'news.body', copy: true, paragraphs: true, help: chLabel + ' 톤에 맞게 다듬으세요' }) +
+        sheetEditField_('CTA', 'sheet-news-cta', newsItem.cta || '', { rows: 3, regen: 'news.cta', copy: true, paragraphs: true }) +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">위 칩으로 채널을 바꾼 뒤 수정·복사하세요. <strong>소식 3채널 만들기</strong>로 세 채널을 다시 생성할 수 있어요. <strong>발행완료</strong>는 현재 채널만 저장·복사합니다.</p>' +
+        '<button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin-top:12px;">소식 3채널 다시 만들기</button>'
+      );
+    }
   } else if(tab==='community'){
     const co = content.community;
     if(!co){
@@ -28862,6 +28960,10 @@ function getTabCopyText(tab, content){
     const th = normalizeThreadBlock(content.thread);
     if(!th || !th.summary) return '';
     return getThreadPlainText(th);
+  }
+  if(tab === 'news'){
+    ensureNewsBlock_(content);
+    return formatNewsChannelText_(getNewsChannelItem_(content, getNewsChannel_()), getNewsChannel_());
   }
   if(tab === 'images'){
     var imgCatId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
@@ -30109,7 +30211,10 @@ var SHEET_FIELD_META_ = {
   'threads.body':    { block: 'threads', label: '본문 (게시글)', instr: '통념 뒤집기·궁금증 훅 한 줄(1~3문장). **반말(구어체)** 기본. 해설·근거는 쓰지 마세요.' },
   'threads.comment': { block: 'threads', label: '댓글 (재게시)', instr: '**바로 위 수정된 본문**의 물음·반전에 대한 해설·근거·과정·철학. **반말(구어체)**. 본문과 같은 문장 반복 금지. 본문에 없는 새 주제로 바꾸지 말 것.' },
   'thread.topicTitle': { block: 'thread', label: '오늘의 한 줄', threadNorm: true, instr: '담백한 관찰·장면 한 줄. 짧은 감탄 가능. 따뜻한 위로·과한 감성 금지.' },
-  'thread.summary':    { block: 'thread', label: '본문 (일상 나눔)', threadNorm: true, instr: '관찰 → 핵심 한 가지 → (선택) 짧은 감탄·철학 1문장. 담백·구어체. 과한 감성·설교 금지.' }
+  'thread.summary':    { block: 'thread', label: '본문 (일상 나눔)', threadNorm: true, instr: '관찰 → 핵심 한 가지 → (선택) 짧은 감탄·철학 1문장. 담백·구어체. 과한 감성·설교 금지.' },
+  'news.title': { block: 'news', label: '제목 · 첫 줄', instr: '소식용 제목 한 줄. 존댓말·질문형 권장. 과장 금지. 원데이면 일정 힌트, 정규면 적합성·변화 힌트.' },
+  'news.body':  { block: 'news', label: '본문', instr: '현재 채널 톤. 신규=확신, 기존=이어짐. 원데이=일정·가격 먼저, 정규=가치·적합성 먼저. 네이버=정보·신뢰, 카카오=짧고 친근, 당근=동네·생활형. 존댓말.' },
+  'news.cta':   { block: 'news', label: 'CTA', instr: '신규면 맞는 사람·다음 행동 1개, 기존이면 다음 수업·멤버십. URL 넣지 말 것. 존댓말.' }
 };
 function fieldValueToString_(meta, block){
   if(!block) return '';
@@ -30157,7 +30262,15 @@ window.regenSheetField_ = async function(key, btn){
   var content = getDraftContent_(draftId);
   if(!content){ setAppToast('먼저 초안을 생성해 주세요.', { duration: 3500, variant: 'err' }); return; }
   applySheetEditsForTab_(content, state.activeTab);
-  var block = content[meta.block] || (content[meta.block] = {});
+  var newsCh = null;
+  var block;
+  if(meta.block === 'news'){
+    ensureNewsBlock_(content);
+    newsCh = getNewsChannel_();
+    block = content.news[newsCh] || (content.news[newsCh] = { title: '', body: '', cta: '' });
+  } else {
+    block = content[meta.block] || (content[meta.block] = {});
+  }
   var cat = CATEGORIES[catId];
   var draft = cat && cat.drafts.find(function(d){ return d.id === draftId; });
 
@@ -30225,7 +30338,12 @@ window.regenSheetField_ = async function(key, btn){
     } else {
       block[meta.__field] = String(val || '').trim();
     }
-    content[meta.block] = block;
+    if(meta.block === 'news' && newsCh){
+      ensureNewsBlock_(content);
+      content.news[newsCh] = block;
+    } else {
+      content[meta.block] = block;
+    }
     if(meta.block === 'threads' && meta.__field === 'body') block.text = block.body || '';
     if(meta.threadNorm){ content.thread = normalizeThreadBlock(block) || block; }
     if(key === 'blog.title' || key === 'community.title'){
@@ -30786,6 +30904,21 @@ function applySheetEditsForTab_(content, tab){
   if(tab === 'images') return applySheetImageEdits_(content);
   if(tab === 'thread') return applySheetThreadEdits_(content);
   if(tab === 'community') return applySheetCommunityEdits_(content);
+  if(tab === 'news') return applySheetNewsEdits_(content);
+  return content;
+}
+
+function applySheetNewsEdits_(content){
+  if(!content) return content;
+  ensureNewsBlock_(content);
+  var ch = getNewsChannel_();
+  var item = content.news[ch] || (content.news[ch] = { title: '', body: '', cta: '' });
+  var t = document.getElementById('sheet-news-title');
+  var b = document.getElementById('sheet-news-body');
+  var c = document.getElementById('sheet-news-cta');
+  if(t) item.title = t.value;
+  if(b) item.body = b.value;
+  if(c) item.cta = c.value;
   return content;
 }
 
@@ -30796,6 +30929,12 @@ function getPublishKeyForTab_(tab, catId){
   if(tab === 'threads') return 'threads';
   if(tab === 'community') return 'community';
   if(tab === 'thread') return 'thread';
+  if(tab === 'news'){
+    var ch = getNewsChannel_();
+    if(ch === 'kakao') return 'newsKakao';
+    if(ch === 'karrot') return 'newsKarrot';
+    return 'newsNaver';
+  }
   return null;
 }
 
@@ -30809,6 +30948,11 @@ function buildFinalTextForKey_(content, catId, key){
   if(key === 'thread'){
     var th = normalizeThreadBlock(content.thread);
     return th && th.summary ? getThreadPlainText(th) : '';
+  }
+  if(key === 'newsNaver' || key === 'newsKakao' || key === 'newsKarrot'){
+    ensureNewsBlock_(content);
+    var chKey = key === 'newsKakao' ? 'kakao' : (key === 'newsKarrot' ? 'karrot' : 'naver');
+    return formatNewsChannelText_(getNewsChannelItem_(content, chKey), chKey);
   }
   return '';
 }
@@ -31308,6 +31452,37 @@ window.onSheetPublishComplete = async function(){
     return;
   }
 
+  if(tab === 'news' && isBlogInstaCategory(catId)){
+    var newsPubContent = getDraftContent_(draftId);
+    if(!newsPubContent || !newsHasAnyContent_(newsPubContent)){
+      setAppToast('소식 초안이 없어요. 먼저 「소식 3채널 만들기」를 눌러 주세요.', { duration: 4500, variant: 'err' });
+      return;
+    }
+    applySheetNewsEdits_(newsPubContent);
+    var newsItemPub = getNewsChannelItem_(newsPubContent, getNewsChannel_());
+    if(!newsChannelHasContent_(newsItemPub)){
+      setAppToast('현재 채널에 내용이 없어요. 다른 채널을 확인하거나 다시 생성해 주세요.', { duration: 4500, variant: 'err' });
+      return;
+    }
+    if(pubBtn){ pubBtn.disabled = true; pubBtn.textContent = '저장 중…'; }
+    try {
+      var newsResult = commitSheetTabPublish_(draftId, catId, 'news');
+      var newsText = formatNewsChannelText_(newsItemPub, getNewsChannel_());
+      copyTextOnly_(newsText, function(){
+        setAppToast('「' + (getPublishChannelBadgeLabel_(newsResult.key) || '소식') + '」저장 · 복사했어요.\n해당 앱에 붙여넣기 하세요.', { duration: 5000, variant: 'ok' });
+      });
+      renderSheetContent(getDraftContent_(draftId));
+      renderTabs();
+      renderMain();
+      afterTabPublishSaved_(newsResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
+    } catch(errNews){
+      setAppToast(((errNews && errNews.message) || String(errNews)), { duration: 8000, variant: 'err' });
+    } finally {
+      if(pubBtn) pubBtn.disabled = false;
+    }
+    return;
+  }
+
   if(tab === 'images' && isDailyShareCategory(catId)){
     setAppToast('일상 사진은 JPEG 다운로드로 저장하세요. 글 발행은 일상 공유 탭에서 합니다.', { duration: 3500, variant: 'ok' });
     return;
@@ -31355,7 +31530,7 @@ window.switchTab = function(t){
   if(isHeiljagyaeCategory(state.selectedCatId) && t !== 'community' && t !== 'images') return;
   if(isBlogInstaCategory(state.selectedCatId)){
     if(t === 'community' || t === 'thread') t = 'blog';
-    if(t !== 'blog' && t !== 'insta' && t !== 'threads' && t !== 'images') return;
+    if(t !== 'blog' && t !== 'insta' && t !== 'threads' && t !== 'images' && t !== 'news') return;
   }
   if(state.activeTab !== t){
     var c0 = getDraftContent_(state.selectedId);
@@ -31370,6 +31545,17 @@ window.switchTab = function(t){
   if(state.selectedId && state.selectedCatId != null){
     setOpenDetailHash_(state.selectedId, state.selectedCatId, t);
   }
+};
+
+window.switchNewsChannel_ = function(ch){
+  ch = normalizeNewsChannel_(ch);
+  var content = getDraftContent_(state.selectedId);
+  if(content && state.activeTab === 'news'){
+    applySheetNewsEdits_(content);
+    persistDraftContent_(state.selectedId, content);
+  }
+  state.newsChannel = ch;
+  if(content) renderSheetContent(content);
 };
 
 function sheetCloseActionsPrefix_(){
@@ -33063,6 +33249,67 @@ window.genContent = async function(ev){
   var draftId = state.selectedId;
   var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
   var tab = state.activeTab;
+
+  if(isBlogInstaCategory(catId) && tab === 'news'){
+    if(!state.apiKey){
+      openApiModal();
+      return;
+    }
+    var newsContent = getDraftContent_(draftId);
+    if(!newsContent){
+      setAppToast('먼저 「초안 생성하기」로 블로그·이미지를 만들어 주세요.', { duration: 4500, variant: 'err' });
+      return;
+    }
+    applySheetEditsForTab_(newsContent, 'news');
+    var catN = CATEGORIES[catId];
+    var draftN = catN && catN.drafts.find(function(d){ return d.id === draftId; });
+    var topicN = draftN ? draftN.topic : '';
+    var angleN = draftN ? (draftN.angle || '') : '';
+    var blogSrc = newsContent.blog ? buildBlogSourceText_(newsContent.blog, catId) : '';
+    var brandN = getBasePrompt();
+    var promptN = [
+      brandN, '',
+      '카테고리: ' + ((catN && catN.name) || ''),
+      '주제: "' + topicN + '"',
+      angleN ? ('각도: ' + angleN) : '',
+      '',
+      DEFAULT_NEWS_CHANNELS_PROMPT,
+      '',
+      blogSrc ? ('[참고 블로그 초안 — 같은 소재를 소식용으로 압축·변형]\n' + blogSrc + '\n') : '',
+      'JSON만 출력:',
+      '{',
+      '  "news": {',
+      '    "naver": { "title": "", "body": "", "cta": "" },',
+      '    "kakao": { "title": "", "body": "", "cta": "" },',
+      '    "karrot": { "title": "", "body": "", "cta": "" }',
+      '  }',
+      '}',
+      '세 채널 모두 채우세요. URL은 넣지 마세요.'
+    ].filter(function(l){ return l != null && l !== ''; }).join('\n');
+    if(clickBtn) startButtonCountdown_(clickBtn, { estimateSec: 45, busyLabel: '소식 생성 중', idleText: clickBtn.textContent });
+    try {
+      var textN = await callClaudePlanner_(promptN, { maxTokens: 3200 });
+      var objN = parsePlannerAiJsonObject_(textN);
+      ensureNewsBlock_(newsContent);
+      var srcNews = (objN && objN.news) || objN || {};
+      NEWS_CHANNEL_DEFS_.forEach(function(d){
+        var it = srcNews[d.id] || {};
+        newsContent.news[d.id] = {
+          title: String(it.title || '').trim(),
+          body: String(it.body || '').trim(),
+          cta: String(it.cta || '').trim()
+        };
+      });
+      persistDraftContent_(draftId, newsContent);
+      renderSheetContent(newsContent);
+      setAppToast('네이버·카카오·당근 소식을 만들었어요. 칩으로 채널을 바꿔 확인하세요.', { duration: 4500, variant: 'ok' });
+    } catch(errN){
+      setAppToast('소식 생성 실패: ' + ((errN && errN.message) || String(errN)), { duration: 7000, variant: 'err' });
+    } finally {
+      if(clickBtn) stopButtonCountdown_(clickBtn);
+    }
+    return;
+  }
 
   if(isBlogInstaCategory(catId) && tab === 'insta'){
     if(!state.apiKey){

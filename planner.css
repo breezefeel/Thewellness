@@ -1384,6 +1384,12 @@ margin-left: 4px;
 .subgoal-step-main { flex: 1; min-width: 0; }
 .subgoal-step-title { display: inline; font-size: 12px; font-weight: 700; color: #1E293B; line-height: 1.35; }
 .subgoal-step-count { display: inline; margin-left: 4px; font-size: 12px; font-weight: 800; color: #0F766E; }
+.subgoal-step-pub-link {
+  display: inline; margin: 0; padding: 0; border: none; background: none;
+  font: inherit; font-size: 12px; font-weight: 800; color: #2563EB;
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+.subgoal-step-pub-link:hover { color: #1D4ED8; }
 .ws-generating-line {
   display: flex;
   align-items: center;

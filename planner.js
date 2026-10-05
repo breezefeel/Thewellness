@@ -5881,6 +5881,20 @@ function countFilledStepTopics_(drafts, catId){
   }
   return filterDraftsByTopicListMode_(drafts, catId).length;
 }
+/** 준비 글 탭에서 발행분만 숨겼을 때 「올린 N」 힌트가 보이게 */
+function formatSubGoalStepCountHTML_(drafts, catId){
+  var mode = getTopicListMode_();
+  var shownN = countFilledStepTopics_(drafts, catId);
+  if(mode === 'write'){
+    var pubN = (drafts || []).filter(function(d){
+      return d && d.id && draftShowsOnPublishedList_(d.id, catId);
+    }).length;
+    if(pubN > 0){
+      return '(' + shownN + ' · <button type="button" class="subgoal-step-pub-link" title="블로그·인스타 등 발행한 글" onclick="event.stopPropagation();setTopicListMode_(\'published\')">올린 ' + pubN + '</button>)';
+    }
+  }
+  return '(' + shownN + ')';
+}
 window.toggleSubGoalStep_ = function(key){
   if(!state.collapsedSubGoalSteps) state.collapsedSubGoalSteps = {};
   var parsed = parseSubGoalStepKey_(key);
@@ -9163,7 +9177,7 @@ function renderSubGoalStepBlockHTML_(catId, step, idx, activeId){
         '<span class="subgoal-step-num">' + (idx + 1) + '</span>' +
         '<span class="subgoal-step-main">' +
           '<span class="subgoal-step-title">' + escapeHtml(step.title || '') + '</span>' +
-          '<span class="subgoal-step-count">(' + countFilledStepTopics_(drafts, catId) + ')</span>' +
+          '<span class="subgoal-step-count">' + formatSubGoalStepCountHTML_(drafts, catId) + '</span>' +
         '</span>' +
       '</div>' +
       '<button type="button" class="subgoal-topic-gen-btn" onclick="event.stopPropagation();openStepTopicSuggest_(' + catId + ',\'' + sid.replace(/'/g, '') + '\')">주제 생성</button>' +
@@ -9363,7 +9377,7 @@ function renderProgramRoadmapHTML_(catId){
       '<div class="subgoal-step-block-head" role="button" tabindex="0" onclick="toggleSubGoalStep_(\'' + miscKey + '\')">' +
         '<div class="subgoal-step-head-static">' +
           '<span class="subgoal-step-num">·</span>' +
-          '<span class="subgoal-step-main"><span class="subgoal-step-title">' + escapeHtml(getSubGoalMiscLabel_(plan)) + '</span><span class="subgoal-step-count">(' + countFilledStepTopics_(misc, catId) + ')</span></span>' +
+          '<span class="subgoal-step-main"><span class="subgoal-step-title">' + escapeHtml(getSubGoalMiscLabel_(plan)) + '</span><span class="subgoal-step-count">' + formatSubGoalStepCountHTML_(misc, catId) + '</span></span>' +
         '</div>' +
       '</div>' +
       (miscCollapsed || !miscShown.length ? '' : '<div class="subgoal-step-cards topic-lines">' + miscShown.map(function(d){

@@ -23627,13 +23627,28 @@ async function prepareRefImageFromFile_(file){
 function isVideoFile_(file){
   if(!file) return false;
   if(file.type && /^video\//i.test(file.type)) return true;
-  return /\.(mp4|mov|webm|m4v|avi|mkv)$/i.test(String(file.name || ''));
+  return /\.(mp4|mov|webm|m4v|avi|mkv|qt)$/i.test(String(file.name || ''));
+}
+
+function isLikelyIosBrowser_(){
+  var ua = navigator.userAgent || '';
+  if(/iPad|iPhone|iPod/i.test(ua)) return true;
+  // iPadOS desktop UA
+  return navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1;
 }
 
 function seekVideoToTime_(video, timeSec){
   return new Promise(function(resolve, reject){
     var settled = false;
+    var timer = setTimeout(function(){
+      // iPad Safari: seeked가 안 와도 currentTime이 바뀌면 통과
+      if(settled) return;
+      settled = true;
+      cleanup();
+      resolve();
+    }, isLikelyIosBrowser_() ? 4000 : 2500);
     function cleanup(){
+      clearTimeout(timer);
       video.removeEventListener('seeked', onSeeked);
       video.removeEventListener('error', onError);
     }
@@ -23647,7 +23662,7 @@ function seekVideoToTime_(video, timeSec){
       if(settled) return;
       settled = true;
       cleanup();
-      reject(new Error('영상 프레임을 읽지 못했어요'));
+      reject(new Error('영상 프레임을 읽지 못했어요 (시크 실패)'));
     }
     video.addEventListener('seeked', onSeeked);
     video.addEventListener('error', onError);
@@ -23655,7 +23670,7 @@ function seekVideoToTime_(video, timeSec){
       var dur = Number(video.duration);
       var t = Number(timeSec) || 0;
       if(isFinite(dur) && dur > 0) t = Math.min(Math.max(0, t), Math.max(0, dur - 0.05));
-      if(Math.abs((video.currentTime || 0) - t) < 0.001){
+      if(Math.abs((video.currentTime || 0) - t) < 0.05){
         settled = true;
         cleanup();
         resolve();
@@ -23670,6 +23685,62 @@ function seekVideoToTime_(video, timeSec){
   });
 }
 
+/** Safari(iPad): duration === Infinity 인 경우 알려진 우회 */
+function resolveSafariInfiniteDuration_(video){
+  return new Promise(function(resolve){
+    var dur = Number(video.duration);
+    if(isFinite(dur) && dur > 0){
+      resolve(dur);
+      return;
+    }
+    var settled = false;
+    function finish(){
+      if(settled) return;
+      settled = true;
+      video.removeEventListener('durationchange', onDur);
+      video.removeEventListener('timeupdate', onTime);
+      var d = Number(video.duration);
+      resolve(isFinite(d) && d > 0 ? d : 0);
+    }
+    function onDur(){
+      var d = Number(video.duration);
+      if(isFinite(d) && d > 0) finish();
+    }
+    function onTime(){
+      var d = Number(video.duration);
+      if(isFinite(d) && d > 0){
+        try { video.currentTime = 0; } catch(e0){}
+        finish();
+      }
+    }
+    video.addEventListener('durationchange', onDur);
+    video.addEventListener('timeupdate', onTime);
+    try {
+      // 끝으로 점프해 duration을 확정시키는 Safari 트릭
+      video.currentTime = 1e101;
+    } catch(e1){
+      finish();
+      return;
+    }
+    setTimeout(finish, isLikelyIosBrowser_() ? 3500 : 2000);
+  });
+}
+
+async function unlockVideoDecodeOnIos_(video){
+  try {
+    video.muted = true;
+    video.playsInline = true;
+    var p = video.play();
+    if(p && typeof p.then === 'function') await p.catch(function(){});
+    video.pause();
+  } catch(e){}
+  var tries = 0;
+  while((!(video.videoWidth > 0) || !(video.videoHeight > 0)) && tries < 50){
+    await new Promise(function(r){ setTimeout(r, 40); });
+    tries++;
+  }
+}
+
 function loadVideoElementFromFile_(file){
   return new Promise(function(resolve, reject){
     var blobUrl = URL.createObjectURL(file);
@@ -23678,10 +23749,14 @@ function loadVideoElementFromFile_(file){
     video.muted = true;
     video.playsInline = true;
     video.setAttribute('playsinline', '');
+    video.setAttribute('webkit-playsinline', '');
+    video.controls = false;
     var settled = false;
+    var loadTimeoutMs = isLikelyIosBrowser_() ? 45000 : 20000;
     function cleanupListeners(){
       video.removeEventListener('loadedmetadata', onReady);
       video.removeEventListener('loadeddata', onReady);
+      video.removeEventListener('canplay', onReady);
       video.removeEventListener('error', onError);
     }
     function fail(msg){
@@ -23694,32 +23769,47 @@ function loadVideoElementFromFile_(file){
     }
     function onReady(){
       if(settled) return;
-      if(!(video.videoWidth > 0) && video.readyState < 1) return;
+      // iPad: metadata만 오고 videoWidth=0인 경우가 있어 readyState만으로도 통과
+      if(video.readyState < 1 && !(video.videoWidth > 0)) return;
       settled = true;
       cleanupListeners();
       resolve({ video: video, blobUrl: blobUrl });
     }
-    function onError(){ fail('영상을 불러오지 못했어요'); }
+    function onError(){
+      var code = video.error && video.error.code;
+      var detail = code ? (' (코드 ' + code + ')') : '';
+      fail('아이패드에서 이 영상 형식을 읽지 못했어요' + detail + '. mp4로 보내거나 유튜브 링크를 써 주세요.');
+    }
     video.addEventListener('loadedmetadata', onReady);
     video.addEventListener('loadeddata', onReady);
+    video.addEventListener('canplay', onReady);
     video.addEventListener('error', onError);
+    // QuickTime이면 type 힌트
+    try {
+      if(file && file.type) video.setAttribute('type', file.type);
+    } catch(e2){}
     video.src = blobUrl;
+    try { video.load(); } catch(e3){}
     setTimeout(function(){
       if(!settled && video.readyState >= 1) onReady();
-      else if(!settled) fail('영상 로딩이 너무 오래 걸려요');
-    }, 12000);
+      else if(!settled) fail('영상 로딩이 너무 오래 걸려요. 파일이 크면 유튜브 링크를 권장합니다.');
+    }, loadTimeoutMs);
   });
 }
 
 function canvasPayloadFromVideoFrame_(video, fileName, frameIdx){
   var w = video.videoWidth || 0;
   var h = video.videoHeight || 0;
-  if(!w || !h) throw new Error('영상 화면 크기를 읽지 못했어요');
+  if(!w || !h) throw new Error('영상 화면 크기를 읽지 못했어요. 아이패드에서는 잠시 후 다시 시도하거나 mp4로 변환해 주세요.');
   var scale = Math.min(1, REF_IMAGE_MAX_DIM / Math.max(w, h, 1));
   var canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(w * scale));
   canvas.height = Math.max(1, Math.round(h * scale));
-  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  try {
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  } catch(e){
+    throw new Error('프레임을 그림으로 옮기지 못했어요. 코덱 제한일 수 있어요 — mp4(H.264) 또는 유튜브를 써 주세요.');
+  }
   var mime = 'image/jpeg';
   var quality = 0.88;
   var base = String(fileName || 'video').replace(/\.\w+$/, '');
@@ -23741,20 +23831,29 @@ async function extractVideoFramesAsRefImages_(file, maxFrames){
   if(file.size > REF_VIDEO_MAX_UPLOAD_BYTES){
     throw new Error('영상은 ' + Math.round(REF_VIDEO_MAX_UPLOAD_BYTES / 1024 / 1024) + 'MB 이하로 올려 주세요. 더 길면 유튜브 공개 URL을 쓰세요.');
   }
+  // iPad 대용량: 로딩·메모리 실패가 잦아 안내
+  if(isLikelyIosBrowser_() && file.size > 200 * 1024 * 1024){
+    // 막지는 않되, 실패 시 메시지에 힌트가 남도록 — 계속 시도
+  }
   maxFrames = Math.max(1, Math.min(REF_VIDEO_MAX_FRAMES, parseInt(maxFrames, 10) || REF_VIDEO_MAX_FRAMES));
   var loaded = await loadVideoElementFromFile_(file);
   var video = loaded.video;
   var blobUrl = loaded.blobUrl;
   try {
-    var duration = Number(video.duration);
+    await unlockVideoDecodeOnIos_(video);
+    var duration = await resolveSafariInfiniteDuration_(video);
     if(!isFinite(duration) || duration <= 0){
-      throw new Error('영상 길이를 읽지 못했어요');
+      // duration을 못 읽으면 0~수 초 구간만 샘플
+      duration = 0;
     }
     if(duration > REF_VIDEO_MAX_DURATION_SEC){
       throw new Error('영상은 ' + Math.round(REF_VIDEO_MAX_DURATION_SEC / 60) + '분 이하만 첨부할 수 있어요. 긴 강의는 유튜브 공개 URL을 메모에 넣어 주세요.');
     }
     var times = [];
-    if(maxFrames === 1){
+    if(duration <= 0){
+      // Infinity/미확정: 초 단위로 조금씩 시도
+      for(var k = 0; k < maxFrames; k++) times.push(0.2 + k * 1.2);
+    } else if(maxFrames === 1){
       times = [Math.min(duration * 0.5, Math.max(0, duration - 0.05))];
     } else {
       for(var i = 0; i < maxFrames; i++){
@@ -23763,13 +23862,28 @@ async function extractVideoFramesAsRefImages_(file, maxFrames){
       }
     }
     var frames = [];
+    var lastErr = null;
     for(var j = 0; j < times.length; j++){
-      await seekVideoToTime_(video, times[j]);
-      await new Promise(function(r){ setTimeout(r, 40); });
-      frames.push(canvasPayloadFromVideoFrame_(video, file.name, j));
+      try {
+        await seekVideoToTime_(video, times[j]);
+        await new Promise(function(r){ setTimeout(r, isLikelyIosBrowser_() ? 120 : 40); });
+        if(!(video.videoWidth > 0)){
+          await unlockVideoDecodeOnIos_(video);
+        }
+        frames.push(canvasPayloadFromVideoFrame_(video, file.name, frames.length));
+      } catch(frameErr){
+        lastErr = frameErr;
+      }
+    }
+    if(!frames.length){
+      var tip = isLikelyIosBrowser_()
+        ? ' 아이패드에서는 짧은 mp4(H.264)나 유튜브 링크가 더 잘 됩니다.'
+        : '';
+      throw new Error((lastErr && lastErr.message ? lastErr.message : '프레임을 뽑지 못했어요.') + tip);
     }
     return frames;
   } finally {
+    try { video.pause(); } catch(eP){}
     try { video.removeAttribute('src'); video.load(); } catch(e1){}
     URL.revokeObjectURL(blobUrl);
   }
@@ -23873,7 +23987,7 @@ window.onNewItemImage = async function(input){
     // 새로 붙이려다 실패한 장만 되돌리고, 기존 첨부는 유지
     state.newItem.refImages = existingImages;
     state.newItem.refImage = existingImages[0] || null;
-    if(typeof setAppToast === 'function') setAppToast('참고 미디어 처리 실패\n' + msg, { duration: 6500, variant: 'err' });
+    if(typeof setAppToast === 'function') setAppToast('참고 미디어 처리 실패\n' + msg, { duration: 9000, variant: 'err' });
     else alert(msg);
   } finally {
     state.newItem.imageAnalyzing = false;

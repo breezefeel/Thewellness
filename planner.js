@@ -2665,9 +2665,13 @@ const FLOW_PROPOSAL_ESTIMATE_SEC = 42;
 const SHEET_FIELD_REGEN_ESTIMATE_SEC = 18;
 const ADD_DRAFT_TOPIC_ESTIMATE_SEC = 38;
 const ADD_DRAFT_FULL_ESTIMATE_SEC = 95;
-/** 추가 폼 참고 사진 1장당 분석 예상(초) — 비전 호출 순차 처리 */
+/** 추가 폼 참고 사진·영상 프레임 1장당 분석 예상(초) — 비전 호출 순차 처리 */
 const REF_IMAGE_ANALYSIS_ESTIMATE_SEC_PER = 18;
 const REF_IMAGE_ANALYSIS_PREP_SEC = 4;
+const REF_MEDIA_MAX_SLOTS = 10;
+const REF_VIDEO_MAX_UPLOAD_BYTES = 1024 * 1024 * 1024;
+const REF_VIDEO_MAX_DURATION_SEC = 300;
+const REF_VIDEO_MAX_FRAMES = 6;
 var plannerWaitUiTimer_ = null;
 var activeButtonCountdowns_ = [];
 
@@ -2860,13 +2864,13 @@ function tickPlannerWaitUi_(){
     var imgHintEl = document.getElementById('new-item-img-analysis-hint');
     if(imgHintEl){
       var nImg = imgW.count || 0;
-      imgHintEl.innerHTML = '사진 ' + nImg + '장 분석 중… <strong id="new-item-img-analysis-cd">' +
+      imgHintEl.innerHTML = '참고 컷 ' + nImg + '장 분석 중… <strong id="new-item-img-analysis-cd">' +
         escapeHtml(formatCountdownLong_(leftImg)) + '</strong> · 참고 메모에 순서대로 채워집니다.';
     }
     var imgBtn = document.getElementById('btn-add-draft-submit');
     if(imgBtn){
       imgBtn.disabled = true;
-      imgBtn.textContent = '사진 분석 중 · ' + formatCountdownShort_(leftImg);
+      imgBtn.textContent = '참고 컷 분석 중 · ' + formatCountdownShort_(leftImg);
     }
   }
   tickButtonCountdowns_();
@@ -23105,6 +23109,30 @@ function koreanPhotoOrdinalLabel_(n){
   };
   return map[n] || (n + '번째 사진');
 }
+function koreanVideoFrameOrdinalLabel_(n){
+  var map = {
+    1: '첫 번째',
+    2: '두 번째',
+    3: '세 번째',
+    4: '네 번째',
+    5: '다섯 번째',
+    6: '여섯 번째',
+    7: '일곱 번째',
+    8: '여덟 번째',
+    9: '아홉 번째',
+    10: '열 번째'
+  };
+  return (map[n] || (n + '번째')) + ' 컷';
+}
+function koreanRefMediaLabel_(absoluteIndex, image){
+  if(image && image.fromVideo){
+    var n = parseInt(image.frameIndex, 10) || absoluteIndex;
+    var label = '영상에서 뽑은 ' + koreanVideoFrameOrdinalLabel_(n);
+    if(image.videoName) label += ' · ' + String(image.videoName);
+    return label;
+  }
+  return koreanPhotoOrdinalLabel_(absoluteIndex);
+}
 
 async function analyzeSingleRefImageForMemo_(image, catId){
   var list = normalizeRefImages_(image);
@@ -23205,7 +23233,7 @@ async function analyzeRefImagesForMemo_(images, catId, startIndex){
   var parts = [];
   var dailyFacts = { who: '', what: '', body: '' };
   for(var i = 0; i < list.length; i++){
-    var label = koreanPhotoOrdinalLabel_(start + i + 1);
+    var label = koreanRefMediaLabel_(start + i + 1, list[i]);
     var body = await analyzeSingleRefImageForMemo_(list[i], catId);
     if(!body) continue;
     if(isDaily){
@@ -23238,7 +23266,7 @@ async function generateTopicFromKeywords_(catId, keywords, imagePayload, sourceN
   var noteBlock = '';
   if(sourceNote && String(sourceNote).trim()){
     noteBlock = '\n[참고 메모 — 영상·테크닉·링크 등]\n' + String(sourceNote).trim();
-    if(!youtubeAnalysis) noteBlock += '\n(AI는 영상 파일을 직접 볼 수 없습니다. 메모·링크 설명을 바탕으로 topic·angle을 만드세요.)';
+    if(!youtubeAnalysis) noteBlock += '\n(로컬 영상은 첨부로 프레임을 뽑거나, 공개 유튜브 URL을 넣으면 분석합니다. 첨부·링크 없는 파일 경로만으로는 볼 수 없습니다.)';
   }
   if(youtubeAnalysis && String(youtubeAnalysis).trim()){
     noteBlock += '\n\n[YouTube 영상 분석 — Gemini]\n' + String(youtubeAnalysis).trim();
@@ -23311,7 +23339,7 @@ async function generateArticleFlowProposals_(catId, keywords, imagePayload, sour
   var noteBlock = '';
   if(memoOnly){
     noteBlock = '\n[참고 메모 · 사진/영상 분석 — 반드시 반영]\n' + memoOnly;
-    if(!youtubeAnalysis) noteBlock += '\n(AI는 영상 파일을 직접 볼 수 없습니다. 메모·링크·분석 설명을 바탕으로 제안하세요.)';
+    if(!youtubeAnalysis) noteBlock += '\n(로컬 영상은 첨부로 프레임을 뽑거나, 공개 유튜브 URL을 넣으면 분석합니다. 첨부·링크 없는 파일만으로는 볼 수 없습니다.)';
   }
   if(youtubeAnalysis && String(youtubeAnalysis).trim()){
     noteBlock += '\n\n[YouTube 영상 분석 — Gemini]\n' + String(youtubeAnalysis).trim();
@@ -23596,33 +23624,181 @@ async function prepareRefImageFromFile_(file){
   }
 }
 
+function isVideoFile_(file){
+  if(!file) return false;
+  if(file.type && /^video\//i.test(file.type)) return true;
+  return /\.(mp4|mov|webm|m4v|avi|mkv)$/i.test(String(file.name || ''));
+}
+
+function seekVideoToTime_(video, timeSec){
+  return new Promise(function(resolve, reject){
+    var settled = false;
+    function cleanup(){
+      video.removeEventListener('seeked', onSeeked);
+      video.removeEventListener('error', onError);
+    }
+    function onSeeked(){
+      if(settled) return;
+      settled = true;
+      cleanup();
+      resolve();
+    }
+    function onError(){
+      if(settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('영상 프레임을 읽지 못했어요'));
+    }
+    video.addEventListener('seeked', onSeeked);
+    video.addEventListener('error', onError);
+    try {
+      var dur = Number(video.duration);
+      var t = Number(timeSec) || 0;
+      if(isFinite(dur) && dur > 0) t = Math.min(Math.max(0, t), Math.max(0, dur - 0.05));
+      if(Math.abs((video.currentTime || 0) - t) < 0.001){
+        settled = true;
+        cleanup();
+        resolve();
+        return;
+      }
+      video.currentTime = t;
+    } catch(e){
+      settled = true;
+      cleanup();
+      reject(e);
+    }
+  });
+}
+
+function loadVideoElementFromFile_(file){
+  return new Promise(function(resolve, reject){
+    var blobUrl = URL.createObjectURL(file);
+    var video = document.createElement('video');
+    video.preload = 'auto';
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute('playsinline', '');
+    var settled = false;
+    function cleanupListeners(){
+      video.removeEventListener('loadedmetadata', onReady);
+      video.removeEventListener('loadeddata', onReady);
+      video.removeEventListener('error', onError);
+    }
+    function fail(msg){
+      if(settled) return;
+      settled = true;
+      cleanupListeners();
+      try { video.removeAttribute('src'); video.load(); } catch(e0){}
+      URL.revokeObjectURL(blobUrl);
+      reject(new Error(msg || '영상을 불러오지 못했어요'));
+    }
+    function onReady(){
+      if(settled) return;
+      if(!(video.videoWidth > 0) && video.readyState < 1) return;
+      settled = true;
+      cleanupListeners();
+      resolve({ video: video, blobUrl: blobUrl });
+    }
+    function onError(){ fail('영상을 불러오지 못했어요'); }
+    video.addEventListener('loadedmetadata', onReady);
+    video.addEventListener('loadeddata', onReady);
+    video.addEventListener('error', onError);
+    video.src = blobUrl;
+    setTimeout(function(){
+      if(!settled && video.readyState >= 1) onReady();
+      else if(!settled) fail('영상 로딩이 너무 오래 걸려요');
+    }, 12000);
+  });
+}
+
+function canvasPayloadFromVideoFrame_(video, fileName, frameIdx){
+  var w = video.videoWidth || 0;
+  var h = video.videoHeight || 0;
+  if(!w || !h) throw new Error('영상 화면 크기를 읽지 못했어요');
+  var scale = Math.min(1, REF_IMAGE_MAX_DIM / Math.max(w, h, 1));
+  var canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(w * scale));
+  canvas.height = Math.max(1, Math.round(h * scale));
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  var mime = 'image/jpeg';
+  var quality = 0.88;
+  var base = String(fileName || 'video').replace(/\.\w+$/, '');
+  var name = base + '_cut' + (frameIdx + 1) + '.jpg';
+  var payload = canvasToRefImagePayload_(canvas, name, mime, quality);
+  while(payload && payload.data.length > 4 * 1024 * 1024 && quality > 0.52){
+    quality -= 0.08;
+    payload = canvasToRefImagePayload_(canvas, name, mime, quality);
+  }
+  if(!payload) throw new Error('영상 프레임 압축에 실패했어요');
+  payload.fromVideo = true;
+  payload.videoName = fileName || '';
+  payload.frameIndex = frameIdx + 1;
+  return payload;
+}
+
+async function extractVideoFramesAsRefImages_(file, maxFrames){
+  if(!file) return [];
+  if(file.size > REF_VIDEO_MAX_UPLOAD_BYTES){
+    throw new Error('영상은 ' + Math.round(REF_VIDEO_MAX_UPLOAD_BYTES / 1024 / 1024) + 'MB 이하로 올려 주세요. 더 길면 유튜브 공개 URL을 쓰세요.');
+  }
+  maxFrames = Math.max(1, Math.min(REF_VIDEO_MAX_FRAMES, parseInt(maxFrames, 10) || REF_VIDEO_MAX_FRAMES));
+  var loaded = await loadVideoElementFromFile_(file);
+  var video = loaded.video;
+  var blobUrl = loaded.blobUrl;
+  try {
+    var duration = Number(video.duration);
+    if(!isFinite(duration) || duration <= 0){
+      throw new Error('영상 길이를 읽지 못했어요');
+    }
+    if(duration > REF_VIDEO_MAX_DURATION_SEC){
+      throw new Error('영상은 ' + Math.round(REF_VIDEO_MAX_DURATION_SEC / 60) + '분 이하만 첨부할 수 있어요. 긴 강의는 유튜브 공개 URL을 메모에 넣어 주세요.');
+    }
+    var times = [];
+    if(maxFrames === 1){
+      times = [Math.min(duration * 0.5, Math.max(0, duration - 0.05))];
+    } else {
+      for(var i = 0; i < maxFrames; i++){
+        var t = duration * (0.05 + (0.9 * i / (maxFrames - 1)));
+        times.push(Math.min(Math.max(0, t), Math.max(0, duration - 0.05)));
+      }
+    }
+    var frames = [];
+    for(var j = 0; j < times.length; j++){
+      await seekVideoToTime_(video, times[j]);
+      await new Promise(function(r){ setTimeout(r, 40); });
+      frames.push(canvasPayloadFromVideoFrame_(video, file.name, j));
+    }
+    return frames;
+  } finally {
+    try { video.removeAttribute('src'); video.load(); } catch(e1){}
+    URL.revokeObjectURL(blobUrl);
+  }
+}
+
 window.onNewItemImage = async function(input){
   var files = input && input.files ? Array.from(input.files) : [];
   if(!files.length){
     // 파일 선택 취소 시 기존 첨부·분석은 유지
     return;
   }
-  var maxFiles = 10;
+  var maxFiles = REF_MEDIA_MAX_SLOTS;
   var existingImages = normalizeRefImages_(state.newItem.refImages);
   var room = maxFiles - existingImages.length;
   if(room <= 0){
-    alert('사진은 최대 ' + maxFiles + '장까지 첨부할 수 있어요.');
+    alert('참고 컷은 최대 ' + maxFiles + '장까지 첨부할 수 있어요.');
     if(input) input.value = '';
     return;
-  }
-  if(files.length > room){
-    alert('사진은 최대 ' + maxFiles + '장까지예요. 이번엔 ' + room + '장만 추가합니다.');
-    files = files.slice(0, room);
   }
   var startIndex = existingImages.length;
   var analysisOk = false;
   var analysisEmpty = false;
   var filledDailyFacts = false;
-  var imgEstSec = REF_IMAGE_ANALYSIS_PREP_SEC + (files.length * REF_IMAGE_ANALYSIS_ESTIMATE_SEC_PER);
+  var hasVideoPick = files.some(isVideoFile_);
+  var imgEstSec = REF_IMAGE_ANALYSIS_PREP_SEC + (Math.min(files.length * (hasVideoPick ? 3 : 1), room) * REF_IMAGE_ANALYSIS_ESTIMATE_SEC_PER);
   state.newItem.imageAnalysisWait = {
     startedAt: Date.now(),
     estimateSec: imgEstSec,
-    count: files.length
+    count: Math.min(files.length, room)
   };
   state.newItem.imageAnalyzing = true;
   resetNewItemFlowProposals_();
@@ -23631,9 +23807,26 @@ window.onNewItemImage = async function(input){
   tickPlannerWaitUi_();
   try {
     var newImages = [];
+    var capped = false;
     for(var i = 0; i < files.length; i++){
-      newImages.push(await prepareRefImageFromFile_(files[i]));
+      var left = maxFiles - existingImages.length - newImages.length;
+      if(left <= 0){
+        capped = true;
+        break;
+      }
+      var f = files[i];
+      if(isVideoFile_(f)){
+        var frameBudget = Math.min(REF_VIDEO_MAX_FRAMES, left);
+        var frames = await extractVideoFramesAsRefImages_(f, frameBudget);
+        newImages = newImages.concat(frames);
+      } else {
+        newImages.push(await prepareRefImageFromFile_(f));
+      }
     }
+    if(capped && typeof setAppToast === 'function'){
+      setAppToast('참고 컷은 최대 ' + maxFiles + '장까지예요. 일부만 추가했어요.', { duration: 4200, variant: 'ok' });
+    }
+    if(!newImages.length) throw new Error('첨부할 컷을 만들지 못했어요');
     var images = existingImages.concat(newImages);
     state.newItem.refImages = images;
     state.newItem.refImage = images[0] || null;
@@ -23652,9 +23845,11 @@ window.onNewItemImage = async function(input){
       var leftNow = state.newItem.imageAnalysisWait
         ? getCountdownSec_(state.newItem.imageAnalysisWait.startedAt, state.newItem.imageAnalysisWait.estimateSec)
         : imgEstSec;
+      var cutLabel = (startIndex > 0 ? '추가 참고 컷 ' : '참고 컷 ') + newImages.length + '장';
+      if(hasVideoPick) cutLabel += '(영상 프레임 포함)';
       if(typeof setAppToast === 'function'){
         setAppToast(
-          (startIndex > 0 ? '추가 사진 ' : '사진 ') + newImages.length + '장 분석 중… ' + formatCountdownLong_(leftNow),
+          cutLabel + ' 분석 중… ' + formatCountdownLong_(leftNow),
           { duration: 3200, variant: 'ok' }
         );
       }
@@ -23670,7 +23865,7 @@ window.onNewItemImage = async function(input){
       else analysisEmpty = true;
       paintNewItemAnalysisFieldsToDom_();
     } else {
-      if(typeof setAppToast === 'function') setAppToast('사진은 저장됐어요. AI 메모 자동 작성은 API 키 설정 후 다시 선택해 주세요.', { duration: 5200, variant: 'err' });
+      if(typeof setAppToast === 'function') setAppToast('참고 컷은 저장됐어요. AI 메모 자동 작성은 API 키 설정 후 다시 선택해 주세요.', { duration: 5200, variant: 'err' });
       else openApiModal();
     }
   } catch(e){
@@ -23678,7 +23873,7 @@ window.onNewItemImage = async function(input){
     // 새로 붙이려다 실패한 장만 되돌리고, 기존 첨부는 유지
     state.newItem.refImages = existingImages;
     state.newItem.refImage = existingImages[0] || null;
-    if(typeof setAppToast === 'function') setAppToast('사진 처리 실패\n' + msg, { duration: 6500, variant: 'err' });
+    if(typeof setAppToast === 'function') setAppToast('참고 미디어 처리 실패\n' + msg, { duration: 6500, variant: 'err' });
     else alert(msg);
   } finally {
     state.newItem.imageAnalyzing = false;
@@ -23689,12 +23884,12 @@ window.onNewItemImage = async function(input){
     if(analysisOk && typeof setAppToast === 'function'){
       setAppToast(
         filledDailyFacts
-          ? '사진에서 누구와·무엇을·몸 느낌을 채웠어요. 확인하고 「글의 흐름 만들기」를 눌러 주세요.'
-          : '사진 분석을 정리했어요. 내용을 확인한 뒤 「글의 흐름 만들기」를 눌러 주세요.',
+          ? '참고 컷에서 누구와·무엇을·몸 느낌을 채웠어요. 확인하고 「글의 흐름 만들기」를 눌러 주세요.'
+          : '참고 컷 분석을 정리했어요. 내용을 확인한 뒤 「글의 흐름 만들기」를 눌러 주세요.',
         { duration: 5200, variant: 'ok' }
       );
     } else if(analysisEmpty && typeof setAppToast === 'function'){
-      setAppToast('사진 분석 결과가 비어 있어요. 사진을 다시 선택해 주세요.', { duration: 5200, variant: 'err' });
+      setAppToast('참고 컷 분석 결과가 비어 있어요. 파일을 다시 선택해 주세요.', { duration: 5200, variant: 'err' });
     }
   }
 };
@@ -23818,15 +24013,15 @@ function renderAddForm(){
   const imgLeftSec = imgWait ? getCountdownSec_(imgWait.startedAt, imgWait.estimateSec) : 0;
   const imgAnalyzingCount = (imgWait && imgWait.count) ? imgWait.count : (imgNames.length || 1);
   const imgHint = analyzing
-    ? '<span id="new-item-img-analysis-hint" style="font-size:11px;color:#D97706;">사진 ' + imgAnalyzingCount + '장 분석 중… <strong id="new-item-img-analysis-cd">' +
+    ? '<span id="new-item-img-analysis-hint" style="font-size:11px;color:#D97706;">참고 컷 ' + imgAnalyzingCount + '장 분석 중… <strong id="new-item-img-analysis-cd">' +
       escapeHtml(formatCountdownLong_(imgLeftSec)) + '</strong>' + (isThought ? ' · 분위기에만 참고합니다.' : (isDaily ? ' · 누구와·무엇을·몸 느낌을 채웁니다.' : ' · 참고 메모에 순서대로 채워집니다.')) + '</span>'
     : (hasPhoto
-      ? '<span style="font-size:11px;color:#0F766E;">참고 사진 ' + imgNames.length + '장: ' + escapeHtml(imgNames.join(', ')) + ' — 추가로 고르면 기존 분석 아래에 이어 붙여요' + (isThought ? ' · 오늘 일기처럼 쓰지 않습니다' : (isDaily ? ' · 빈 칸만 사진으로 채웁니다' : '')) + '</span>'
+      ? '<span style="font-size:11px;color:#0F766E;">참고 컷 ' + imgNames.length + '장: ' + escapeHtml(imgNames.join(', ')) + ' — 추가로 고르면 기존 분석 아래에 이어 붙여요' + (isThought ? ' · 오늘 일기처럼 쓰지 않습니다' : (isDaily ? ' · 빈 칸만 사진·영상으로 채웁니다' : '')) + '</span>'
       : (isThought
         ? '<span style="font-size:11px;color:#9CA3AF;">선택. 분위기에만 쓰고, 오늘 있었던 일처럼 쓰지 않습니다.</span>'
         : (isDaily
-        ? '<span style="font-size:11px;color:#9CA3AF;">여러 장 가능. 올리면 아래 누구와·무엇을·몸 느낌을 사진에서 채웁니다.</span>'
-        : '<span style="font-size:11px;color:#9CA3AF;">여러 장·추가 첨부 가능 · 최대 12MB(자동 압축). 장마다 순서대로 메모에 쌓여요.</span>')));
+        ? '<span style="font-size:11px;color:#9CA3AF;">사진·짧은 영상 가능. 올리면 아래 누구와·무엇을·몸 느낌을 채웁니다.</span>'
+        : '<span style="font-size:11px;color:#9CA3AF;">사진·영상(짧은 클립) · 추가 첨부 가능 · 사진 최대 12MB · 영상 최대 1GB·5분(자동 프레임 6컷·압축). 긴 강의는 유튜브 URL 권장. 컷마다 순서대로 메모에 쌓여요.</span>')));
   const addIntro = isThought
     ? '떠오른 <strong>한 줄</strong>을 적으면, 사람들이 「내 얘기네」 하게 풀어 초안을 만듭니다. 오늘 있었던 일처럼 꾸며 내지 않고, 정답·가르침으로 바꾸지 않습니다.'
     : (isDaily
@@ -23866,25 +24061,25 @@ function renderAddForm(){
     : ('<div class="form-field"><label class="form-label">' + kwLabel + '</label>' +
       '<textarea id="new-item-topic-input" class="form-input form-textarea" rows="6" oninput="onNewItemTopicInput_(this)" placeholder="' + kwPlaceholder + '">' + escapeHtml(state.newItem.topic) + '</textarea>' +
       '<div style="font-size:11px;color:#9CA3AF;margin-top:4px;">' + kwHint + '</div></div>'));
-  const refNoteLabel = hasPhoto ? '사진 분석 내용 · 참고 메모' : (isThought ? '풀어 쓸 장면 (선택)' : (isDaily ? '참고 메모 (선택)' : (isExpert ? '핵심 포인트 · 영상 메모' : '참고 영상 · 메모 (선택)')));
+  const refNoteLabel = hasPhoto ? '사진·영상 분석 내용 · 참고 메모' : (isThought ? '풀어 쓸 장면 (선택)' : (isDaily ? '참고 메모 (선택)' : (isExpert ? '핵심 포인트 · 영상 메모' : '참고 영상 · 메모 (선택)')));
   const refNotePlaceholder = isThought
     ? '이런 때 있잖아요 — 정도의 일반 장면만. 오늘 일어난 일처럼 적지 마세요.'
     : (isDaily
-    ? '사진에 대한 짧은 메모만. 가르침·루틴은 적지 마세요.'
+    ? '사진·영상에 대한 짧은 메모만. 가르침·루틴은 적지 마세요.'
     : (isExpert
       ? '핵심 포인트 1~3개, 영상 링크, 시연 타임스탬프, 평가·동작 요령…'
       : '영상 링크, 테크닉 이름, 동작 요령, 타임스탬프(예: 2:30~), 자막·핵심 메모…'));
   const refNoteHint = isThought
     ? '한 줄을 비출 일상 장면이 있으면 적어요. 없어도 초안은 만들어집니다.'
     : (isDaily
-    ? '사진은 위 세 칸을 채우고, 이 메모는 장면 보완용입니다.'
+    ? '사진·영상은 위 세 칸을 채우고, 이 메모는 장면 보완용입니다.'
     : (isExpert
-      ? '공개 <strong>유튜브 URL</strong>이 있으면 서버(Gemini)가 영상을 분석해요. GAS 스크립트 속성 <code style="font-size:10px;">GEMINI_API_KEY</code> 필요. 비공개 영상은 자막·메모를 붙여 주세요.'
-      : '공개 유튜브 URL → 서버(Gemini) 분석. 그 외는 <strong>링크·메모</strong>가 초안까지 전달돼요.'));
+      ? '짧은 <strong>영상 파일</strong>은 프레임으로 분석해요. 긴 강의는 공개 <strong>유튜브 URL</strong>(Gemini). GAS 스크립트 속성 <code style="font-size:10px;">GEMINI_API_KEY</code> 필요. 비공개는 자막·메모를 붙여 주세요.'
+      : '짧은 영상 파일 → 프레임 분석. 공개 유튜브 URL → 서버(Gemini). 그 외는 <strong>링크·메모</strong>가 초안까지 전달돼요.'));
   const flowsReady = !!state.newItem.flowProposalsReady && (state.newItem.flowProposals || []).length > 0;
   const flowLoading = !!state.newItem.flowProposalsLoading;
   const btnLabel = analyzing
-    ? ('사진 분석 중 · ' + formatCountdownShort_(imgLeftSec))
+    ? ('참고 컷 분석 중 · ' + formatCountdownShort_(imgLeftSec))
     : (flowLoading ? '글 흐름 만드는 중…' : (flowsReady ? '선택한 흐름으로 초안 만들기' : '글의 흐름 만들기'));
   const submitDisabled = analyzing || flowLoading;
   const flowSectionHtml = renderAddFormFlowSectionHTML_();
@@ -23893,8 +24088,8 @@ function renderAddForm(){
     : '';
   const actionButtonHtml = '<button type="button" class="btn-submit" id="btn-add-draft-submit" onclick="runNewItemFlowAction()" ' + (submitDisabled ? 'disabled' : '') + '>' + btnLabel + '</button>';
   const photoFieldHtml = '<div class="form-field">' +
-    '<label class="form-label">참고 사진' + (isThought ? ' (선택)' : (isDaily ? ' (올리면 아래 칸을 채움 · 원본 4:5)' : ' (선택)')) + '</label>' +
-    '<input class="form-input" type="file" accept="image/*" multiple onchange="onNewItemImage(this)" style="padding:8px;" />' +
+    '<label class="form-label">참고 사진·영상' + (isThought ? ' (선택)' : (isDaily ? ' (올리면 아래 칸을 채움 · 원본 4:5)' : ' (선택)')) + '</label>' +
+    '<input class="form-input" type="file" accept="image/*,video/*" multiple onchange="onNewItemImage(this)" style="padding:8px;" />' +
     '<div style="margin-top:4px;">' + imgHint + '</div>' +
   '</div>';
   var dailySuggestHtml = '';

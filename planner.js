@@ -4793,16 +4793,11 @@ function getDraftsForSubGoalStep_(catId, stepId, opts){
     if(!d || !d.id) return false;
     return getDraftRoadmapStepId_(d, catId, cat.drafts.indexOf(d)) === String(stepId);
   }).sort(function(a, b){
+    var ta = getDraftCreatedAtMs_(a) || userAddedDraftTimestamp_(a.id) || 0;
+    var tb = getDraftCreatedAtMs_(b) || userAddedDraftTimestamp_(b.id) || 0;
+    if(ta !== tb) return tb - ta; // 최근 생성일 상단
     var ia = cat.drafts.indexOf(a);
     var ib = cat.drafts.indexOf(b);
-    var pa = getDraftStepParts_(a, catId, ia);
-    var pb = getDraftStepParts_(b, catId, ib);
-    if(pa.step !== pb.step) return pa.step - pb.step;
-    if(String(stepId) === SUBGOAL_MISC_ID){
-      var ta = getDraftCreatedAtMs_(a) || userAddedDraftTimestamp_(a.id) || 0;
-      var tb = getDraftCreatedAtMs_(b) || userAddedDraftTimestamp_(b.id) || 0;
-      if(ta !== tb) return tb - ta; // 생성 시간 최신순
-    }
     return ia - ib;
   });
 }
@@ -5567,20 +5562,21 @@ function applyDraftRoadmapAssignment_(draft, catId, stepId, stepTitle, order, to
   draft.series = stepTitle;
   draft.step = order + '/' + totalInStep;
   draft.roadmapStepId = nextId;
-  if(!isUserAddedDraftId_(draft.id)){
-    stampDraftBrandOverride_(draft.id, patch);
-    if(state.draftBrandOverrides && state.draftBrandOverrides[draft.id]){
-      if(nextId !== SUBGOAL_MISC_ID){
-        delete state.draftBrandOverrides[draft.id].previousRoadmapStepId;
-        delete state.draftBrandOverrides[draft.id].previousSeries;
-        delete state.draftBrandOverrides[draft.id].miscLocked;
-      } else if(opts.dropRescueHints){
-        delete state.draftBrandOverrides[draft.id].previousRoadmapStepId;
-        delete state.draftBrandOverrides[draft.id].previousSeries;
-        state.draftBrandOverrides[draft.id].miscLocked = true;
-      }
+  // 시드·직접추가 모두 override에 단계 배정을 남겨야 함.
+  // 예전에 기타로 잠긴(miscLocked) 주제는 draft만 바꾸면 토스트만 뜨고 목록은 기타에 남음.
+  stampDraftBrandOverride_(draft.id, patch);
+  if(state.draftBrandOverrides && state.draftBrandOverrides[draft.id]){
+    if(nextId !== SUBGOAL_MISC_ID){
+      delete state.draftBrandOverrides[draft.id].previousRoadmapStepId;
+      delete state.draftBrandOverrides[draft.id].previousSeries;
+      delete state.draftBrandOverrides[draft.id].miscLocked;
+    } else if(opts.dropRescueHints){
+      delete state.draftBrandOverrides[draft.id].previousRoadmapStepId;
+      delete state.draftBrandOverrides[draft.id].previousSeries;
+      state.draftBrandOverrides[draft.id].miscLocked = true;
     }
-  } else {
+  }
+  if(isUserAddedDraftId_(draft.id)){
     draft.updatedAt = new Date().toISOString();
   }
 }
@@ -11206,7 +11202,7 @@ function isExpertCourseCategory(catId){ return catId === 3 || catId === 4 || cat
 function getExpertCourseTopicAudienceLine_(catId){
   if(catId === 3) return 'CMT 수강·복습 중인 도수·물리치료 동료에게 건네는 한 줄';
   if(catId === 4) return 'IFC 얼굴·구조 교육을 배우는 미용·도수·물리치료 동료에게 건네는 한 줄';
-  if(catId === 5) return 'Re:Al 움직임 과정 수강·복습 중인 재활·트레이닝 동료에게 건네는 한 줄';
+  if(catId === 5) return 'Re:Al 움직임 과정을 쓰는 강사·트레이너·움직임 지도자(직군 제한 없음)에게 건네는 한 줄';
   return 'PT·트레이너 동료에게 건네는 한 줄';
 }
 /** 초안·주제 생성 등에 쓰는 탭별 독자 한 줄 (cat.audience보다 구체적) */
@@ -11214,7 +11210,7 @@ function getProgramAudienceLine_(catId){
   var id = parseInt(catId, 10);
   if(id === 3) return 'CMT 임상도수 과정 수강·복습 중인 물리치료사·도수 치료사 (평가·촉진 중심)';
   if(id === 4) return 'IFC 얼굴·구조 교육 수강·복습 중인 얼굴·구조 교육 전문가 (미용·도수·물리치료)';
-  if(id === 5) return 'Re:Al 움직임 과정 수강·복습 중인 물리치료사·트레이너 (기능재활·움직임 지도 연결)';
+  if(id === 5) return 'Re:Al 움직임 과정 — 강사·트레이너·물리치료사 등 움직임 지도자 (직군 제한 없음 · 강사/회원 호칭)';
   if(id === 0) return '통증·구조 치료에 관심 있는 일반인';
   if(id === 1) return '일상 움직임·자세·기능재활에 관심 있는 일반인';
   if(id === 2) return '얼굴·비대칭 관리에 관심 있는 일반인 (20~40대)';
@@ -12923,7 +12919,12 @@ const DEFAULT_EXPERT_COURSE_SCOPE_RULE = `[범위·집중 — 최우선]
 - 학교·기관·기업 연수임이 입력에 명시되면, 테크닉 나열보다 **교육이 필요했던 이유·참여자의 역할·실제 질문·관찰 관점의 변화**를 중심으로 후기형 글을 쓸 수 있습니다.
 - 연수 후기에서도 장소·대상·질문·현장 장면은 입력에 있는 내용만 사용하고, 교사·담당자가 진단하거나 교정하는 사람처럼 쓰지 마세요.
 - **쓰지 말 것**: 참고에 없는 평가·질환·부위·테크닉으로 **확장**, PSP·임상 전체 흐름으로 **넓혀 쓰기**, "통상적으로는~" 식 **교과서적 부가 설명**, 영상·사진과 무관한 **별도 케이스·일반론**.
-- 정보가 부족하면 억지로 채우지 말고, 참고·영상·사진에 있는 것만 **더 명확하게** 풀어라. 강의 본 동료와 대화하는 톤.`;
+- 정보가 부족하면 억지로 채우지 말고, 참고·영상·사진에 있는 것만 **더 명확하게** 풀어라. 강의 본 동료와 대화하는 톤.
+
+[전문가 영상 공유 — 시청 유도]
+- **직접 시청 유도 금지**: 「영상 보세요」「영상 보시면서」「댓글로 남겨주세요」「다음 컷에서 이어갈게요」처럼 시청·댓글을 **명시적으로 시키는** 문장 금지.
+- **허용**: 장면에 있는 손·자세·자막·순서를 구체적으로 서술해, 읽다 보면 자연히 영상을 떠올리게 하기. 「영상에서 반복해서 보이는 포인트는…」 정도는 OK.
+- hook는 「영상 여러 컷에서 공통으로…」식 **분석 보고**보다, 현장에서 자주 보는 **자세·실수·질문**으로 시작하세요.`;
 
 /** 미카닥 말투 카드 v1 — 기준 원문: mikadoc-voice-card.md */
 const MIKADOC_VOICE_CARD_RULE = `[미카닥 말투 카드]
@@ -13012,7 +13013,7 @@ function buildExpertCourseBlogPrompt_(opts){
     '- 독자: ' + roleReaders + '\n' +
     '- 글의 중심은 **원리 설명**(왜 이렇게 하는지)이며, 영상·사진에서 본 시연을 복기하는 톤\n\n' +
     '[글 흐름 — 입력에 맞는 유형 하나를 선택]\n' +
-    '- **테크닉·시연형**: 영상·사진 맥락(hook) → 손 위치·동작·주의사항 2~3개(outline) → 왜 그런지·메커니즘·현장 적용(draft)\n' +
+    '- **테크닉·시연형**: 흔한 자세·실수·질문으로 공감(hook) → 손 위치·동작·주의사항 2~3개(outline) → 왜 그런지·메커니즘·현장 적용(draft)\n' +
     '- **강의·연수 후기형**: 교육이 필요했던 이유와 현장 장면(hook) → 다룬 관찰·학습 포인트 2~3개(outline) → 실제 질문·역할의 경계·달라진 관점(draft)\n' +
     '- 두 유형을 섞어 나열하지 말고, 입력의 중심에 더 가까운 하나를 선택하세요.\n\n' +
     BLOG_INSTA_HONORIFIC_SPEECH_RULE + '\n\n' +
@@ -13022,13 +13023,13 @@ function buildExpertCourseBlogPrompt_(opts){
     '- 과장·낚시·"꼭 해야 한다" 압박 금지. **내용으로 말하는** 느낌\n' +
     '- 전문 용어는 쓰되, **한 줄 정도 풀어서** 설명\n' +
     '- 강의 중 실제로 하는 **말하듯** 자연스럽게(존댓말 유지)\n' +
-    '- 해시태그 **최소화**(3~5개)\n\n' +
+    '- 해시태그 **최소화**(3~5개). 영문 브랜드 표기는 정확히 (예: Re:Al)\n\n' +
     '[형식 — JSON 필드]\n' +
     '- title: 현장에서 궁금해할 테크닉·질문 한 줄 (35자 내외)\n' +
-    '- hook: 영상·사진 맥락 (위 1번)\n' +
+    '- hook: **현장 공감 장면**으로 시작 (분석 보고체·직접 시청 유도 금지). 자막·손·자세가 있으면 자연스럽게 녹이기\n' +
     '- outline: 시연·핵심 포인트 배열 (위 2번)\n' +
-    '- draft: 선택한 유형의 본문 (**650~1,000자**, 참고·영상·사진 범위 안만). **존댓말**\n' +
-    '- cta: 수강·등록 유도 금지. 가벼운 마무리\n' +
+    '- draft: 선택한 유형의 본문 (**650~1,000자**, 참고·영상·사진 범위 안만). **존댓말**. 말미에 「영상 보세요/댓글」 금지\n' +
+    '- cta: 수강·등록·시청·댓글 유도 금지. 원리·과정 핵심으로 **가볍게 닫기**만\n' +
     '- hashtags: 3~5개' +
     (programBlock ? '\n\n' + programBlock : '');
 }
@@ -13075,14 +13076,16 @@ const DEFAULT_IFC_EXPERT_BLOG_PROMPT = buildExpertCourseBlogPrompt_({
     '- 교육·구조 설명 중심. 「우리가 치료한 결과」류 치료행위 수행 암시는 금지'
 });
 const DEFAULT_REAL_MOVEMENT_EXPERT_BLOG_PROMPT = buildExpertCourseBlogPrompt_({
-  audienceIntro: '**Re:Al 움직임 전문가 과정** 수강·복습 중인 물리치료사·트레이너를 독자로 하는',
-  roleReaders: '기능 회복·PAR·Position을 임상에 연결하는 움직임·재활 전문가',
-  programBlock: '[Real Movement 맥락]\n' +
-    '- 기능재활·움직임 지도 연결. PAR·Position·progression을 **참고·영상에서 다룬 내용** 안에서만 연결\n' +
-    '- 참고에 없는 평가·운동 처방·다른 부위로 확장 금지\n' +
-    '- 안전한 progression·환자 순응도·코칭 언어가 드러나게\n' +
-    '- 한글 프로그램명 쓸 때 「리얼무브먼트」「리얼 움직임」(「리:얼」 금지, 리얼무브먼트는 붙여 쓰기·한 줄). 영문 Re:Al은 유지\n' +
-    '- 도수·카이로 시술 장면을 주인공처럼 부각하지 말 것. 중심은 기능재활·움직임 지도 언어'
+  audienceIntro: '**Re:Al 움직임 과정**을 배우거나 현장에 적용하는 **강사·트레이너·물리치료사·움직임 지도자**를 독자로 하는',
+  roleReaders: '자격·직군 제한 없이 움직임·패시브·PAR를 지도하는 현장 사람(강사·회원 지도 맥락)',
+  programBlock: '[Re:Al 독자·호칭·영상 톤]\n' +
+    '- **대상 제한 없음**: Re:Al·리얼 움직임은 의료인 전용이 아님. 「물리치료사만」「치료사끼리」처럼 좁히지 말 것. 강사·트레이너·PT·필라테스·에스테 등 **움직임 지도하는 누구나**를 포함.\n' +
+    '- **호칭**: 기본은 **강사 / 회원**. 「치료사 / 클라이언트」를 기본 호칭으로 쓰지 말 것(CMT 도수 채널이 아님). 입력에 치료사·클라이언트가 있어도 강사·회원으로 바꿔 쓰기.\n' +
+    '- **시청 유도**: 「영상 보세요」「댓글 남겨주세요」 금지. 손·무릎·테이블·체중 이동 등 **장면을 구체적으로** 써서 자연스럽게 영상이 떠오르게.\n' +
+    '- hook 예: 「회원 다리를 팔·허리 힘으로 버티는 자세, 많이 보셨죠?」처럼 **공감 질문**으로 시작.\n' +
+    '- 기능재활·PAR·Position·progression은 **참고·영상에서 다룬 내용** 안에서만. 없는 평가·처방·다른 부위로 확장 금지.\n' +
+    '- 한글명 「리얼무브먼트」「리얼 움직임」(「리:얼」 금지, 리얼무브먼트는 붙여 쓰기). 영문·해시태그는 **Re:Al** 표기 유지(#Re알 금지).\n' +
+    '- 도수·카이로 시술 장면을 주인공처럼 부각하지 말 것. 중심은 기능재활·움직임 지도 언어.'
 });
 const DEFAULT_CMT_EXPERT_INSTA_PROMPT = buildExpertCourseInstaPrompt_({
   roleReaders: 'CMT 수강·복습 중인 도수·물리치료 동료',
@@ -13093,8 +13096,8 @@ const DEFAULT_IFC_EXPERT_INSTA_PROMPT = buildExpertCourseInstaPrompt_({
   programBlock: '[IFC] 얼굴·경축·구조 관점. 이번 강의·영상의 테크닉·평가 포인트만. 표면 미용·도수/카이로 주인공 부각 금지.'
 });
 const DEFAULT_REAL_MOVEMENT_EXPERT_INSTA_PROMPT = buildExpertCourseInstaPrompt_({
-  roleReaders: 'Re:Al 움직임 과정 수강·복습 중인 재활·트레이닝 동료',
-  programBlock: '[Re:Al] 기능재활·움직임 지도 연결. 이번 강의·영상의 테크닉·포인트만. 도수·카이로 시술 주인공 부각 금지.'
+  roleReaders: 'Re:Al 움직임을 지도하는 강사·트레이너·움직임 지도자(직군 제한 없음)',
+  programBlock: '[Re:Al] 강사/회원 호칭. 직군 좁히지 말 것. 직접 「영상 보세요」 금지·장면으로 말하기. 이번 영상 테크닉만. 도수·카이로 주인공 부각 금지.'
 });
 const DEFAULT_CMT_EXPERT_THREADS_PROMPT = buildExpertCourseThreadsPrompt_({
   roleReaders: 'CMT 수강·복습 중인 도수·물리치료 동료',
@@ -13105,8 +13108,8 @@ const DEFAULT_IFC_EXPERT_THREADS_PROMPT = buildExpertCourseThreadsPrompt_({
   programBlock: '[IFC] 경축·턱관절·구조 연결 관점. 미용 마사지 톤 금지. before/after 과장 금지.'
 });
 const DEFAULT_REAL_MOVEMENT_EXPERT_THREADS_PROMPT = buildExpertCourseThreadsPrompt_({
-  roleReaders: 'Re:Al 움직임 과정 수강·복습 중인 재활·트레이닝 동료',
-  programBlock: '[Re:Al] 기능재활·움직임·PAR·Position 연결. 이번 강의·영상 테크닉만.'
+  roleReaders: 'Re:Al 움직임을 지도하는 강사·트레이너·움직임 지도자(직군 제한 없음)',
+  programBlock: '[Re:Al] 강사/회원 호칭. 직군 좁히지 말 것. 기능재활·PAR·Position은 참고 범위 안만.'
 });
 
 // ── 기본 프롬프트 (카테고리별 블로그/인스타/쓰레드 등) ──
@@ -13261,6 +13264,25 @@ function migrateLegacyExpertCoursePrompts_(){
     });
   });
   return changed;
+}
+/** 저장본이 이전 Re:Al 기본 블로그면 독자·시청유도·호칭 규칙으로 교체 */
+function migrateRealMovementExpertBlogPrompt_(){
+  if(!state.prompts || !state.prompts.categories) return false;
+  if(!state.prompts.categories[5]) state.prompts.categories[5] = {};
+  var cat = state.prompts.categories[5];
+  var cur = String(cat.blog || '');
+  if(!cur) return false;
+  if(cur.indexOf('[Re:Al 독자·호칭·영상 톤]') >= 0) return false;
+  var looksPrevDefault =
+    cur.indexOf('Re:Al 움직임 전문가 과정') >= 0 &&
+    cur.indexOf('물리치료사·트레이너를 독자로') >= 0 &&
+    cur.indexOf('[범위·집중 — 최우선]') >= 0;
+  if(!looksPrevDefault) return false;
+  cat.blog = DEFAULT_REAL_MOVEMENT_EXPERT_BLOG_PROMPT;
+  if(cat.insta && String(cat.insta).indexOf('수강·복습 중인 재활·트레이닝 동료') >= 0){
+    cat.insta = DEFAULT_REAL_MOVEMENT_EXPERT_INSTA_PROMPT;
+  }
+  return true;
 }
 function migrateUniversalContentFlowPrompts_(){
   if(!state.prompts || !state.prompts.categories) return false;
@@ -18123,6 +18145,7 @@ function applyPersistPayload(s, opts){
   if(migrateLegacyPublishTabPublished_()) migrated = true;
   if(migrateLegacyBaseAffiliationPrompt_()) migrated = true;
   if(migrateLegacyExpertCoursePrompts_()) migrated = true;
+  if(migrateRealMovementExpertBlogPrompt_()) migrated = true;
   if(migrateUniversalContentFlowPrompts_()) migrated = true;
   if(migrateSpeechStylePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrateHospitalGuidanceOnceInSelfCare_()){ migrated = true; touchPromptsUpdatedAt_(); }
@@ -19666,6 +19689,7 @@ function runDeferredBootMigrations_(){
     if(migrateLegacyPublishTabPublished_()) migrated = true;
     if(migrateLegacyBaseAffiliationPrompt_()) migrated = true;
     if(migrateLegacyExpertCoursePrompts_()) migrated = true;
+  if(migrateRealMovementExpertBlogPrompt_()) migrated = true;
     if(migrateUniversalContentFlowPrompts_()) migrated = true;
     if(migrateSpeechStylePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrateHospitalGuidanceOnceInSelfCare_()){ migrated = true; touchPromptsUpdatedAt_(); }
@@ -20818,6 +20842,10 @@ function getDraftCreatedAtMs_(d) {
   if (m) {
     var n = parseInt(m[1], 10);
     if (!isNaN(n)) return n;
+  }
+  if (d.updatedAt) {
+    var u = Date.parse(d.updatedAt);
+    if (!isNaN(u)) return u;
   }
   return 0;
 }
@@ -22354,7 +22382,11 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
   const dateLabel = (pub && pub.date)
     ? ('발행: ' + escapeHtml(String(pub.date)))
     : '미발행';
+  const createdBadge = (createdDateLabel && createdDateLabel !== '-')
+    ? '<span class="topic-line-created" title="생성일">' + escapeHtml(createdDateLabel) + '</span>'
+    : '';
   const badges = [
+    createdBadge,
     isDailyThoughtDraft_(d) ? '<span class="badge badge-thought">생각</span>' : '',
     isRec && d.recType==='related' ? '<span class="badge badge-rec">관련</span>' : '',
     (hasDraft && !onPublishedList && !publishBadges && !draftShowsOnPublishedList_(d.id, cat.id)) ? '<span class="badge badge-gen">초안</span>' : '',
@@ -22401,9 +22433,9 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
     '<div class="card-intent-foot">' +
       '<div class="card-intent-dates"><span>' + dateLabel + '</span><span>생성 ' + createdDateLabel + '</span></div>' +
       '<div class="card-more-actions">' +
-        '<button type="button" class="draft-card-delete-mini" title="이 주제 카드 삭제" onclick="event.stopPropagation();deleteDraft(' + cat.id + ',\'' + d.id + '\')">삭제</button>' +
+        '<button type="button" class="draft-card-tidy-mini" title="다른 단계로 옮기기" aria-expanded="false" onclick="event.stopPropagation();toggleMoveDraftPicker_(this)">순서</button>' +
         '<button type="button" class="draft-card-refresh-mini" data-regen-draft="' + d.id + '" title="이 주제의 제목·각도만 다시 받기" onclick="event.stopPropagation();refreshTopicsForDraft(' + cat.id + ',\'' + d.id + '\')">주제 변경</button>' +
-        '<button type="button" class="draft-card-tidy-mini" title="다른 단계로 옮기기" aria-expanded="false" onclick="event.stopPropagation();toggleMoveDraftPicker_(this)">정리</button>' +
+        '<button type="button" class="draft-card-delete-mini" title="이 주제 카드 삭제" onclick="event.stopPropagation();deleteDraft(' + cat.id + ',\'' + d.id + '\')">삭제</button>' +
         orderBtns +
       '</div>' +
     '</div>' +

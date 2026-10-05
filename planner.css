@@ -1873,6 +1873,10 @@ overflow: hidden;
 @media (max-width: 639px) {
   .detail-sheet {
     max-height: min(92dvh, calc(100svh - env(safe-area-inset-top, 0px) - 4px));
+    width: 100%;
+    max-width: 100%;
+    left: 0;
+    right: 0;
   }
   .detail-sheet.open.sheet-settled {
     transform: none !important;
@@ -2261,6 +2265,12 @@ border-radius: 7px; padding: 3px 10px; cursor: pointer; transition: all .15s;
 .sheet-field-regen { color: #4F46E5; border-color: #E0E7FF; background: #EEF2FF; }
 .sheet-field-regen:hover { background: #E0E7FF; }
 .sheet-field-regen:disabled { opacity: .6; cursor: default; }
+.sheet-field-polish { color: #0F766E; border-color: #CCFBF1; background: #F0FDFA; }
+.sheet-field-polish:hover:not(:disabled) { background: #CCFBF1; }
+.sheet-field-polish:disabled {
+  opacity: .45; cursor: not-allowed; color: #94A3B8;
+  border-color: #E2E8F0; background: #F8FAFC;
+}
 
 /* 상단 전체 복사 바 */
 .sheet-fullcopy-bar { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; flex-wrap: wrap; }
@@ -3719,13 +3729,14 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 
 @media (min-width: 640px) {
 .detail-sheet {
-  max-width: min(640px, calc(100vw - 32px));
+  max-width: min(920px, calc(100vw - 20px));
+  width: min(920px, calc(100vw - 20px));
   left: 50%; right: auto;
   transform: translateX(-50%) translateY(100%);
-  border-radius: 20px; bottom: 20px;
+  border-radius: 20px; bottom: 16px;
 }
 .detail-sheet.open { transform: translateX(-50%) translateY(0); }
-.prompt-modal { border-radius: 20px; max-width: min(640px, calc(100vw - 32px)); bottom: 20px; }
+.prompt-modal { border-radius: 20px; max-width: min(920px, calc(100vw - 20px)); bottom: 16px; }
 
   #main-content {
     max-width: 960px;
@@ -3744,10 +3755,34 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 }
 
-/* iPad·와이드 태블릿: 초안 시트 가급적 넓게 */
+/* 아이패드·태블릿: 좌우 여백 최소화, 시트 거의 전체 폭 */
+@media (min-width: 640px) and (max-width: 1366px) {
+  .detail-sheet {
+    max-width: calc(100vw - 12px);
+    width: calc(100vw - 12px);
+    bottom: max(8px, env(safe-area-inset-bottom, 0px));
+    border-radius: 16px;
+  }
+  .prompt-modal {
+    max-width: calc(100vw - 12px);
+    bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* 터치 기기(아이패드·폰 가로 등): 한층 더 넓게 */
+@media (min-width: 640px) and (hover: none),
+       (min-width: 640px) and (pointer: coarse) {
+  .detail-sheet {
+    max-width: calc(100vw - 8px);
+    width: calc(100vw - 8px);
+  }
+  .prompt-modal { max-width: calc(100vw - 8px); }
+}
+
+/* iPad·와이드 태블릿: 초안 시트 가급적 넓게 (데스크톱 기본) */
 @media (min-width: 768px) {
-  .detail-sheet { max-width: min(760px, calc(100vw - 40px)); }
-  .prompt-modal { max-width: min(720px, calc(100vw - 40px)); }
+  .detail-sheet { max-width: min(1100px, calc(100vw - 24px)); width: min(1100px, calc(100vw - 24px)); }
+  .prompt-modal { max-width: min(1040px, calc(100vw - 24px)); }
 }
 
 @media (min-width: 1024px) {
@@ -3756,8 +3791,19 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 14px;
   }
-  .detail-sheet { max-width: min(900px, calc(100vw - 48px)); }
-  .prompt-modal { max-width: min(840px, calc(100vw - 48px)); }
+  .detail-sheet { max-width: min(1200px, calc(100vw - 32px)); width: min(1200px, calc(100vw - 32px)); }
+  .prompt-modal { max-width: min(1120px, calc(100vw - 32px)); }
+}
+
+/* 아이패드·소형 노트북 폭에서는 위 데스크톱 max보다 전체 폭 규칙이 이기도록 재강조 */
+@media (min-width: 768px) and (max-width: 1366px) {
+  .detail-sheet {
+    max-width: calc(100vw - 12px) !important;
+    width: calc(100vw - 12px) !important;
+  }
+  .prompt-modal {
+    max-width: calc(100vw - 12px) !important;
+  }
 }
 
 /* ── 지점·브랜딩 메뉴얼 ── */
@@ -4664,6 +4710,13 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   flex: 0 0 auto;
   font-size: 11px;
   font-weight: 700;
+}
+.draft-card.topic-line .topic-line-created {
+  color: #94A3B8;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
 }
 .draft-card.topic-line .topic-line-more {
   flex: 0 0 auto;

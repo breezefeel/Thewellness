@@ -5873,9 +5873,13 @@ function isSubGoalStepCollapsed_(catId, stepId){
   return false;
 }
 function countFilledStepTopics_(drafts, catId){
-  return (drafts || []).filter(function(d){
-    return d && d.id && !draftIsShelfEmpty_(d, catId);
-  }).length;
+  // 괄호 숫자 = 지금 탭에서 보이는 카드 수 (준비/올린 필터와 동일)
+  if(getTopicListMode_() === 'plan'){
+    return (drafts || []).filter(function(d){
+      return d && d.id && !draftIsShelfEmpty_(d, catId);
+    }).length;
+  }
+  return filterDraftsByTopicListMode_(drafts, catId).length;
 }
 window.toggleSubGoalStep_ = function(key){
   if(!state.collapsedSubGoalSteps) state.collapsedSubGoalSteps = {};
@@ -9352,7 +9356,7 @@ function renderProgramRoadmapHTML_(catId){
   }
   var misc = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID);
   var miscShown = filterDraftsByTopicListMode_(misc, catId);
-  if(miscShown.length){
+  if(miscShown.length || (getTopicListMode_() === 'plan' && countFilledStepTopics_(misc, catId))){
     var miscCollapsed = isSubGoalStepCollapsed_(catId, SUBGOAL_MISC_ID);
     var miscKey = subGoalStepKey_(catId, SUBGOAL_MISC_ID).replace(/'/g, '');
     html += '<div class="subgoal-step-block misc step-tone-misc' + (miscCollapsed ? ' collapsed' : '') + '">' +
@@ -9362,7 +9366,7 @@ function renderProgramRoadmapHTML_(catId){
           '<span class="subgoal-step-main"><span class="subgoal-step-title">' + escapeHtml(getSubGoalMiscLabel_(plan)) + '</span><span class="subgoal-step-count">(' + countFilledStepTopics_(misc, catId) + ')</span></span>' +
         '</div>' +
       '</div>' +
-      (miscCollapsed ? '' : '<div class="subgoal-step-cards topic-lines">' + miscShown.map(function(d){
+      (miscCollapsed || !miscShown.length ? '' : '<div class="subgoal-step-cards topic-lines">' + miscShown.map(function(d){
         return draftCardHTML(d, cat, false, cat.drafts.indexOf(d), true);
       }).join('') + '</div>') +
     '</div>';
@@ -30380,11 +30384,14 @@ function sheetEditField_(label, id, value, opts){
   var cls = 'sheet-edit' + (opts.title ? ' sheet-edit-title' : '');
   var help = opts.help ? '<div class="publish-field-help" style="margin:4px 0 6px;">' + escapeHtml(opts.help) + '</div>' : '';
   var wrapCls = 'cb' + (opts.title ? ' sheet-title-anchor' : '');
+  var displayValue = opts.paragraphs ? ensureProseParagraphBreaks_(value) : (value || '');
+  if(opts.regen) setSheetFieldBaseline_(id, displayValue);
   var tools = '';
   if(opts.regen || opts.copy){
     tools = '<span class="sheet-field-tools">';
     if(opts.regen){
-      tools += '<button type="button" class="sheet-field-btn sheet-field-regen" onclick="regenSheetField_(\'' + opts.regen + '\', this)">재생성</button>';
+      tools += '<button type="button" class="sheet-field-btn sheet-field-polish" data-for="' + escapeHtml(id) + '" disabled title="수정한 뒤 오타·문법·표현만 가볍게 다듬습니다" onclick="polishSheetField_(\'' + opts.regen + '\', this)">글 다듬기</button>';
+      tools += '<button type="button" class="sheet-field-btn sheet-field-regen" title="제목·다른 칸·현재 박스 글을 참고해서 재작성할까요?" onclick="confirmRegenSheetField_(\'' + opts.regen + '\', this)">재생성</button>';
     }
     if(opts.copy){
       tools += '<button type="button" class="sheet-field-btn sheet-field-copy" onclick="copySheetField_(\'' + id + '\', this' + (opts.copyHashtags ? ', true' : '') + ')">복사</button>';
@@ -30392,12 +30399,12 @@ function sheetEditField_(label, id, value, opts){
     tools += '</span>';
   }
   var oninput = 'autoGrowTextarea_(this)' +
+    (opts.regen ? ';onSheetFieldInput_(this)' : '') +
     (opts.stepPreview ? ';renderSelfCareStepsPreview_(this)' : '') +
     (opts.syncTopic ? ';onSheetTitleSyncTopic_(this)' : '');
   var onblur = opts.syncTopic ? ' onblur="flushSheetTitleBackgroundWork_()"' : '';
   var previewAttr = opts.stepPreview ? ' data-selfcare-preview="1"' : '';
   var previewHost = opts.stepPreview ? '<div class="selfcare-steps" data-steps-for="' + id + '"></div>' : '';
-  var displayValue = opts.paragraphs ? ensureProseParagraphBreaks_(value) : (value || '');
   return '<div class="' + wrapCls + '"><div class="cb-label">' + escapeHtml(label) + tools + '</div>' + help +
     '<textarea class="' + cls + '" id="' + id + '" rows="' + rows + '"' + previewAttr + onblur + ' oninput="' + oninput + '">' + escapeHtml(displayValue) + '</textarea>' + previewHost + '</div>';
 }
@@ -30592,6 +30599,56 @@ function buildSheetFieldReference_(meta, block){
   return lines.join('\n\n') || '(없음)';
 }
 
+window.confirmRegenSheetField_ = function(key, btn){
+  if(!window.confirm('제목·다른 칸·현재 박스 글을 참고해서 재작성할까요?')) return;
+  return regenSheetField_(key, btn);
+};
+
+var _sheetFieldBaselineMap_ = {};
+function normalizeSheetFieldCompare_(v){
+  return String(v || '').replace(/\r\n/g, '\n').trim();
+}
+function setSheetFieldBaseline_(fieldId, value){
+  if(!fieldId) return;
+  _sheetFieldBaselineMap_[fieldId] = normalizeSheetFieldCompare_(value);
+}
+function findSheetFieldTextarea_(btnOrKey){
+  if(btnOrKey && btnOrKey.getAttribute){
+    var forId = btnOrKey.getAttribute('data-for');
+    if(forId) return document.getElementById(forId);
+    var wrap = btnOrKey.closest && btnOrKey.closest('.cb');
+    if(wrap) return wrap.querySelector('textarea.sheet-edit');
+  }
+  var meta = SHEET_FIELD_META_[btnOrKey];
+  if(!meta) return null;
+  var map = {
+    'blog.title': 'sheet-blog-title', 'blog.problem': 'sheet-blog-problem', 'blog.selfCare': 'sheet-blog-selfcare',
+    'blog.explanation': 'sheet-blog-explanation', 'blog.cta': 'sheet-blog-cta', 'blog.hashtags': 'sheet-blog-hashtags',
+    'blog.hook': 'sheet-blog-hook', 'blog.outline': 'sheet-blog-outline', 'blog.draft': 'sheet-blog-draft',
+    'community.title': 'sheet-community-title', 'community.problem': 'sheet-community-problem',
+    'community.selfCare': 'sheet-community-selfcare', 'community.explanation': 'sheet-community-explanation',
+    'insta.hook': 'sheet-insta-hook', 'insta.caption': 'sheet-insta-caption', 'insta.hashtags': 'sheet-insta-hashtags',
+    'threads.body': 'sheet-threads-body', 'threads.comment': 'sheet-threads-comment',
+    'thread.topicTitle': 'sheet-thread-title', 'thread.summary': 'sheet-thread-summary',
+    'news.title': 'sheet-news-title', 'news.body': 'sheet-news-body', 'news.cta': 'sheet-news-cta'
+  };
+  return document.getElementById(map[btnOrKey] || '');
+}
+window.onSheetFieldInput_ = function(ta){
+  updateSheetFieldPolishBtn_(ta);
+};
+function updateSheetFieldPolishBtn_(ta){
+  if(!ta || !ta.id) return;
+  var wrap = ta.closest && ta.closest('.cb');
+  var btn = wrap && wrap.querySelector('.sheet-field-polish');
+  if(!btn) return;
+  var base = _sheetFieldBaselineMap_[ta.id];
+  if(base == null) base = '';
+  var cur = normalizeSheetFieldCompare_(ta.value);
+  var dirty = !!cur && cur !== base;
+  btn.disabled = !dirty;
+};
+
 window.regenSheetField_ = async function(key, btn){
   var meta = SHEET_FIELD_META_[key];
   if(!meta) return;
@@ -30696,6 +30753,101 @@ window.regenSheetField_ = async function(key, btn){
     setAppToast('「' + meta.label + '」을 다시 생성했어요.', { duration: 3000, variant: 'ok' });
   } catch(e){
     setAppToast('재생성에 실패했어요: ' + ((e && e.message) || String(e)), { duration: 6000, variant: 'err' });
+    if(btn) stopButtonCountdown_(btn);
+  } finally {
+    if(btn && document.body.contains(btn)) stopButtonCountdown_(btn);
+  }
+};
+
+/** 수정된 칸만 — 오타·문법·자연스러움 정도로 가볍게 다듬기 (전체 재작성 아님) */
+window.polishSheetField_ = async function(key, btn){
+  var meta = SHEET_FIELD_META_[key];
+  if(!meta) return;
+  meta.__field = key.split('.')[1];
+  if(!state.apiKey){ openApiModal(); return; }
+  var ta = findSheetFieldTextarea_(btn) || findSheetFieldTextarea_(key);
+  if(ta){
+    var base = _sheetFieldBaselineMap_[ta.id];
+    if(base == null) base = '';
+    if(normalizeSheetFieldCompare_(ta.value) === base){
+      setAppToast('수정된 내용이 없어요. 글을 고친 뒤 「글 다듬기」를 눌러 주세요.', { duration: 3500, variant: 'err' });
+      if(btn) btn.disabled = true;
+      return;
+    }
+  }
+  var draftId = state.selectedId;
+  if(!draftId){ setAppToast('먼저 초안 카드를 선택해 주세요.', { duration: 3000, variant: 'err' }); return; }
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  var content = getDraftContent_(draftId);
+  if(!content){ setAppToast('먼저 초안을 생성해 주세요.', { duration: 3500, variant: 'err' }); return; }
+  applySheetEditsForTab_(content, state.activeTab);
+  var newsCh = null;
+  var block;
+  if(meta.block === 'news'){
+    ensureNewsBlock_(content);
+    newsCh = getNewsChannel_();
+    block = content.news[newsCh] || (content.news[newsCh] = { title: '', body: '', cta: '' });
+  } else {
+    block = content[meta.block] || (content[meta.block] = {});
+  }
+  var currentValue = fieldValueToString_(meta, block).trim();
+  if(!currentValue){
+    setAppToast('다듬을 글이 비어 있어요.', { duration: 2800, variant: 'err' });
+    return;
+  }
+  var outputGuide = meta.array
+    ? 'JSON만 출력하세요: {"value": ["태그1", "태그2", ...]}  (# 없이 단어만)'
+    : meta.arrayLines
+      ? 'JSON만 출력하세요: {"value": ["줄1", "줄2", ...]}'
+      : 'JSON만 출력하세요: {"value": "다듬은 내용"}';
+  var prompt = [
+    '당신은 한국어 교정 편집자입니다. 「' + meta.label + '」 글만 가볍게 다듬으세요.',
+    '',
+    '[절대 지킬 것]',
+    '- 의미·정보·사실·숫자·순서·불릿 개수·👉 단계 구조를 바꾸지 마세요.',
+    '- 새 내용을 추가하거나 문단을 통째로 다시 쓰지 마세요.',
+    '- 오타·띄어쓰기·맞춤법·어색한 표현만 고치고, 문장을 조금 더 자연스럽게만 만드세요.',
+    '- 존댓말/반말 톤은 원문과 같게 유지하세요.',
+    '',
+    '[원문]',
+    currentValue,
+    '',
+    outputGuide
+  ].join('\n');
+
+  if(btn){
+    startButtonCountdown_(btn, { estimateSec: Math.min(SHEET_FIELD_REGEN_ESTIMATE_SEC, 18), busyLabel: '글 다듬는 중', idleText: '글 다듬기' });
+  }
+  try {
+    var text = await callClaudePlanner_(prompt, { maxTokens: 1400 });
+    var obj = parsePlannerAiJsonObject_(text);
+    var val = obj.value;
+    if(meta.array){
+      var arr = Array.isArray(val) ? val : String(val || '').split(/[\s,#]+/);
+      block[meta.__field] = arr.map(function(t){ return String(t).replace(/^#/, '').trim(); }).filter(Boolean);
+    } else if(meta.arrayLines){
+      var arr2 = Array.isArray(val) ? val : String(val || '').split('\n');
+      block[meta.__field] = arr2.map(function(s){ return String(s).replace(/^\d+[.)]\s*/, '').trim(); }).filter(Boolean);
+    } else {
+      block[meta.__field] = String(val || '').trim();
+    }
+    if(meta.block === 'news' && newsCh){
+      ensureNewsBlock_(content);
+      content.news[newsCh] = block;
+    } else {
+      content[meta.block] = block;
+    }
+    if(meta.block === 'threads' && meta.__field === 'body') block.text = block.body || '';
+    if(meta.threadNorm){ content.thread = normalizeThreadBlock(block) || block; }
+    if(key === 'blog.title' || key === 'community.title'){
+      syncThumbnailOverlayHook_(content, catId);
+      syncDraftTopicFromTitle_(block[meta.__field], { draftId: draftId, save: false });
+    }
+    persistDraftContent_(draftId, content);
+    renderSheetContent(content);
+    setAppToast('「' + meta.label + '」을 다듬었어요.', { duration: 2800, variant: 'ok' });
+  } catch(e){
+    setAppToast('글 다듬기에 실패했어요: ' + ((e && e.message) || String(e)), { duration: 6000, variant: 'err' });
     if(btn) stopButtonCountdown_(btn);
   } finally {
     if(btn && document.body.contains(btn)) stopButtonCountdown_(btn);

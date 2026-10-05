@@ -11450,6 +11450,45 @@ const REAL_MOVEMENT_PLACE_YAKSU_URL = 'https://naver.me/x2YstInq';
 const REAL_MOVEMENT_PLACE_INCHEON_URL = 'https://naver.me/xYNbHrY9';
 const REAL_MOVEMENT_IG_PARK_URL = 'https://www.instagram.com/dr.park_dc.pt/';
 const REAL_MOVEMENT_IG_CENTER_URL = 'https://www.instagram.com/re.al_movement_official/';
+/** 소식 탭 — 지점별 발행 바로가기 (당근은 앱 실행만) */
+const DAANGN_APP_OPEN_URL_ = 'https://www.daangn.com/';
+const NEWS_POST_LINKS_BY_BRANCH_ = {
+  yaksu: {
+    label: '약수',
+    naver: 'https://new.smartplace.naver.com/',
+    naverPlace: REAL_MOVEMENT_PLACE_YAKSU_URL,
+    kakao: 'https://business.kakao.com/_nVSxdn/chats',
+    kakaoChat: 'https://pf.kakao.com/_nVSxdn/chat',
+    karrot: DAANGN_APP_OPEN_URL_
+  },
+  incheon: {
+    label: '인천',
+    naver: 'https://new.smartplace.naver.com/',
+    naverPlace: REAL_MOVEMENT_PLACE_INCHEON_URL,
+    kakao: 'https://pf.kakao.com/_unqbX/chat',
+    kakaoChat: 'https://pf.kakao.com/_unqbX/chat',
+    karrot: DAANGN_APP_OPEN_URL_
+  }
+};
+function renderNewsPostLinksBarHTML_(){
+  function linkOrMissing_(url, label, title){
+    if(url){
+      return '<a class="sheet-news-post-link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer" title="' +
+        escapeHtml(title || label) + '">' + escapeHtml(label) + '</a>';
+    }
+    return '<span class="sheet-news-post-missing" title="등록된 링크가 없어요">' + escapeHtml(label) + '</span>';
+  }
+  var rows = ['yaksu', 'incheon'].map(function(key){
+    var b = NEWS_POST_LINKS_BY_BRANCH_[key];
+    return '<div class="sheet-news-post-row">' +
+      '<span class="sheet-news-post-branch">' + escapeHtml(b.label) + '</span>' +
+      linkOrMissing_(b.naver, '네이버 소식', '스마트플레이스 관리 · 소식 작성') +
+      linkOrMissing_(b.kakao, '카카오채널 소식', '카카오채널 관리·소식') +
+      linkOrMissing_(b.karrot, '당근 소식', '아이폰·아이패드·안드로이드에서 당근 앱 열기') +
+    '</div>';
+  }).join('');
+  return '<div class="sheet-news-post-links" aria-label="지점별 소식 발행 링크">' + rows + '</div>';
+}
 function getRealMovementBlogFooterText_(){
   return [
     '👇더 궁금한 점이 있다면 아래 링크를 참고해주세요',
@@ -29200,8 +29239,8 @@ function renderSheetContent(content) {
         sheetEditField_('제목 · 첫 줄', 'sheet-news-title', newsItem.title || '', { rows: 2, title: true, regen: 'news.title', copy: true }) +
         sheetEditField_('본문', 'sheet-news-body', newsItem.body || '', { rows: 10, regen: 'news.body', copy: true, paragraphs: true, help: chLabel + ' 톤에 맞게 다듬으세요' }) +
         sheetEditField_('CTA', 'sheet-news-cta', newsItem.cta || '', { rows: 3, regen: 'news.cta', copy: true, paragraphs: true }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">위 칩으로 채널을 바꾼 뒤 수정·복사하세요. <strong>소식 3채널 만들기</strong>로 세 채널을 다시 생성할 수 있어요. <strong>발행완료</strong>는 현재 채널만 저장·복사합니다.</p>' +
-        '<button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin-top:12px;">소식 3채널 다시 만들기</button>'
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">위 칩으로 채널을 바꾼 뒤 수정·복사하세요. <strong>발행완료</strong>는 현재 채널만 저장·복사합니다. 아래 링크로 지점별 소식 화면에 바로 갈 수 있어요.</p>' +
+        renderNewsPostLinksBarHTML_()
       );
     }
   } else if(tab==='community'){

@@ -2271,11 +2271,23 @@ border-radius: 7px; padding: 3px 10px; cursor: pointer; transition: all .15s;
 .sheet-field-regen { color: #4F46E5; border-color: #E0E7FF; background: #EEF2FF; }
 .sheet-field-regen:hover { background: #E0E7FF; }
 .sheet-field-regen:disabled { opacity: .6; cursor: default; }
-.sheet-field-polish { color: #0F766E; border-color: #CCFBF1; background: #F0FDFA; }
-.sheet-field-polish:hover:not(:disabled) { background: #CCFBF1; }
+.sheet-field-polish {
+  color: #0F766E; border-color: #5EEAD4; background: #CCFBF1;
+  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, .08);
+}
+.sheet-field-polish:hover:not(:disabled) {
+  background: #99F6E4; border-color: #2DD4BF; color: #115E59;
+}
+.sheet-field-btn.sheet-field-polish:disabled,
 .sheet-field-polish:disabled {
-  opacity: .45; cursor: not-allowed; color: #94A3B8;
-  border-color: #E2E8F0; background: #F8FAFC;
+  opacity: 1;
+  cursor: not-allowed;
+  color: #94A3B8;
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+  border-style: dashed;
+  box-shadow: none;
+  filter: grayscale(1);
 }
 
 /* 상단 전체 복사 바 */
@@ -2325,6 +2337,28 @@ background: #111827; color: #fff; border-color: #111827;
 }
 .sheet-news-chip.has:not(.active) {
 border-color: #93C5FD; background: #EFF6FF; color: #1D4ED8;
+}
+.sheet-news-post-links {
+  margin: 10px 0 4px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid #E5E7EB; background: #F8FAFC;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.sheet-news-post-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  font-size: 12px; line-height: 1.4;
+}
+.sheet-news-post-branch {
+  flex: 0 0 auto; min-width: 2.5em; font-weight: 800; color: #0F766E;
+}
+.sheet-news-post-link {
+  color: #1D4ED8; font-weight: 700; text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.sheet-news-post-link:hover { color: #1E40AF; }
+.sheet-news-post-missing {
+  color: #94A3B8; font-weight: 600;
+  text-decoration: line-through; text-decoration-color: #CBD5E1;
+  cursor: help;
 }
 .sheet-insta-pending-countdown {
 display: inline-flex; align-items: center; gap: 4px; margin: 8px 0 4px; padding: 5px 9px;

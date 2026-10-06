@@ -15218,13 +15218,56 @@ function pruneOrphanSubGoalStepOutbox_(){
   });
   if((state.syncOutbox || []).length !== before){
     rebuildDirtyStateFromOutbox_();
-    state.syncNeedsSnapshot = true;
-    state.syncDirty = true;
+    // outbox만 정리한 경우 snapshot 강제 금지 — 매 push마다 dirty 재점화되어 「미반영 1건」루프가 생김
+    if(!(state.syncOutbox || []).length && !Object.keys(state.syncDirtyEntityKeys || {}).length){
+      state.syncDirty = !!state.syncNeedsSnapshot;
+    }
   }
+}
+/** outbox·dirty 키 없이 snapshot 플래그만 남은 고착 상태 해제 (rev가 서버와 같으면) */
+function clearStuckSyncFlagsIfClean_(remotePayload){
+  try {
+    prunePhantomSyncDirtyKeys_(getPersistPayload(), remotePayload || getPersistPayload());
+  } catch(ePr){}
+  var outboxN = (state.syncOutbox || []).length;
+  var dirtyN = Object.keys(state.syncDirtyEntityKeys || {}).length;
+  if(outboxN || dirtyN){
+    state.syncDirty = true;
+    return false;
+  }
+  var localRev = parseInt(state.syncRevision, 10) || 0;
+  var remoteRev = remotePayload
+    ? (parseInt(remotePayload.syncRevision, 10) || getPayloadRevision_(remotePayload) || 0)
+    : localRev;
+  var serverStored = 0;
+  try { serverStored = parseInt(localStorage.getItem(GAS_LAST_SYNC_REV_KEY) || '0', 10) || 0; } catch(eR){}
+  var revAligned = !!(localRev && (
+    localRev === remoteRev ||
+    localRev === serverStored ||
+    (!remoteRev && localRev === serverStored)
+  ));
+  if(state.syncNeedsSnapshot && revAligned){
+    state.syncNeedsSnapshot = false;
+    state.syncDirty = false;
+    return true;
+  }
+  if(!state.syncNeedsSnapshot){
+    state.syncDirty = false;
+    return true;
+  }
+  return false;
 }
 function schedulePlannerGasPush_(immediate){
   if(!plannerSyncBootstrapReady_ || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return;
   if(!getPlannerGasUrl_() || location.protocol === 'file:') return;
+  try {
+    if(clearStuckSyncFlagsIfClean_(null)){
+      save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+      try { updateSyncStatusUI_(); } catch(eUiClr){}
+      return;
+    }
+  } catch(eStuck){}
+  if(!hasPendingLocalSyncChanges_()) return;
   // 부팅 직후·대용량이면 즉시 푸시 금지 — JSON.stringify 로 「응답 없는 페이지」 방지
   var quietUntil = state._bootQuietUntil || 0;
   var forceDelay = Date.now() < quietUntil ||
@@ -15240,6 +15283,17 @@ function schedulePlannerGasPush_(immediate){
     plannerGasPushTimer = null;
     if(Date.now() < (state._bootQuietUntil || 0)){
       schedulePlannerGasPush_(false);
+      return;
+    }
+    try {
+      if(clearStuckSyncFlagsIfClean_(null)){
+        save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+        try { updateSyncStatusUI_(); } catch(eUiClr2){}
+        return;
+      }
+    } catch(eStuck2){}
+    if(!hasPendingLocalSyncChanges_()){
+      try { updateSyncStatusUI_(); } catch(eUiIdle){}
       return;
     }
     plannerGasPushNow_().catch(function(err){ console.warn('[서버 동기화]', err); });
@@ -15485,7 +15539,16 @@ async function plannerGasPushNow_(){
         lastOkRevision = state.syncRevision;
         scheduleDriveUpload(false);
         if((state.syncOutbox || []).length && !plannerSyncConflictPending_) continue;
-        if(state.syncDirty) schedulePlannerGasPush_(true);
+        if(clearStuckSyncFlagsIfClean_(data.payload)){
+          save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+          return { ok: true, revision: state.syncRevision, batches: round };
+        }
+        if((state.syncOutbox || []).length || Object.keys(state.syncDirtyEntityKeys || {}).length){
+          schedulePlannerGasPush_(true);
+        } else if(state.syncNeedsSnapshot){
+          // snapshot 1회만 더 — 플래그만 남은 채 무한 재시도 방지
+          schedulePlannerGasPush_(true);
+        }
         return { ok: true, revision: state.syncRevision, batches: round };
       }
       var changedDuringRequest = plannerDirtyGeneration_ !== requestDirtyGeneration;
@@ -15507,15 +15570,25 @@ async function plannerGasPushNow_(){
         : {};
       state.syncNeedsSnapshot = (changedDuringRequest ? needsSnapshotAfterRequest : false) || migratedNow;
       if(!state.syncDirty && !state.syncNeedsSnapshot) state.syncOutbox = [];
+      // 스냅샷 성공 후 outbox·dirty키 없으면 고착 플래그 해제
+      if(!migratedNow && !changedDuringRequest){
+        clearStuckSyncFlagsIfClean_(data.payload);
+      }
       save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
       clearPlannerGasRetry_();
       markGasSyncOk_(state.syncRevision, data.savedAt || canon.savedAt);
       scheduleDriveUpload(false);
-      if(state.syncDirty || state.syncNeedsSnapshot) schedulePlannerGasPush_(true);
+      if((state.syncOutbox || []).length || Object.keys(state.syncDirtyEntityKeys || {}).length){
+        schedulePlannerGasPush_(true);
+      } else if(state.syncDirty || state.syncNeedsSnapshot){
+        // 마이그레이션으로만 dirty면 1회 더, 그 외 고착이면 위에서 이미 클리어됨
+        if(migratedNow || changedDuringRequest) schedulePlannerGasPush_(true);
+      }
       return { ok: true, revision: state.syncRevision };
     } else if(data.result === 'success'){
       clearPlannerGasRetry_();
       markGasSyncOk_(state.syncRevision, data.savedAt);
+      clearStuckSyncFlagsIfClean_(null);
       return { ok: true, revision: state.syncRevision };
     }
     break;
@@ -16379,6 +16452,11 @@ window.openSyncStatusModal_ = async function(){
   var alreadyOpen = overlay.classList.contains('open');
   overlay.classList.add('open');
   if(!alreadyOpen) lockBodyScroll_();
+  try {
+    if(clearStuckSyncFlagsIfClean_(null)){
+      save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+    }
+  } catch(eClr0){}
   refreshSyncStatusBodyHtml_(getSyncStatusInfo_());
   refreshSyncHistoryInModal_();
   var waitNote = document.createElement('div');
@@ -16388,7 +16466,14 @@ window.openSyncStatusModal_ = async function(){
   body.appendChild(waitNote);
   try {
     _syncStatusModalRemote = await fetchServerSyncMeta_();
-    // 입력 중이면 본문 전체를 덮지 않음
+    try {
+      var remoteLike = {
+        syncRevision: (_syncStatusModalRemote && _syncStatusModalRemote.rev) || 0
+      };
+      if(clearStuckSyncFlagsIfClean_(remoteLike)){
+        save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+      }
+    } catch(eClr1){}
     refreshSyncStatusBodyHtml_(getSyncStatusInfo_());
     refreshSyncHistoryInModal_();
   } catch(e2){

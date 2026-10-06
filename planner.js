@@ -2894,32 +2894,32 @@ const CATEGORY_THREE_MONTH_OUTCOME = {
 const PROGRAM_INITIAL_PLAN_DRAFTS = {
   '0': {
     brandProfile: '통증 부위를 단편적으로 다루지 않고, 구조·연부조직·기능을 함께 설명하는 도수치료 관점이 핵심입니다. 독자는 "왜 이 부위가 먼저인지"를 이해해야 치료 순서에 신뢰를 가질 수 있습니다. 과장된 즉효 표현보다 평가 기반 접근(History·Movement·Palpation)을 일관되게 보여 주세요.',
-    strategyGuide: '기준:\n- 단계는 회원이 찾는 부위·질문(목·어깨 / 허리·골반·고관절 / 무릎·발목 / 도수 오해·횟수·재발)으로 나눈다. 수업 순서가 아니라 궁금증 서랍이다.\n- 주제는 통증 이름만 나열하지 말고, 글 안에서 "원인 구조·왜 이 부위부터"를 1줄로 설명한다.\n- 각 단계는 독자가 바로 적용할 1가지 행동을 포함한다.\n\n의도:\n- 검색·상담 질문과 단계가 맞닿게 한다.\n- 단기 완화 기대를 "재발 줄이는 구조 이해"로 전환한다.\n- 상담 시 "왜 지금 이 접근인지"를 설명하는 기준 문장을 확보한다.',
+    strategyGuide: '기준:\n- 주제 서랍은 회원이 찾는 부위(목·등·어깨 / 허리·골반·고관절 / 사지 / 전신)로 나눈다. 분기·단계 순서가 아니라 궁금증 서랍이다. 기타 주제는 서랍 밖이다.\n- 주제는 통증 이름만 나열하지 말고, 글 안에서 "원인 구조·왜 이 부위부터"를 1줄로 설명한다.\n- 각 서랍 글은 독자가 바로 적용할 1가지 행동을 포함한다.\n\n의도:\n- 검색·상담 질문과 서랍이 맞닿게 한다.\n- 단기 완화 기대를 "재발 줄이는 구조 이해"로 전환한다.\n- 상담 시 "왜 지금 이 접근인지"를 설명하는 기준 문장을 확보한다.',
     steps: [
-      { id: '1', title: '1단계 · 목·어깨', summary: '거북목·승모·어깨 통증과 연쇄 보상', rationale: '목·어깨는 가장 흔한 상담·검색 키워드입니다. 부위 글 안에서 왜 인접 구조를 보는지 설명합니다.' },
-      { id: '2', title: '2단계 · 허리·골반·고관절', summary: '허리 통증과 골반·고관절 연결', rationale: '허리만 보면 반복되는 경우가 많습니다. 골반·고관절을 같은 서랍에서 이해하게 합니다.' },
-      { id: '3', title: '3단계 · 무릎·발목', summary: '무릎·발목 통증과 하중·보행 패턴', rationale: '하체 통증도 부위만 다루면 재발하기 쉽습니다. 하중과 보행 맥락을 함께 둡니다.' },
-      { id: '4', title: '4단계 · 도수 오해·횟수·재발', summary: '소리·횟수·재발에 대한 기대치와 유지', rationale: '치료 전 불안과 재발 걱정이 이탈을 만듭니다. 오해 해소와 유지 루틴을 한 서랍에 둡니다.' }
+      { id: '1', title: '목·등·어깨', summary: '목·등·어깨 통증과 연쇄 보상', rationale: '목·등·어깨는 가장 흔한 상담·검색 키워드입니다. 부위 글 안에서 왜 인접 구조를 보는지 설명합니다.' },
+      { id: '2', title: '허리·골반·고관절', summary: '허리 통증과 골반·고관절 연결', rationale: '허리만 보면 반복되는 경우가 많습니다. 골반·고관절을 같은 서랍에서 이해하게 합니다.' },
+      { id: '3', title: '사지', summary: '팔·다리·무릎·발목 등 사지 통증', rationale: '사지 통증도 부위만 다루면 재발하기 쉽습니다. 하중·보상·인접 관절 맥락을 함께 둡니다.' },
+      { id: '4', title: '전신', summary: '전신 패턴·오해·재발·유지', rationale: '한 부위로 끝나지 않는 전신 연결, 기대치·재발 질문을 모읍니다.' }
     ]
   },
   '1': {
     brandProfile: '리얼무브먼트는 **보건의료 배경의 임상가**가 인체를 바탕으로 지도하는 **기능재활·움직임 센터** 컬러가 핵심입니다. PAR·Position으로 "좋은 자세를 고정"이 아니라 "움직임을 조절"하도록 돕습니다. 일상 동작(앉기·걷기·업무)에서 바로 써먹을 표현을 우선하고, 도수치료·카이로프랙틱·시술 장면을 주인공처럼 부각하지 마세요(마이너스). 표기 「리얼무브먼트」붙여 쓰기·한 줄(리:얼 금지), Re:Al 유지. 치료행위 수행 암시 금지 — 「치료를 해도 반복=자세/움직임」 맥락은 허용.',
-    strategyGuide: '기준:\n- 단계는 회원이 찾는 말(유연성·자세·생활습관·기능운동)로 나눈다. 수업 순서가 아니라 궁금증 서랍이다.\n- 각 글은 왜 1줄 + 바로 할 수 있는 1가지를 포함한다.\n- "정답 자세"보다 상황별 조절 원칙을 제시한다.\n\n의도:\n- 독자가 자세·스트레칭·기능운동을 생활 기술로 인식하게 한다.\n- 검색·상담 질문과 단계가 맞닿게 한다.\n- 센터 방문 전후 모두 유지 가능한 자기조절 프레임을 만든다.',
+    strategyGuide: '기준:\n- 주제 서랍은 회원이 찾는 말(유연성·자세·생활습관·코어 기능운동)로 나눈다. 분기·단계 순서가 아니라 궁금증 서랍이다.\n- 각 글은 왜 1줄 + 바로 할 수 있는 1가지를 포함한다.\n- "정답 자세"보다 상황별 조절 원칙을 제시한다.\n\n의도:\n- 독자가 자세·스트레칭·기능운동을 생활 기술로 인식하게 한다.\n- 검색·상담 질문과 서랍이 맞닿게 한다.\n- 센터 방문 전후 모두 유지 가능한 자기조절 프레임을 만든다.',
     steps: [
-      { id: '1', title: '1단계 · 유연성·스트레칭', summary: '안 풀리는 이유와 올바른 스트레칭·이완', rationale: '회원이 가장 먼저 찾는 말인 유연성·스트레칭을 서랍으로 둡니다. 억지 당기기와 Passive 방법의 차이를 먼저 잡습니다.' },
-      { id: '2', title: '2단계 · 자세·거북목·라운드 숄더', summary: '거북목·라운드숄더·정렬을 스스로 조절하기', rationale: '자세·거북목은 상담·검색의 핵심 키워드입니다. 고정 자세가 아니라 조절 가능한 움직임을 안내합니다.' },
-      { id: '3', title: '3단계 · 앉기·걷기 생활습관', summary: '앉기·걷기·업무 동선에 붙이는 습관', rationale: '운동 시간보다 생활 시간이 깁니다. 앉기·걷기 같은 장면 루틴으로 실행 장벽을 낮춥니다.' },
-      { id: '4', title: '4단계 · 기능운동', summary: '일상·보행에 쓰는 기능운동으로 연결', rationale: '스트레칭·자세만으로는 유지가 어렵습니다. 기능을 쓰는 동작으로 결과를 체감하게 합니다.' }
+      { id: '1', title: '유연성·스트레칭', summary: '안 풀리는 이유와 올바른 스트레칭·이완', rationale: '회원이 가장 먼저 찾는 말인 유연성·스트레칭을 서랍으로 둡니다. 억지 당기기와 Passive 방법의 차이를 먼저 잡습니다.' },
+      { id: '2', title: '자세·거북목·라운드 숄더', summary: '거북목·라운드숄더·정렬을 스스로 조절하기', rationale: '자세·거북목은 상담·검색의 핵심 키워드입니다. 고정 자세가 아니라 조절 가능한 움직임을 안내합니다.' },
+      { id: '3', title: '앉기·걷기 생활습관', summary: '앉기·걷기·업무 동선에 붙이는 습관', rationale: '운동 시간보다 생활 시간이 깁니다. 앉기·걷기 같은 장면 루틴으로 실행 장벽을 낮춥니다.' },
+      { id: '4', title: '코어 기능운동', summary: '코어·기능운동으로 일상·보행에 연결', rationale: '스트레칭·자세만으로는 유지가 어렵습니다. 코어를 쓰는 기능운동으로 결과를 체감하게 합니다.' }
     ]
   },
   '2': {
     brandProfile: '리얼 페이스는 **임상가가 구조를 아는 기능·웰니스 접근**으로, 얼굴만 따로 보지 않고 경추·호흡·생활습관까지 함께 봅니다. "작은 얼굴" 기대는 과장 없이. 미용·시술·도수/카이로 장면을 주인공처럼 부각하지 말고, 균형·순환·긴장 완화·습관 조절을 강조하세요. 표기 「리얼 페이스」(리:얼 금지), Re:Al Face 유지. 치료행위 수행 암시 금지.',
     strategyGuide: '기준:\n- 단계는 회원이 찾는 말(비대칭·윤곽·턱관절·목·자세)로 나눈다. 수업 순서가 아니라 궁금증 서랍이다.\n- 전/후 기대치는 기간·개인차를 반드시 함께 안내한다.\n- 얼굴 문제를 경추·호흡·저작 패턴과 연결해 설명한다.\n\n의도:\n- 검색·상담 질문과 단계가 맞닿게 한다.\n- 단기 외형 집착을 줄이고 구조 기반 관리 관점을 심는다.\n- 상담 시 현실적인 목표 설정으로 이탈을 줄인다.',
     steps: [
-      { id: '1', title: '1단계 · 비대칭·한쪽 얼굴', summary: '셀카·짝짝이·한쪽만 작아 보이는 패턴', rationale: '비대칭·한쪽 얼굴은 가장 흔한 진입 키워드입니다. 관찰 기준과 과장 없는 해석을 먼저 둡니다.' },
-      { id: '2', title: '2단계 · 윤곽·이중턱·붓기', summary: '살·붓기·윤곽·작은얼굴 기대치', rationale: '윤곽·이중턱·붓기는 관심도가 높습니다. 다이어트만의 문제로 보지 않도록 구조를 나눕니다.' },
-      { id: '3', title: '3단계 · 턱관절·씹기', summary: '이갈이·한쪽으로 씹기·턱관절 불편', rationale: '저작·턱 습관이 얼굴 패턴을 만듭니다. 습관과 구조를 연결하는 서랍입니다.' },
-      { id: '4', title: '4단계 · 목·자세와 얼굴', summary: '경추·자세·호흡이 얼굴에 미치는 영향', rationale: '얼굴만 따로 보지 않는 브랜드 강점입니다. 목·자세 연결로 차별을 만듭니다.' }
+      { id: '1', title: '비대칭·한쪽 얼굴', summary: '셀카·짝짝이·한쪽만 작아 보이는 패턴', rationale: '비대칭·한쪽 얼굴은 가장 흔한 진입 키워드입니다. 관찰 기준과 과장 없는 해석을 먼저 둡니다.' },
+      { id: '2', title: '윤곽·이중턱·붓기', summary: '살·붓기·윤곽·작은얼굴 기대치', rationale: '윤곽·이중턱·붓기는 관심도가 높습니다. 다이어트만의 문제로 보지 않도록 구조를 나눕니다.' },
+      { id: '3', title: '턱관절·씹기', summary: '이갈이·한쪽으로 씹기·턱관절 불편', rationale: '저작·턱 습관이 얼굴 패턴을 만듭니다. 습관과 구조를 연결하는 서랍입니다.' },
+      { id: '4', title: '목·자세와 얼굴', summary: '경추·자세·호흡이 얼굴에 미치는 영향', rationale: '얼굴만 따로 보지 않는 브랜드 강점입니다. 목·자세 연결로 차별을 만듭니다.' }
     ]
   },
   '3': {
@@ -2974,10 +2974,10 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
     brandProfile: '힐자계는 입주민이 집 근처에서 부담 없이 따라할 수 있는 생활형 케어가 핵심입니다. **기능재활·움직임 센터**의 쉬운 버전으로, 엘리베이터 앞·거실·출근 전 동선을 기준으로 안내하세요. 도수·카이로·시술 톤은 쓰지 말고, 짧은 루틴·안전한 표현을 우선합니다.',
     strategyGuide: '기준:\n- 단계는 건강상식 → 통증 셀프케어 → 자세 셀프운동 → 얼굴 셀프운동으로 나눈다.\n- 한 콘텐츠당 동작은 1~2개로 제한한다.\n- 통증 악화·저림 등 경고 신호 시 병원 진료 권유 문구를 포함한다.\n\n의도:\n- 입주민이 "어렵지 않다"는 경험을 반복하게 만든다.\n- 과한 운동 대신 꾸준한 생활형 루틴을 정착시킨다.\n- 지역 커뮤니티 신뢰를 높여 상담 접점을 자연스럽게 만든다.',
     steps: [
-      { id: '1', title: '1단계 · 건강상식', summary: '입주민이 궁금해하는 몸·생활 상식을 쉽게', rationale: '어려운 이론보다 "이런 말이 맞나?"에 답하는 상식 글이 커뮤니티 진입을 엽니다.' },
-      { id: '2', title: '2단계 · 통증 셀프케어', summary: '뻐근함·가벼운 불편을 스스로 다루는 법', rationale: '목·어깨·허리 등 흔한 불편에 짧고 안전한 셀프케어를 붙여 신뢰와 실행을 동시에 만듭니다.' },
-      { id: '3', title: '3단계 · 자세 셀프운동', summary: '집·동선에서 하는 짧은 자세 운동', rationale: '엘리베이터·거실·재택 장면의 자세 루틴으로 "나도 할 수 있다"를 반복합니다.' },
-      { id: '4', title: '4단계 · 얼굴 셀프운동', summary: '붓기·긴장 완화를 위한 가벼운 얼굴 움직임', rationale: '얼굴은 관심도가 높고 부담이 낮습니다. 과장 없이 짧은 셀프운동으로 연결합니다.' }
+      { id: '1', title: '건강상식', summary: '입주민이 궁금해하는 몸·생활 상식을 쉽게', rationale: '어려운 이론보다 "이런 말이 맞나?"에 답하는 상식 글이 커뮤니티 진입을 엽니다.' },
+      { id: '2', title: '통증 셀프케어', summary: '뻐근함·가벼운 불편을 스스로 다루는 법', rationale: '목·어깨·허리 등 흔한 불편에 짧고 안전한 셀프케어를 붙여 신뢰와 실행을 동시에 만듭니다.' },
+      { id: '3', title: '자세 셀프운동', summary: '집·동선에서 하는 짧은 자세 운동', rationale: '엘리베이터·거실·재택 장면의 자세 루틴으로 "나도 할 수 있다"를 반복합니다.' },
+      { id: '4', title: '얼굴 셀프운동', summary: '붓기·긴장 완화를 위한 가벼운 얼굴 움직임', rationale: '얼굴은 관심도가 높고 부담이 낮습니다. 과장 없이 짧은 셀프운동으로 연결합니다.' }
     ]
   }
 };
@@ -2985,11 +2985,11 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
 const PROGRAM_INITIAL_STEP_TOPICS = {
   '0': {
     '1': [
-      { topic: '목 통증인데 어깨를 함께 보는 진짜 이유', angle: '목·어깨 연쇄 보상' },
+      { topic: '목 통증인데 어깨·등을 함께 보는 진짜 이유', angle: '목·등·어깨 연쇄' },
       { topic: '승모근만 풀면 왜 금방 다시 뻐근해질까요?', angle: '목·어깨 구조 관점' },
+      { topic: '등이 굳으면 목이 먼저 아픈 이유', angle: '등·경추 연결' },
       { topic: '거북목처럼 보여도, 먼저 확인할 한 가지', angle: '경추·어깨 단정 전에' },
-      { topic: '어깨가 올라간 채 버티는 하루, 어디서부터 풀까요?', angle: '목·어깨 우선순위' },
-      { topic: '목·어깨 중 이번 주에 먼저 손댈 곳은?', angle: '부위 선택 체크' }
+      { topic: '어깨가 올라간 채 버티는 하루, 어디서부터 풀까요?', angle: '목·등·어깨 우선순위' }
     ],
     '2': [
       { topic: '허리가 뻐근한데, 왜 고관절부터 보나요?', angle: '허리·골반·고관절 연결' },
@@ -2999,18 +2999,18 @@ const PROGRAM_INITIAL_STEP_TOPICS = {
       { topic: '허리만 스트레칭해도 안 풀릴 때', angle: '인접 관절 관점' }
     ],
     '3': [
-      { topic: '무릎이 아픈데 발목·엉덩이부터 보는 이유', angle: '무릎·발목 하중 사슬' },
-      { topic: '계단만 오르내려도 무릎이 뻐근할 때', angle: '무릎 통증 생활 장면' },
-      { topic: '발목이 자주 접질리는 패턴, 무릎과 연결되나요?', angle: '발목·무릎 안정성' },
-      { topic: '오래 서 있으면 무릎 앞이 무거운 이유', angle: '하중·정렬 관점' },
-      { topic: '무릎 보호, 근력만 키우면 충분할까요?', angle: '기능·구조 균형' }
+      { topic: '무릎이 아픈데 발목·엉덩이부터 보는 이유', angle: '사지·하중 사슬' },
+      { topic: '팔꿈치·손목이 뻐근할 때, 어깨만 보면 안 되는 이유', angle: '상지 보상' },
+      { topic: '발목이 자주 접질리는 패턴, 무릎과 연결되나요?', angle: '하지 안정성' },
+      { topic: '오래 서 있으면 무릎 앞이 무거운 이유', angle: '하지 하중·정렬' },
+      { topic: '손·발 저림, 사지 끝만의 문제일까요?', angle: '사지·신경 경로 오해' }
     ],
     '4': [
+      { topic: '한 부위만 아픈데 전신을 보는 이유', angle: '전신 패턴' },
       { topic: '"딱 소리"가 나야 치료가 된 걸까요?', angle: '도수 오해 해소' },
       { topic: '도수치료 횟수, 얼마나 해야 방향이 보이나요?', angle: '기대치·재평가' },
-      { topic: '치료 받고 더 아플 때, 호전 반응일까 문제일까?', angle: '호전 반응 vs 문제' },
-      { topic: '좋아졌다 싶다가 다시 아픈 사이클 끊는 법', angle: '재발 신호·조기 대응' },
-      { topic: '치료 후 3일, 집에선 무엇을 하면 좋을까요?', angle: '재발 방지 최소 루틴' }
+      { topic: '좋아졌다 싶다가 다시 아픈 사이클 끊는 법', angle: '재발·전신 유지' },
+      { topic: '치료 후 3일, 집에선 무엇을 하면 좋을까요?', angle: '전신 유지 루틴' }
     ]
   },
   '1': {
@@ -3036,11 +3036,11 @@ const PROGRAM_INITIAL_STEP_TOPICS = {
       { topic: '출퇴근길에 붙이는 짧은 리셋', angle: '동선에 붙는 생활습관' }
     ],
     '4': [
-      { topic: '스쿼트보다 먼저 해야 할 일상 동작', angle: '기능운동 우선순위' },
-      { topic: '운동 전 5분, 이것만 하면 부상이 준다', angle: '기능적 워밍업' },
-      { topic: '고관절이 안 열리면 허리가 먼저 아파요', angle: '기능 사슬 연결' },
-      { topic: '앉기·서기·걷기를 기능으로 쓰는 법', angle: 'Position·기능운동 입문' },
-      { topic: '한 달 후를 위한 이번 주 기능운동 한 가지', angle: '습관 고정 CTA' }
+      { topic: '코어가 안 잡히면 허리가 먼저 아픈 이유', angle: '코어 기능운동' },
+      { topic: '스쿼트보다 먼저 해야 할 코어 동작', angle: '기능운동 우선순위' },
+      { topic: '운동 전 5분, 코어만 깨워도 부상이 준다', angle: '코어 워밍업' },
+      { topic: '앉기·서기·걷기에 코어를 쓰는 법', angle: '일상 코어 기능' },
+      { topic: '한 달 후를 위한 이번 주 코어 기능운동 한 가지', angle: '습관 고정 CTA' }
     ]
   },
   '2': {
@@ -3440,7 +3440,7 @@ function getProgramSeedStrategyGuide_(catId){
   return seed ? normalizeProgramStrategyGuideTemplate_(String(seed.strategyGuide || '').trim()) : '';
 }
 /** 일반인 궁금증 서랍 개정 — 기존 로드맵 단계 제목을 시드와 맞춤 (글 배정 id 유지) */
-const CURIOSITY_HUB_PLAN_REV = { '0': 'curiosity-v1', '1': 'curiosity-v1', '2': 'curiosity-v1', '7': 'curiosity-v1' };
+const CURIOSITY_HUB_PLAN_REV = { '0': 'curiosity-v3', '1': 'curiosity-v3', '2': 'curiosity-v3', '7': 'curiosity-v3' };
 function syncCuriosityHubPlanFromSeed_(catId){
   catId = normalizePendingCatId_(catId);
   var rev = CURIOSITY_HUB_PLAN_REV[String(catId)];
@@ -5906,10 +5906,16 @@ function getFirstUnpublishedDraftInStep_(drafts){
 }
 function renderSubGoalStepCardsHTML_(catId, drafts, collapsed){
   var cat = CATEGORIES[catId];
-  if(collapsed && getTopicListMode_() !== 'published') return '';
+  if(collapsed && getTopicListMode_() !== 'published'){
+    return '<div class="subgoal-step-cards topic-lines is-drop-empty collapsed-drop" aria-hidden="true"></div>';
+  }
   var shown = filterDraftsByTopicListMode_(drafts, catId);
-  if(getTopicListMode_() === 'published' && !shown.length) return '';
-  if(!shown.length) return '';
+  if(getTopicListMode_() === 'published' && !shown.length){
+    return '<div class="subgoal-step-cards topic-lines is-drop-empty" data-drop-hint="1"><span class="subgoal-drop-hint">여기에 놓기</span></div>';
+  }
+  if(!shown.length){
+    return '<div class="subgoal-step-cards topic-lines is-drop-empty" data-drop-hint="1"><span class="subgoal-drop-hint">주제를 끌어다 놓으세요</span></div>';
+  }
   var html = '<div class="subgoal-step-cards topic-lines">';
   shown.forEach(function(d){
     html += draftCardHTML(d, cat, false, cat.drafts.indexOf(d), true);
@@ -5925,7 +5931,7 @@ function isSubGoalStepCollapsed_(catId, stepId){
   return false;
 }
 function countFilledStepTopics_(drafts, catId){
-  // 괄호 숫자 = 지금 탭에서 보이는 카드 수 (준비/올린 필터와 동일)
+  // 괄호 숫자 = 지금 탭에서 보이는 카드 수 (준비/완료 필터와 동일)
   if(getTopicListMode_() === 'plan'){
     return (drafts || []).filter(function(d){
       return d && d.id && !draftIsShelfEmpty_(d, catId);
@@ -5933,7 +5939,7 @@ function countFilledStepTopics_(drafts, catId){
   }
   return filterDraftsByTopicListMode_(drafts, catId).length;
 }
-/** 준비↔올린 탭에서 반대편 개수를 링크로 보여 줌 */
+/** 준비↔완료 탭에서 반대편 개수를 링크로 보여 줌 */
 function formatSubGoalStepCountHTML_(drafts, catId){
   var mode = getTopicListMode_();
   var shownN = countFilledStepTopics_(drafts, catId);
@@ -5942,14 +5948,14 @@ function formatSubGoalStepCountHTML_(drafts, catId){
       return d && d.id && draftShowsOnPublishedList_(d.id, catId);
     }).length;
     if(pubN > 0){
-      return '(' + shownN + ' · <button type="button" class="subgoal-step-pub-link" title="블로그·인스타 등 발행한 글" onclick="event.stopPropagation();setTopicListMode_(\'published\')">올린 ' + pubN + '</button>)';
+      return '(' + shownN + ' · <button type="button" class="subgoal-step-pub-link" title="블로그·인스타 등 발행 완료한 글" onclick="event.stopPropagation();setTopicListMode_(\'published\')">완료 ' + pubN + '</button>)';
     }
   } else if(mode === 'published'){
     var writeN = (drafts || []).filter(function(d){
       return d && d.id && !draftShowsOnPublishedList_(d.id, catId) && !draftIsShelfEmpty_(d, catId);
     }).length;
     if(writeN > 0){
-      return '(' + shownN + ' · <button type="button" class="subgoal-step-pub-link" title="아직 올리지 않은 준비 글" onclick="event.stopPropagation();setTopicListMode_(\'write\')">준비 ' + writeN + '</button>)';
+      return '(' + shownN + ' · <button type="button" class="subgoal-step-pub-link" title="아직 완료하지 않은 준비 글" onclick="event.stopPropagation();setTopicListMode_(\'write\')">준비 ' + writeN + '</button>)';
     }
   }
   return '(' + shownN + ')';
@@ -9165,6 +9171,19 @@ function renderPlanLayerMonthHTML_(catId){
     var pspItems = pspParts.join('') || '<p class="plan-layer-empty">카테고리가 아직 없습니다.</p>';
     return planLayerCardHTML_('3', 'PSP 카테고리', pspItems, 'openExpertCategoryNote_()', 'month');
   }
+  if(isFlatProgramRoadmapCategory_(catId)){
+    var flatParts = [];
+    (meta.steps || []).forEach(function(s, j){
+      var why = String(s.rationale || s.summary || '').trim();
+      var t = displaySubGoalStepTitle_(s.title || '주제', catId);
+      flatParts.push('<div class="plan-layer-item ' + getStepToneClass_(j) + '">' +
+        '<div class="plan-layer-item-title">' + escapeHtml((j + 1) + '. ' + t) + '</div>' +
+        (why ? '<div class="plan-layer-item-intent">' + planLayerParagraphsHTML_(why) + '</div>' : '') +
+      '</div>');
+    });
+    var flatItems = flatParts.join('') || '<p class="plan-layer-empty">주제 서랍이 아직 없습니다.</p>';
+    return planLayerCardHTML_('3', '주제 서랍', flatItems, 'openMonthPlanSuggest_()', 'month');
+  }
   var groups = monthStepGroups_(meta.steps || []);
   var parts = [];
   groups.forEach(function(group, gi){
@@ -9230,12 +9249,12 @@ function renderSubGoalStepBlockHTML_(catId, step, idx, activeId){
   if(getTopicListMode_() === 'published' && !shown.length) return '';
   var collapsed = isSubGoalStepCollapsed_(catId, sid);
   var stepKey = subGoalStepKey_(catId, sid).replace(/'/g, '');
-  var html = '<div class="subgoal-step-block ' + getPlanTierClass_('topic-plan') + (isActive ? ' active' : '') + (collapsed ? ' collapsed' : '') + '" data-plan-tier="3">' +
+  var html = '<div class="subgoal-step-block ' + getPlanTierClass_('topic-plan') + (isActive ? ' active' : '') + (collapsed ? ' collapsed' : '') + '" data-plan-tier="3" data-drop-step="' + escapeHtml(sid) + '" data-drop-cat="' + catId + '">' +
     '<div class="subgoal-step-block-head" role="button" tabindex="0" onclick="toggleSubGoalStep_(\'' + stepKey + '\')">' +
       '<div class="subgoal-step-head-static">' +
         '<span class="subgoal-step-num">' + (idx + 1) + '</span>' +
         '<span class="subgoal-step-main">' +
-          '<span class="subgoal-step-title">' + escapeHtml(step.title || '') + '</span>' +
+          '<span class="subgoal-step-title">' + escapeHtml(displaySubGoalStepTitle_(step.title || '', catId)) + '</span>' +
           '<span class="subgoal-step-count">' + formatSubGoalStepCountHTML_(drafts, catId) + '</span>' +
         '</span>' +
       '</div>' +
@@ -9306,7 +9325,7 @@ function renderDailySharePanelHTML_(catId){
       '<div class="daily-month-head-row">' +
         '<button type="button" class="daily-month-head" onclick="toggleDailyMonthGroup_(\'' + escapeHtml(g.monthKey) + '\')" aria-expanded="' + (!monthCollapsed) + '">' +
           '<span class="daily-month-label">' + escapeHtml(g.label) + (isCurrent ? ' · 이번 달' : '') + '</span>' +
-          '<span class="daily-month-stats">' + (writeMode ? ('준비 ' + shown.length) : ('올린 ' + shown.length)) + '</span>' +
+          '<span class="daily-month-stats">' + (writeMode ? ('준비 ' + shown.length) : ('완료 ' + shown.length)) + '</span>' +
           '<span class="daily-month-chevron">' + (monthCollapsed ? '▸' : '▾') + '</span>' +
         '</button>' +
       '</div>';
@@ -9317,7 +9336,7 @@ function renderDailySharePanelHTML_(catId){
           html += draftCardHTML(d, cat, false, cat.drafts.indexOf(d), false);
         });
       } else if(g.drafts.some(function(d){ return draftShowsOnPublishedList_(d.id, catId); })){
-        html += '<div class="subgoal-step-topics empty">이 달의 글은 올린 글에 있습니다.</div>';
+        html += '<div class="subgoal-step-topics empty">이 달의 글은 완료 글에 있습니다.</div>';
       } else {
         html += '<div class="subgoal-step-topics empty">아직 주제가 없어요. 위쪽 <strong>추가</strong>에서 사진·장면 또는 <strong>생각 한 줄</strong>을 적어 보세요.</div>';
       }
@@ -9326,7 +9345,7 @@ function renderDailySharePanelHTML_(catId){
     html += '</div>';
   });
   if(!dailyShownAny && getTopicListMode_() === 'published'){
-    html += '<div class="topic-list-mode-empty">아직 한 곳이라도 올린 글이 없습니다.</div>';
+    html += '<div class="topic-list-mode-empty">아직 한 곳이라도 완료 글이 없습니다.</div>';
   }
   html += '</div>';
   return html;
@@ -9416,6 +9435,10 @@ function renderProgramRoadmapHTML_(catId){
         pspSeq++;
       });
     });
+  } else if(isFlatProgramRoadmapCategory_(catId)){
+    (plan.steps || []).forEach(function(step, j){
+      html += renderSubGoalStepBlockHTML_(catId, step, j, activeId);
+    });
   } else {
     var stepGroups = monthStepGroups_(plan.steps);
     stepGroups.forEach(function(group, gi){
@@ -9429,23 +9452,19 @@ function renderProgramRoadmapHTML_(catId){
   }
   var misc = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID);
   var miscShown = filterDraftsByTopicListMode_(misc, catId);
-  if(miscShown.length || (getTopicListMode_() === 'plan' && countFilledStepTopics_(misc, catId))){
-    var miscCollapsed = isSubGoalStepCollapsed_(catId, SUBGOAL_MISC_ID);
-    var miscKey = subGoalStepKey_(catId, SUBGOAL_MISC_ID).replace(/'/g, '');
-    html += '<div class="subgoal-step-block misc step-tone-misc' + (miscCollapsed ? ' collapsed' : '') + '">' +
-      '<div class="subgoal-step-block-head" role="button" tabindex="0" onclick="toggleSubGoalStep_(\'' + miscKey + '\')">' +
-        '<div class="subgoal-step-head-static">' +
-          '<span class="subgoal-step-num">·</span>' +
-          '<span class="subgoal-step-main"><span class="subgoal-step-title">' + escapeHtml(getSubGoalMiscLabel_(plan)) + '</span><span class="subgoal-step-count">' + formatSubGoalStepCountHTML_(misc, catId) + '</span></span>' +
-        '</div>' +
+  var miscCollapsed = isSubGoalStepCollapsed_(catId, SUBGOAL_MISC_ID);
+  var miscKey = subGoalStepKey_(catId, SUBGOAL_MISC_ID).replace(/'/g, '');
+  html += '<div class="subgoal-step-block misc step-tone-misc' + (miscCollapsed ? ' collapsed' : '') + '" data-drop-step="' + escapeHtml(SUBGOAL_MISC_ID) + '" data-drop-cat="' + catId + '">' +
+    '<div class="subgoal-step-block-head" role="button" tabindex="0" onclick="toggleSubGoalStep_(\'' + miscKey + '\')">' +
+      '<div class="subgoal-step-head-static">' +
+        '<span class="subgoal-step-num">·</span>' +
+        '<span class="subgoal-step-main"><span class="subgoal-step-title">' + escapeHtml(getSubGoalMiscLabel_(plan)) + '</span><span class="subgoal-step-count">' + formatSubGoalStepCountHTML_(misc, catId) + '</span></span>' +
       '</div>' +
-      (miscCollapsed || !miscShown.length ? '' : '<div class="subgoal-step-cards topic-lines">' + miscShown.map(function(d){
-        return draftCardHTML(d, cat, false, cat.drafts.indexOf(d), true);
-      }).join('') + '</div>') +
-    '</div>';
-  }
+    '</div>' +
+    renderSubGoalStepCardsHTML_(catId, misc, miscCollapsed) +
+  '</div>';
   if(getTopicListMode_() === 'published' && !filterDraftsByTopicListMode_(getVisibleDraftsInMain_(catId), catId).length){
-    html += '<div class="topic-list-mode-empty">아직 한 곳이라도 올린 글이 없습니다.</div>';
+    html += '<div class="topic-list-mode-empty">아직 한 곳이라도 완료 글이 없습니다.</div>';
   }
   html += '</div>';
   return html;
@@ -11252,6 +11271,18 @@ function isOpsManualCategory(catId){ return catId === 8; }
 function isThreadCategory(catId){ return isDailyShareCategory(catId); }
 function isHeiljagyaeCategory(catId){ return catId === 7; }
 function isGeneralAudienceCategory(catId){ return catId === 0 || catId === 1 || catId === 2; }
+/** 일반 프로그램(도수·무브먼트·페이스·힐자계) — 분기·N단계 표기 없이 주제 서랍만 */
+function isFlatProgramRoadmapCategory_(catId){
+  var id = Number(catId);
+  return id === 0 || id === 1 || id === 2 || id === 7;
+}
+function displaySubGoalStepTitle_(title, catId){
+  var t = String(title || '').trim();
+  if(isFlatProgramRoadmapCategory_(catId)){
+    t = t.replace(/^\d+\s*단계\s*[·․.\-–—]\s*/, '');
+  }
+  return t;
+}
 /** 리얼무브먼트 일반인 블로그 — 말미에 프로필·톡톡·인스타·예약 링크 카드를 고정 삽입 */
 function isRealMovementBlogCategory_(catId){ return Number(catId) === 1; }
 /** 도수치료·CMT Academy만 치료·시술 행위 서술 허용 */
@@ -20431,7 +20462,7 @@ function renderTabs() {
       '<select class="cat-group-select" onclick="event.stopPropagation()" onchange="selectCat(parseInt(this.value,10))" aria-label="' + groupLabel + ' 프로그램 선택">' +
       options +
       '</select>' +
-      '<span class="cat-group-badge" title="준비 글과 올린 글의 합">' + activeCount + '</span>' +
+      '<span class="cat-group-badge" title="준비 글과 완료 글의 합">' + activeCount + '</span>' +
     '</div>';
   }
   function opsGroupSelectorHTML(){
@@ -20583,7 +20614,7 @@ function draftHasAnyPublish_(draftId){
   return false;
 }
 
-/** 한 채널이라도 발행 기록이 있으면 올린 글 목록. 단계 소속은 바꾸지 않는다. */
+/** 한 채널이라도 발행 기록이 있으면 완료 글 목록. 단계 소속은 바꾸지 않는다. */
 function draftShowsOnPublishedList_(draftId, catId){
   if(!draftId) return false;
   if(getDraftPublishedChannelKeys_(draftId, catId).length) return true;
@@ -20645,7 +20676,7 @@ function renderTopicListModeBarHTML_(catId){
   var mode = getTopicListMode_();
   return '<div class="topic-list-mode" role="tablist" aria-label="주제 목록">' +
     '<button type="button" class="topic-list-mode-btn' + (mode === 'write' ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 'write' ? 'true' : 'false') + '" onclick="setTopicListMode_(\'write\')">준비 글 <span>' + writeN + '</span></button>' +
-    '<button type="button" class="topic-list-mode-btn' + (mode === 'published' ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 'published' ? 'true' : 'false') + '" onclick="setTopicListMode_(\'published\')">올린 글 <span>' + pubN + '</span></button>' +
+    '<button type="button" class="topic-list-mode-btn' + (mode === 'published' ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 'published' ? 'true' : 'false') + '" onclick="setTopicListMode_(\'published\')">완료 글 <span>' + pubN + '</span></button>' +
     '<button type="button" class="topic-list-mode-btn topic-list-mode-btn-plan' + (mode === 'plan' ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 'plan' ? 'true' : 'false') + '" onclick="setTopicListMode_(\'plan\')">기획</button>' +
   '</div>' +
   (mode === 'published' ? renderPublishedChannelLegendHTML_(catId) : '');
@@ -20659,7 +20690,7 @@ function getPublishedLegendKeys_(catId){
 function renderPublishedChannelLegendHTML_(catId){
   var keys = getPublishedLegendKeys_(catId);
   if(!keys.length) return '';
-  return '<div class="published-channel-legend" aria-label="올린 채널">' +
+  return '<div class="published-channel-legend" aria-label="완료 채널">' +
     keys.map(function(k){
       return '<span class="badge badge-channel badge-ch-' + k + '">' +
         escapeHtml(getPublishChannelBadgeLabel_(k)) + '</span>';
@@ -20843,7 +20874,7 @@ window.pruneTopicsWithoutDraft_ = function(catId){
   try {
     okConfirm = confirm(
       name + '에서 목록에 뺀 빈 주제 ' + n + '개를 삭제할까요?\n' +
-      '(추가한 주제, 초안 있는 주제, 올린 글은 그대로 둡니다)' + quotaHint
+      '(추가한 주제, 초안 있는 주제, 완료 글은 그대로 둡니다)' + quotaHint
     );
   } catch(eConf){ okConfirm = false; }
   if(!okConfirm){
@@ -20933,7 +20964,7 @@ window.forceDedupeSubGoalSteps_ = function(catId){
   }
 };
 
-/** 상단 탭 배지 — 준비 글 + 올린 글 (빈 칸·기타 빈 주제는 제외) */
+/** 상단 탭 배지 — 준비 글 + 완료 글 (빈 칸·기타 빈 주제는 제외) */
 function countUnpublishedTopicsForCat_(catIdx) {
   if(isOpsManualCategory(catIdx)) return countOpsManualUnchecked_(catIdx);
   return countTopicListBuckets_(catIdx).total;
@@ -22484,6 +22515,7 @@ function renderMain(opts) {
 
   mc.innerHTML = searchHTML + bodyHTML;
   scheduleWorkshopTextareaGrow_(document.getElementById('main-content'));
+  try { ensureTopicDragDropBound_(); } catch(eDnD){}
   if(focusSnap) restoreTextFieldFocus_(focusSnap);
   if(isAutoTopicReplenishEnabled_()){
     scheduleMinimumPendingDraftsForCat_(state.currentCat, 'render');
@@ -22564,8 +22596,14 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
       '</div>' +
     '</div>' +
     renderMoveDraftPickerHTML_(cat.id, d.id);
-  return `<div class="draft-card topic-line plan-tier-topic${isPub?' published':''}${isPartialPub?' partial-published':''}${isRec?' recommended':''}" data-plan-tier="4" style="--cc:${color}" tabindex="0" role="button" aria-label="${escapeHtml(lineTitle)}" onclick="openDetail('${d.id}',${cat.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetail('${d.id}',${cat.id});}">
+  var stepIdAttr = '';
+  try {
+    var sidAttr = getDraftRoadmapStepId_(d, cat.id, draftIndex);
+    if(sidAttr) stepIdAttr = ' data-step-id="' + escapeHtml(String(sidAttr)) + '"';
+  } catch(eSid){}
+  return `<div class="draft-card topic-line plan-tier-topic${isPub?' published':''}${isPartialPub?' partial-published':''}${isRec?' recommended':''}" data-plan-tier="4" data-draft-id="${escapeHtml(d.id)}" data-cat-id="${cat.id}"${stepIdAttr} draggable="true" style="--cc:${color}" tabindex="0" role="button" aria-label="${escapeHtml(lineTitle)}" onclick="onTopicCardClick_(event,'${d.id}',${cat.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetail('${d.id}',${cat.id});}">
     <div class="topic-line-row">
+      <span class="topic-drag-handle" title="끌어서 단계 이동" aria-hidden="true">⠿</span>
       <div class="card-topic">${escapeHtml(lineTitle)}</div>
       <div class="topic-line-meta">${badges}</div>
       <button type="button" class="topic-line-more" onclick="event.stopPropagation();var card=this.closest('.draft-card');card.classList.toggle('more-open');this.setAttribute('aria-expanded', card.classList.contains('more-open')?'true':'false');">자세히</button>
@@ -24972,16 +25010,22 @@ function renderMoveDraftPickerHTML_(fromCatId, draftId){
   var stepBtns = steps.map(function(step, idx){
     if(!step) return '';
     var sid = String(step.id);
-    var label = (idx + 1) + '단계';
-    var current = sid === currentStepId;
     var tip = String(step.title || '').trim();
+    var label = isFlatProgramRoadmapCategory_(fromCatId)
+      ? (displaySubGoalStepTitle_(tip, fromCatId) || ((idx + 1) + ''))
+      : ((idx + 1) + '단계');
+    var current = sid === currentStepId;
     return '<button type="button" class="card-move-opt' + (current ? ' is-current' : '') + '"' +
       (current ? ' disabled' : '') +
       (tip ? ' title="' + escapeHtml(tip) + '"' : '') +
       ' onclick="event.stopPropagation();moveDraftToStep_(' + fromCatId + ',\'' + draftId + '\',\'' + sid.replace(/'/g, '') + '\')">' +
       escapeHtml(label) + '</button>';
   }).join('');
-  if(!stepBtns) stepBtns = '<span class="card-move-empty">생성된 단계가 없어요</span>';
+  var miscCurrent = currentStepId === SUBGOAL_MISC_ID;
+  stepBtns += '<button type="button" class="card-move-opt' + (miscCurrent ? ' is-current' : '') + '"' +
+    (miscCurrent ? ' disabled' : '') +
+    ' title="기타 주제" onclick="event.stopPropagation();moveDraftToStep_(' + fromCatId + ',\'' + draftId + '\',\'' + SUBGOAL_MISC_ID + '\')">기타</button>';
+  if(!steps.length && !stepBtns) stepBtns = '<span class="card-move-empty">생성된 단계가 없어요</span>';
   var programs = ADD_FORM_CAT_ORDER.map(function(id){
     if(id === fromCatId || !CATEGORIES[id] || isOpsManualCategory(id)) return '';
     var name = CAT_TAB_SHORT[id] || CATEGORIES[id].name;
@@ -25035,6 +25079,10 @@ window.moveDraftToStep_ = function(catId, draftId, stepId){
   }
   var plan = getSubGoalPlan_(catId);
   if(!plan || !plan.steps) return;
+  if(stepId === SUBGOAL_MISC_ID){
+    dropDraftOnStep_(catId, draftId, SUBGOAL_MISC_ID, null);
+    return;
+  }
   var step = null;
   var stepIdx = -1;
   plan.steps.forEach(function(s, i){
@@ -25048,20 +25096,197 @@ window.moveDraftToStep_ = function(catId, draftId, stepId){
     if(typeof setAppToast === 'function') setAppToast('이미 ' + label + '에 있어요.', { duration: 2800 });
     return;
   }
-  var existing = getDraftsForSubGoalStep_(catId, step.id, { live: true }).filter(function(d){
-    return d && d.id !== draftId;
+  dropDraftOnStep_(catId, draftId, step.id, null);
+};
+
+var _topicDragState = { draftId: '', catId: null, moved: false, suppressClick: false };
+
+window.onTopicCardClick_ = function(ev, draftId, catId){
+  if(_topicDragState.suppressClick){
+    _topicDragState.suppressClick = false;
+    if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+    return;
+  }
+  openDetail(draftId, catId);
+};
+
+function clearTopicDropHighlights_(){
+  document.querySelectorAll('.subgoal-step-block.is-drop-target, .draft-card.topic-line.is-drop-before, .draft-card.topic-line.is-drop-after').forEach(function(el){
+    el.classList.remove('is-drop-target', 'is-drop-before', 'is-drop-after');
   });
-  var order = existing.length + 1;
-  applyDraftRoadmapAssignment_(draft, catId, step.id, step.title || label, order, Math.max(order, 1));
-  try { ensurePendingAssignmentForDraft_(catId, step.id, order, draftId); } catch(eAsg){}
+}
+
+function topicDropLabel_(catId, stepId){
+  if(String(stepId) === SUBGOAL_MISC_ID) return getSubGoalMiscLabel_(getSubGoalPlan_(catId)) || '기타 주제';
+  var plan = getSubGoalPlan_(catId);
+  if(!plan || !plan.steps) return '주제';
+  for(var i = 0; i < plan.steps.length; i++){
+    if(plan.steps[i] && String(plan.steps[i].id) === String(stepId)){
+      var raw = plan.steps[i].title || '';
+      if(isFlatProgramRoadmapCategory_(catId)){
+        return displaySubGoalStepTitle_(raw, catId) || ('주제 ' + (i + 1));
+      }
+      return (i + 1) + '단계';
+    }
+  }
+  return '주제';
+}
+
+function reindexDraftsInStep_(catId, stepId, ordered){
+  var plan = getSubGoalPlan_(catId);
+  var title = String(stepId) === SUBGOAL_MISC_ID
+    ? getSubGoalMiscLabel_(plan)
+    : getSubGoalStepTitle_(plan, stepId);
+  var total = stepTopicSlotTotalForCount_(ordered.length);
+  ordered.forEach(function(d, i){
+    if(!d) return;
+    applyDraftRoadmapAssignment_(d, catId, stepId, title || '', i + 1, Math.max(total, 1));
+    try { ensurePendingAssignmentForDraft_(catId, stepId, i + 1, d.id); } catch(eA){}
+  });
+  try { densifyStepSlotTotalsOnly_(catId, stepId); } catch(eD){}
+}
+
+window.dropDraftOnStep_ = function(catId, draftId, targetStepId, beforeDraftId){
+  catId = parseInt(catId, 10);
+  targetStepId = String(targetStepId || '');
+  beforeDraftId = beforeDraftId ? String(beforeDraftId) : '';
+  var cat = CATEGORIES[catId];
+  if(!cat || !draftId || !targetStepId) return;
+  var draft = (cat.drafts || []).find(function(d){ return d && d.id === draftId; });
+  if(!draft){
+    if(typeof setAppToast === 'function') setAppToast('주제를 찾을 수 없어요.', { duration: 3200 });
+    return;
+  }
+  var plan = getSubGoalPlan_(catId);
+  if(!plan) return;
+  if(targetStepId !== SUBGOAL_MISC_ID){
+    var ok = (plan.steps || []).some(function(s){ return s && String(s.id) === targetStepId; });
+    if(!ok) return;
+  }
+  var di = cat.drafts.indexOf(draft);
+  var fromStep = String(getDraftRoadmapStepId_(draft, catId, di) || '');
+  var peers = getDraftsForSubGoalStep_(catId, targetStepId, { live: true }).filter(function(d){
+    return d && d.id && d.id !== draftId;
+  });
+  var insertAt = peers.length;
+  if(beforeDraftId){
+    for(var i = 0; i < peers.length; i++){
+      if(peers[i] && peers[i].id === beforeDraftId){ insertAt = i; break; }
+    }
+  }
+  var ordered = peers.slice();
+  ordered.splice(insertAt, 0, draft);
+  var sameStep = fromStep === targetStepId;
+  if(sameStep && beforeDraftId === draftId) return;
+  reindexDraftsInStep_(catId, targetStepId, ordered);
+  if(!sameStep && fromStep){
+    var left = getDraftsForSubGoalStep_(catId, fromStep, { live: true }).filter(function(d){
+      return d && d.id && d.id !== draftId;
+    });
+    reindexDraftsInStep_(catId, fromStep, left);
+  }
   save({ driveImmediate: true, gasImmediate: true });
   renderMain();
   if(typeof setAppToast === 'function'){
     var t0 = draft.topic || '주제';
     var short = t0.length > 24 ? t0.slice(0, 24) + '…' : t0;
-    setAppToast('「' + short + '」을(를) ' + label + '로 옮겼어요.', { duration: 3200, variant: 'ok' });
+    var label = topicDropLabel_(catId, targetStepId);
+    setAppToast(
+      sameStep
+        ? ('「' + short + '」 순서를 바꿨어요.')
+        : ('「' + short + '」을(를) ' + label + '로 옮겼어요.'),
+      { duration: 3000, variant: 'ok' }
+    );
   }
 };
+
+function ensureTopicDragDropBound_(){
+  var mc = document.getElementById('main-content');
+  if(!mc || mc._topicDndBound) return;
+  mc._topicDndBound = true;
+  mc.addEventListener('dragstart', function(ev){
+    var card = ev.target && ev.target.closest ? ev.target.closest('.draft-card.topic-line[data-draft-id]') : null;
+    if(!card || !mc.contains(card)) return;
+    if(ev.target && ev.target.closest && ev.target.closest('button, a, input, textarea, select')){
+      ev.preventDefault();
+      return;
+    }
+    var draftId = card.getAttribute('data-draft-id');
+    var catId = parseInt(card.getAttribute('data-cat-id'), 10);
+    if(!draftId || isNaN(catId)) return;
+    _topicDragState.draftId = draftId;
+    _topicDragState.catId = catId;
+    _topicDragState.moved = false;
+    _topicDragState.suppressClick = false;
+    card.classList.add('is-dragging');
+    try {
+      ev.dataTransfer.effectAllowed = 'move';
+      ev.dataTransfer.setData('text/plain', draftId);
+      ev.dataTransfer.setData('application/x-planner-draft', JSON.stringify({ draftId: draftId, catId: catId }));
+    } catch(eDt){}
+  });
+  mc.addEventListener('dragend', function(ev){
+    var card = ev.target && ev.target.closest ? ev.target.closest('.draft-card.topic-line') : null;
+    if(card) card.classList.remove('is-dragging');
+    clearTopicDropHighlights_();
+    if(_topicDragState.moved) _topicDragState.suppressClick = true;
+    _topicDragState.draftId = '';
+    _topicDragState.catId = null;
+    _topicDragState.moved = false;
+  });
+  mc.addEventListener('dragover', function(ev){
+    if(!_topicDragState.draftId) return;
+    var block = ev.target && ev.target.closest ? ev.target.closest('.subgoal-step-block[data-drop-step]') : null;
+    if(!block || !mc.contains(block)) return;
+    ev.preventDefault();
+    try { ev.dataTransfer.dropEffect = 'move'; } catch(eDf){}
+    clearTopicDropHighlights_();
+    block.classList.add('is-drop-target');
+    var overCard = ev.target.closest('.draft-card.topic-line[data-draft-id]');
+    if(overCard && overCard.getAttribute('data-draft-id') !== _topicDragState.draftId){
+      var rect = overCard.getBoundingClientRect();
+      var before = (ev.clientY - rect.top) < rect.height / 2;
+      overCard.classList.add(before ? 'is-drop-before' : 'is-drop-after');
+    }
+  });
+  mc.addEventListener('dragleave', function(ev){
+    var block = ev.target && ev.target.closest ? ev.target.closest('.subgoal-step-block[data-drop-step]') : null;
+    if(!block) return;
+    var related = ev.relatedTarget;
+    if(related && block.contains(related)) return;
+    block.classList.remove('is-drop-target');
+  });
+  mc.addEventListener('drop', function(ev){
+    if(!_topicDragState.draftId) return;
+    var block = ev.target && ev.target.closest ? ev.target.closest('.subgoal-step-block[data-drop-step]') : null;
+    if(!block || !mc.contains(block)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    var draftId = _topicDragState.draftId;
+    var catId = _topicDragState.catId;
+    var targetStep = block.getAttribute('data-drop-step');
+    var dropCat = parseInt(block.getAttribute('data-drop-cat'), 10);
+    if(!isNaN(dropCat)) catId = dropCat;
+    var beforeId = null;
+    var overCard = ev.target.closest('.draft-card.topic-line[data-draft-id]');
+    if(overCard && overCard.getAttribute('data-draft-id') !== draftId){
+      var rect = overCard.getBoundingClientRect();
+      var before = (ev.clientY - rect.top) < rect.height / 2;
+      if(before) beforeId = overCard.getAttribute('data-draft-id');
+      else {
+        var next = overCard.nextElementSibling;
+        while(next && !(next.classList && next.classList.contains('draft-card'))){
+          next = next.nextElementSibling;
+        }
+        beforeId = next ? next.getAttribute('data-draft-id') : null;
+      }
+    }
+    _topicDragState.moved = true;
+    _topicDragState.suppressClick = true;
+    clearTopicDropHighlights_();
+    dropDraftOnStep_(catId, draftId, targetStep, beforeId);
+  });
+}
 window.moveDraftToCategory_ = function(fromCatId, draftId, toCatId){
   fromCatId = parseInt(fromCatId, 10);
   toCatId = parseInt(toCatId, 10);

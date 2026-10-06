@@ -14671,10 +14671,75 @@ function stampChangedSyncEntities_(previousPayload, currentPayload){
   return changed;
 }
 function hasPendingLocalSyncChanges_(){
-  if(state.syncNeedsSnapshot) return true;
-  if(state.syncDirty) return true;
   if((state.syncOutbox || []).length) return true;
   if(Object.keys(state.syncDirtyEntityKeys || {}).length) return true;
+  if(state.syncNeedsSnapshot) return true;
+  // syncDirty 단독은 미반영로 치지 않음 — 키·outbox·snapshot 없이 dirty만 남은 고착 방지
+  return false;
+}
+/** 서버 반영 성공 후 로컬 미반영 플래그를 전부 끔 (미반영 1건 루프 차단) */
+function markLocalInSyncWithServer_(serverPayload, opts){
+  opts = opts || {};
+  var rev = parseInt(serverPayload && (serverPayload.syncRevision || serverPayload.serverRevision), 10) || 0;
+  if(!rev) rev = parseInt(state.syncRevision, 10) || 0;
+  if(rev) state.syncRevision = rev;
+  if(!opts.keepOutbox) state.syncOutbox = [];
+  if(!opts.keepDirtyKeys) state.syncDirtyEntityKeys = {};
+  state.syncNeedsSnapshot = false;
+  state.syncDirty = false;
+  state._applyMigrated = false;
+  state._postAdoptMigration = false;
+  try {
+    markGasSyncOk_(rev, (serverPayload && serverPayload.savedAt) || null);
+  } catch(eMk){}
+  return true;
+}
+/** outbox·dirty 키 없이 남은 snapshot/dirty 고착 해제 */
+function clearStuckSyncFlagsIfClean_(remotePayload){
+  try {
+    prunePhantomSyncDirtyKeys_(getPersistPayload(), remotePayload || getPersistPayload());
+  } catch(ePr){}
+  // UI 전용·빈 키 정리
+  Object.keys(state.syncDirtyEntityKeys || {}).forEach(function(key){
+    if(key === 'setting:catGroupLast' || key === 'setting:plannerSetupDismissed' || key === 'ops:meta'){
+      delete state.syncDirtyEntityKeys[key];
+    }
+  });
+  var outboxN = (state.syncOutbox || []).length;
+  var dirtyN = Object.keys(state.syncDirtyEntityKeys || {}).length;
+  if(outboxN || dirtyN){
+    state.syncDirty = true;
+    return false;
+  }
+  var localRev = parseInt(state.syncRevision, 10) || 0;
+  var remoteRev = remotePayload
+    ? (parseInt(remotePayload.syncRevision, 10) || getPayloadRevision_(remotePayload) || 0)
+    : 0;
+  var serverStored = 0;
+  try { serverStored = parseInt(localStorage.getItem(GAS_LAST_SYNC_REV_KEY) || '0', 10) || 0; } catch(eR){}
+  var revAligned = !!(localRev && (
+    (remoteRev && localRev === remoteRev) ||
+    (serverStored && localRev === serverStored) ||
+    (!remotePayload && serverStored && localRev === serverStored) ||
+    (!remotePayload && !serverStored && localRev > 0 && !!state.syncNeedsSnapshot)
+  ));
+  // outbox·dirty키 없고 snapshot/dirty만 남은 경우 → 서버와 rev가 맞거나, 이미 성공 기록이 있으면 강제 해제
+  if(!outboxN && !dirtyN && (state.syncNeedsSnapshot || state.syncDirty)){
+    if(revAligned || (serverStored > 0 && localRev >= serverStored)){
+      markLocalInSyncWithServer_(remotePayload || { syncRevision: localRev || serverStored });
+      return true;
+    }
+    // dirty 단독(키·snapshot 없음)은 실제 변경이 아님
+    if(state.syncDirty && !state.syncNeedsSnapshot){
+      state.syncDirty = false;
+      return true;
+    }
+  }
+  if(!state.syncNeedsSnapshot && !state.syncDirty) return false;
+  if(!state.syncNeedsSnapshot){
+    state.syncDirty = false;
+    return true;
+  }
   return false;
 }
 /** 로컬 미업로드 수정이 없을 때 — GAS를 기준본으로 채택 */
@@ -15108,7 +15173,10 @@ function ensureOutboxFromLegacyDirty_(payload){
   if(Array.isArray(state.syncOutbox) && state.syncOutbox.length) return;
   var keys = Object.keys(state.syncDirtyEntityKeys || {});
   if(keys.length) enqueueSyncOutboxChanges_(keys, payload || getPersistPayload());
-  else if(state.syncDirty) state.syncNeedsSnapshot = true;
+  else if(state.syncDirty && !state.syncNeedsSnapshot){
+    // dirty 플래그만 있고 키·outbox가 없으면 snapshot 재점화 금지 — 「미반영 1건」루프 원인
+    state.syncDirty = false;
+  }
 }
 var SYNC_OUTBOX_PATCH_BATCH_ = 200;
 function buildPendingSyncMutations_(payload){
@@ -15224,39 +15292,6 @@ function pruneOrphanSubGoalStepOutbox_(){
     }
   }
 }
-/** outbox·dirty 키 없이 snapshot 플래그만 남은 고착 상태 해제 (rev가 서버와 같으면) */
-function clearStuckSyncFlagsIfClean_(remotePayload){
-  try {
-    prunePhantomSyncDirtyKeys_(getPersistPayload(), remotePayload || getPersistPayload());
-  } catch(ePr){}
-  var outboxN = (state.syncOutbox || []).length;
-  var dirtyN = Object.keys(state.syncDirtyEntityKeys || {}).length;
-  if(outboxN || dirtyN){
-    state.syncDirty = true;
-    return false;
-  }
-  var localRev = parseInt(state.syncRevision, 10) || 0;
-  var remoteRev = remotePayload
-    ? (parseInt(remotePayload.syncRevision, 10) || getPayloadRevision_(remotePayload) || 0)
-    : localRev;
-  var serverStored = 0;
-  try { serverStored = parseInt(localStorage.getItem(GAS_LAST_SYNC_REV_KEY) || '0', 10) || 0; } catch(eR){}
-  var revAligned = !!(localRev && (
-    localRev === remoteRev ||
-    localRev === serverStored ||
-    (!remoteRev && localRev === serverStored)
-  ));
-  if(state.syncNeedsSnapshot && revAligned){
-    state.syncNeedsSnapshot = false;
-    state.syncDirty = false;
-    return true;
-  }
-  if(!state.syncNeedsSnapshot){
-    state.syncDirty = false;
-    return true;
-  }
-  return false;
-}
 function schedulePlannerGasPush_(immediate){
   if(!plannerSyncBootstrapReady_ || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return;
   if(!getPlannerGasUrl_() || location.protocol === 'file:') return;
@@ -15311,7 +15346,7 @@ function clearPlannerGasRetry_(){
   plannerLastSyncError_ = '';
 }
 function schedulePlannerGasRetry_(error){
-  if(!state.syncDirty || !plannerSyncBootstrapReady_ || plannerSyncConflictPending_) return;
+  if(!hasPendingLocalSyncChanges_() || !plannerSyncBootstrapReady_ || plannerSyncConflictPending_) return;
   if(typeof navigator !== 'undefined' && navigator.onLine === false) return;
   if(plannerGasRetryTimer_) return;
   plannerGasRetryCount_++;
@@ -15391,9 +15426,21 @@ async function plannerGasPushNow_(){
   if(!url || !plannerSyncBootstrapReady_ || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return { ok: false, skipped: true };
   return withPlannerSyncMutex_(async function(){
   try {
+    try {
+      if(clearStuckSyncFlagsIfClean_(null)){
+        save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+        try { updateSyncStatusUI_(); } catch(eUiPre){}
+        return { ok: true, cleared: true };
+      }
+    } catch(ePreStuck){}
     await plannerPullRemoteIntoStateCore_();
     if(plannerSyncConflictPending_) return { ok: false, conflict: true };
-    if(!state.syncDirty) return { ok: true, skipped: true };
+    if(!hasPendingLocalSyncChanges_()){
+      markLocalInSyncWithServer_({ syncRevision: state.syncRevision });
+      save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+      try { updateSyncStatusUI_(); } catch(eUiSkip){}
+      return { ok: true, skipped: true };
+    }
     var body = getPersistPayload();
     body.savedAt = new Date().toISOString();
     ensurePlanRowStableIdsInPayload_(body);
@@ -15533,20 +15580,21 @@ async function plannerGasPushNow_(){
       if(usePatch){
         acknowledgeSyncOutbox_(data.accepted, mutations);
         applyServerPayloadPreservingOutbox_(data.payload, data.serverRevision);
-        save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
         clearPlannerGasRetry_();
-        markGasSyncOk_(state.syncRevision, data.savedAt || data.payload.savedAt);
         lastOkRevision = state.syncRevision;
         scheduleDriveUpload(false);
-        if((state.syncOutbox || []).length && !plannerSyncConflictPending_) continue;
-        if(clearStuckSyncFlagsIfClean_(data.payload)){
+        if((state.syncOutbox || []).length && !plannerSyncConflictPending_){
           save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
-          return { ok: true, revision: state.syncRevision, batches: round };
+          continue;
         }
-        if((state.syncOutbox || []).length || Object.keys(state.syncDirtyEntityKeys || {}).length){
-          schedulePlannerGasPush_(true);
-        } else if(state.syncNeedsSnapshot){
-          // snapshot 1회만 더 — 플래그만 남은 채 무한 재시도 방지
+        // patch 배치 완료 + 남은 outbox/키 없음 → 미반영 강제 해제 (snapshot 재점화 금지)
+        if(!Object.keys(state.syncDirtyEntityKeys || {}).length){
+          markLocalInSyncWithServer_(data.payload);
+        } else {
+          clearStuckSyncFlagsIfClean_(data.payload);
+        }
+        save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+        if(hasPendingLocalSyncChanges_() && !plannerSyncConflictPending_){
           schedulePlannerGasPush_(true);
         }
         return { ok: true, revision: state.syncRevision, batches: round };
@@ -15564,31 +15612,25 @@ async function plannerGasPushNow_(){
       state.syncRevision = parseInt(data.serverRevision, 10) || getPayloadRevision_(data.payload);
       state.syncEntityUpdatedAt = Object.assign({}, canon.syncEntityUpdatedAt || {});
       state.syncBaseEntityUpdatedAt = Object.assign({}, canon.syncEntityUpdatedAt || {});
-      state.syncDirty = changedDuringRequest || migratedNow;
-      state.syncDirtyEntityKeys = (changedDuringRequest || migratedNow)
-        ? Object.assign({}, pendingKeysAfterRequest, state.syncDirtyEntityKeys || {})
-        : {};
-      state.syncNeedsSnapshot = (changedDuringRequest ? needsSnapshotAfterRequest : false) || migratedNow;
-      if(!state.syncDirty && !state.syncNeedsSnapshot) state.syncOutbox = [];
-      // 스냅샷 성공 후 outbox·dirty키 없으면 고착 플래그 해제
       if(!migratedNow && !changedDuringRequest){
-        clearStuckSyncFlagsIfClean_(data.payload);
+        // 스냅샷 성공 = 서버에 반영됨 → 미반영 플래그 전부 끔
+        markLocalInSyncWithServer_(data.payload);
+      } else {
+        state.syncDirty = true;
+        state.syncDirtyEntityKeys = Object.assign({}, pendingKeysAfterRequest, state.syncDirtyEntityKeys || {});
+        state.syncNeedsSnapshot = !!needsSnapshotAfterRequest || migratedNow;
       }
       save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
       clearPlannerGasRetry_();
-      markGasSyncOk_(state.syncRevision, data.savedAt || canon.savedAt);
       scheduleDriveUpload(false);
-      if((state.syncOutbox || []).length || Object.keys(state.syncDirtyEntityKeys || {}).length){
+      if(hasPendingLocalSyncChanges_() && (migratedNow || changedDuringRequest) && !plannerSyncConflictPending_){
         schedulePlannerGasPush_(true);
-      } else if(state.syncDirty || state.syncNeedsSnapshot){
-        // 마이그레이션으로만 dirty면 1회 더, 그 외 고착이면 위에서 이미 클리어됨
-        if(migratedNow || changedDuringRequest) schedulePlannerGasPush_(true);
       }
       return { ok: true, revision: state.syncRevision };
     } else if(data.result === 'success'){
       clearPlannerGasRetry_();
-      markGasSyncOk_(state.syncRevision, data.savedAt);
-      clearStuckSyncFlagsIfClean_(null);
+      markLocalInSyncWithServer_({ syncRevision: data.serverRevision || state.syncRevision, savedAt: data.savedAt });
+      save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
       return { ok: true, revision: state.syncRevision };
     }
     break;
@@ -15994,7 +16036,8 @@ function countPendingSyncItems_(){
   var outbox = (state.syncOutbox || []).length;
   var dirtyKeys = Object.keys(state.syncDirtyEntityKeys || {}).length;
   var n = Math.max(outbox, dirtyKeys);
-  if((state.syncDirty || state.syncNeedsSnapshot) && n < 1) n = 1;
+  // 키·outbox 없이 dirty/snapshot만 남은 고착은 0건 — UI 「미반영 1건」루프 차단
+  if(n < 1 && state.syncNeedsSnapshot && hasPendingLocalSyncChanges_()) n = 1;
   return n;
 }
 function isServerSyncConfigured_(){
@@ -16019,8 +16062,9 @@ function getSyncStatusInfo_(remoteMeta){
   var busy = isPlannerSyncBusy_();
   var serverOn = isServerSyncConfigured_();
   var driveOn = hasDriveValidToken_();
-  var serverPending = serverOn && !!state.syncDirty;
-  var drivePending = driveOn && !!state.syncDirty;
+  var localPending = hasPendingLocalSyncChanges_();
+  var serverPending = serverOn && localPending;
+  var drivePending = driveOn && localPending;
   var remoteNewer = remoteRev != null && remoteRev > localRev;
   var pendingCount = countPendingSyncItems_();
   var phase = 'ok';
@@ -17332,7 +17376,7 @@ window.applyPlannerBootstrapChoice_ = async function(){
       } catch(eIntA){}
       save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
       markGasSyncOk_(pending.serverRevision, pending.remote.savedAt || pending.remote.localSavedAt);
-      if(state.syncDirty || state.syncNeedsSnapshot) schedulePlannerGasPush_(true);
+      if(hasPendingLocalSyncChanges_()) schedulePlannerGasPush_(true);
       if(typeof setAppToast === 'function') setAppToast('서버(팀) 내용으로 맞췄어요.', { duration: 4200, variant: 'ok' });
     } else if(mode === 'local'){
       markSyncReason_('첫맞춤·이 기기');
@@ -18637,8 +18681,16 @@ function applyPersistPayload(s, opts){
   }
   if(legacyDirtyBeforeRestore && !(state.syncOutbox || []).length &&
       !Object.keys(state.syncDirtyEntityKeys || {}).length && !state.syncNeedsSnapshot){
-    state.syncNeedsSnapshot = true;
-    state.syncDirty = true;
+    var serverStoredOnRestore = 0;
+    try { serverStoredOnRestore = parseInt(localStorage.getItem(GAS_LAST_SYNC_REV_KEY) || '0', 10) || 0; } catch(eRst){}
+    var localRevOnRestore = parseInt(state.syncRevision, 10) || 0;
+    // 이미 서버와 맞춘 뒤 dirty만 남은 고착 → snapshot 재점화 금지
+    if(serverStoredOnRestore > 0 && localRevOnRestore > 0 && localRevOnRestore >= serverStoredOnRestore){
+      state.syncDirty = false;
+    } else {
+      state.syncNeedsSnapshot = true;
+      state.syncDirty = true;
+    }
   }
   state.chatgptOpenUrl = s.chatgptOpenUrl || '';
   state.prompts = s.prompts !== undefined ? s.prompts : null;

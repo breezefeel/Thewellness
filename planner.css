@@ -833,9 +833,13 @@ margin-left: 4px;
   margin: 0 14px 12px;
 }
 .life-health-mode {
-  display: flex;
-  gap: 6px;
-  margin: 0 14px 8px;
+  display: none !important;
+}
+.life-health-daily-body {
+  padding: 0 0 8px;
+}
+.life-health-daily-body .daily-draft-section {
+  margin-top: 4px;
 }
 .life-health-mode-btn {
   flex: 1;

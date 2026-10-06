@@ -84,7 +84,7 @@ const CATEGORIES = [
 ];
 
 /** 상단 카테고리 탭: 두 줄 순서·표시명 (데이터 CATEGORIES 인덱스 기준)
- *  생활건강 = 드롭다운 1칸(7), 내부 모드로 6(일상 공유)·7(기타) 전환 */
+ *  생활건강 = 드롭다운 1칸(7). 서랍: 건강상식~얼굴셀프교정 + 일상 공유(6) + 기타 */
 const CAT_TAB_NAV_ROWS = [[0, 1, 2, 7], [3, 5, 4]];
 const CAT_TAB_SHORT = {
   0: '도수치료',
@@ -99,9 +99,37 @@ const CAT_TAB_SHORT = {
 };
 const CAT_GROUP_GENERAL = [0, 1, 2, 7];
 const LIFE_HEALTH_LABEL = '생활건강';
-const LIFE_HEALTH_MODE_IDS = [6, 7]; // 6 일상 공유 · 7 기타
+const LIFE_HEALTH_HOST_CAT = 7;
+const LIFE_HEALTH_DAILY_CAT = 6;
+const LIFE_HEALTH_DAILY_STEP_TITLE = '일상 공유';
+const LIFE_HEALTH_MODE_IDS = [6, 7]; // 데이터 카테고리(호스트 7 + 일상 6)
 function isLifeHealthCategory_(catId){
   return catId === 6 || catId === 7;
+}
+function isLifeHealthDailyStepTitle_(title){
+  var t = String(title || '').replace(/[·․.\s\-–—_/]/g, '').toLowerCase();
+  return t === '일상공유' || t === 'daily' || t === 'dailyshare';
+}
+function isLifeHealthDailyStep_(step){
+  return !!(step && isLifeHealthDailyStepTitle_(step.title));
+}
+function findLifeHealthDailyStepId_(plan){
+  var steps = (plan && plan.steps) || [];
+  for(var i = 0; i < steps.length; i++){
+    if(isLifeHealthDailyStep_(steps[i])) return String(steps[i].id);
+  }
+  return 's5';
+}
+function isLifeHealthDailyFocus_(){
+  return state.lifeHealthModeCat === LIFE_HEALTH_DAILY_CAT;
+}
+function setLifeHealthFocus_(modeCat){
+  state.lifeHealthModeCat = (modeCat === LIFE_HEALTH_DAILY_CAT) ? LIFE_HEALTH_DAILY_CAT : LIFE_HEALTH_HOST_CAT;
+}
+window.setLifeHealthFocus_ = setLifeHealthFocus_;
+function resolveLifeHealthAddCat_(){
+  if(isLifeHealthDailyFocus_()) return LIFE_HEALTH_DAILY_CAT;
+  return LIFE_HEALTH_HOST_CAT;
 }
 const CAT_GROUP_EXPERT = [3, 5, 4];
 /** 지점브랜딩 상단 드롭다운 — opsManual.activeBranch 와 연동 */
@@ -2980,13 +3008,14 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
     ]
   },
   '7': {
-    brandProfile: '생활건강·기타는 집·동네에서 부담 없이 따라할 수 있는 생활형 케어가 핵심입니다. **기능재활·움직임 센터**의 쉬운 버전으로, 엘리베이터 앞·거실·출근 전 동선을 기준으로 안내하세요. 도수·카이로·시술 톤은 쓰지 말고, 짧은 루틴·안전한 표현을 우선합니다.',
-    strategyGuide: '기준:\n- 주제 서랍은 건강상식 → 통증 셀프케어 → 자세 셀프운동 → 얼굴 셀프운동으로 나눈다.\n- 한 콘텐츠당 동작은 1~2개로 제한한다.\n- 통증 악화·저림 등 경고 신호 시 병원 진료 권유 문구를 포함한다.\n\n의도:\n- 독자가 "어렵지 않다"는 경험을 반복하게 만든다.\n- 과한 운동 대신 꾸준한 생활형 루틴을 정착시킨다.\n- 생활건강 접점을 높여 상담으로 자연스럽게 연결한다.',
+    brandProfile: '생활건강은 집·동네에서 부담 없이 따라할 수 있는 생활형 케어와, 미카닥 개인 계정의 일상 공유를 한곳에서 다룹니다. 셀프케어 서랍(건강상식·통증·자세·얼굴)은 **기능재활·움직임 센터**의 쉬운 버전으로, 엘리베이터 앞·거실·출근 전 동선을 기준으로 안내하세요. 도수·카이로·시술 톤은 쓰지 말고, 짧은 루틴·안전한 표현을 우선합니다. 일상 공유만은 강의·홍보 없이 그날의 장면·생각 한 줄 성격을 유지합니다.',
+    strategyGuide: '기준:\n- 주제 서랍은 건강상식 → 통증 셀프케어 → 자세 셀프운동 → 얼굴 셀프교정 → 일상 공유 → 기타 주제 순이다.\n- 1~4·기타는 생활형 셀프케어. 한 콘텐츠당 동작 1~2개, 경고 신호 시 병원 권유.\n- 일상 공유만 장면·생각 한 줄 성격(월별 피드)을 유지한다. 셀프케어 톤으로 바꾸지 않는다.\n\n의도:\n- 독자가 "어렵지 않다"는 경험을 반복하게 만든다.\n- 과한 운동 대신 꾸준한 생활형 루틴을 정착시킨다.\n- 생활건강 접점을 높여 상담으로 자연스럽게 연결한다.',
     steps: [
       { id: '1', title: '건강상식', summary: '입주민이 궁금해하는 몸·생활 상식을 쉽게', rationale: '어려운 이론보다 "이런 말이 맞나?"에 답하는 상식 글이 커뮤니티 진입을 엽니다.' },
       { id: '2', title: '통증 셀프케어', summary: '뻐근함·가벼운 불편을 스스로 다루는 법', rationale: '목·어깨·허리 등 흔한 불편에 짧고 안전한 셀프케어를 붙여 신뢰와 실행을 동시에 만듭니다.' },
       { id: '3', title: '자세 셀프운동', summary: '집·동선에서 하는 짧은 자세 운동', rationale: '엘리베이터·거실·재택 장면의 자세 루틴으로 "나도 할 수 있다"를 반복합니다.' },
-      { id: '4', title: '얼굴 셀프운동', summary: '붓기·긴장 완화를 위한 가벼운 얼굴 움직임', rationale: '얼굴은 관심도가 높고 부담이 낮습니다. 과장 없이 짧은 셀프운동으로 연결합니다.' }
+      { id: '4', title: '얼굴 셀프교정', summary: '붓기·긴장 완화를 위한 가벼운 얼굴 움직임', rationale: '얼굴은 관심도가 높고 부담이 낮습니다. 과장 없이 짧은 셀프교정으로 연결합니다.' },
+      { id: '5', title: '일상 공유', summary: '미카닥 개인 계정 · 장면·생각 한 줄', rationale: '셀프케어와 분리된 사람 레이어입니다. 월별 피드·일기 성격을 유지합니다.' }
     ]
   }
 };
@@ -3247,12 +3276,13 @@ const PROGRAM_INITIAL_STEP_TOPICS = {
       { topic: '단지 산책 늘린 뒤 종아리 뻐근할 때', angle: '자세 셀프운동 · 걷기 후' }
     ],
     '4': [
-      { topic: '얼굴이 무겁게 느껴질 때 할 수 있는 30초', angle: '얼굴 셀프운동 · 부담 없이' },
-      { topic: '턱·볼 긴장을 가볍게 푸는 법', angle: '얼굴 셀프운동 · 저작 긴장' },
-      { topic: '목과 함께 하는 짧은 얼굴 리셋', angle: '얼굴 셀프운동 · 경추 연결' },
-      { topic: '아침에 거울 보기 전 가벼운 얼굴 움직임', angle: '얼굴 셀프운동 · 동선' },
-      { topic: '과장 없이 하는 얼굴 셀프케어의 선', angle: '얼굴 셀프운동 · 기대치' }
-    ]
+      { topic: '얼굴이 무겁게 느껴질 때 할 수 있는 30초', angle: '얼굴 셀프교정 · 부담 없이' },
+      { topic: '턱·볼 긴장을 가볍게 푸는 법', angle: '얼굴 셀프교정 · 저작 긴장' },
+      { topic: '목과 함께 하는 짧은 얼굴 리셋', angle: '얼굴 셀프교정 · 경추 연결' },
+      { topic: '아침에 거울 보기 전 가벼운 얼굴 움직임', angle: '얼굴 셀프교정 · 동선' },
+      { topic: '과장 없이 하는 얼굴 셀프케어의 선', angle: '얼굴 셀프교정 · 기대치' }
+    ],
+    '5': []
   }
 };
 function getInitialStepTopics_(catId, stepId){
@@ -3470,11 +3500,14 @@ function getProgramSeedStrategyGuide_(catId){
   return seed ? normalizeProgramStrategyGuideTemplate_(String(seed.strategyGuide || '').trim()) : '';
 }
 /** 일반인 궁금증 서랍 개정 — 제목 매칭으로 단계 재정렬·삽입 (글 배정 유지) */
-const CURIOSITY_HUB_PLAN_REV = { '0': 'curiosity-v5', '1': 'curiosity-v4', '2': 'curiosity-v5', '7': 'curiosity-v3' };
+const CURIOSITY_HUB_PLAN_REV = { '0': 'curiosity-v5', '1': 'curiosity-v4', '2': 'curiosity-v5', '7': 'curiosity-v4' };
 function curiosityStepTitleKey_(title, catId){
-  return displaySubGoalStepTitle_(String(title || ''), catId)
+  var t = displaySubGoalStepTitle_(String(title || ''), catId)
     .replace(/[·․.\s\-–—_/]/g, '')
     .toLowerCase();
+  // 생활건강: 옛 「얼굴 셀프운동」→「얼굴 셀프교정」매칭
+  if(String(catId) === '7' && t === '얼굴셀프운동') t = '얼굴셀프교정';
+  return t;
 }
 function syncCuriosityHubPlanFromSeed_(catId){
   catId = normalizePendingCatId_(catId);
@@ -4562,7 +4595,11 @@ window.addSelectedDailyShareTopics_ = function(){
 };
 window.openAddForm_ = function(){
   state.showAdd = true;
-  state.newItem.catId = state.currentCat;
+  var addCat = state.currentCat;
+  if(isHeiljagyaeCategory(addCat) || addCat === LIFE_HEALTH_DAILY_CAT){
+    addCat = resolveLifeHealthAddCat_();
+  }
+  state.newItem.catId = addCat;
   state.newItem.topic = state.newItem.topic || '';
   var btn = document.getElementById('add-toggle-btn');
   if(btn) btn.textContent = '닫기';
@@ -5181,6 +5218,13 @@ function countFilledTopicSlots_(catId, stepId){
   return n;
 }
 function stepNeedsMoreTopics_(catId, stepId){
+  if(isHeiljagyaeCategory(catId)){
+    var plan = getEffectiveSubGoalPlan_(catId) || getSubGoalPlan_(catId);
+    var steps = (plan && plan.steps) || [];
+    for(var i = 0; i < steps.length; i++){
+      if(String(steps[i].id) === String(stepId) && isLifeHealthDailyStep_(steps[i])) return false;
+    }
+  }
   return countFilledTopicSlots_(catId, stepId) < STEP_TOPIC_SLOTS_DEFAULT;
 }
 function applyTopicToStepSlot_(catId, stepId, slotNum, topicData){
@@ -5939,11 +5983,17 @@ function getActiveSubGoalStepId_(catId){
   var cat = CATEGORIES[catId];
   if(!plan || !cat || !cat.drafts) return plan && plan.steps.length ? String(plan.steps[0].id) : null;
   for(var si = 0; si < plan.steps.length; si++){
-    var sid = String(plan.steps[si].id);
+    var step = plan.steps[si];
+    if(isHeiljagyaeCategory(catId) && isLifeHealthDailyStep_(step)) continue;
+    var sid = String(step.id);
     var items = getDraftsForSubGoalStep_(catId, sid);
     if(!items.length) return sid;
     var allPub = items.every(function(d){ return draftIsPublished_(d.id); });
     if(!allPub) return sid;
+  }
+  for(var sj = 0; sj < plan.steps.length; sj++){
+    if(isHeiljagyaeCategory(catId) && isLifeHealthDailyStep_(plan.steps[sj])) continue;
+    return String(plan.steps[sj].id);
   }
   return plan.steps.length ? String(plan.steps[plan.steps.length - 1].id) : null;
 }
@@ -9353,14 +9403,18 @@ window.toggleMainGoalPanel_ = function(){
 };
 function renderSubGoalStepBlockHTML_(catId, step, idx, activeId){
   var sid = String(step.id);
+  if(isHeiljagyaeCategory(catId) && isLifeHealthDailyStep_(step)){
+    return renderLifeHealthDailyStepBlockHTML_(catId, step, idx, activeId);
+  }
   var isActive = sid === String(activeId);
   var drafts = getDraftsForSubGoalStep_(catId, sid);
   var shown = filterDraftsByTopicListMode_(drafts, catId);
   if(getTopicListMode_() === 'published' && !shown.length) return '';
   var collapsed = isSubGoalStepCollapsed_(catId, sid);
   var stepKey = subGoalStepKey_(catId, sid).replace(/'/g, '');
+  var focusTip = isHeiljagyaeCategory(catId) ? ('setLifeHealthFocus_(' + LIFE_HEALTH_HOST_CAT + ');') : '';
   var html = '<div class="subgoal-step-block ' + getPlanTierClass_('topic-plan') + (isActive ? ' active' : '') + (collapsed ? ' collapsed' : '') + '" data-plan-tier="3" data-drop-step="' + escapeHtml(sid) + '" data-drop-cat="' + catId + '">' +
-    '<div class="subgoal-step-block-head" role="button" tabindex="0" onclick="toggleSubGoalStep_(\'' + stepKey + '\')">' +
+    '<div class="subgoal-step-block-head" role="button" tabindex="0" onclick="' + focusTip + 'toggleSubGoalStep_(\'' + stepKey + '\')">' +
       '<div class="subgoal-step-head-static">' +
         '<span class="subgoal-step-num">' + (idx + 1) + '</span>' +
         '<span class="subgoal-step-main">' +
@@ -9368,9 +9422,39 @@ function renderSubGoalStepBlockHTML_(catId, step, idx, activeId){
           '<span class="subgoal-step-count">' + formatSubGoalStepCountHTML_(drafts, catId) + '</span>' +
         '</span>' +
       '</div>' +
-      '<button type="button" class="subgoal-topic-gen-btn" onclick="event.stopPropagation();openStepTopicSuggest_(' + catId + ',\'' + sid.replace(/'/g, '') + '\')">주제 생성</button>' +
+      '<button type="button" class="subgoal-topic-gen-btn" onclick="event.stopPropagation();' + focusTip + 'openStepTopicSuggest_(' + catId + ',\'' + sid.replace(/'/g, '') + '\')">주제 생성</button>' +
     '</div>';
   html += renderSubGoalStepCardsHTML_(catId, drafts, collapsed);
+  html += '</div>';
+  return html;
+}
+function renderLifeHealthDailyStepBlockHTML_(hostCatId, step, idx, activeId){
+  var sid = String(step.id);
+  var dailyCat = LIFE_HEALTH_DAILY_CAT;
+  var cat = CATEGORIES[dailyCat];
+  if(!cat) return '';
+  var drafts = getVisibleDraftsInMain_(dailyCat) || [];
+  var shown = filterDraftsByTopicListMode_(drafts, dailyCat);
+  if(getTopicListMode_() === 'published' && !shown.length) return '';
+  var collapsed = isSubGoalStepCollapsed_(hostCatId, sid);
+  var stepKey = subGoalStepKey_(hostCatId, sid).replace(/'/g, '');
+  var isActive = sid === String(activeId) || isLifeHealthDailyFocus_();
+  var html = '<div class="subgoal-step-block life-health-daily-step ' + getPlanTierClass_('topic-plan') + (isActive ? ' active' : '') + (collapsed ? ' collapsed' : '') + '" data-plan-tier="3" data-life-health-daily="1">' +
+    '<div class="subgoal-step-block-head" role="button" tabindex="0" onclick="setLifeHealthFocus_(' + dailyCat + ');toggleSubGoalStep_(\'' + stepKey + '\')">' +
+      '<div class="subgoal-step-head-static">' +
+        '<span class="subgoal-step-num">' + (idx + 1) + '</span>' +
+        '<span class="subgoal-step-main">' +
+          '<span class="subgoal-step-title">' + escapeHtml(LIFE_HEALTH_DAILY_STEP_TITLE) + '</span>' +
+          '<span class="subgoal-step-count">' + formatSubGoalStepCountHTML_(drafts, dailyCat) + '</span>' +
+        '</span>' +
+      '</div>' +
+      '<button type="button" class="subgoal-topic-gen-btn" onclick="event.stopPropagation();setLifeHealthFocus_(' + dailyCat + ');openAddForm_()">추가</button>' +
+    '</div>';
+  if(!collapsed){
+    html += '<div class="life-health-daily-body">' + renderDailySharePanelHTML_(dailyCat) + '</div>';
+  } else {
+    html += '<div class="subgoal-step-cards topic-lines is-drop-empty collapsed-drop" aria-hidden="true"></div>';
+  }
   html += '</div>';
   return html;
 }
@@ -9564,16 +9648,24 @@ function renderProgramRoadmapHTML_(catId){
   var miscShown = filterDraftsByTopicListMode_(misc, catId);
   var miscCollapsed = isSubGoalStepCollapsed_(catId, SUBGOAL_MISC_ID);
   var miscKey = subGoalStepKey_(catId, SUBGOAL_MISC_ID).replace(/'/g, '');
-  html += '<div class="subgoal-step-block misc step-tone-misc' + (miscCollapsed ? ' collapsed' : '') + '" data-drop-step="' + escapeHtml(SUBGOAL_MISC_ID) + '" data-drop-cat="' + catId + '">' +
-    '<div class="subgoal-step-block-head" role="button" tabindex="0" onclick="toggleSubGoalStep_(\'' + miscKey + '\')">' +
-      '<div class="subgoal-step-head-static">' +
-        '<span class="subgoal-step-num">·</span>' +
-        '<span class="subgoal-step-main"><span class="subgoal-step-title">' + escapeHtml(getSubGoalMiscLabel_(plan)) + '</span><span class="subgoal-step-count">' + formatSubGoalStepCountHTML_(misc, catId) + '</span></span>' +
+  var miscNum = isHeiljagyaeCategory(catId) ? String((plan.steps || []).length + 1) : '·';
+  var miscFocus = isHeiljagyaeCategory(catId) ? ('setLifeHealthFocus_(' + LIFE_HEALTH_HOST_CAT + ');') : '';
+  if(!(getTopicListMode_() === 'published' && !miscShown.length)){
+    html += '<div class="subgoal-step-block misc step-tone-misc' + (miscCollapsed ? ' collapsed' : '') + '" data-drop-step="' + escapeHtml(SUBGOAL_MISC_ID) + '" data-drop-cat="' + catId + '">' +
+      '<div class="subgoal-step-block-head" role="button" tabindex="0" onclick="' + miscFocus + 'toggleSubGoalStep_(\'' + miscKey + '\')">' +
+        '<div class="subgoal-step-head-static">' +
+          '<span class="subgoal-step-num">' + miscNum + '</span>' +
+          '<span class="subgoal-step-main"><span class="subgoal-step-title">' + escapeHtml(getSubGoalMiscLabel_(plan)) + '</span><span class="subgoal-step-count">' + formatSubGoalStepCountHTML_(misc, catId) + '</span></span>' +
+        '</div>' +
       '</div>' +
-    '</div>' +
-    renderSubGoalStepCardsHTML_(catId, misc, miscCollapsed) +
-  '</div>';
-  if(getTopicListMode_() === 'published' && !filterDraftsByTopicListMode_(getVisibleDraftsInMain_(catId), catId).length){
+      renderSubGoalStepCardsHTML_(catId, misc, miscCollapsed) +
+    '</div>';
+  }
+  var pubPool = filterDraftsByTopicListMode_(getVisibleDraftsInMain_(catId), catId);
+  if(isHeiljagyaeCategory(catId)){
+    pubPool = pubPool.concat(filterDraftsByTopicListMode_(getVisibleDraftsInMain_(LIFE_HEALTH_DAILY_CAT), LIFE_HEALTH_DAILY_CAT));
+  }
+  if(getTopicListMode_() === 'published' && !pubPool.length){
     html += '<div class="topic-list-mode-empty">아직 한 곳이라도 완료 글이 없습니다.</div>';
   }
   html += '</div>';
@@ -11045,10 +11137,13 @@ function ensureCatGroupLast_(){
   return state.catGroupLast;
 }
 function rememberCatGroupSelection_(catId){
-  if(isLifeHealthCategory_(catId)) state.lifeHealthModeCat = catId;
+  if(isLifeHealthCategory_(catId)){
+    if(catId === LIFE_HEALTH_DAILY_CAT) state.lifeHealthModeCat = LIFE_HEALTH_DAILY_CAT;
+    else if(state.lifeHealthModeCat !== LIFE_HEALTH_DAILY_CAT) state.lifeHealthModeCat = LIFE_HEALTH_HOST_CAT;
+  }
   var key = getCatGroupKeyForCat_(catId);
   if(!key || key === 'ops') return;
-  ensureCatGroupLast_()[key] = isLifeHealthCategory_(catId) ? 7 : catId;
+  ensureCatGroupLast_()[key] = isLifeHealthCategory_(catId) ? LIFE_HEALTH_HOST_CAT : catId;
 }
 function getDisplayCatInGroup_(ids, groupKey){
   if(groupKey === 'general' && isLifeHealthCategory_(state.currentCat)) return 7;
@@ -11058,22 +11153,14 @@ function getDisplayCatInGroup_(ids, groupKey){
   return ids[0];
 }
 function lifeHealthLandingCat_(){
-  var last = state.lifeHealthModeCat;
-  if(last === 6 || last === 7) return last;
-  if(isLifeHealthCategory_(state.currentCat)) return state.currentCat;
-  return 7;
+  return LIFE_HEALTH_HOST_CAT;
 }
 function countLifeHealthTopics_(){
-  return countUnpublishedTopicsForCat_(6) + countUnpublishedTopicsForCat_(7);
+  return countUnpublishedTopicsForCat_(LIFE_HEALTH_DAILY_CAT) + countUnpublishedTopicsForCat_(LIFE_HEALTH_HOST_CAT);
 }
 function renderLifeHealthModeBarHTML_(){
-  var mode = state.currentCat;
-  var n6 = countTopicListBuckets_(6).total;
-  var n7 = countTopicListBuckets_(7).total;
-  return '<div class="life-health-mode" role="tablist" aria-label="생활건강 모드">' +
-    '<button type="button" class="life-health-mode-btn' + (mode === 6 ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 6 ? 'true' : 'false') + '" onclick="selectCat(6)">일상 공유 <span>' + n6 + '</span></button>' +
-    '<button type="button" class="life-health-mode-btn' + (mode === 7 ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 7 ? 'true' : 'false') + '" onclick="selectCat(7)">기타 <span>' + n7 + '</span></button>' +
-  '</div>';
+  // 모드 토글 제거 — 생활건강은 서랍 하나로 통합
+  return '';
 }
 
 var minDraftReplenishRunningByCat = {};
@@ -20673,6 +20760,13 @@ function selectOpsBranchFromNav_(branchId){
 window.selectOpsBranchFromNav_ = selectOpsBranchFromNav_;
 
 function selectCat(i) {
+  i = parseInt(i, 10);
+  if(i === LIFE_HEALTH_DAILY_CAT){
+    setLifeHealthFocus_(LIFE_HEALTH_DAILY_CAT);
+    i = LIFE_HEALTH_HOST_CAT;
+  } else if(i === LIFE_HEALTH_HOST_CAT){
+    if(state.lifeHealthModeCat !== LIFE_HEALTH_DAILY_CAT) setLifeHealthFocus_(LIFE_HEALTH_HOST_CAT);
+  }
   rememberCatGroupSelection_(i);
   state.currentCat = i;
   state.searchQ = '';
@@ -20816,8 +20910,20 @@ function countTopicListBuckets_(catId){
   });
   return { pubN: pubN, writeN: writeN, total: pubN + writeN };
 }
+function countTopicListBucketsForView_(catId){
+  if(isHeiljagyaeCategory(catId)){
+    var tip = countTopicListBuckets_(LIFE_HEALTH_HOST_CAT);
+    var daily = countTopicListBuckets_(LIFE_HEALTH_DAILY_CAT);
+    return {
+      pubN: tip.pubN + daily.pubN,
+      writeN: tip.writeN + daily.writeN,
+      total: tip.total + daily.total
+    };
+  }
+  return countTopicListBuckets_(catId);
+}
 function renderTopicListModeBarHTML_(catId){
-  var buckets = countTopicListBuckets_(catId);
+  var buckets = countTopicListBucketsForView_(catId);
   var pubN = buckets.pubN;
   var writeN = buckets.writeN;
   var mode = getTopicListMode_();
@@ -20831,7 +20937,7 @@ function renderTopicListModeBarHTML_(catId){
 function getPublishedLegendKeys_(catId){
   if(isBlogInstaCategory(catId)) return ['blog', 'insta', 'image', 'threads'];
   if(isDailyShareCategory(catId)) return ['image', 'thread'];
-  if(isHeiljagyaeCategory(catId)) return ['community', 'image'];
+  if(isHeiljagyaeCategory(catId)) return ['community', 'image', 'thread'];
   return getRequiredPublishKeysForCat_(catId);
 }
 function renderPublishedChannelLegendHTML_(catId){
@@ -22628,11 +22734,10 @@ function renderMain(opts) {
     </div>`;
 
   var bodyHTML = '';
-  var listHead = (isLifeHealthCategory_(state.currentCat) ? renderLifeHealthModeBarHTML_() : '') +
-    renderTopicListModeBarHTML_(state.currentCat);
+  var listHead = renderTopicListModeBarHTML_(state.currentCat);
   if(state.searchQ && String(state.searchQ).trim()){
     var q = state.searchQ;
-    var hits = cat.drafts.filter(function(d){
+    function draftMatchesSearch_(d){
       if(!d) return false;
       return (d.topic || '').includes(q) || (d.angle || '').includes(q) ||
         (d.series && d.series.includes(q)) || (d.rationale && d.rationale.includes(q)) ||
@@ -22640,16 +22745,31 @@ function renderMain(opts) {
         (d.dailyThought && String(d.dailyThought).includes(q)) ||
         (d.dailyWho && String(d.dailyWho).includes(q)) ||
         (d.dailyWhat && String(d.dailyWhat).includes(q));
+    }
+    var hitPairs = [];
+    (cat.drafts || []).forEach(function(d){
+      if(!draftMatchesSearch_(d)) return;
+      hitPairs.push({ d: d, cat: cat });
     });
-    hits = hits.filter(function(d){
+    if(isHeiljagyaeCategory(state.currentCat)){
+      var dailyCatObj = CATEGORIES[LIFE_HEALTH_DAILY_CAT];
+      ((dailyCatObj && dailyCatObj.drafts) || []).forEach(function(d){
+        if(!draftMatchesSearch_(d)) return;
+        hitPairs.push({ d: d, cat: dailyCatObj });
+      });
+    }
+    hitPairs = hitPairs.filter(function(pair){
+      var cid = pair.cat.id;
       if(getTopicListMode_() === 'plan'){
-        return draftShowsOnPublishedList_(d.id, state.currentCat) || !draftIsShelfEmpty_(d, state.currentCat);
+        return draftShowsOnPublishedList_(pair.d.id, cid) || !draftIsShelfEmpty_(pair.d, cid);
       }
-      return draftMatchesTopicListMode_(d, state.currentCat);
+      return draftMatchesTopicListMode_(pair.d, cid);
     });
     bodyHTML = listHead +
       '<div class="cards-wrap search-results topic-lines">' +
-      (hits.length ? hits.map(function(d){ return draftCardHTML(d, cat, false, cat.drafts.indexOf(d), false); }).join('') :
+      (hitPairs.length ? hitPairs.map(function(pair){
+        return draftCardHTML(pair.d, pair.cat, false, pair.cat.drafts.indexOf(pair.d), false);
+      }).join('') :
         '<div class="empty-note">검색 결과가 없어요</div>') +
     '</div>';
   } else {
@@ -22789,7 +22909,11 @@ function toggleAdd(){
   if(state.showAdd) try { flushNewItemFieldsFromDom_(); } catch(eFlush){}
   state.showAdd = !state.showAdd;
   if(state.showAdd){
-    state.newItem.catId = state.currentCat;
+    var addCat = state.currentCat;
+    if(isHeiljagyaeCategory(addCat) || addCat === LIFE_HEALTH_DAILY_CAT){
+      addCat = resolveLifeHealthAddCat_();
+    }
+    state.newItem.catId = addCat;
     state.newItem.topic = state.newItem.topic || '';
   }
   document.getElementById('add-toggle-btn').textContent = state.showAdd ? '닫기' : '추가';

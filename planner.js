@@ -27257,6 +27257,8 @@ function resetThumbMakerVisualState_(st){
   st.bgDataUrlUpscaled = null;
   st.bgDataUrlBeforeUpscale = null;
   st.aiUpscaleOn = false;
+  st.addFormPicks = null;
+  st.addFormPickIndex = 0;
 }
 
 function serializeThumbWorkspace_(st){
@@ -28481,19 +28483,188 @@ async function pickBestFrameFromVideoFile_(file, phrases){
   return best;
 }
 
-async function pickBestAddFormThumbMedia_(fileList){
+function estimateAddFormThumbScanSec_(files){
+  var list = Array.prototype.slice.call(files || []);
+  var imgs = Math.min(24, list.filter(isAddFormImageFile_).length);
+  var vids = Math.min(4, list.filter(isAddFormVideoFile_).length);
+  return Math.max(3, Math.min(90, Math.ceil(1.5 + imgs * 0.25 + vids * 4.5)));
+}
+
+function pushTopThumbCandidate_(list, item, limit){
+  if(!item || !item.dataUrl) return;
+  limit = limit || 3;
+  // 동일 장면 중복 완화
+  for(var i = 0; i < list.length; i++){
+    if(list[i].name === item.name && Math.abs((list[i].score || 0) - (item.score || 0)) < 0.02){
+      if((item.score || 0) > (list[i].score || 0)) list[i] = item;
+      return;
+    }
+  }
+  list.push(item);
+  list.sort(function(a, b){ return (b.score || 0) - (a.score || 0); });
+  if(list.length > limit) list.length = limit;
+}
+
+var _thumbFolderScanTimer = null;
+var _thumbFolderScanStartedAt = 0;
+var _thumbFolderScanEstimateSec = 0;
+
+function stopThumbFolderScanCountdown_(){
+  if(_thumbFolderScanTimer){
+    clearInterval(_thumbFolderScanTimer);
+    _thumbFolderScanTimer = null;
+  }
+}
+
+function ensureThumbFolderProgressEl_(){
+  var el = document.getElementById('thumb-folder-progress');
+  if(el) return el;
+  var nameEl = document.getElementById('thumb-photo-name');
+  if(!nameEl || !nameEl.parentNode) return null;
+  el = document.createElement('div');
+  el.id = 'thumb-folder-progress';
+  el.className = 'thumb-folder-progress';
+  el.hidden = true;
+  nameEl.parentNode.insertBefore(el, nameEl.nextSibling);
+  return el;
+}
+
+function updateThumbFolderScanProgress_(opts){
+  opts = opts || {};
+  var el = ensureThumbFolderProgressEl_();
+  if(!el) return;
+  if(opts.done){
+    stopThumbFolderScanCountdown_();
+    el.hidden = true;
+    el.textContent = '';
+    el.classList.remove('is-busy');
+    return;
+  }
+  el.hidden = false;
+  el.classList.add('is-busy');
+  var left = getCountdownSec_(_thumbFolderScanStartedAt, _thumbFolderScanEstimateSec);
+  var parts = [];
+  parts.push(opts.label || '폴더 장면 고르는 중…');
+  if(opts.fileCount) parts.push('파일 ' + opts.fileCount + '개');
+  if(_thumbFolderScanEstimateSec) parts.push('예상 약 ' + _thumbFolderScanEstimateSec + '초');
+  if(opts.doneCount != null && opts.totalCount){
+    parts.push(opts.doneCount + '/' + opts.totalCount);
+  }
+  parts.push(formatCountdownLong_(left));
+  el.textContent = parts.join(' · ');
+}
+
+function startThumbFolderScanCountdown_(estimateSec, fileCount){
+  stopThumbFolderScanCountdown_();
+  _thumbFolderScanStartedAt = Date.now();
+  _thumbFolderScanEstimateSec = Math.max(3, parseInt(estimateSec, 10) || 8);
+  updateThumbFolderScanProgress_({ fileCount: fileCount, label: '폴더 장면 고르는 중…' });
+  _thumbFolderScanTimer = setInterval(function(){
+    updateThumbFolderScanProgress_({ fileCount: fileCount, label: '폴더 장면 고르는 중…' });
+  }, 250);
+}
+
+function renderThumbFolderPicksHTML_(picks, selectedIndex){
+  picks = picks || [];
+  if(!picks.length) return '';
+  var html = '<div class="thumb-folder-picks" id="thumb-folder-picks">';
+  html += '<div class="thumb-folder-picks-hd">추천 사진 ' + picks.length + '장 · 눌러서 선택</div>';
+  html += '<div class="thumb-folder-picks-grid">';
+  picks.forEach(function(p, i){
+    var on = i === (selectedIndex == null ? 0 : selectedIndex);
+    html += '<button type="button" class="thumb-folder-pick' + (on ? ' on' : '') + '" onclick="selectAddFormThumbPick_(' + i + ')" title="' + escapeHtml(p.name || ('추천 ' + (i + 1))) + '">';
+    html += '<img src="' + String(p.dataUrl || '').replace(/"/g, '&quot;') + '" alt="">';
+    html += '<span class="thumb-folder-pick-rank">' + (i + 1) + '</span>';
+    if(p.kind === 'video') html += '<span class="thumb-folder-pick-kind">영상</span>';
+    html += '</button>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
+function refreshThumbFolderPicksUI_(){
+  var st = ensureThumbMakerState_();
+  var picks = st.addFormPicks || [];
+  var host = document.getElementById('thumb-folder-picks');
+  var html = renderThumbFolderPicksHTML_(picks, st.addFormPickIndex || 0);
+  if(!html){
+    if(host) host.remove();
+    return;
+  }
+  if(host){
+    host.outerHTML = html;
+  } else {
+    var progress = document.getElementById('thumb-folder-progress');
+    var nameEl = document.getElementById('thumb-photo-name');
+    var anchor = progress || nameEl;
+    if(anchor && anchor.parentNode){
+      anchor.insertAdjacentHTML('afterend', html);
+    }
+  }
+}
+
+async function applyAddFormThumbPick_(picked, opts){
+  opts = opts || {};
+  if(!picked || !picked.dataUrl) throw new Error('선택한 사진이 없어요.');
+  clearThumbAiUpscaleCache_();
+  var st = ensureThumbMakerState_();
+  st.draftId = '__add_form__';
+  st.catId = (state.newItem && state.newItem.catId != null) ? state.newItem.catId : state.currentCat;
+  await setThumbMakerBackgroundFromDataUrl_(picked.dataUrl, picked.name || '썸네일 장면');
+  if(!isThumbPhotoOnlyMode_()){
+    st.programMode = 'topic';
+    st.fields = buildThumbMakerCopy_(buildAddFormThumbContent_(), st.catId, { programMode: 'topic', preferTopic: true });
+    st.lastCopy = st.fields;
+    applyThumbFieldsToDom_(st.fields);
+  }
+  var nameEl = document.getElementById('thumb-photo-name');
+  if(nameEl) nameEl.textContent = st.fileName || picked.name || '';
+  await paintThumbMakerPreview_();
+  refreshThumbFolderPicksUI_();
+  if(!opts.silent){
+    setAppToast(
+      (picked.kind === 'video' ? '영상 장면을 골랐어요. ' : '추천 사진을 적용했어요. ') +
+      '후킹·구도를 수정해 보세요.',
+      { duration: 2600, variant: 'ok' }
+    );
+  }
+}
+
+window.selectAddFormThumbPick_ = async function(index){
+  var st = ensureThumbMakerState_();
+  var picks = st.addFormPicks || [];
+  var i = parseInt(index, 10) || 0;
+  if(!picks[i]){
+    setAppToast('추천 사진이 없어요. 폴더를 다시 선택해 주세요.', { duration: 2600, variant: 'err' });
+    return;
+  }
+  st.addFormPickIndex = i;
+  try {
+    await applyAddFormThumbPick_(picks[i]);
+  } catch(err){
+    setAppToast((err && err.message) || '사진을 적용하지 못했어요.', { duration: 3000, variant: 'err' });
+  }
+};
+
+/** 폴더·다중 파일에서 점수 상위 후보(기본 3장) */
+async function pickTopAddFormThumbCandidates_(fileList, opts){
+  opts = opts || {};
+  var limit = Math.max(1, parseInt(opts.limit, 10) || 3);
+  var onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : null;
   var files = Array.prototype.slice.call(fileList || []).filter(function(f){
     return isAddFormImageFile_(f) || isAddFormVideoFile_(f);
   });
   if(!files.length) throw new Error('사진 또는 영상 파일을 골라 주세요.');
   var phrases = parseAddFormKeywordPhrases_();
-  var best = null;
+  var top = [];
   var imgFiles = files.filter(isAddFormImageFile_);
   var vidFiles = files.filter(isAddFormVideoFile_).slice(0, 4);
+  var total = Math.min(24, imgFiles.length) + vidFiles.length;
+  var done = 0;
 
   for(var i = 0; i < imgFiles.length && i < 24; i++){
     var img = imgFiles[i];
-    if(isLikelyHeicFile_(img)) continue;
+    if(isLikelyHeicFile_(img)){ done++; if(onProgress) onProgress({ done: done, total: total }); continue; }
     try {
       var payload = await prepareThumbBackgroundPayload_(img, img.name);
       var dataUrl = 'data:' + (payload.mediaType || 'image/jpeg') + ';base64,' + payload.data;
@@ -28502,49 +28673,73 @@ async function pickBestAddFormThumbMedia_(fileList){
       if(bitmap && bitmap.close) try { bitmap.close(); } catch(eClose){}
       var score = energy * addFormKeywordFileBoost_(img.name || '', phrases);
       if(phrases.length && addFormKeywordFileBoost_(img.name || '', phrases) > 1.2) score *= 1.15;
-      if(!best || score > best.score){
-        best = { score: score, dataUrl: dataUrl, name: payload.name || img.name, kind: 'image' };
-      }
+      pushTopThumbCandidate_(top, {
+        score: score,
+        dataUrl: dataUrl,
+        name: payload.name || img.name,
+        kind: 'image'
+      }, limit);
     } catch(eImg){}
+    done++;
+    if(onProgress) onProgress({ done: done, total: total });
   }
 
   for(var v = 0; v < vidFiles.length; v++){
     try {
       var frame = await pickBestFrameFromVideoFile_(vidFiles[v], phrases);
-      if(frame && (!best || frame.score > best.score)) best = frame;
+      if(frame) pushTopThumbCandidate_(top, frame, limit);
     } catch(eVid){}
+    done++;
+    if(onProgress) onProgress({ done: done, total: total });
   }
 
-  if(!best) throw new Error('맞는 장면을 찾지 못했어요. 다른 파일·폴더를 시도해 주세요.');
-  return best;
+  if(!top.length) throw new Error('맞는 장면을 찾지 못했어요. 다른 파일·폴더를 시도해 주세요.');
+  return top;
+}
+
+async function pickBestAddFormThumbMedia_(fileList){
+  var top = await pickTopAddFormThumbCandidates_(fileList, { limit: 1 });
+  return top[0];
 }
 
 window.onAddFormThumbFiles_ = async function(input){
   var files = input && input.files;
   if(!files || !files.length) return;
-  setAppToast('키워드에 맞는 장면 고르는 중…', { duration: 2200, variant: 'ok' });
+  var isFolder = !!(input && (input.id === 'add-thumb-folder-input' || input.hasAttribute('webkitdirectory')));
+  var mediaFiles = Array.prototype.slice.call(files).filter(function(f){
+    return isAddFormImageFile_(f) || isAddFormVideoFile_(f);
+  });
+  var fileCount = mediaFiles.length || files.length;
+  var estimateSec = estimateAddFormThumbScanSec_(mediaFiles.length ? mediaFiles : files);
+  startThumbFolderScanCountdown_(estimateSec, fileCount);
+  setAppToast(
+    (isFolder ? '폴더 ' : '') + '장면 고르는 중… 예상 약 ' + estimateSec + '초',
+    { duration: Math.min(5000, estimateSec * 400), variant: 'ok' }
+  );
   try {
-    var picked = await pickBestAddFormThumbMedia_(files);
-    clearThumbAiUpscaleCache_();
+    var top = await pickTopAddFormThumbCandidates_(files, {
+      limit: 3,
+      onProgress: function(p){
+        updateThumbFolderScanProgress_({
+          fileCount: fileCount,
+          doneCount: p.done,
+          totalCount: p.total,
+          label: isFolder ? '폴더 장면 고르는 중…' : '장면 고르는 중…'
+        });
+      }
+    });
     var st = ensureThumbMakerState_();
-    st.draftId = '__add_form__';
-    st.catId = (state.newItem && state.newItem.catId != null) ? state.newItem.catId : state.currentCat;
-    await setThumbMakerBackgroundFromDataUrl_(picked.dataUrl, picked.name || '썸네일 장면');
-    if(!isThumbPhotoOnlyMode_()){
-      st.programMode = 'topic';
-      st.fields = buildThumbMakerCopy_(buildAddFormThumbContent_(), st.catId, { programMode: 'topic', preferTopic: true });
-      st.lastCopy = st.fields;
-      applyThumbFieldsToDom_(st.fields);
-    }
-    var nameEl = document.getElementById('thumb-photo-name');
-    if(nameEl) nameEl.textContent = st.fileName || picked.name || '';
-    await paintThumbMakerPreview_();
+    st.addFormPicks = top;
+    st.addFormPickIndex = 0;
+    updateThumbFolderScanProgress_({ done: true });
+    refreshThumbFolderPicksUI_();
+    await applyAddFormThumbPick_(top[0], { silent: true });
     setAppToast(
-      (picked.kind === 'video' ? '영상에서 장면을 캡처했어요. ' : '사진을 골랐어요. ') +
-      '후킹·구도를 수정해 보세요.',
-      { duration: 2800, variant: 'ok' }
+      '추천 ' + top.length + '장을 준비했어요. 아래에서 골라 주세요.',
+      { duration: 3200, variant: 'ok' }
     );
   } catch(err){
+    updateThumbFolderScanProgress_({ done: true });
     setAppToast((err && err.message) || '장면을 고르지 못했어요.', { duration: 3200, variant: 'err' });
   }
   if(input) input.value = '';
@@ -28604,6 +28799,10 @@ function renderThumbMakerCard_(content){
   }
   html += '</div>';
   html += '<div class="thumb-maker-photo-name" id="thumb-photo-name">' + escapeHtml(photoName) + '</div>';
+  html += '<div class="thumb-folder-progress" id="thumb-folder-progress" hidden></div>';
+  if(addForm && st.addFormPicks && st.addFormPicks.length){
+    html += renderThumbFolderPicksHTML_(st.addFormPicks, st.addFormPickIndex || 0);
+  }
   if(refCount > 1){
     var refs = getCurrentDraftRefImagesForThumb_();
     html += '<div class="thumb-maker-ref-pick" id="thumb-ref-pick">';
@@ -29472,7 +29671,12 @@ window.clearThumbMakerPhoto_ = function(){
   st.bgDataUrl = null;
   st.bgImg = null;
   st.fileName = '';
+  st.addFormPicks = null;
+  st.addFormPickIndex = 0;
   clearThumbAiUpscaleCache_();
+  updateThumbFolderScanProgress_({ done: true });
+  var picksEl = document.getElementById('thumb-folder-picks');
+  if(picksEl) picksEl.remove();
   updateThumbPhotoBadge_();
   schedulePersistThumbWorkspace_(true);
   paintThumbMakerPreview_();

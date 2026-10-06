@@ -16,6 +16,10 @@
   var PHOTO_DEFAULT_SEC = 3;
   var END_HOLD_SEC = 0.9;
   var END_FADE_SEC = 1.0;
+  var REEL_MAX_IMAGES_ = 36;
+  var REEL_MAX_VIDEOS_ = 4;
+  var REEL_IMAGE_CONCURRENCY_ = 4;
+  var REEL_IMAGE_MAX_EDGE_ = 1620;
   var FOCUS_LABEL = { left: '왼쪽', center: '가운데', right: '오른쪽' };
 
   var reel = {
@@ -78,6 +82,21 @@
     return !!(file && ((file.type && file.type.indexOf('video/') === 0) || /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(file.name || '')));
   }
 
+  function isImageFile(file) {
+    return !!(file && (
+      (file.type && file.type.indexOf('image/') === 0 && !/heic|heif/i.test(file.type || '')) ||
+      /\.(jpe?g|png|webp|gif|bmp)$/i.test(file.name || '')
+    ));
+  }
+
+  function isHeicLikeFile_(file) {
+    return !!(file && (
+      /\.heic$/i.test(file.name || '') ||
+      /\.heif$/i.test(file.name || '') ||
+      /heic|heif/i.test(file.type || '')
+    ));
+  }
+
   function includedClips() {
     return (reel.clips || []).filter(function (c) { return c && c.include !== false; });
   }
@@ -132,6 +151,15 @@
     return null;
   }
 
+  function defaultCaptionTexts_() {
+    return [
+      ['장면을 열고', '핵심 포인트부터 보여 줍니다'],
+      ['손과 프로브가 같이 움직일 때', '반응이 더 선명해집니다'],
+      ['현장에서 바로', '시연할 수 있습니다'],
+      ['휴대형 고주파,', '세미나·실습에 맞춘 흐름입니다']
+    ];
+  }
+
   function defaultCaptions(duration) {
     var d = Math.max(6, Number(duration) || 30);
     var cuts = [
@@ -140,20 +168,107 @@
       { t0: Math.min(12.5, d * 0.47), t1: Math.min(20, d * 0.7) },
       { t0: Math.min(20.5, d * 0.72), t1: Math.max(d - 0.4, d * 0.92) }
     ];
-    var texts = [
-      ['장면을 열고', '핵심 포인트부터 보여 줍니다'],
-      ['손과 프로브가 같이 움직일 때', '반응이 더 선명해집니다'],
-      ['현장에서 바로', '시연할 수 있습니다'],
-      ['휴대형 고주파,', '세미나·실습에 맞춘 흐름입니다']
-    ];
+    var texts = defaultCaptionTexts_();
     return cuts.map(function (c, i) {
       return {
         start: Math.round(c.t0 * 10) / 10,
         end: Math.round(Math.min(c.t1, d - 0.15) * 10) / 10,
         line1: texts[i][0],
-        line2: texts[i][1]
+        line2: texts[i][1],
+        clipId: null
       };
     });
+  }
+
+  /** 포함 클립 기준 타임라인 구간 */
+  function clipTimelineRanges_() {
+    var list = includedClips();
+    var acc = 0;
+    return list.map(function (c) {
+      var dur = Math.max(0.1, Number(c.duration) || 0);
+      var start = acc;
+      acc += dur;
+      return {
+        id: c.id || ('tmp-' + start),
+        clip: c,
+        start: start,
+        end: acc,
+        duration: dur
+      };
+    });
+  }
+
+  function captionTextForIndex_(i) {
+    var texts = defaultCaptionTexts_();
+    var t = texts[i % texts.length] || ['멘트', ''];
+    return { line1: t[0], line2: t[1] };
+  }
+
+  function captionRangeForClip_(range) {
+    var dur = Math.max(0.2, range.end - range.start);
+    var pad = Math.min(0.2, dur * 0.08);
+    var start = range.start + (range.start === 0 ? Math.min(0.15, pad) : pad * 0.5);
+    var end = Math.max(start + 0.35, range.end - pad);
+    return {
+      start: Math.round(start * 10) / 10,
+      end: Math.round(end * 10) / 10
+    };
+  }
+
+  function bindCaptionsToClips_(prevCaptions, textPairs) {
+    var ranges = clipTimelineRanges_();
+    var d = totalDuration();
+    if (!ranges.length || !(d > 0.05)) {
+      return defaultCaptions(Math.max(6, d || 12));
+    }
+    if (!reel._captionTextByClipId) reel._captionTextByClipId = {};
+    var prev = prevCaptions || [];
+    var byId = {};
+    var orphans = [];
+    var hasClipId = false;
+    prev.forEach(function (cap) {
+      if (!cap) return;
+      var text = { line1: cap.line1 || '', line2: cap.line2 || '' };
+      if (cap.clipId) {
+        hasClipId = true;
+        if (!byId[cap.clipId]) byId[cap.clipId] = text;
+        else orphans.push(text);
+        reel._captionTextByClipId[cap.clipId] = text;
+      } else {
+        orphans.push(text);
+      }
+    });
+    // 예전 멘트(클립 id 없음) → 당시 순서대로 클립에 매칭
+    if (!hasClipId && prev.length) {
+      byId = {};
+      orphans = [];
+      ranges.forEach(function (r, i) {
+        if (prev[i]) {
+          byId[r.id] = { line1: prev[i].line1 || '', line2: prev[i].line2 || '' };
+          reel._captionTextByClipId[r.id] = byId[r.id];
+        }
+      });
+      orphans = prev.slice(ranges.length).map(function (cap) {
+        return { line1: (cap && cap.line1) || '', line2: (cap && cap.line2) || '' };
+      });
+    }
+    var next = ranges.map(function (r, i) {
+      var timed = captionRangeForClip_(r);
+      var text = byId[r.id] ||
+        reel._captionTextByClipId[r.id] ||
+        (textPairs && textPairs[i]) ||
+        orphans.shift() ||
+        captionTextForIndex_(i);
+      reel._captionTextByClipId[r.id] = { line1: text.line1 || '', line2: text.line2 || '' };
+      return {
+        clipId: r.id,
+        start: timed.start,
+        end: timed.end,
+        line1: text.line1 || '',
+        line2: text.line2 || ''
+      };
+    });
+    return next;
   }
 
   function readFormKeywords_() {
@@ -226,14 +341,15 @@
       if (force) toast_('영상을 먼저 선택해 주세요.', 'err');
       return false;
     }
-    var base = defaultCaptions(d);
-    var pairs = phrasePairsFromKeywords_(phrases);
-    for (var i = 0; i < base.length; i++) {
-      var pair = pairs[i % pairs.length];
-      base[i].line1 = pair[0] || base[i].line1;
-      base[i].line2 = pair[1] || (pairs.length > 1 ? '' : base[i].line2);
-    }
-    reel.captions = base;
+    var pairs = phrasePairsFromKeywords_(phrases).map(function (p) {
+      return { line1: p[0] || '', line2: p[1] || '' };
+    });
+    // 클립 순서에 맞춰 멘트 구간·문구를 다시 붙임
+    var ranges = clipTimelineRanges_();
+    var textPairs = ranges.map(function (r, i) {
+      return pairs[i % pairs.length] || captionTextForIndex_(i);
+    });
+    reel.captions = bindCaptionsToClips_([], textPairs);
     if (reel.top2 === '휴대 가능한 인디바 고주파' || force) {
       var top = phrases[0];
       if (top && top.length > 22) top = top.slice(0, 22);
@@ -260,13 +376,25 @@
 
   function rebuildCaptionsKeepText() {
     var d = totalDuration();
-    var prev = reel.captions || [];
-    var next = defaultCaptions(d);
-    for (var i = 0; i < next.length && i < prev.length; i++) {
-      next[i].line1 = prev[i].line1;
-      next[i].line2 = prev[i].line2;
+    if (!(d > 0.05) || !includedClips().length) {
+      reel.captions = [];
+      return;
     }
-    reel.captions = next;
+    // 멘트 문구는 클립 id에 묶고, 구간은 현재 재생 순서 기준으로 다시 맞춤
+    reel.captions = bindCaptionsToClips_(reel.captions || [], null);
+  }
+
+  function reassignCaptionClipId_(cap) {
+    if (!cap) return;
+    var mid = ((Number(cap.start) || 0) + (Number(cap.end) || 0)) / 2;
+    var ranges = clipTimelineRanges_();
+    for (var i = 0; i < ranges.length; i++) {
+      if (mid >= ranges[i].start && mid < ranges[i].end) {
+        cap.clipId = ranges[i].id;
+        return;
+      }
+    }
+    if (ranges.length) cap.clipId = ranges[ranges.length - 1].id;
   }
 
   function captionAt(t) {
@@ -602,32 +730,167 @@
     return best;
   }
 
-  function loadImageFile(file) {
+  function makeImageThumbDataUrl_(img) {
+    try {
+      var tw = 160;
+      var th = 90;
+      var c = document.createElement('canvas');
+      c.width = tw;
+      c.height = th;
+      var ctx = c.getContext('2d');
+      if (!ctx) return '';
+      var iw = img.naturalWidth || img.width || 1;
+      var ih = img.naturalHeight || img.height || 1;
+      var scale = Math.max(tw / iw, th / ih);
+      var dw = iw * scale;
+      var dh = ih * scale;
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, tw, th);
+      ctx.drawImage(img, (tw - dw) / 2, (th - dh) / 2, dw, dh);
+      return c.toDataURL('image/jpeg', 0.75);
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function loadHtmlImageFromUrl_(url) {
     return new Promise(function (resolve, reject) {
-      var url = URL.createObjectURL(file);
       var img = new Image();
-      img.onload = function () {
-        resolve({
-          id: uid(),
-          kind: 'image',
-          name: file.name || 'photo.jpg',
-          objectUrl: url,
-          sourceKey: url,
-          el: img,
-          duration: PHOTO_DEFAULT_SEC,
-          trimStart: 0,
-          trimEnd: PHOTO_DEFAULT_SEC,
-          include: true,
-          score: 0.5,
-          file: file
-        });
-      };
-      img.onerror = function () {
-        try { URL.revokeObjectURL(url); } catch (e) {}
-        reject(new Error('사진을 열 수 없습니다: ' + (file.name || '')));
-      };
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { reject(new Error('사진을 열 수 없습니다')); };
       img.src = url;
     });
+  }
+
+  async function decodeReelImageBitmap_(file) {
+    if (typeof createImageBitmap !== 'function') return null;
+    try {
+      // 긴 변을 줄여 디코드 비용을 크게 낮춤 (릴스 1080 기준으로 충분)
+      return await createImageBitmap(file, {
+        resizeWidth: REEL_IMAGE_MAX_EDGE_,
+        resizeHeight: REEL_IMAGE_MAX_EDGE_,
+        resizeQuality: 'high'
+      });
+    } catch (e1) {
+      try { return await createImageBitmap(file); } catch (e2) { return null; }
+    }
+  }
+
+  async function loadImageFile(file) {
+    var url = URL.createObjectURL(file);
+    try {
+      var img = await decodeReelImageBitmap_(file);
+      if (!img) img = await loadHtmlImageFromUrl_(url);
+      return {
+        id: uid(),
+        kind: 'image',
+        name: file.name || 'photo.jpg',
+        objectUrl: url,
+        sourceKey: url,
+        el: img,
+        duration: PHOTO_DEFAULT_SEC,
+        trimStart: 0,
+        trimEnd: PHOTO_DEFAULT_SEC,
+        include: true,
+        score: 0.5,
+        thumbDataUrl: makeImageThumbDataUrl_(img),
+        file: file,
+        closeEl: !!(img && typeof img.close === 'function')
+      };
+    } catch (err) {
+      try { URL.revokeObjectURL(url); } catch (e) {}
+      throw new Error('사진을 열 수 없습니다: ' + (file.name || ''));
+    }
+  }
+
+  function estimateReelImportSec_(imgN, vidN) {
+    var imgWall = Math.ceil(Math.max(0, imgN) / REEL_IMAGE_CONCURRENCY_) * 0.2;
+    var vidWall = Math.max(0, vidN) * 4.0;
+    return Math.max(3, Math.min(120, Math.ceil(1.2 + imgWall + vidWall + 2.5)));
+  }
+
+  function pickReelImportBatch_(files) {
+    var imgs = files.filter(isImageFile);
+    var vids = files.filter(isVideoFile);
+    imgs.sort(function (a, b) {
+      var sa = a.size || 0;
+      var sb = b.size || 0;
+      var pa = sa > 12 * 1024 * 1024 ? 1 : 0;
+      var pb = sb > 12 * 1024 * 1024 ? 1 : 0;
+      if (pa !== pb) return pa - pb;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'ko');
+    });
+    vids.sort(function (a, b) {
+      return String(a.name || '').localeCompare(String(b.name || ''), 'ko');
+    });
+    return {
+      images: imgs.slice(0, REEL_MAX_IMAGES_),
+      videos: vids.slice(0, REEL_MAX_VIDEOS_),
+      skippedImg: Math.max(0, imgs.length - REEL_MAX_IMAGES_),
+      skippedVid: Math.max(0, vids.length - REEL_MAX_VIDEOS_),
+      totalFound: imgs.length + vids.length
+    };
+  }
+
+  async function mapPool_(items, concurrency, workerFn, onProgress) {
+    var list = items || [];
+    var out = new Array(list.length);
+    var cursor = 0;
+    var done = 0;
+    async function runOne() {
+      while (cursor < list.length) {
+        var idx = cursor++;
+        try {
+          out[idx] = await workerFn(list[idx], idx);
+        } catch (err) {
+          out[idx] = { __error: err };
+        }
+        done++;
+        if (onProgress) onProgress(done, list.length);
+      }
+    }
+    var n = Math.max(1, Math.min(concurrency || 1, list.length || 1));
+    var runners = [];
+    for (var i = 0; i < n; i++) runners.push(runOne());
+    await Promise.all(runners);
+    return out;
+  }
+
+  var importCountdown_ = { timer: null, startedAt: 0, estimateSec: 0, done: 0, total: 0, label: '' };
+
+  function stopImportCountdown_() {
+    if (importCountdown_.timer) {
+      clearInterval(importCountdown_.timer);
+      importCountdown_.timer = null;
+    }
+  }
+
+  function paintImportCountdownStatus_() {
+    var left = Math.max(0, importCountdown_.estimateSec - Math.floor((Date.now() - importCountdown_.startedAt) / 1000));
+    var leftTxt = left <= 0 ? '거의 다 됐어요…' : ('약 ' + left + '초 남음');
+    var prog = importCountdown_.total
+      ? (importCountdown_.done + '/' + importCountdown_.total)
+      : '';
+    reel.status = (importCountdown_.label || '미디어 불러오는 중…') +
+      (prog ? (' ' + prog) : '') +
+      ' · 예상 ' + importCountdown_.estimateSec + '초 · ' + leftTxt;
+    rerenderSoftStatus_();
+  }
+
+  function startImportCountdown_(estimateSec, total, label) {
+    stopImportCountdown_();
+    importCountdown_.startedAt = Date.now();
+    importCountdown_.estimateSec = Math.max(3, parseInt(estimateSec, 10) || 8);
+    importCountdown_.done = 0;
+    importCountdown_.total = Math.max(0, parseInt(total, 10) || 0);
+    importCountdown_.label = label || '미디어 불러오는 중…';
+    paintImportCountdownStatus_();
+    importCountdown_.timer = setInterval(paintImportCountdownStatus_, 250);
+  }
+
+  function bumpImportCountdownDone_(done) {
+    importCountdown_.done = Math.max(importCountdown_.done, done || 0);
+    paintImportCountdownStatus_();
   }
 
   async function loadVideoFileAsSegments_(file, onProgress) {
@@ -673,45 +936,108 @@
   }
 
   async function addFiles(fileList) {
-    var files = Array.prototype.slice.call(fileList || []);
-    if (!files.length) return;
+    var raw = Array.prototype.slice.call(fileList || []);
+    if (!raw.length) return;
+    var heicN = raw.filter(isHeicLikeFile_).length;
+    var files = raw.filter(function (f) { return isVideoFile(f) || isImageFile(f); });
+    if (!files.length) {
+      toast_(
+        heicN
+          ? 'HEIC는 바로 쓸 수 없어요. JPEG/PNG로 보낸 뒤 다시 골라 주세요.'
+          : '사진 또는 영상 파일을 골라 주세요.',
+        'err'
+      );
+      return;
+    }
+    var batch = pickReelImportBatch_(files);
+    var imgs = batch.images;
+    var vids = batch.videos;
+    var workN = imgs.length + vids.length;
+    if (!workN) {
+      toast_('불러올 사진·영상이 없어요.', 'err');
+      return;
+    }
+    var estimateSec = estimateReelImportSec_(imgs.length, vids.length);
+    stopLivePreview_();
+    livePreview.tOut = 0;
+    invalidateLivePreviewAudio_();
     reel.busy = true;
-    reel.status = '미디어 불러오는 중…';
-    rerender_();
-    for (var i = 0; i < files.length; i++) {
-      var f = files[i];
-      try {
-        if (isVideoFile(f)) {
-          var segs = await loadVideoFileAsSegments_(f, function (msg) {
-            reel.status = msg;
-            rerenderSoftStatus_();
+    startImportCountdown_(estimateSec, workN, '폴더·파일 불러오는 중…');
+    rerenderSoft_();
+    if (batch.skippedImg || batch.skippedVid) {
+      toast_(
+        '빠른 불러오기를 위해 사진 ' + imgs.length + '장' +
+          (vids.length ? ('·영상 ' + vids.length + '개') : '') +
+          '만 사용합니다' +
+          (batch.skippedImg || batch.skippedVid
+            ? ' (나머지 ' + (batch.skippedImg + batch.skippedVid) + '개 생략)'
+            : ''),
+        'ok'
+      );
+    }
+    try {
+      var doneBase = 0;
+      // 사진은 병렬 디코드
+      var imgResults = await mapPool_(imgs, REEL_IMAGE_CONCURRENCY_, function (file) {
+        return loadImageFile(file);
+      }, function (done) {
+        bumpImportCountdownDone_(doneBase + done);
+      });
+      imgResults.forEach(function (item) {
+        if (!item || item.__error) {
+          if (item && item.__error) toast_((item.__error && item.__error.message) || '사진 로드 실패', 'err');
+          return;
+        }
+        reel.clips.push(item);
+      });
+      doneBase = imgs.length;
+      bumpImportCountdownDone_(doneBase);
+
+      // 영상은 구간 분석이라 순차 처리
+      for (var v = 0; v < vids.length; v++) {
+        try {
+          var segs = await loadVideoFileAsSegments_(vids[v], function (msg) {
+            importCountdown_.label = msg || '영상 구간 찾는 중…';
+            paintImportCountdownStatus_();
           });
           reel.clips = reel.clips.concat(segs);
-        } else {
-          reel.clips.push(await loadImageFile(f));
+        } catch (err) {
+          toast_((err && err.message) || '영상 로드 실패', 'err');
         }
-      } catch (err) {
-        toast_((err && err.message) || '파일 로드 실패', 'err');
+        bumpImportCountdownDone_(doneBase + v + 1);
       }
+
+      stopImportCountdown_();
+      autoSelectClips_();
+      rebuildCaptionsKeepText();
+      var kwApplied = applyKeywordsToCaptions_(false);
+      reel.focusAuto = true;
+      reel.status = '구도 자동 분석 중…';
+      rerenderSoftStatus_();
+      try {
+        reel.focus = await detectFocusAutoFromClips();
+      } catch (e) {
+        reel.focus = 'center';
+      }
+      reel.status = '자동 구도: ' + (FOCUS_LABEL[reel.focus] || '') +
+        ' · 구간 ' + includedClips().length + '개 선정' +
+        (kwApplied ? ' · 키워드 멘트 반영' : '') +
+        (heicN ? ' · HEIC ' + heicN + '개 건너뜀' : '') +
+        (batch.skippedImg || batch.skippedVid
+          ? (' · ' + (batch.skippedImg + batch.skippedVid) + '개 생략')
+          : '') +
+        ' · 미리보기 생성 중…';
+      rerenderSoft_();
+      await refreshPreviews();
+    } catch (errAll) {
+      stopImportCountdown_();
+      reel.busy = false;
+      reel.status = (errAll && errAll.message) || '미디어 로드 실패';
+      toast_(reel.status, 'err');
+      rerenderSoft_();
+    } finally {
+      stopImportCountdown_();
     }
-    autoSelectClips_();
-    rebuildCaptionsKeepText();
-    var kwApplied = applyKeywordsToCaptions_(false);
-    reel.focusAuto = true;
-    reel.status = '구도 자동 분석 중…';
-    rerender_();
-    try {
-      reel.focus = await detectFocusAutoFromClips();
-    } catch (e) {
-      reel.focus = 'center';
-    }
-    reel.busy = false;
-    reel.status = '자동 구도: ' + (FOCUS_LABEL[reel.focus] || '') +
-      ' · 구간 ' + includedClips().length + '개 선정' +
-      (kwApplied ? ' · 키워드 멘트 반영' : '') +
-      ' · 미리보기 생성 중…';
-    rerender_();
-    await refreshPreviews();
   }
 
   function autoSelectClips_() {
@@ -743,36 +1069,285 @@
       return 0;
     });
   }
+  var previewGen_ = 0;
+
   async function refreshPreviews() {
+    var gen = ++previewGen_;
+    stopLivePreview_();
     if (!includedClips().length) {
       reel.previews = [];
       reel.status = '포함할 영상·사진을 골라 주세요.';
-      rerender_();
+      reel.busy = false;
+      rerenderSoft_();
       return;
     }
     reel.busy = true;
     reel.status = '컷 미리보기 생성 중…';
-    rerender_();
-    var canvas = document.createElement('canvas');
-    canvas.width = W; canvas.height = H;
-    var ctx = canvas.getContext('2d');
-    var out = [];
-    for (var i = 0; i < reel.captions.length; i++) {
-      var c = reel.captions[i];
-      var t = Math.min(Math.max(c.start + 0.1, c.start), (c.start + c.end) / 2);
-      await prepareMediaAt(t);
-      drawReelFrame(ctx, t);
-      out.push({ index: i, t: t, dataUrl: canvas.toDataURL('image/jpeg', 0.82) });
-      reel.status = '컷 미리보기 ' + (i + 1) + '/' + reel.captions.length;
+    // 전체 페이지 재렌더 대신 릴스 블록만 1회 갱신 — 스크롤 튀김 방지
+    rerenderSoft_();
+    try {
+      var canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      var ctx = canvas.getContext('2d');
+      var out = [];
+      for (var i = 0; i < reel.captions.length; i++) {
+        if (gen !== previewGen_) return;
+        var c = reel.captions[i];
+        var t = Math.min(Math.max(c.start + 0.1, c.start), (c.start + c.end) / 2);
+        await prepareMediaAt(t);
+        if (gen !== previewGen_) return;
+        drawReelFrame(ctx, t);
+        out.push({ index: i, t: t, dataUrl: canvas.toDataURL('image/jpeg', 0.82) });
+        reel.status = '컷 미리보기 ' + (i + 1) + '/' + reel.captions.length;
+        rerenderSoftStatus_();
+      }
+      if (gen !== previewGen_) return;
+      reel.previews = out;
+      reel.status = '구도 ' + (FOCUS_LABEL[reel.focus] || '') +
+        (reel.focusAuto ? '(자동)' : '(수동)') +
+        ' · 클립 ' + includedClips().length + '개 · 본편 ' + fmtTime(contentDuration()) +
+        ' + 엔딩홀드 ' + END_HOLD_SEC + '초';
       rerenderSoft_();
+      paintLivePreviewAt_(0).catch(function () {});
+    } catch (errPrev) {
+      if (gen === previewGen_) {
+        reel.status = (errPrev && errPrev.message) || '미리보기 생성 실패';
+        toast_(reel.status, 'err');
+        rerenderSoftStatus_();
+      }
+    } finally {
+      if (gen === previewGen_) {
+        reel.busy = false;
+        if (!livePreview.playing) rerenderSoft_();
+      }
     }
-    reel.previews = out;
-    reel.busy = false;
-    reel.status = '구도 ' + (FOCUS_LABEL[reel.focus] || '') +
-      (reel.focusAuto ? '(자동)' : '(수동)') +
-      ' · 클립 ' + includedClips().length + '개 · 본편 ' + fmtTime(contentDuration()) +
-      ' + 엔딩홀드 ' + END_HOLD_SEC + '초';
-    rerender_();
+  }
+
+  var livePreview = {
+    playing: false,
+    tOut: 0,
+    raf: 0,
+    lastWall: 0,
+    painting: false,
+    audio: {
+      ctx: null,
+      src: null,
+      gain: null,
+      buf: null,
+      key: '',
+      preparing: false
+    }
+  };
+
+  function livePreviewAudioKey_() {
+    var parts = includedClips().map(function (c) {
+      if (!c) return '';
+      if (c.kind === 'video') {
+        return 'v:' + (c.sourceKey || c.objectUrl || c.name || '') + ':' +
+          (Number(c.trimStart) || 0) + '-' + (Number(c.trimEnd) || c.duration || 0);
+      }
+      return 'i:' + (c.sourceKey || c.objectUrl || c.name || '') + ':' + (Number(c.duration) || 0);
+    });
+    return parts.join('|') +
+      '|spd:' + clampSpeed(reel.speed) +
+      '|vol:' + clampVolume(reel.volume) +
+      '|pitch:' + (reel.preservePitch ? 1 : 0);
+  }
+
+  function stopLivePreviewAudio_() {
+    try {
+      if (livePreview.audio && livePreview.audio.src) livePreview.audio.src.stop(0);
+    } catch (eStop) {}
+    if (livePreview.audio) livePreview.audio.src = null;
+  }
+
+  function invalidateLivePreviewAudio_() {
+    stopLivePreviewAudio_();
+    if (livePreview.audio) {
+      livePreview.audio.buf = null;
+      livePreview.audio.key = '';
+    }
+  }
+
+  async function ensureLivePreviewAudioBuf_() {
+    var key = livePreviewAudioKey_();
+    if (livePreview.audio.buf && livePreview.audio.key === key) return livePreview.audio.buf;
+    var buf = await buildExportAudioBuffer_();
+    livePreview.audio.buf = buf || null;
+    livePreview.audio.key = key;
+    return livePreview.audio.buf;
+  }
+
+  async function startLivePreviewAudio_(fromT) {
+    stopLivePreviewAudio_();
+    var buf = await ensureLivePreviewAudioBuf_();
+    if (!buf || !livePreview.playing) return false;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    if (!livePreview.audio.ctx) livePreview.audio.ctx = new AC();
+    var ctx = livePreview.audio.ctx;
+    if (ctx.state === 'suspended') {
+      try { await ctx.resume(); } catch (eRes) {}
+    }
+    if (!livePreview.playing) return false;
+    var src = ctx.createBufferSource();
+    src.buffer = buf;
+    var gain = ctx.createGain();
+    gain.gain.value = 1;
+    src.connect(gain);
+    gain.connect(ctx.destination);
+    var offset = Math.max(0, Math.min(Math.max(0, buf.duration - 0.02), Number(fromT) || 0));
+    try {
+      src.start(0, offset);
+    } catch (eStart) {
+      return false;
+    }
+    livePreview.audio.src = src;
+    livePreview.audio.gain = gain;
+    src.onended = function () {
+      if (livePreview.audio.src === src) livePreview.audio.src = null;
+    };
+    return true;
+  }
+
+  function stopLivePreview_() {
+    livePreview.playing = false;
+    livePreview.lastWall = 0;
+    livePreview.audio.preparing = false;
+    if (livePreview.raf) {
+      cancelAnimationFrame(livePreview.raf);
+      livePreview.raf = 0;
+    }
+    stopLivePreviewAudio_();
+    updateLivePreviewControls_();
+  }
+
+  function updateLivePreviewControls_() {
+    var duration = renderDuration();
+    var timeEl = document.getElementById('reel-live-preview-time');
+    var scrub = document.getElementById('reel-live-preview-scrub');
+    var btn = document.getElementById('reel-live-preview-play');
+    if (timeEl) timeEl.textContent = fmtTime(livePreview.tOut || 0) + ' / ' + fmtTime(duration);
+    if (scrub) {
+      scrub.max = String(Math.max(0.1, duration));
+      if (document.activeElement !== scrub) scrub.value = String(livePreview.tOut || 0);
+    }
+    if (btn) {
+      if (livePreview.audio && livePreview.audio.preparing) btn.textContent = '소리 준비…';
+      else btn.textContent = livePreview.playing ? '일시정지' : '재생';
+    }
+  }
+
+  async function paintLivePreviewAt_(tOut) {
+    if (livePreview.painting) return;
+    var canvas = document.getElementById('reel-live-preview-canvas');
+    if (!canvas || !includedClips().length) return;
+    livePreview.painting = true;
+    try {
+      var ctx = canvas.getContext('2d');
+      var duration = Math.max(0.1, renderDuration());
+      tOut = Math.max(0, Math.min(duration, Number(tOut) || 0));
+      livePreview.tOut = tOut;
+      var tSrc = outputToSourceTime_(tOut);
+      await prepareMediaAt(tSrc);
+      // soft re-render 중 canvas가 바뀌면 중단
+      if (document.getElementById('reel-live-preview-canvas') !== canvas) return;
+      drawReelFrame(ctx, tSrc, tOut);
+      updateLivePreviewControls_();
+    } finally {
+      livePreview.painting = false;
+    }
+  }
+
+  function livePreviewTick_(wallNow) {
+    if (!livePreview.playing) return;
+    if (!livePreview.lastWall) livePreview.lastWall = wallNow;
+    var dt = Math.min(0.12, (wallNow - livePreview.lastWall) / 1000);
+    livePreview.lastWall = wallNow;
+    var duration = renderDuration();
+    var next = (livePreview.tOut || 0) + dt;
+    if (next >= duration - 0.02) {
+      livePreview.tOut = duration;
+      livePreview.playing = false;
+      stopLivePreviewAudio_();
+      paintLivePreviewAt_(duration).then(updateLivePreviewControls_).catch(function () {});
+      return;
+    }
+    paintLivePreviewAt_(next).then(function () {
+      if (livePreview.playing) livePreview.raf = requestAnimationFrame(livePreviewTick_);
+    }).catch(function () {
+      stopLivePreview_();
+    });
+  }
+
+  async function toggleLivePreview_() {
+    if (livePreview.playing || livePreview.audio.preparing) {
+      stopLivePreview_();
+      return;
+    }
+    if (reel.busy) {
+      toast_('작업이 끝난 뒤 미리보기를 재생해 주세요.', 'err');
+      return;
+    }
+    if (!includedClips().length) {
+      toast_('포함할 영상·사진을 먼저 선택해 주세요.', 'err');
+      return;
+    }
+    if ((livePreview.tOut || 0) >= renderDuration() - 0.05) livePreview.tOut = 0;
+    livePreview.playing = true;
+    livePreview.audio.preparing = true;
+    livePreview.lastWall = 0;
+    updateLivePreviewControls_();
+    var hasAudio = false;
+    try {
+      hasAudio = await startLivePreviewAudio_(livePreview.tOut || 0);
+    } catch (eAud) {
+      hasAudio = false;
+    }
+    livePreview.audio.preparing = false;
+    if (!livePreview.playing) {
+      stopLivePreviewAudio_();
+      updateLivePreviewControls_();
+      return;
+    }
+    updateLivePreviewControls_();
+    if (!hasAudio) {
+      var onlyPhotos = includedClips().every(function (c) { return c.kind === 'image'; });
+      if (!onlyPhotos) {
+        toast_('영상 소리를 읽지 못해 화면만 재생합니다.', 'err');
+      }
+    }
+    livePreview.lastWall = 0;
+    livePreview.raf = requestAnimationFrame(livePreviewTick_);
+  }
+
+  async function scrubLivePreview_(v) {
+    stopLivePreview_();
+    await paintLivePreviewAt_(parseFloat(v) || 0);
+  }
+
+  function renderLivePreviewHTML_() {
+    if (!includedClips().length) return '';
+    var duration = Math.max(0.1, renderDuration());
+    return '<div class="reel-live-preview" id="reel-live-preview">' +
+      '<div class="reel-live-preview-hd">' +
+        '<span class="form-label" style="margin:0;">완성본 미리보기</span>' +
+        '<span class="reel-live-preview-time" id="reel-live-preview-time">' +
+          esc(fmtTime(livePreview.tOut || 0)) + ' / ' + esc(fmtTime(duration)) +
+        '</span>' +
+      '</div>' +
+      '<div class="reel-live-preview-stage">' +
+        '<canvas id="reel-live-preview-canvas" width="' + W + '" height="' + H + '" aria-label="릴스 완성본 미리보기"></canvas>' +
+      '</div>' +
+      '<div class="reel-live-preview-controls">' +
+        '<button type="button" class="reel-focus-btn" id="reel-live-preview-play" onclick="ReelMaker.toggleLivePreview()" ' +
+          (reel.busy ? 'disabled' : '') + '>재생</button>' +
+        '<input type="range" id="reel-live-preview-scrub" class="reel-live-preview-scrub" min="0" max="' + duration +
+          '" step="0.05" value="' + (livePreview.tOut || 0) + '" oninput="ReelMaker.scrubLivePreview(this.value)" ' +
+          (reel.busy ? 'disabled' : '') + '>' +
+      '</div>' +
+      '<p class="reel-focus-hint" style="margin:6px 0 0;">재생으로 멘트·구도·소리·길이를 확인한 뒤 아래에서 저장하세요. (사진만이면 소리는 없습니다)</p>' +
+    '</div>';
   }
 
   function pickMime() {
@@ -963,6 +1538,7 @@
       return;
     }
 
+    stopLivePreview_();
     reel.busy = true;
     reel.exportPct = 0;
     reel.status = '오디오 준비 중…';
@@ -1065,13 +1641,28 @@
     if (typeof setAppToast === 'function') setAppToast(msg, { duration: 2600, variant: variant || 'ok' });
   }
   function rerender_() {
+    var y = window.scrollY || window.pageYOffset || 0;
     if (typeof renderMain === 'function') renderMain();
     else if (typeof render === 'function') render();
+    try { window.scrollTo(0, y); } catch (eScr) {}
   }
   function rerenderSoft_() {
+    stopLivePreview_();
     var host = document.getElementById('reel-maker-root');
     if (!host) { rerender_(); return; }
+    var y = window.scrollY || window.pageYOffset || 0;
+    var topBefore = host.getBoundingClientRect().top;
     host.outerHTML = renderReelMakerSectionHTML_();
+    try {
+      var host2 = document.getElementById('reel-maker-root');
+      if (host2) {
+        var topAfter = host2.getBoundingClientRect().top;
+        window.scrollTo(0, y + (topAfter - topBefore));
+      } else {
+        window.scrollTo(0, y);
+      }
+    } catch (eScr2) {}
+    paintLivePreviewAt_(livePreview.tOut || 0).catch(function () {});
   }
   function rerenderSoftStatus_() {
     var el = document.getElementById('reel-maker-status');
@@ -1088,17 +1679,21 @@
     if (!reel.clips.length) return '';
     return '<div class="reel-clip-list">' +
       '<div class="reel-cap-list-head"><span class="form-label" style="margin:0;">릴스 후보 구간</span>' +
-        '<span style="font-size:10px;color:#9CA3AF;">포함 ' + includedClips().length + '/' + reel.clips.length + ' · ' + fmtTime(totalDuration()) + '</span></div>' +
-      '<p class="reel-focus-hint" style="margin-top:0;">긴 영상·여러 영상에서 움직임이 큰 구간을 자동으로 골랐어요. 위에 키워드가 있으면 멘트·구간 개수에 반영됩니다. 시작·끝을 고치거나 포함을 끄면 됩니다.</p>' +
+        '<span style="font-size:10px;color:#9CA3AF;">포함 ' + includedClips().length + '/' + reel.clips.length + ' · ' + fmtTime(totalDuration()) + '</span>' +
+        '<button type="button" class="reel-btn-ghost" onclick="ReelMaker.clearClips()" ' + (reel.busy ? 'disabled' : '') + '>목록 비우기</button>' +
+      '</div>' +
+      '<p class="reel-focus-hint" style="margin-top:0;">긴 영상·여러 영상에서 움직임이 큰 구간을 자동으로 골랐어요. 위에 키워드가 있으면 멘트·구간 개수에 반영됩니다. <strong>위·아래</strong>로 재생 순서를 바꾸면 멘트도 해당 클립을 따라갑니다. 시작·끝·포함을 고치면 됩니다. 새로 고를 때는 아래로 이어 붙으니, 처음부터면 「목록 비우기」를 누르세요.</p>' +
       reel.clips.map(function (c, i) {
         var thumb = c.thumbDataUrl
           ? '<img class="reel-seg-thumb" src="' + c.thumbDataUrl + '" alt="">'
           : '<div class="reel-seg-thumb reel-cap-thumb-empty">컷</div>';
+        var canUp = i > 0;
+        var canDown = i < reel.clips.length - 1;
         return '<div class="reel-clip-row' + (c.include ? '' : ' is-off') + '">' +
           thumb +
           '<div class="reel-clip-main">' +
             '<label class="reel-clip-inc"><input type="checkbox" ' + (c.include ? 'checked' : '') + ' onchange="ReelMaker.toggleClip(' + i + ', this.checked)" ' + (reel.busy ? 'disabled' : '') + '>포함</label>' +
-            '<div class="reel-clip-name">' + esc(c.kind === 'video' ? '🎞 ' : '🖼 ') + esc(c.name) + '</div>' +
+            '<div class="reel-clip-name">' + esc(c.kind === 'video' ? '영상 · ' : '사진 · ') + esc(c.name) + '</div>' +
             '<div class="reel-clip-sub">' +
               (c.kind === 'image'
                 ? ('길이 <input class="form-input reel-time" value="' + esc(String(c.duration)) + '" onchange="ReelMaker.setClipDuration(' + i + ', this.value)" ' + (reel.busy ? 'disabled' : '') + '>초')
@@ -1108,7 +1703,13 @@
             '</div>' +
             (c.reason ? '<div class="reel-clip-reason">' + esc(c.reason) + (c.score ? ' · 점수 ' + Math.round(c.score) : '') + '</div>' : '') +
           '</div>' +
-          '<button type="button" class="reel-cap-del" onclick="ReelMaker.removeClip(' + i + ')" ' + (reel.busy ? 'disabled' : '') + '>삭제</button>' +
+          '<div class="reel-clip-actions">' +
+            '<button type="button" class="reel-clip-move" onclick="ReelMaker.moveClip(' + i + ',-1)" title="위로" aria-label="위로" ' +
+              ((reel.busy || !canUp) ? 'disabled' : '') + '>▲</button>' +
+            '<button type="button" class="reel-clip-move" onclick="ReelMaker.moveClip(' + i + ',1)" title="아래로" aria-label="아래로" ' +
+              ((reel.busy || !canDown) ? 'disabled' : '') + '>▼</button>' +
+            '<button type="button" class="reel-cap-del" onclick="ReelMaker.removeClip(' + i + ')" ' + (reel.busy ? 'disabled' : '') + '>삭제</button>' +
+          '</div>' +
         '</div>';
       }).join('') +
     '</div>';
@@ -1149,7 +1750,7 @@
           '<input type="file" webkitdirectory multiple accept="video/*,image/*" onchange="ReelMaker.onFile(this)" ' + (reel.busy ? 'disabled' : '') + ' style="display:none">' +
           '폴더 선택</label>' +
       '</div>' +
-      '<div class="reel-maker-hint">PC: 파일 여러 개·폴더 선택 가능.<br>모바일·탬플릿: 사진첩에서 영상/사진만 고르기만 가능.</div>' +
+      '<div class="reel-maker-hint">PC: 파일 여러 개·폴더 선택 가능. 큰 폴더는 사진 최대 ' + REEL_MAX_IMAGES_ + '장·영상 ' + REEL_MAX_VIDEOS_ + '개만 빠르게 불러옵니다.<br>모바일·탬플릿: 사진첩에서 영상/사진만 고르기만 가능.</div>' +
       (hasMedia
         ? (renderClipList_() +
           '<div class="reel-maker-meta" id="reel-maker-meta">본편 ' + fmtTime(contentDuration()) +
@@ -1184,12 +1785,13 @@
             '<input class="form-input" value="' + esc(reel.top2) + '" oninput="ReelMaker.setTop(2,this.value)" style="margin-top:6px;" ' + (reel.busy ? 'disabled' : '') + '>' +
           '</div>' +
           '<div class="reel-cap-list">' +
-            '<div class="reel-cap-list-head"><span class="form-label" style="margin:0;">멘트 컷</span>' +
+            '<div class="reel-cap-list-head"><span class="form-label" style="margin:0;">멘트 컷 · 클립별</span>' +
               '<button type="button" class="reel-btn-ghost" onclick="ReelMaker.applyKeywords()" ' + (reel.busy ? 'disabled' : '') + '>키워드→멘트</button>' +
               '<button type="button" class="reel-btn-ghost" onclick="ReelMaker.addCap()" ' + (reel.busy ? 'disabled' : '') + '>구간+</button>' +
-              '<button type="button" class="reel-btn-ghost" onclick="ReelMaker.refreshPreviews()" ' + (reel.busy ? 'disabled' : '') + '>미리보기</button>' +
+              '<button type="button" class="reel-btn-ghost" onclick="ReelMaker.refreshPreviews()" ' + (reel.busy ? 'disabled' : '') + '>컷 썸네일</button>' +
             '</div>' + rows +
           '</div>' +
+          renderLivePreviewHTML_() +
           '<button type="button" class="btn-submit reel-export-btn" onclick="ReelMaker.exportReel()" ' + (reel.busy ? 'disabled' : '') + '>' +
             (reel.busy && reel.exportPct ? ('렌더 중… ' + reel.exportPct + '%') : '완료 · 저장·다운로드') +
           '</button>')
@@ -1199,7 +1801,11 @@
   }
 
   function revokeClip(c) {
-    if (!c || !c.objectUrl) return;
+    if (!c) return;
+    if (c.closeEl && c.el && typeof c.el.close === 'function') {
+      try { c.el.close(); } catch (eClose) {}
+    }
+    if (!c.objectUrl) return;
     var key = c.sourceKey || c.objectUrl;
     var stillUsed = (reel.clips || []).some(function (other) {
       return other && other !== c && (other.sourceKey || other.objectUrl) === key;
@@ -1235,6 +1841,7 @@
     toggleClip: function (i, on) {
       if (!reel.clips[i]) return;
       reel.clips[i].include = !!on;
+      invalidateLivePreviewAudio_();
       rebuildCaptionsKeepText();
       refreshPreviews();
     },
@@ -1244,6 +1851,7 @@
       if (!(n > 0)) n = PHOTO_DEFAULT_SEC;
       reel.clips[i].duration = Math.min(12, Math.max(1, n));
       reel.clips[i].trimEnd = reel.clips[i].duration;
+      invalidateLivePreviewAudio_();
       rebuildCaptionsKeepText();
       refreshPreviews();
     },
@@ -1255,6 +1863,7 @@
       else c.trimEnd = t;
       syncClipDurationFromTrim_(c);
       c.reason = '수동 구간';
+      invalidateLivePreviewAudio_();
       rebuildCaptionsKeepText();
       refreshPreviews();
     },
@@ -1263,6 +1872,7 @@
       var removed = reel.clips[i];
       reel.clips.splice(i, 1);
       revokeClip(removed);
+      invalidateLivePreviewAudio_();
       rebuildCaptionsKeepText();
       if (!reel.clips.length) {
         reel.captions = [];
@@ -1273,6 +1883,34 @@
       }
       refreshPreviews();
     },
+    moveClip: function (i, dir) {
+      i = parseInt(i, 10) || 0;
+      dir = parseInt(dir, 10) || 0;
+      var j = i + dir;
+      if (!reel.clips[i] || !reel.clips[j] || reel.busy) return;
+      var tmp = reel.clips[i];
+      reel.clips[i] = reel.clips[j];
+      reel.clips[j] = tmp;
+      livePreview.tOut = 0;
+      invalidateLivePreviewAudio_();
+      rebuildCaptionsKeepText();
+      refreshPreviews();
+    },
+    clearClips: function () {
+      if (reel.busy) return;
+      stopLivePreview_();
+      invalidateLivePreviewAudio_();
+      previewGen_++;
+      (reel.clips || []).forEach(revokeClip);
+      reel.clips = [];
+      reel.captions = [];
+      reel.previews = [];
+      reel._captionTextByClipId = {};
+      reel.status = '';
+      reel.exportPct = 0;
+      livePreview.tOut = 0;
+      rerenderSoft_();
+    },
     setTop: function (n, v) {
       if (n === 1) reel.top1 = v; else reel.top2 = v;
     },
@@ -1280,6 +1918,10 @@
       reel.volume = clampVolume((Number(v) || 0) / 100);
       var lab = document.getElementById('reel-vol-label');
       if (lab) lab.textContent = '볼륨 ' + Math.round(reel.volume * 100) + '%';
+      invalidateLivePreviewAudio_();
+      if (livePreview.playing) {
+        startLivePreviewAudio_(livePreview.tOut || 0).catch(function () {});
+      }
     },
     setSpeed: function (v) {
       reel.speed = clampSpeed((Number(v) || 100) / 100);
@@ -1293,9 +1935,17 @@
           ' · 저장 ' + fmtTime(renderDuration()) + ' (×' + reel.speed.toFixed(2) + ' · 페이드+홀드)' +
           ' <span id="reel-maker-pct">' + pctTxt + '</span>';
       }
+      invalidateLivePreviewAudio_();
+      if (livePreview.playing) {
+        startLivePreviewAudio_(livePreview.tOut || 0).catch(function () {});
+      }
     },
     setPreservePitch: function (on) {
       reel.preservePitch = !!on;
+      invalidateLivePreviewAudio_();
+      if (livePreview.playing) {
+        startLivePreviewAudio_(livePreview.tOut || 0).catch(function () {});
+      }
     },
     setFocus: function (focus) {
       if (focus !== 'left' && focus !== 'center' && focus !== 'right') return;
@@ -1319,16 +1969,27 @@
       });
     },
     setCapText: function (i, field, v) {
-      if (reel.captions[i]) reel.captions[i][field] = v;
+      if (!reel.captions[i]) return;
+      reel.captions[i][field] = v;
+      var id = reel.captions[i].clipId;
+      if (id) {
+        if (!reel._captionTextByClipId) reel._captionTextByClipId = {};
+        if (!reel._captionTextByClipId[id]) reel._captionTextByClipId[id] = { line1: '', line2: '' };
+        reel._captionTextByClipId[id][field] = v;
+      }
     },
     setCapTime: function (i, field, v) {
-      if (reel.captions[i]) reel.captions[i][field] = parseTime(v);
+      if (!reel.captions[i]) return;
+      reel.captions[i][field] = parseTime(v);
+      reassignCaptionClipId_(reel.captions[i]);
     },
     addCap: function () {
       var last = reel.captions[reel.captions.length - 1];
       var start = last ? last.end : 0;
       var end = Math.min(totalDuration(), start + 4);
-      reel.captions.push({ start: start, end: end, line1: '새 멘트 1줄', line2: '새 멘트 2줄' });
+      var cap = { start: start, end: end, line1: '새 멘트 1줄', line2: '새 멘트 2줄', clipId: null };
+      reassignCaptionClipId_(cap);
+      reel.captions.push(cap);
       refreshPreviews();
     },
     applyKeywords: function () {
@@ -1338,6 +1999,15 @@
       refreshPreviews();
     },
     refreshPreviews: function () { refreshPreviews(); },
+    toggleLivePreview: function () {
+      toggleLivePreview_().catch(function (err) {
+        stopLivePreview_();
+        toast_((err && err.message) || '미리보기 재생 실패', 'err');
+      });
+    },
+    scrubLivePreview: function (v) {
+      scrubLivePreview_(v).catch(function () {});
+    },
     exportReel: function () {
       exportReel().catch(function (err) {
         reel.busy = false;
@@ -1347,13 +2017,17 @@
       });
     },
     reset: function () {
+      stopLivePreview_();
+      invalidateLivePreviewAudio_();
       (reel.clips || []).forEach(revokeClip);
       reel.clips = [];
       reel.captions = [];
       reel.previews = [];
+      reel._captionTextByClipId = {};
       reel.busy = false;
       reel.status = '';
       reel.exportPct = 0;
+      livePreview.tOut = 0;
       reel.top1 = 'IFC x INDIBA';
       reel.top2 = '휴대 가능한 인디바 고주파';
       reel.focus = 'center';

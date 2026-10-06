@@ -4289,9 +4289,16 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .sync-progress-overlay.open { display: flex; }
 .sync-progress-box { text-align: center; color: #fff; max-width: 320px; width: 100%; }
-.sync-progress-label { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
+.sync-progress-label { font-size: 15px; font-weight: 700; margin-bottom: 14px; line-height: 1.45; }
 .sync-progress-track { height: 6px; background: rgba(255,255,255,.2); border-radius: 999px; overflow: hidden; }
 .sync-progress-fill { height: 100%; width: 0; background: #2DD4BF; border-radius: 999px; transition: width .35s ease; }
+.sync-progress-cancel {
+  margin-top: 16px; appearance: none; -webkit-appearance: none;
+  border: 1px solid rgba(255,255,255,.35); background: transparent; color: #fff;
+  font: inherit; font-size: 13px; font-weight: 700; padding: 8px 14px; border-radius: 10px; cursor: pointer;
+}
+.sync-progress-cancel:hover { background: rgba(255,255,255,.1); }
+.sync-progress-cancel[hidden] { display: none !important; }
 #drive-modal-overlay { z-index: 310; }
 #drive-oauth-busy {
   display: none; position: fixed; inset: 0; z-index: 500;

@@ -18142,32 +18142,75 @@ function runSyncProgressCountdown_(totalSec, onDone){
   var ov = document.getElementById('sync-progress-overlay');
   var label = document.getElementById('sync-progress-label');
   var bar = document.getElementById('sync-progress-bar');
+  var cancelBtn = document.getElementById('sync-progress-cancel');
   if(!ov || !label){
     if(onDone) onDone();
     return function(){};
   }
   ov.classList.add('open');
+  if(cancelBtn){
+    cancelBtn.hidden = true;
+    cancelBtn.textContent = '닫고 기다리기';
+  }
   var left = Math.max(1, Math.ceil(totalSec));
+  var finished = false;
+  var wallMs = Math.max(90000, (Math.ceil(totalSec) + 90) * 1000);
   label.textContent = '동기화 중… 약 ' + left + '초 남음';
   if(bar) bar.style.width = '8%';
   var tick = setInterval(function(){
+    if(finished) return;
     left--;
     if(left <= 0){
       clearInterval(tick);
-      label.textContent = '마무리 중…';
+      label.textContent = '서버 응답 대기 중…\n데이터가 크면 1~2분 더 걸릴 수 있어요.';
       if(bar) bar.style.width = '96%';
+      if(cancelBtn) cancelBtn.hidden = false;
       return;
     }
     label.textContent = '동기화 중… 약 ' + left + '초 남음';
     if(bar) bar.style.width = Math.min(92, Math.round((1 - left / totalSec) * 100)) + '%';
   }, 1000);
-  return function finishProgress_(ok){
+  var wall = setTimeout(function(){
+    if(finished) return;
+    label.textContent = '응답이 너무 늦어요.\n이 기기 저장은 유지됩니다. 창을 닫고 잠시 뒤 다시 「지금 동기화」해 보세요.';
+    if(bar) bar.style.width = '100%';
+    if(cancelBtn){
+      cancelBtn.hidden = false;
+      cancelBtn.textContent = '창 닫기';
+    }
+  }, wallMs);
+  function finishProgress_(ok){
+    if(finished) return;
+    finished = true;
     clearInterval(tick);
+    clearTimeout(wall);
+    if(cancelBtn) cancelBtn.hidden = true;
     if(bar) bar.style.width = '100%';
     label.textContent = ok ? '동기화 완료' : '동기화 종료';
-    setTimeout(function(){ ov.classList.remove('open'); if(onDone) onDone(); }, ok ? 600 : 400);
+    setTimeout(function(){
+      ov.classList.remove('open');
+      if(onDone) onDone();
+    }, ok ? 600 : 400);
+  }
+  finishProgress_.setLabel = function(text){
+    if(finished || !label) return;
+    label.textContent = String(text || '');
   };
+  finishProgress_.isOpen = function(){ return !finished && ov.classList.contains('open'); };
+  return finishProgress_;
 }
+window.dismissSyncProgressOverlay_ = function(){
+  var ov = document.getElementById('sync-progress-overlay');
+  if(ov) ov.classList.remove('open');
+  var cancelBtn = document.getElementById('sync-progress-cancel');
+  if(cancelBtn) cancelBtn.hidden = true;
+  var btn = document.getElementById('btn-sync-now');
+  if(btn) btn.disabled = false;
+  try { updateSyncStatusUI_(); } catch(e){}
+  if(typeof setAppToast === 'function'){
+    setAppToast('동기화 창을 닫았어요. 백그라운드 전송이 있으면 이어가고, 이 기기 저장은 유지됩니다.', { duration: 5200, variant: 'ok' });
+  }
+};
 window.confirmManualSyncFromPreview_ = async function(){
   var preview = _manualSyncPreviewCache_;
   if(!preview || preview.direction === 'noop'){
@@ -18176,13 +18219,38 @@ window.confirmManualSyncFromPreview_ = async function(){
   }
   closeSyncPreviewModal_();
   savePreSyncBackup_();
-  var finishProgress = runSyncProgressCountdown_(preview.estimatedSec, null);
+  var est = Math.max(12, parseInt(preview.estimatedSec, 10) || 30);
+  var finishProgress = runSyncProgressCountdown_(est, null);
+  var hardFail = null;
+  var hardTimer = setTimeout(function(){
+    hardFail = new Error('동기화가 예상보다 오래 걸려 중단했어요. 이 기기 저장은 유지됩니다. 잠시 뒤 「지금 동기화」를 다시 눌러 주세요.');
+  }, Math.max(120000, (est + 100) * 1000));
   try {
-    await runManualFullSync_({ fromPreview: true, preview: preview });
+    if(finishProgress.setLabel) finishProgress.setLabel('서버와 비교·반영 중…');
+    var runPromise = runManualFullSync_({ fromPreview: true, preview: preview });
+    await Promise.race([
+      runPromise,
+      new Promise(function(_, reject){
+        var watch = setInterval(function(){
+          if(hardFail){
+            clearInterval(watch);
+            reject(hardFail);
+          }
+        }, 500);
+      })
+    ]);
     finishProgress(!plannerSyncConflictPending_);
   } catch(eRun){
     finishProgress(false);
-    throw eRun;
+    var msg = (eRun && eRun.message) ? eRun.message : String(eRun);
+    var err = document.getElementById('sync-status-err');
+    if(err) err.textContent = msg;
+    notifyPlannerSyncIssue_(eRun, { manual: true, force: true });
+  } finally {
+    clearTimeout(hardTimer);
+    var btn = document.getElementById('btn-sync-now');
+    if(btn) btn.disabled = false;
+    try { updateSyncStatusUI_(); } catch(eUi){}
   }
 };
 window.runManualFullSync_ = async function(opts){

@@ -3009,7 +3009,7 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
   },
   '7': {
     brandProfile: '생활건강은 집·동네에서 부담 없이 따라할 수 있는 생활형 케어와, 미카닥 개인 계정의 일상 공유를 한곳에서 다룹니다. 셀프케어 서랍(건강상식·통증·자세·얼굴)은 **기능재활·움직임 센터**의 쉬운 버전으로, 엘리베이터 앞·거실·출근 전 동선을 기준으로 안내하세요. 도수·카이로·시술 톤은 쓰지 말고, 짧은 루틴·안전한 표현을 우선합니다. 일상 공유만은 강의·홍보 없이 그날의 장면·생각 한 줄 성격을 유지합니다.',
-    strategyGuide: '기준:\n- 주제 서랍은 건강상식 → 통증 셀프케어 → 자세 셀프운동 → 얼굴 셀프교정 → 일상 공유 → 기타 주제 순이다.\n- 1~4·기타는 생활형 셀프케어. 한 콘텐츠당 동작 1~2개, 경고 신호 시 병원 권유.\n- 일상 공유만 장면·생각 한 줄 성격(월별 피드)을 유지한다. 셀프케어 톤으로 바꾸지 않는다.\n\n의도:\n- 독자가 "어렵지 않다"는 경험을 반복하게 만든다.\n- 과한 운동 대신 꾸준한 생활형 루틴을 정착시킨다.\n- 생활건강 접점을 높여 상담으로 자연스럽게 연결한다.',
+    strategyGuide: '기준:\n- 주제 서랍은 건강상식 → 통증 셀프케어 → 자세 셀프운동 → 얼굴 셀프교정 → 일상 공유 → 기타 주제 순이다.\n- 1~4·기타는 생활형 셀프케어. 한 콘텐츠당 동작 1~2개, 경고 신호 시 병원 권유.\n- 일상 공유만 장면·생각 한 줄 성격을 유지한다. 셀프케어 톤으로 바꾸지 않는다. 목록은 다른 서랍처럼 월별 구분 없이 둔다.\n\n의도:\n- 독자가 "어렵지 않다"는 경험을 반복하게 만든다.\n- 과한 운동 대신 꾸준한 생활형 루틴을 정착시킨다.\n- 생활건강 접점을 높여 상담으로 자연스럽게 연결한다.',
     steps: [
       { id: '1', title: '건강상식', summary: '입주민이 궁금해하는 몸·생활 상식을 쉽게', rationale: '어려운 이론보다 "이런 말이 맞나?"에 답하는 상식 글이 커뮤니티 진입을 엽니다.' },
       { id: '2', title: '통증 셀프케어', summary: '뻐근함·가벼운 불편을 스스로 다루는 법', rationale: '목·어깨·허리 등 흔한 불편에 짧고 안전한 셀프케어를 붙여 신뢰와 실행을 동시에 만듭니다.' },
@@ -9450,11 +9450,8 @@ function renderLifeHealthDailyStepBlockHTML_(hostCatId, step, idx, activeId){
       '</div>' +
       '<button type="button" class="subgoal-topic-gen-btn" onclick="event.stopPropagation();setLifeHealthFocus_(' + dailyCat + ');openAddForm_()">추가</button>' +
     '</div>';
-  if(!collapsed){
-    html += '<div class="life-health-daily-body">' + renderDailySharePanelHTML_(dailyCat) + '</div>';
-  } else {
-    html += '<div class="subgoal-step-cards topic-lines is-drop-empty collapsed-drop" aria-hidden="true"></div>';
-  }
+  // 다른 서랍과 같이 월별 구분 없이 주제 목록만
+  html += renderSubGoalStepCardsHTML_(dailyCat, drafts, collapsed);
   html += '</div>';
   return html;
 }

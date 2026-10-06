@@ -10789,7 +10789,7 @@ let state = {
   generatedOnly: {},
   localSavedAt: '',
   showAdd: false,
-  newItem: { date:'', topic:'', catId:0, dailyShareKind:'scene', dailyThought:'', dailyWho:'', dailyWhat:'', dailyBody:'', articleKind:'', articleKindLocked:false, refImages:[], refImage:null, refNote:'', imageAnalyzing:false, imageAnalysisWait:null, flowProposals:[], selectedFlowIdx:0, flowProposalsLoading:false, flowProposalsReady:false, cachedYoutubeAnalysis:'', _cachedFlowYoutubeUrl:'' },
+  newItem: { date:'', topic:'', catId:0, dailyShareKind:'scene', dailyThought:'', dailyWho:'', dailyWhat:'', dailyBody:'', articleKind:'', articleKindLocked:false, refImages:[], refImage:null, refNote:'', imageAnalyzing:false, imageAnalysisWait:null, flowProposals:[], selectedFlowIdx:0, flowProposalsLoading:false, flowProposalsReady:false, cachedYoutubeAnalysis:'', _cachedFlowYoutubeUrl:'', mediaStudioOpen:false, mediaStudioFocus:'' },
   apiKey: '',
   plannerClaudeEnabled: false,
   geminiYoutubeEnabled: false,
@@ -11170,7 +11170,13 @@ function getCatPromptForGeneration_(catId, type){
   return guide + '\n\n' + block;
 }
 function isDailyShareCategory(catId){ return catId === 6; }
-function isThumbPhotoOnlyMode_(){ return isDailyShareCategory(state.selectedCatId); }
+function isThumbPhotoOnlyMode_(){
+  if(state.showAdd){
+    var addCat = state.newItem && state.newItem.catId;
+    if(addCat != null) return isDailyShareCategory(addCat);
+  }
+  return isDailyShareCategory(state.selectedCatId);
+}
 function emptyThumbPhotoCopy_(){
   return { hero: '', tagline: '', program: '', body: '', keywords: [], brandProgram: '' };
 }
@@ -22373,6 +22379,8 @@ function renderMain(opts) {
     bindNewItemTopicInput_();
     bindNewItemRefNoteInput_();
     bindNewItemFlowInputs_();
+    scheduleThumbMakerInit_();
+    scheduleAddMediaStudioScroll_();
     if(focusSnap) restoreTextFieldFocus_(focusSnap);
     return;
   }
@@ -22566,6 +22574,7 @@ function newItemHasRefImages_(){
 }
 
 function createEmptyNewItem_(catId){
+  try { if(typeof ReelMaker !== 'undefined' && ReelMaker && typeof ReelMaker.reset === 'function') ReelMaker.reset(); } catch(e) {}
   return {
     date: '', topic: '', catId: typeof catId === 'number' ? catId : 0,
     dailyShareKind: 'scene', dailyThought: '',
@@ -22573,7 +22582,8 @@ function createEmptyNewItem_(catId){
     articleKind: '', articleKindLocked: false,
     refImages: [], refImage: null, refNote: '', imageAnalyzing: false, imageAnalysisWait: null,
     flowProposals: [], selectedFlowIdx: 0, flowProposalsLoading: false,
-    flowProposalsReady: false, cachedYoutubeAnalysis: '', _cachedFlowYoutubeUrl: ''
+    flowProposalsReady: false, cachedYoutubeAnalysis: '', _cachedFlowYoutubeUrl: '',
+    mediaStudioOpen: false, mediaStudioFocus: ''
   };
 }
 function isDailyThoughtDraft_(item){
@@ -23978,6 +23988,77 @@ async function extractVideoFramesAsRefImages_(file, maxFrames){
   }
 }
 
+/** 릴스 메이커 저장 후 → 참고 메모(+가능하면 프레임 분석) 반영 */
+window.applyReelMemoToNewItem_ = async function(payload){
+  payload = payload || {};
+  var memoText = String(payload.memoText || '').trim();
+  var frames = Array.isArray(payload.frames) ? payload.frames.filter(function(f){ return f && f.data; }) : [];
+  if(!memoText && !frames.length) return;
+
+  try { if(typeof flushNewItemFieldsFromDom_ === 'function') flushNewItemFieldsFromDom_(); } catch(e0){}
+
+  if(memoText){
+    var prev = String(state.newItem.refNote || '').trim();
+    // 같은 릴스 블록이 이미 있으면 교체
+    var marker = '[릴스 메이커 저장]';
+    if(prev.indexOf(marker) >= 0){
+      var re = /\[릴스 메이커 저장\][\s\S]*?(?=\n\n\[|$)/;
+      if(re.test(prev)) prev = prev.replace(re, '').trim();
+    }
+    state.newItem.refNote = prev ? (prev + '\n\n' + memoText) : memoText;
+  }
+
+  if(frames.length){
+    var existing = normalizeRefImages_(state.newItem.refImages);
+    var room = Math.max(0, REF_MEDIA_MAX_SLOTS - existing.length);
+    var addFrames = frames.slice(0, room).map(function(f, idx){
+      return {
+        data: f.data,
+        name: f.name || ('릴스컷_' + (idx + 1) + '.jpg'),
+        mediaType: 'image'
+      };
+    });
+    if(addFrames.length){
+      var startIndex = existing.length;
+      state.newItem.refImages = existing.concat(addFrames);
+      state.newItem.refImage = state.newItem.refImages[0] || null;
+      if(typeof isPlannerAiAvailable_ === 'function' && isPlannerAiAvailable_()){
+        try {
+          state.newItem.imageAnalyzing = true;
+          state.newItem.imageAnalysisWait = {
+            startedAt: Date.now(),
+            estimateSec: Math.max(8, addFrames.length * (REF_IMAGE_ANALYSIS_ESTIMATE_SEC_PER || 6)),
+            count: addFrames.length
+          };
+          if(typeof ensurePlannerWaitTimer_ === 'function') ensurePlannerWaitTimer_();
+          renderMain({ force: true });
+          var pack = await analyzeRefImagesForMemo_(addFrames, state.newItem.catId, startIndex);
+          var analysis = pack && pack.text ? String(pack.text).trim() : '';
+          if(analysis){
+            var cur = String(state.newItem.refNote || '').trim();
+            state.newItem.refNote = cur ? (cur + '\n\n' + analysis) : analysis;
+          }
+          if(pack && pack.dailyFacts && isDailyShareCategory(state.newItem.catId) && !isDailyThoughtNewItem_()){
+            if(pack.dailyFacts.who && !state.newItem.dailyWho) state.newItem.dailyWho = pack.dailyFacts.who;
+            if(pack.dailyFacts.what && !state.newItem.dailyWhat) state.newItem.dailyWhat = pack.dailyFacts.what;
+            if(pack.dailyFacts.body && !state.newItem.dailyBody) state.newItem.dailyBody = pack.dailyFacts.body;
+          }
+        } catch(eAnal) {
+          if(typeof setAppToast === 'function') setAppToast('릴스 컷 분석은 건너뛰고 메모만 반영했어요.', { duration: 2800, variant: 'ok' });
+        } finally {
+          state.newItem.imageAnalyzing = false;
+          state.newItem.imageAnalysisWait = null;
+        }
+      }
+    }
+  }
+
+  renderMain({ force: true });
+  if(typeof setAppToast === 'function'){
+    setAppToast('릴스 내용이 참고 영상·메모에 들어갔습니다.', { duration: 2600, variant: 'ok' });
+  }
+};
+
 window.onNewItemImage = async function(input){
   var files = input && input.files ? Array.from(input.files) : [];
   if(!files.length){
@@ -24155,6 +24236,52 @@ window.onNewItemRefNoteInput_ = function(el){
   maybeAutoPickArticleKind_();
   invalidateNewItemFlowsFromInput_();
 };
+window.pasteYoutubeUrlToRefNote_ = async function(){
+  if(!state.newItem) return;
+  var clip = '';
+  try {
+    if(navigator.clipboard && navigator.clipboard.readText){
+      clip = String(await navigator.clipboard.readText() || '').trim();
+    }
+  } catch(eClip){}
+  var urls = extractYoutubeUrlsFromText_(clip);
+  var url = urls[0] || '';
+  if(!url){
+    var typed = window.prompt('공개 유튜브 URL을 붙여 넣으세요.\n(파일 선택 칸에는 URL을 넣을 수 없습니다.)', clip || '');
+    if(typed == null) return;
+    urls = extractYoutubeUrlsFromText_(typed);
+    url = urls[0] || '';
+    if(!url){
+      if(typeof setAppToast === 'function') setAppToast('유튜브 링크를 확인해 주세요. (youtube.com / youtu.be / Shorts)', { duration: 3600, variant: 'err' });
+      return;
+    }
+  }
+  var note = String(state.newItem.refNote || '').trim();
+  if(extractYoutubeUrlsFromText_(note).indexOf(url) >= 0){
+    if(typeof setAppToast === 'function') setAppToast('이미 참고 메모에 같은 유튜브 링크가 있어요.', { duration: 2600, variant: 'ok' });
+  } else {
+    state.newItem.refNote = note ? (note + '\n\n' + url) : url;
+    state.newItem.cachedYoutubeAnalysis = '';
+    state.newItem._cachedFlowYoutubeUrl = '';
+    maybeAutoPickArticleKind_();
+    invalidateNewItemFlowsFromInput_();
+    var ta = document.getElementById('new-item-ref-note-input');
+    if(ta){
+      ta.value = state.newItem.refNote;
+      if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(ta);
+      try { ta.focus(); } catch(eF){}
+    }
+    if(typeof setAppToast === 'function'){
+      setAppToast(
+        isGeminiYoutubeAvailable_()
+          ? '유튜브 URL을 참고 메모에 넣었어요. 글 흐름 만들 때 분석합니다.'
+          : '유튜브 URL을 참고 메모에 넣었어요. (분석은 GEMINI_API_KEY 설정 후)',
+        { duration: 3200, variant: 'ok' }
+      );
+    }
+  }
+  markPlannerComposeActivity_();
+};
 
 function renderAddFormFlowSectionHTML_(){
   var flows = state.newItem.flowProposals || [];
@@ -24224,7 +24351,7 @@ function renderAddForm(){
         ? '<span style="font-size:11px;color:#9CA3AF;">선택. 분위기에만 쓰고, 오늘 있었던 일처럼 쓰지 않습니다.</span>'
         : (isDaily
         ? '<span style="font-size:11px;color:#9CA3AF;">사진·짧은 영상 가능. 올리면 아래 누구와·무엇을·몸 느낌을 채웁니다.</span>'
-        : '<span style="font-size:11px;color:#9CA3AF;">사진·영상(짧은 클립) · 추가 첨부 가능 · 사진 최대 12MB · 영상 최대 1GB·5분(자동 프레임 6컷·압축). 긴 강의는 유튜브 URL 권장. 컷마다 순서대로 메모에 쌓여요.</span>')));
+        : '')));
   const addIntro = isThought
     ? '떠오른 <strong>한 줄</strong>을 적으면, 사람들이 「내 얘기네」 하게 풀어 초안을 만듭니다. 오늘 있었던 일처럼 꾸며 내지 않고, 정답·가르침으로 바꾸지 않습니다.'
     : (isDaily
@@ -24243,8 +24370,8 @@ function renderAddForm(){
   const kwHint = kindDef && kindDef.kwHint
       ? kindDef.kwHint
       : (isExpert
-      ? '다룰 <strong>테크닉/개념</strong>을 한 줄로. 핵심 포인트·시연 내용은 아래 메모에 — <strong>영상·강의에서 말한 것만</strong> 적어 주세요.'
-      : '적은 키워드·문장도 <strong>입력한 내용에서 크게 벗어나지 않고</strong> 주제·초안을 만듭니다.');
+      ? '다룰 <strong>테크닉/개념</strong>을 한 줄로. 핵심 포인트·시연 내용은 아래 메모에 — <strong>영상·강의에서 말한 것만</strong> 적어 주세요. 릴스 만들 때 멘트·구간 후보에도 반영됩니다.'
+      : '적은 키워드·문장도 <strong>입력한 내용에서 크게 벗어나지 않고</strong> 주제·초안을 만듭니다. 릴스 만들 때 멘트·구간 후보에도 반영됩니다.');
   const dailyKindHtml = isDaily ? dailyKindToggleHtml_(isThought, 'setNewDailyShareKind_') : '';
   const dailyFactsHtml = isThought
     ? ('<div class="form-field"><label class="form-label">생각 한 줄</label>' +
@@ -24290,10 +24417,48 @@ function renderAddForm(){
     ? '<button type="button" class="btn-flow-regen" onclick="regenerateFlowProposals()" ' + (analyzing || flowLoading ? 'disabled' : '') + '>흐름 다시 제안</button>'
     : '';
   const actionButtonHtml = '<button type="button" class="btn-submit" id="btn-add-draft-submit" onclick="runNewItemFlowAction()" ' + (submitDisabled ? 'disabled' : '') + '>' + btnLabel + '</button>';
-  const photoFieldHtml = '<div class="form-field">' +
-    '<label class="form-label">참고 사진·영상' + (isThought ? ' (선택)' : (isDaily ? ' (올리면 아래 칸을 채움 · 원본 4:5)' : ' (선택)')) + '</label>' +
-    '<input class="form-input" type="file" accept="image/*,video/*" multiple onchange="onNewItemImage(this)" style="padding:8px;" />' +
+  const photoFieldHtml = '<div class="form-field add-photo-field">' +
+    '<label class="form-label">글 생성 참고 사진·영상</label>' +
+    '<div class="add-ref-media-row">' +
+      '<input class="form-input" type="file" accept="image/*,video/*" multiple onchange="onNewItemImage(this)" style="padding:8px;" ' + (analyzing ? 'disabled' : '') + ' />' +
+      '<button type="button" class="add-url-paste-btn" onclick="pasteYoutubeUrlToRefNote_()" ' + (analyzing ? 'disabled' : '') + ' title="공개 유튜브 URL을 참고 메모에 넣습니다">URL 붙여넣기</button>' +
+    '</div>' +
+    '<div class="add-ref-media-hint">기기 사진·영상은 <strong>파일 선택</strong>. 유튜브는 파일 칸에 넣을 수 없고, <strong>URL 붙여넣기</strong> 또는 아래 참고 메모에 링크를 넣으면 됩니다' +
+      (isGeminiYoutubeAvailable_() ? ' (공개 영상 · Gemini 분석).' : ' (공개 영상 · 서버에 GEMINI_API_KEY 필요).') +
+    '</div>' +
     '<div style="margin-top:4px;">' + imgHint + '</div>' +
+  '</div>';
+  const mediaStudioOpen = !!(state.newItem && state.newItem.mediaStudioOpen);
+  const reelMakerHtml = mediaStudioOpen && (typeof renderReelMakerSectionHTML_ === 'function')
+    ? renderReelMakerSectionHTML_()
+    : '';
+  const thumbMakerHtml = mediaStudioOpen && (typeof renderAddFormThumbSectionHTML_ === 'function')
+    ? renderAddFormThumbSectionHTML_()
+    : '';
+  const mediaPickRowHtml = !mediaStudioOpen
+    ? ('<div class="add-media-pick-row">' +
+        '<button type="button" class="form-field add-photo-field add-media-pick-card" onclick="openAddMediaStudio_(\'thumb\')">' +
+          '<span class="form-label add-media-pick-label">썸네일 만들기<span class="add-media-fold-hint">펼치기 ▾</span></span>' +
+          '<span class="add-media-pick-fake">파일 선택 · 사진·영상·폴더</span>' +
+          '<span class="add-media-pick-hint">키워드에 맞는 장면으로 썸네일 초안</span>' +
+        '</button>' +
+        '<button type="button" class="form-field add-photo-field add-media-pick-card" onclick="openAddMediaStudio_(\'reel\')">' +
+          '<span class="form-label add-media-pick-label">릴스 만들기 <span style="font-weight:600;color:#9CA3AF;">· 4:5</span><span class="add-media-fold-hint">펼치기 ▾</span></span>' +
+          '<span class="add-media-pick-fake">파일 선택 · 영상·사진·폴더</span>' +
+          '<span class="add-media-pick-hint">참고할 영상, 사진, 폴더를 선택해주세요.</span>' +
+        '</button>' +
+      '</div>')
+    : '';
+  const mediaStackHtml = '<div class="add-media-stack' + (mediaStudioOpen ? ' is-open' : '') + '">' +
+    photoFieldHtml +
+    (mediaStudioOpen
+      ? (thumbMakerHtml + reelMakerHtml)
+      : mediaPickRowHtml) +
+  '</div>';
+  const refNoteFieldHtml = '<div class="form-field">' +
+    '<label class="form-label">' + refNoteLabel + '</label>' +
+    '<textarea id="new-item-ref-note-input" class="form-input form-textarea' + (hasPhoto ? ' image-analysis-textarea' : '') + '" rows="' + (hasPhoto ? '9' : '5') + '" oninput="onNewItemRefNoteInput_(this)" placeholder="' + refNotePlaceholder + '" ' + (analyzing ? 'disabled' : '') + '>' + escapeHtml(state.newItem.refNote || '') + '</textarea>' +
+    '<div style="font-size:11px;color:#9CA3AF;margin-top:4px;">' + refNoteHint + (hasPhoto ? ' 사진 선택 시 AI 분석이 「첫 번째 사진」… 순으로 쌓이며, 직접 수정할 수 있어요.' : '') + ' 릴스 저장 시에도 여기로 요약·분석이 들어갑니다.</div>' +
   '</div>';
   var dailySuggestHtml = '';
   if(isDaily){
@@ -24321,19 +24486,46 @@ function renderAddForm(){
     </div>
     ${(!isDaily && !isThought) ? articleKindToggleHtml_(catId) : ''}
     ${dailyKindHtml}
-    ${isDaily && !isThought ? photoFieldHtml : ''}
     ${dailyFactsHtml}
-    <div class="form-field">
-      <label class="form-label">${refNoteLabel}</label>
-      <textarea id="new-item-ref-note-input" class="form-input form-textarea${hasPhoto ? ' image-analysis-textarea' : ''}" rows="${hasPhoto ? '9' : '5'}" oninput="onNewItemRefNoteInput_(this)" placeholder="${refNotePlaceholder}" ${analyzing ? 'disabled' : ''}>${escapeHtml(state.newItem.refNote || '')}</textarea>
-      <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">${refNoteHint}${hasPhoto ? ' 사진 선택 시 AI 분석이 「첫 번째 사진」… 순으로 쌓이며, 직접 수정할 수 있어요.' : ''}</div>
-    </div>
-    ${!isDaily || isThought ? photoFieldHtml : ''}
+    ${mediaStackHtml}
+    ${refNoteFieldHtml}
     ${dailySuggestHtml}
     ${flowsReady ? '' : actionButtonHtml}
   </div>
   ${flowSectionHtml ? `<div class="add-flow-outside">${flowSectionHtml}${regenBtnHtml}${flowsReady ? actionButtonHtml : ''}</div>` : ''}
   </div>`;
+}
+window.openAddMediaStudio_ = function(focus){
+  if(!state.newItem) return;
+  state.newItem.mediaStudioOpen = true;
+  state.newItem.mediaStudioFocus = focus === 'reel' ? 'reel' : 'thumb';
+  markPlannerComposeActivity_();
+  if(typeof renderMain === 'function') renderMain({ force: true });
+};
+window.closeAddMediaStudio_ = function(){
+  if(!state.newItem) return;
+  state.newItem.mediaStudioOpen = false;
+  state.newItem.mediaStudioFocus = '';
+  markPlannerComposeActivity_();
+  if(typeof renderMain === 'function') renderMain({ force: true });
+};
+function scheduleAddMediaStudioScroll_(){
+  if(!state.showAdd || !state.newItem || !state.newItem.mediaStudioOpen) return;
+  syncStickyCatNavOffset_();
+  var focus = state.newItem.mediaStudioFocus;
+  if(focus !== 'reel' && focus !== 'thumb') return;
+  var targetId = focus === 'reel' ? 'reel-maker-root' : 'add-thumb-maker-root';
+  setTimeout(function(){
+    var el = document.getElementById(targetId);
+    if(!el || typeof el.scrollIntoView !== 'function') return;
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch(e){
+      try { el.scrollIntoView(true); } catch(e2){}
+    }
+    // 한 번만 스크롤
+    state.newItem.mediaStudioFocus = '';
+  }, 80);
 }
 function scrollTextareaCaretIntoView_(ta){
   if(!ta || ta.tagName !== 'TEXTAREA') return;
@@ -26079,9 +26271,22 @@ function buildThumbMakerCopy_(content, catId, opts){
   var angle = '';
   var keywords = [];
 
+  if(content && content._addForm){
+    topic = String(content.addTopic || topic || '').trim();
+    angle = String(content.addAngle || '').trim();
+    title = String((content.blog && content.blog.title) || topic || '').trim();
+    hook = String((content.blog && content.blog.hook) || angle || topic || '').trim();
+    if(Array.isArray(content.addKeywords)){
+      content.addKeywords.forEach(function(kw){
+        var s = String(kw || '').trim();
+        if(s && keywords.indexOf(s) < 0) keywords.push(clampThumbLine_(s, 28));
+      });
+    }
+  }
+
   if(content && content.blog){
-    title = String(content.blog.title || '').trim();
-    hook = String(content.blog.hook || '').trim();
+    title = String(content.blog.title || title || '').trim();
+    hook = String(content.blog.hook || hook || '').trim();
     if(!hook) hook = getGeneralBlogProblemText_(content.blog) || String(content.blog.problem || '').trim();
   }
   if(content && content.community){
@@ -26143,7 +26348,7 @@ function buildThumbMakerCopy_(content, catId, opts){
   if(!body) body = scrubNonClinicalTreatmentCopy_(preset.defaultBody, catId) || preset.defaultBody;
 
   return {
-    hero: hero,
+    hero: expandThumbHeroLinesForEdit_(hero),
     tagline: preset.tagline,
     program: program,
     body: body,
@@ -26521,32 +26726,42 @@ function resolveThumbMakerContent_(){
 /** 초안이 바뀌면 이전 작업 저장 후 복원, 같으면 수정값 유지 */
 function syncThumbMakerFields_(content, force){
   var st = ensureThumbMakerState_();
-  var draftId = state.selectedId;
-  var catId = state.selectedCatId;
+  var addForm = !!(content && content._addForm) || (state.showAdd && st.draftId === '__add_form__');
+  var draftId = addForm ? '__add_form__' : state.selectedId;
+  var catId = addForm
+    ? ((state.newItem && state.newItem.catId != null) ? state.newItem.catId : state.currentCat)
+    : state.selectedCatId;
   var changed = st.draftId !== draftId || st.catId !== catId;
   if(changed){
-    if(st.draftId){
+    if(st.draftId && st.draftId !== '__add_form__'){
       try { persistThumbMakerFieldsFromDom_(); } catch(eDom){}
       schedulePersistThumbWorkspace_(true);
     }
+    var catOnlyOnAdd = addForm && st.draftId === '__add_form__' && st.catId !== catId;
+    var keepVisual = catOnlyOnAdd && !!st.bgDataUrl;
     st.draftId = draftId;
     st.catId = catId;
-    resetThumbMakerVisualState_(st);
+    if(!keepVisual) resetThumbMakerVisualState_(st);
     st.fields = null;
     st.programMode = isDailyShareCategory(catId) ? 'photo' : 'topic';
     st.sizeKey = isDailyShareCategory(catId) ? '4x5' : (st.sizeKey || '4x5');
-    st.photoIndex = 0;
-    st.fields = isDailyShareCategory(catId) ? emptyThumbPhotoCopy_() : buildThumbMakerCopy_(content, catId, { programMode: 'topic' });
+    if(!keepVisual) st.photoIndex = 0;
+    st.fields = isDailyShareCategory(catId)
+      ? emptyThumbPhotoCopy_()
+      : buildThumbMakerCopy_(content || buildAddFormThumbContent_(), catId, { programMode: 'topic', preferTopic: !!addForm });
     st.lastCopy = st.fields;
-    beginThumbWorkspaceRestore_(draftId, catId, content);
+    if(!isDailyShareCategory(catId)) st.programMode = 'topic';
+    if(!addForm) beginThumbWorkspaceRestore_(draftId, catId, content);
   } else if(force || !st.fields){
     if(isDailyShareCategory(catId)){
       st.programMode = 'photo';
       st.fields = emptyThumbPhotoCopy_();
     } else {
-      st.programMode = st.programMode || 'topic';
-      if(force) st.programMode = 'topic';
-      st.fields = buildThumbMakerCopy_(content, catId, { programMode: st.programMode || 'topic' });
+      st.programMode = 'topic';
+      st.fields = buildThumbMakerCopy_(content || (addForm ? buildAddFormThumbContent_() : null), catId, {
+        programMode: 'topic',
+        preferTopic: !!addForm || !!force
+      });
     }
   }
   st.lastCopy = st.fields;
@@ -26588,11 +26803,22 @@ function readThumbMakerFields_(){
   }
   if(sizeEl && sizeEl.value) st.sizeKey = sizeEl.value;
   if(heroEl || tagEl || progEl || bodyEl){
+    var heroRaw = heroEl ? String(heroEl.value || '') : '';
+    heroRaw = heroRaw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+    // 후킹은 줄바꿈 유지(최대 3줄). 한 줄이면 그대로(이미지에도 한 줄).
+    var heroNorm = heroRaw.indexOf('\n') >= 0
+      ? heroRaw.split('\n').slice(0, 3).map(function(l){ return l.trim(); }).filter(Boolean).join('\n')
+      : String(heroRaw || '').replace(/\s+/g, ' ').trim();
+    var bodyRaw = bodyEl ? String(bodyEl.value || '') : '';
+    bodyRaw = bodyRaw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+    var bodyNorm = bodyRaw.indexOf('\n') >= 0
+      ? bodyRaw.split('\n').slice(0, 3).map(function(l){ return l.trim(); }).filter(Boolean).join('\n')
+      : bodyRaw.replace(/\s+/g, ' ').trim();
     return {
-      hero: normalizeThumbBrandOneLine_(heroEl ? String(heroEl.value || '').trim() : '') || (heroEl ? String(heroEl.value || '').trim() : ''),
+      hero: heroNorm,
       tagline: tagEl ? String(tagEl.value || '').trim() : '',
       program: normalizeThumbBrandOneLine_(progEl ? String(progEl.value || '').trim() : '') || (progEl ? String(progEl.value || '').trim() : ''),
-      body: scrubNonClinicalTreatmentCopy_(bodyEl ? String(bodyEl.value || '').trim() : '', st.catId != null ? st.catId : state.selectedCatId)
+      body: scrubNonClinicalTreatmentCopy_(bodyNorm, st.catId != null ? st.catId : state.selectedCatId)
     };
   }
   return st.fields || st.lastCopy || buildThumbMakerCopy_(null, state.selectedCatId);
@@ -26867,13 +27093,33 @@ function wrapThumbLinesAtBreaks_(ctx, text, maxWidth, maxLines){
   return lines.length ? lines : [''];
 }
 
-/** 가능하면 한 줄: 글자 크기를 줄이고, 그래도 넘치면 의미 단위로만 줄바꿈 */
+/** 가능하면 한 줄: 글자 크기를 줄이고, 그래도 넘치면 의미 단위로만 줄바꿈.
+ *  입력에 엔터(줄바꿈)가 있으면 그 줄을 그대로 씀. */
 function fitThumbTextBlock_(ctx, text, maxWidth, maxSize, minSize, weight, maxLines){
-  var t = String(text || '').replace(/\s+/g, ' ').trim();
   var fontFamily = '"Noto Sans KR","Apple SD Gothic Neo",sans-serif';
   var size = maxSize;
   maxLines = maxLines == null ? 2 : maxLines;
-  if(!t) return { size: maxSize, lines: [''] };
+  var raw = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  if(!raw) return { size: maxSize, lines: [''] };
+
+  if(raw.indexOf('\n') >= 0){
+    var explicit = raw.split('\n').map(function(l){ return l.trim(); }).filter(Boolean).slice(0, maxLines);
+    if(!explicit.length) return { size: maxSize, lines: [''] };
+    while(size >= minSize){
+      ctx.font = weight + ' ' + size + 'px ' + fontFamily;
+      var ok = true;
+      for(var ei = 0; ei < explicit.length; ei++){
+        if(ctx.measureText(explicit[ei]).width > maxWidth + 1){ ok = false; break; }
+      }
+      if(ok) return { size: size, lines: explicit };
+      size -= 1;
+    }
+    ctx.font = weight + ' ' + minSize + 'px ' + fontFamily;
+    return { size: minSize, lines: explicit };
+  }
+
+  var t = raw.replace(/\s+/g, ' ').trim();
+  size = maxSize;
   while(size >= minSize){
     ctx.font = weight + ' ' + size + 'px ' + fontFamily;
     if(ctx.measureText(t).width <= maxWidth){
@@ -26885,34 +27131,81 @@ function fitThumbTextBlock_(ctx, text, maxWidth, maxSize, minSize, weight, maxLi
   return { size: minSize, lines: wrapThumbLinesAtBreaks_(ctx, t, maxWidth, maxLines) };
 }
 
-/** 후킹 타이틀: 기본은 크게 2줄, oneLine이면 글씨를 줄여 한 줄 유지 */
+/** 후킹 타이틀: 입력 줄바꿈을 그대로 씀(최대 3줄). 한 줄이면 한 줄로 그림 */
 function fitThumbHeroHook_(ctx, text, maxWidth, maxSize, minSize, opts){
   opts = opts || {};
+  var maxLines = opts.maxLines != null ? opts.maxLines : 3;
   if(opts.oneLine){
-    return fitThumbTextBlock_(ctx, text, maxWidth, maxSize, minSize, '900', 1);
+    return fitThumbTextBlock_(ctx, String(text || '').replace(/\s+/g, ' ').trim(), maxWidth, maxSize, minSize, '900', 1);
   }
-  var t = String(text || '').replace(/\s+/g, ' ').trim();
+  var raw = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
   var fontFamily = '"Noto Sans KR","Apple SD Gothic Neo",sans-serif';
-  if(!t) return { size: maxSize, lines: [''] };
+  if(!raw) return { size: maxSize, lines: [''] };
+  var explicit = raw.split('\n').map(function(l){ return l.trim(); }).filter(Boolean).slice(0, maxLines);
+  if(raw.indexOf('\n') >= 0 && explicit.length){
+    var sizeE = maxSize;
+    while(sizeE >= minSize){
+      ctx.font = '900 ' + sizeE + 'px ' + fontFamily;
+      var ok = true;
+      for(var ei = 0; ei < explicit.length; ei++){
+        if(ctx.measureText(explicit[ei]).width > maxWidth + 1){ ok = false; break; }
+      }
+      if(ok) return { size: sizeE, lines: explicit };
+      sizeE -= 1;
+    }
+    ctx.font = '900 ' + minSize + 'px ' + fontFamily;
+    return { size: minSize, lines: explicit };
+  }
+  // 줄바꿈 없는 한 줄 입력 → 이미지에도 한 줄(글씨만 축소)
+  var t = raw.replace(/\s+/g, ' ').trim();
   var size = maxSize;
   while(size >= minSize){
     ctx.font = '900 ' + size + 'px ' + fontFamily;
     if(ctx.measureText(t).width <= maxWidth){
       return { size: size, lines: [t] };
     }
-    var lines = wrapThumbLinesAtBreaks_(ctx, t, maxWidth, 2);
-    var truncated = lines.length && /…$/.test(lines[lines.length - 1]);
-    var overflowLine = false;
-    for(var li = 0; li < lines.length; li++){
-      if(ctx.measureText(lines[li]).width > maxWidth + 1) overflowLine = true;
-    }
-    if(!truncated && !overflowLine && !(lines.length === 2 && String(lines[1]).replace(/…$/g, '').length <= 2)){
-      return { size: size, lines: lines };
-    }
     size -= 1;
   }
   ctx.font = '900 ' + minSize + 'px ' + fontFamily;
-  return { size: minSize, lines: wrapThumbLinesAtBreaks_(ctx, t, maxWidth, 2) };
+  return { size: minSize, lines: [t] };
+}
+
+/** 브랜드·긴 후킹을 편집칸에 미리보기와 같은 줄 수로 펼침 */
+function expandThumbHeroLinesForEdit_(hero){
+  var raw = String(hero || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  if(!raw) return '';
+  if(raw.indexOf('\n') >= 0){
+    return raw.split('\n').slice(0, 3).map(function(l){ return l.trim(); }).filter(Boolean).join('\n');
+  }
+  if(isKnownThumbBrandHero_(raw)){
+    var brandLines = splitThumbHeroLines_(raw);
+    if(brandLines && brandLines.length) return brandLines.slice(0, 3).join('\n');
+  }
+  return raw.replace(/\s+/g, ' ');
+}
+
+function syncThumbHeroTextareaRows_(heroText){
+  var el = document.getElementById('thumb-hero');
+  if(!el) return;
+  var n = String(heroText || '').split('\n').filter(function(l){ return String(l || '').trim(); }).length;
+  el.rows = Math.min(3, Math.max(1, n || 1));
+}
+
+function syncThumbHeroTextareaFromLayout_(heroLines){
+  var el = document.getElementById('thumb-hero');
+  var st = ensureThumbMakerState_();
+  if(!el || st.activeField === 'hero') return;
+  var lines = (heroLines || []).map(function(l){ return String(l || '').trim(); }).filter(Boolean).slice(0, 3);
+  if(!lines.length) return;
+  var next = lines.join('\n');
+  if(String(el.value || '') === next){
+    syncThumbHeroTextareaRows_(next);
+    return;
+  }
+  el.value = next;
+  syncThumbHeroTextareaRows_(next);
+  if(st.fields) st.fields.hero = next;
+  st.lastCopy = st.fields || st.lastCopy;
 }
 
 function layoutThumbPosterText_(ctx, W, H, copy, scale){
@@ -26921,33 +27214,39 @@ function layoutThumbPosterText_(ctx, W, H, copy, scale){
   // 우측까지 넓게 써서 줄바꿈을 최소화 (기존 0.62 → 거의 전폭)
   var textMax = Math.max(40, W - padX * 2);
   var bottomPad = Math.round(H * 0.055);
-  var heroRaw = String(copy.hero || '').trim();
-  var heroIsBrand = isKnownThumbBrandHero_(heroRaw);
+  var heroRaw = String(copy.hero || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
   var heroLines;
   var heroSize;
   var heroLineH;
   var heroKorean = /[가-힣]/.test(heroRaw);
   var typeScale = 1;
-  var heroOneLine = false;
   try {
     var typeSt = ensureThumbMakerState_();
     typeScale = clampThumbTypeScale_(typeSt.typeScale);
-    heroOneLine = !!typeSt.heroOneLine;
+    typeSt.heroOneLine = false;
+    typeSt.outFocus = false;
   } catch(eType){}
-  if(heroIsBrand){
-    heroLines = splitThumbHeroLines_(heroRaw);
-    heroSize = fitHeroFontSize_(ctx, heroLines, textMax, Math.round(W * 0.118 * scale * typeScale), Math.max(14, Math.round(W * 0.036 * Math.min(1, typeScale))));
-    heroLineH = Math.round(heroSize * (heroKorean ? 1.12 : 0.92));
-  } else {
-    var heroFit = fitThumbHeroHook_(
-      ctx, heroRaw, textMax,
-      Math.max(18, Math.round(W * 0.072 * scale * typeScale)),
-      Math.max(heroOneLine ? 13 : 16, Math.round(W * (heroOneLine ? 0.022 : 0.042) * Math.min(1, typeScale))),
-      { oneLine: heroOneLine }
+
+  var explicitHero = heroRaw.split('\n').map(function(l){ return l.trim(); }).filter(Boolean).slice(0, 3);
+  var hasExplicitBreaks = heroRaw.indexOf('\n') >= 0 && explicitHero.length > 0;
+  if(hasExplicitBreaks){
+    heroLines = explicitHero;
+    heroSize = fitHeroFontSize_(
+      ctx, heroLines, textMax,
+      Math.round(W * (heroLines.length >= 3 ? 0.092 : 0.108) * scale * typeScale),
+      Math.max(14, Math.round(W * 0.032 * Math.min(1, typeScale)))
     );
-    heroLines = heroFit.lines;
-    heroSize = heroFit.size;
-    heroLineH = Math.round(heroSize * 1.18);
+    heroLineH = Math.round(heroSize * (heroKorean ? 1.12 : 0.98));
+  } else {
+    // 한 줄 입력 → 이미지에도 한 줄
+    var one = heroRaw.replace(/\s+/g, ' ').trim();
+    heroLines = one ? [one] : [''];
+    heroSize = fitHeroFontSize_(
+      ctx, heroLines, textMax,
+      Math.round(W * 0.1 * scale * typeScale),
+      Math.max(13, Math.round(W * 0.028 * Math.min(1, typeScale)))
+    );
+    heroLineH = Math.round(heroSize * (heroKorean ? 1.12 : 0.95));
   }
 
   var tagFit = fitThumbTextBlock_(
@@ -26965,7 +27264,7 @@ function layoutThumbPosterText_(ctx, W, H, copy, scale){
     Math.max(12, Math.round(W * (progIsBrand ? 0.032 : 0.02))),
     '800', progMaxLines
   );
-  var bodyMaxLines = scale < 0.85 ? 2 : 3;
+  var bodyMaxLines = scale < 0.85 ? 3 : 4;
   var bodyFit = fitThumbTextBlock_(
     ctx, String(copy.body || ''), textMax,
     Math.max(13, Math.round(W * 0.022 * scale)),
@@ -27034,11 +27333,11 @@ function drawThumbPosterOnCanvas_(ctx, W, H, copy, bgImg, opts){
   var focusX = opts.focusX != null ? opts.focusX : st.focusX;
   var focusY = opts.focusY != null ? opts.focusY : st.focusY;
   var zoom = opts.zoom != null ? opts.zoom : st.zoom;
-  var outFocus = opts.outFocus != null ? opts.outFocus : !!st.outFocus;
+  var outFocus = false;
   var enhance = opts.enhance != null ? opts.enhance : !!st.enhance;
+  st.outFocus = false;
   // 드래그 중에는 무거운 FX를 건너뛰어 끊김 방지
   if(st.dragPan && st.dragPan.moved){
-    outFocus = false;
     enhance = false;
   }
   ctx.clearRect(0, 0, W, H);
@@ -27064,6 +27363,7 @@ function drawThumbPosterOnCanvas_(ctx, W, H, copy, bgImg, opts){
     scale *= 0.9;
     layout = layoutThumbPosterText_(ctx, W, H, copy, scale);
   }
+  try { syncThumbHeroTextareaFromLayout_(layout.heroLines); } catch(eSync){}
 
   // 스크림을 텍스트 바로 위부터 시작해 위쪽 빈 여백을 줄임
   var thumbPalette = getThumbPosterPaletteForCat_(st.catId != null ? st.catId : state.selectedCatId);
@@ -27201,42 +27501,276 @@ function drawThumbPosterOnCanvas_(ctx, W, H, copy, bgImg, opts){
 }
 
 function applyThumbFieldsToDom_(copy){
+  var heroVal = expandThumbHeroLinesForEdit_((copy && copy.hero) || '');
+  if(copy) copy.hero = heroVal;
   var map = {
-    'thumb-hero': copy.hero || '',
-    'thumb-tagline': copy.tagline || '',
-    'thumb-program': copy.program || '',
-    'thumb-body': copy.body || ''
+    'thumb-hero': heroVal,
+    'thumb-tagline': (copy && copy.tagline) || '',
+    'thumb-program': (copy && copy.program) || '',
+    'thumb-body': (copy && copy.body) || ''
   };
   Object.keys(map).forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.value = map[id];
   });
+  syncThumbHeroTextareaRows_(heroVal);
+  try {
+    var st = ensureThumbMakerState_();
+    st.heroLineLocked = false;
+  } catch(e){}
 }
+
+function buildAddFormThumbContent_(){
+  var raw = String((state.newItem && state.newItem.topic) || '').trim();
+  var lines = raw.split(/\r?\n/).map(function(l){ return String(l || '').trim(); }).filter(Boolean);
+  var phrases = [];
+  lines.forEach(function(line){
+    line.split(/\s*[·|/]\s*|,\s+/).forEach(function(p){
+      p = String(p || '').trim();
+      if(p && phrases.indexOf(p) < 0) phrases.push(p);
+    });
+  });
+  var title = phrases[0] || raw.slice(0, 40);
+  var hook = phrases[1] || phrases[0] || raw.slice(0, 80);
+  return {
+    _addForm: true,
+    addTopic: title,
+    addAngle: phrases.slice(1).join(' · ') || title,
+    addKeywords: phrases,
+    blog: {
+      title: title,
+      hook: hook,
+      problem: raw
+    }
+  };
+}
+
+function renderAddFormThumbSectionHTML_(){
+  return '<div class="form-field add-thumb-field" id="add-thumb-maker-root">' +
+    renderThumbMakerCard_(buildAddFormThumbContent_()) +
+  '</div>';
+}
+
+function parseAddFormKeywordPhrases_(){
+  var c = buildAddFormThumbContent_();
+  return c.addKeywords || [];
+}
+
+function addFormKeywordFileBoost_(fileName, phrases){
+  var hay = String(fileName || '').toLowerCase().replace(/\s+/g, '');
+  if(!hay || !phrases || !phrases.length) return 1;
+  var boost = 1;
+  for(var i = 0; i < phrases.length; i++){
+    var tok = String(phrases[i] || '').toLowerCase().replace(/\s+/g, '');
+    if(tok.length >= 2 && hay.indexOf(tok) >= 0) boost += 0.55;
+    else if(tok.length >= 4 && hay.indexOf(tok.slice(0, 4)) >= 0) boost += 0.2;
+  }
+  return boost;
+}
+
+function isAddFormVideoFile_(file){
+  return !!(file && ((file.type && file.type.indexOf('video/') === 0) || /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(file.name || '')));
+}
+
+function isAddFormImageFile_(file){
+  return !!(file && ((file.type && file.type.indexOf('image/') === 0) || /\.(jpe?g|png|webp|gif|bmp)$/i.test(file.name || '')));
+}
+
+function scoreImageBitmapEnergy_(bitmap){
+  try {
+    var w = 80, h = 45;
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    var ctx = c.getContext('2d', { willReadFrequently: true });
+    if(!ctx) return 0.5;
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    var data = ctx.getImageData(0, 0, w, h).data;
+    var sum = 0, sum2 = 0, n = w * h;
+    for(var i = 0; i < data.length; i += 4){
+      var y = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      sum += y; sum2 += y * y;
+    }
+    var mean = sum / n;
+    var variance = Math.max(0, sum2 / n - mean * mean);
+    return Math.sqrt(variance) / 128;
+  } catch(e){
+    return 0.5;
+  }
+}
+
+async function pickBestFrameFromVideoFile_(file, phrases){
+  var url = URL.createObjectURL(file);
+  var best = null;
+  try {
+    var video = document.createElement('video');
+    video.preload = 'auto';
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+    await new Promise(function(resolve, reject){
+      video.onloadedmetadata = function(){ resolve(); };
+      video.onerror = function(){ reject(new Error('영상을 열 수 없습니다')); };
+    });
+    var dur = video.duration || 0;
+    if(!(dur > 0.2)) throw new Error('영상 길이가 너무 짧습니다');
+    var samples = [];
+    var n = dur <= 12 ? 5 : (dur <= 40 ? 8 : 10);
+    for(var i = 0; i < n; i++){
+      samples.push(0.12 + (dur - 0.25) * (i / Math.max(1, n - 1)));
+    }
+    var canvas = document.createElement('canvas');
+    var ctx = canvas.getContext('2d', { willReadFrequently: true });
+    for(var s = 0; s < samples.length; s++){
+      var t = samples[s];
+      await new Promise(function(resolve){
+        var done = false;
+        function finish(){ if(done) return; done = true; resolve(); }
+        video.onseeked = finish;
+        try { video.currentTime = t; } catch(e){ finish(); }
+        setTimeout(finish, 900);
+      });
+      canvas.width = 160; canvas.height = 90;
+      ctx.drawImage(video, 0, 0, 160, 90);
+      var energy = scoreImageBitmapEnergy_(canvas);
+      var score = energy * addFormKeywordFileBoost_(file.name || '', phrases);
+      // 맨 앞·끝은 약간 감점
+      if(t < 0.8) score *= 0.92;
+      if(t > dur - 0.8) score *= 0.9;
+      if(!best || score > best.score){
+        var outW = Math.min(1280, video.videoWidth || 1080);
+        var outH = Math.min(1600, video.videoHeight || 1350);
+        var out = document.createElement('canvas');
+        out.width = outW; out.height = outH;
+        out.getContext('2d').drawImage(video, 0, 0, outW, outH);
+        best = {
+          score: score,
+          dataUrl: out.toDataURL('image/jpeg', 0.88),
+          name: (file.name || 'video') + ' · ' + (Math.floor(t / 60) + ':' + (t % 60 < 10 ? '0' : '') + Math.floor(t % 60)),
+          kind: 'video'
+        };
+      }
+    }
+  } finally {
+    try { URL.revokeObjectURL(url); } catch(e3){}
+  }
+  return best;
+}
+
+async function pickBestAddFormThumbMedia_(fileList){
+  var files = Array.prototype.slice.call(fileList || []).filter(function(f){
+    return isAddFormImageFile_(f) || isAddFormVideoFile_(f);
+  });
+  if(!files.length) throw new Error('사진 또는 영상 파일을 골라 주세요.');
+  var phrases = parseAddFormKeywordPhrases_();
+  var best = null;
+  var imgFiles = files.filter(isAddFormImageFile_);
+  var vidFiles = files.filter(isAddFormVideoFile_).slice(0, 4);
+
+  for(var i = 0; i < imgFiles.length && i < 24; i++){
+    var img = imgFiles[i];
+    if(isLikelyHeicFile_(img)) continue;
+    try {
+      var payload = await prepareThumbBackgroundPayload_(img, img.name);
+      var dataUrl = 'data:' + (payload.mediaType || 'image/jpeg') + ';base64,' + payload.data;
+      var bitmap = await loadBitmapForThumb_(dataUrl);
+      var energy = scoreImageBitmapEnergy_(bitmap);
+      if(bitmap && bitmap.close) try { bitmap.close(); } catch(eClose){}
+      var score = energy * addFormKeywordFileBoost_(img.name || '', phrases);
+      if(phrases.length && addFormKeywordFileBoost_(img.name || '', phrases) > 1.2) score *= 1.15;
+      if(!best || score > best.score){
+        best = { score: score, dataUrl: dataUrl, name: payload.name || img.name, kind: 'image' };
+      }
+    } catch(eImg){}
+  }
+
+  for(var v = 0; v < vidFiles.length; v++){
+    try {
+      var frame = await pickBestFrameFromVideoFile_(vidFiles[v], phrases);
+      if(frame && (!best || frame.score > best.score)) best = frame;
+    } catch(eVid){}
+  }
+
+  if(!best) throw new Error('맞는 장면을 찾지 못했어요. 다른 파일·폴더를 시도해 주세요.');
+  return best;
+}
+
+window.onAddFormThumbFiles_ = async function(input){
+  var files = input && input.files;
+  if(!files || !files.length) return;
+  setAppToast('키워드에 맞는 장면 고르는 중…', { duration: 2200, variant: 'ok' });
+  try {
+    var picked = await pickBestAddFormThumbMedia_(files);
+    clearThumbAiUpscaleCache_();
+    var st = ensureThumbMakerState_();
+    st.draftId = '__add_form__';
+    st.catId = (state.newItem && state.newItem.catId != null) ? state.newItem.catId : state.currentCat;
+    await setThumbMakerBackgroundFromDataUrl_(picked.dataUrl, picked.name || '썸네일 장면');
+    if(!isThumbPhotoOnlyMode_()){
+      st.programMode = 'topic';
+      st.fields = buildThumbMakerCopy_(buildAddFormThumbContent_(), st.catId, { programMode: 'topic', preferTopic: true });
+      st.lastCopy = st.fields;
+      applyThumbFieldsToDom_(st.fields);
+    }
+    var nameEl = document.getElementById('thumb-photo-name');
+    if(nameEl) nameEl.textContent = st.fileName || picked.name || '';
+    await paintThumbMakerPreview_();
+    setAppToast(
+      (picked.kind === 'video' ? '영상에서 장면을 캡처했어요. ' : '사진을 골랐어요. ') +
+      '후킹·구도를 수정해 보세요.',
+      { duration: 2800, variant: 'ok' }
+    );
+  } catch(err){
+    setAppToast((err && err.message) || '장면을 고르지 못했어요.', { duration: 3200, variant: 'err' });
+  }
+  if(input) input.value = '';
+};
 
 function renderThumbMakerCard_(content){
   var st = ensureThumbMakerState_();
+  var addForm = !!(content && content._addForm);
   var copy = syncThumbMakerFields_(content, false);
   var sizeKey = st.sizeKey || '4x5';
   var mode = st.programMode || 'topic';
   var photoOnly = isThumbPhotoOnlyMode_();
-  var refCount = getCurrentDraftRefImagesForThumb_().length;
-  var kwHint = (copy.keywords && copy.keywords.length)
-    ? '반영 메모: ' + copy.keywords.join(' · ')
-    : '주제·초안이 있으면 핵심 문장을 자동으로 채웁니다.';
-  var photoName = st.fileName ? st.fileName : (photoOnly ? '일상 사진 올리기 (JPEG/PNG · 첫 장이 피드)' : '배경 사진 올리기 (JPEG/PNG 권장 · HEIC는 변환 필요할 수 있어요)');
+  var refCount = addForm ? 0 : getCurrentDraftRefImagesForThumb_().length;
+  var photoName = st.fileName ? st.fileName : (photoOnly ? '일상 사진 올리기 (JPEG/PNG · 첫 장이 피드)' : (addForm ? '사진·영상·폴더에서 장면을 고르세요' : '배경 사진 올리기 (JPEG/PNG 권장 · HEIC는 변환 필요할 수 있어요)'));
   var html = '';
-  html += '<div class="img-section-title">' + (photoOnly ? '일상 사진 4:5 보정' : '썸네일 만들기') + '</div>';
+  html += '<div class="img-section-title' + (addForm ? ' add-media-section-hd' : '') + '">' +
+    '<span>' + (photoOnly ? '일상 사진 4:5 보정' : '썸네일 만들기') + '</span>' +
+    (addForm
+      ? '<button type="button" class="add-media-fold-btn" onclick="closeAddMediaStudio_()" title="접기" aria-label="썸네일 만들기 접기">접기 ▴</button>'
+      : '') +
+  '</div>';
   html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">' +
     (photoOnly
-      ? '찍힌 사진을 <strong>4:5</strong>로만 맞춥니다. 글자·망고·후킹은 없습니다. <strong>선명하게</strong>는 로컬 보정, <strong>AI 화질</strong>은 꺼 두고 필요할 때만 켜세요. 여러 장이면 첫 장이 피드입니다. JPEG로 저장합니다.'
-      : '사진이 배경 전체에 들어가고, <strong>큰 흰 글씨로 주제 후킹</strong>을 올립니다. 브랜드명은 그 아래 두 번째로 크게 두어, 여러 장을 올려도 내용이 구분되게 합니다. 하단 배경은 <strong>프로그램 팔레트 색</strong>으로 살짝 물들여 가독성을 확보해요. <strong>미리보기에서 사진을 드래그</strong>해 초점을 옮기고, 글자를 누르면 수정할 수 있어요.') +
+      ? '찍힌 사진을 <strong>4:5</strong>로만 맞춥니다. 글자·망고·후킹은 없습니다. <strong>선명하게</strong>·<strong>AI 화질</strong>로 보정할 수 있어요. 여러 장이면 첫 장이 피드입니다.'
+      : (addForm
+        ? '키워드와 맞는 <strong>사진·영상 장면</strong>을 고른 뒤 후킹·슬로건·브랜드를 수정합니다. 폴더를 고르면 그 안 미디어를 훑습니다.'
+        : '사진 위에 <strong>주제 후킹</strong>을 크게 올립니다. 미리보기에서 드래그로 초점, 글자를 누르면 입력칸으로 이동합니다.')) +
     '</p>';
   html += '<div class="img-tool-card thumb-maker-card">';
   html += '<div class="thumb-maker-grid">';
+  html += '<div class="thumb-maker-preview-col">';
+  html += '<div class="thumb-maker-preview-wrap" id="thumb-preview-wrap">';
+  html += '<canvas id="thumb-preview-canvas" width="1080" height="1350" aria-label="' + (photoOnly ? '일상 사진 4:5 미리보기' : '썸네일 미리보기') + '"></canvas>';
+  html += '<div class="thumb-maker-photo-badge" id="thumb-photo-badge"' + (st.bgDataUrl ? ' style="display:none"' : '') + '>' + (photoOnly ? '사진 필요' : '배경 사진 필요') + '</div>';
+  html += '</div>';
+  html += '<p class="thumb-maker-click-hint">사진을 <strong>드래그</strong>·핀치·휠로 확대·이동' +
+    (photoOnly ? '.' : '. <strong>글자</strong>를 누르면 입력칸으로 이동합니다.') +
+    (typeof isPhoneOrTablet === 'function' && isPhoneOrTablet() ? ' 모바일은 <strong>공유·저장</strong> → 이미지 저장.' : '') +
+    '</p>';
+  html += '</div>';
   html += '<div class="thumb-maker-fields">';
   html += '<div class="thumb-maker-photo-row">';
-  html += '<label class="thumb-maker-photo-btn" for="thumb-photo-input">' + (photoOnly ? '사진 올리기' : '배경 사진 올리기') + '</label>';
-  html += '<input type="file" id="thumb-photo-input" accept="image/jpeg,image/png,image/webp,image/*" style="display:none" onchange="onThumbMakerPhoto_(event)">';
+  if(addForm){
+    html += '<label class="thumb-maker-photo-btn" for="add-thumb-file-input">사진·영상 선택</label>';
+    html += '<input type="file" id="add-thumb-file-input" accept="image/*,video/*" multiple style="display:none" onchange="onAddFormThumbFiles_(this)">';
+    html += '<label class="thumb-maker-photo-btn" for="add-thumb-folder-input">폴더 선택</label>';
+    html += '<input type="file" id="add-thumb-folder-input" webkitdirectory multiple style="display:none" onchange="onAddFormThumbFiles_(this)">';
+  } else {
+    html += '<label class="thumb-maker-photo-btn" for="thumb-photo-input">' + (photoOnly ? '사진 올리기' : '배경 사진 올리기') + '</label>';
+    html += '<input type="file" id="thumb-photo-input" accept="image/jpeg,image/png,image/webp,image/*" style="display:none" onchange="onThumbMakerPhoto_(event)">';
+  }
   if(refCount){
     html += '<button type="button" class="img-tool-copy-btn" onclick="useDraftRefPhotoForThumb_(0)">초안 사진 쓰기' + (refCount > 1 ? ' (' + refCount + ')' : '') + '</button>';
   }
@@ -27257,10 +27791,8 @@ function renderThumbMakerCard_(content){
     html += '</div>';
   }
   if(!photoOnly){
-  html += '<div class="thumb-maker-mode-row">';
-  html += '<button type="button" class="thumb-maker-mode-btn' + (mode === 'brand' ? ' on' : '') + '" data-thumb-mode="brand" onclick="setThumbProgramMode_(\'brand\')">브랜드 타이틀</button>';
-  html += '<button type="button" class="thumb-maker-mode-btn' + (mode === 'topic' ? ' on' : '') + '" data-thumb-mode="topic" onclick="setThumbProgramMode_(\'topic\')">주제 후킹</button>';
-  html += '</div>';
+    st.programMode = 'topic';
+    mode = 'topic';
   }
   html += '<label>사진 초점 (드래그 또는 버튼)</label>';
   html += '<div class="thumb-maker-mode-row">';
@@ -27292,16 +27824,9 @@ function renderThumbMakerCard_(content){
   html += '<button type="button" class="thumb-maker-mode-btn" onclick="nudgeThumbZoom_(-0.15)" aria-label="축소">−</button>';
   html += '<span class="thumb-maker-zoom-label" id="thumb-zoom-label">' + Math.round((st.zoom || 1) * 100) + '%</span>';
   html += '<button type="button" class="thumb-maker-mode-btn" onclick="nudgeThumbZoom_(0.15)" aria-label="확대">+</button>';
-  html += '<button type="button" class="thumb-maker-mode-btn" onclick="resetThumbZoom_()" title="100%로">100%</button>';
-  if(!photoOnly){
-    html += '<button type="button" class="thumb-maker-mode-btn' + (st.outFocus ? ' on' : '') + '" data-thumb-fx="outfocus" onclick="toggleThumbOutFocus_()">아웃포커스</button>';
-  }
   html += '<button type="button" class="thumb-maker-mode-btn' + (st.enhance ? ' on' : '') + '" data-thumb-fx="enhance" onclick="toggleThumbEnhance_()">선명하게</button>';
   html += '<button type="button" class="thumb-maker-mode-btn' + (st.aiUpscaleOn ? ' on' : '') + '" id="thumb-ai-upscale-btn" data-thumb-fx="aiupscale" onclick="toggleThumbAiUpscale_(this)" title="켜면 AI 업스케일, 끄면 원본. 반복 클릭으로 비교">AI 화질</button>';
   html += '</div>';
-  html += '<p style="font-size:11px;color:#9CA3AF;margin:-4px 0 10px;line-height:1.45;">−/+·휠·핀치로 <strong>55%~260%</strong> 확대·축소. 「선명하게」는 로컬 보정' +
-    (photoOnly ? '. <strong>AI 화질</strong>은 꺼 두고 필요할 때만 켜세요.' : ', <strong>AI 화질</strong>은 서버 업스케일(첫 적용 후 버튼으로 원본↔결과 비교). GAS에 <code style="font-size:10px;">REPLICATE_API_TOKEN</code> 필요.') +
-    '</p>';
   if(photoOnly){
     html += '<input type="hidden" id="thumb-size" value="4x5">';
     html += '<p style="font-size:11px;color:#9CA3AF;margin:0 0 10px;">비율은 인스타 피드용 <strong>4:5</strong>로 고정입니다.</p>';
@@ -27315,23 +27840,20 @@ function renderThumbMakerCard_(content){
   }
   if(!photoOnly){
   html += '<label for="thumb-hero">후킹 타이틀 · 그리드에서 가장 크게</label>';
-  html += '<input type="text" id="thumb-hero" value="' + escapeHtml(copy.hero) + '" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'hero\')" onblur="onThumbMakerFieldBlur_()">';
+  var heroEdit = expandThumbHeroLinesForEdit_(copy.hero);
+  html += '<textarea id="thumb-hero" rows="' + Math.min(3, Math.max(1, heroEdit.split('\n').filter(Boolean).length || 1)) + '" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'hero\')" onblur="onThumbMakerFieldBlur_()">' + escapeHtml(heroEdit) + '</textarea>';
   html += '<div class="thumb-maker-mode-row thumb-maker-zoom-row">';
   html += '<span class="thumb-maker-axis-label">후킹 글씨</span>';
   html += '<button type="button" class="thumb-maker-mode-btn" onclick="nudgeThumbTypeScale_(-0.08)" aria-label="글씨 줄이기">−</button>';
   html += '<span class="thumb-maker-zoom-label" id="thumb-type-label">' + Math.round(clampThumbTypeScale_(st.typeScale) * 100) + '%</span>';
   html += '<button type="button" class="thumb-maker-mode-btn" onclick="nudgeThumbTypeScale_(0.08)" aria-label="글씨 키우기">+</button>';
-  html += '<button type="button" class="thumb-maker-mode-btn" onclick="resetThumbTypeScale_()" title="기본 크기">100%</button>';
-  html += '<button type="button" class="thumb-maker-mode-btn' + (st.heroOneLine ? ' on' : '') + '" id="thumb-hero-oneline-btn" onclick="toggleThumbHeroOneLine_()">한 줄</button>';
   html += '</div>';
-  html += '<p style="font-size:11px;color:#9CA3AF;margin:-4px 0 10px;line-height:1.45;">긴 후킹은 기본이 큰 2줄입니다. <strong>한 줄</strong>을 켜거나 − 로 줄이면 한 줄에 맞춥니다.</p>';
   html += '<label for="thumb-tagline">슬로건</label>';
   html += '<input type="text" id="thumb-tagline" value="' + escapeHtml(copy.tagline) + '" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'tagline\')" onblur="onThumbMakerFieldBlur_()">';
   html += '<label for="thumb-program">브랜드명</label>';
   html += '<input type="text" id="thumb-program" value="' + escapeHtml(copy.program) + '" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'program\')" onblur="onThumbMakerFieldBlur_()">';
   html += '<label for="thumb-body">핵심 문장</label>';
   html += '<textarea id="thumb-body" rows="3" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'body\')" onblur="onThumbMakerFieldBlur_()">' + escapeHtml(copy.body) + '</textarea>';
-  html += '<p style="font-size:11px;color:#9CA3AF;margin:0 0 8px;line-height:1.45;">' + escapeHtml(kwHint) + '</p>';
   }
   var savedThumb = content && content.images && content.images.thumbMakerSaved;
   if(savedThumb && savedThumb.dataUrl){
@@ -27345,28 +27867,21 @@ function renderThumbMakerCard_(content){
     html += '<button type="button" class="img-tool-copy-btn" onclick="downloadSavedThumbMaker_()">저장본 다시 받기</button>';
     html += '</div>';
   }
-  html += '<div class="img-tool-actions">';
+  html += '<div class="img-tool-actions thumb-maker-actions">';
   html += '<button type="button" class="img-tool-main-btn thumb" onclick="downloadThumbMakerPng_(this)">' +
     (typeof isPhoneOrTablet === 'function' && isPhoneOrTablet() ? '공유·저장' : (photoOnly ? 'JPEG 다운로드' : 'PNG 다운로드')) + '</button>';
+  html += '<div class="thumb-maker-actions-row">';
   html += '<button type="button" class="img-tool-copy-btn" onclick="copyThumbMakerPng_(this)">클립보드 복사</button>';
   if(photoOnly && refCount > 1){
     html += '<button type="button" class="img-tool-copy-btn" onclick="downloadAllDailyPhotos_(this)">모든 장 4:5 JPEG</button>';
   }
   if(!photoOnly){
-    html += '<button type="button" class="img-tool-copy-btn" onclick="refreshThumbMakerFromTopic_()">주제 다시 반영</button>';
+    html += '<button type="button" class="img-tool-copy-btn" onclick="refreshThumbMakerFromTopic_()">' +
+      (addForm ? '키워드 다시 반영' : '주제 다시 반영') + '</button>';
   }
   html += '</div>';
+  html += '</div>';
   html += '<div class="thumb-gallery-strip" id="thumb-gallery-strip"></div>';
-  html += '</div>';
-  html += '<div>';
-  html += '<div class="thumb-maker-preview-wrap" id="thumb-preview-wrap">';
-  html += '<canvas id="thumb-preview-canvas" width="1080" height="1350" aria-label="' + (photoOnly ? '일상 사진 4:5 미리보기' : '썸네일 미리보기') + '"></canvas>';
-  html += '<div class="thumb-maker-photo-badge" id="thumb-photo-badge"' + (st.bgDataUrl ? ' style="display:none"' : '') + '>' + (photoOnly ? '사진 필요' : '배경 사진 필요') + '</div>';
-  html += '</div>';
-  html += '<p class="thumb-maker-click-hint">사진을 <strong>드래그</strong>·모바일은 <strong>두 손가락 핀치</strong>로 확대, <strong>휠</strong>로 확대·축소' +
-    (photoOnly ? '합니다. 글자·후킹은 없습니다.' : ', <strong>글자</strong>를 누르면 입력칸으로 이동합니다.') +
-    (typeof isPhoneOrTablet === 'function' && isPhoneOrTablet() ? ' 모바일은 <strong>공유·저장</strong> → 이미지 저장을 선택하세요.' : '') +
-    '</p>';
   html += '</div>';
   html += '</div></div>';
   return html;
@@ -27374,12 +27889,23 @@ function renderThumbMakerCard_(content){
 
 function scheduleThumbMakerInit_(){
   if(!document.getElementById('thumb-preview-canvas')) return;
+  syncStickyCatNavOffset_();
   setTimeout(function(){
     bindThumbMakerCanvasInteractions_();
     paintThumbMakerPreview_();
     renderThumbGalleryStrip_();
     bindThumbWorkspaceLifecycle_();
   }, 30);
+}
+function syncStickyCatNavOffset_(){
+  try {
+    var nav = document.querySelector('.sticky-cat-nav');
+    if(!nav) return;
+    var h = Math.ceil(nav.getBoundingClientRect().height || 0);
+    if(h > 40 && h < 160){
+      document.documentElement.style.setProperty('--sticky-cat-nav-h', h + 'px');
+    }
+  } catch(e){}
 }
 
 function bindThumbWorkspaceLifecycle_(){
@@ -27726,6 +28252,7 @@ window.focusThumbMakerField_ = function(key){
 
 window.onThumbMakerFieldChange_ = function(){
   var st = ensureThumbMakerState_();
+  if(st.activeField === 'hero') st.heroLineLocked = true;
   persistThumbMakerFieldsFromDom_();
   if(st._paintTimer) clearTimeout(st._paintTimer);
   st._paintTimer = setTimeout(function(){ paintThumbMakerPreview_(); }, 120);
@@ -28129,17 +28656,25 @@ window.clearThumbMakerPhoto_ = function(){
 window.refreshThumbMakerFromTopic_ = function(){
   if(isThumbPhotoOnlyMode_()) return;
   var st = ensureThumbMakerState_();
-  var content = resolveThumbMakerContent_();
+  var addForm = state.showAdd || st.draftId === '__add_form__';
+  var content = addForm ? buildAddFormThumbContent_() : resolveThumbMakerContent_();
   var prev = readThumbMakerFields_();
   // 「주제 다시 반영」= 현재 주제를 큰 타이틀·핵심 문장에 넣음
   st.programMode = 'topic';
-  st.fields = buildThumbMakerCopy_(content, state.selectedCatId, {
+  st.fields = buildThumbMakerCopy_(content, addForm
+    ? ((state.newItem && state.newItem.catId != null) ? state.newItem.catId : state.currentCat)
+    : state.selectedCatId, {
     programMode: 'topic',
     preferTopic: true
   });
   st.lastCopy = st.fields;
-  st.draftId = state.selectedId;
-  st.catId = state.selectedCatId;
+  if(addForm){
+    st.draftId = '__add_form__';
+    st.catId = (state.newItem && state.newItem.catId != null) ? state.newItem.catId : state.currentCat;
+  } else {
+    st.draftId = state.selectedId;
+    st.catId = state.selectedCatId;
+  }
   applyThumbFieldsToDom_(st.fields);
   var btns = document.querySelectorAll('.thumb-maker-mode-btn[data-thumb-mode]');
   for(var i = 0; i < btns.length; i++){
@@ -28151,8 +28686,8 @@ window.refreshThumbMakerFromTopic_ = function(){
     (prev.body || '') !== (st.fields.body || '');
   setAppToast(
     changed
-      ? '주제를 큰 타이틀·핵심 문장에 반영했어요.'
-      : '이미 주제와 같은 내용이에요. (바꿀 값이 없어요)',
+      ? (addForm ? '키워드를 후킹·핵심 문장에 반영했어요.' : '주제를 큰 타이틀·핵심 문장에 반영했어요.')
+      : (addForm ? '이미 키워드와 같은 내용이에요.' : '이미 주제와 같은 내용이에요. (바꿀 값이 없어요)'),
     { duration: 2200, variant: 'ok' }
   );
 };
@@ -28188,6 +28723,14 @@ async function paintThumbMakerPreview_(){
   if(!copy.hero && st.fields) copy = st.fields;
   // 예전 데이터에 남아 있는 `: ` 접두어 정리
   if(copy && copy.body) copy.body = String(copy.body).replace(/^[:：]\s*/, '');
+  // 사용자가 줄을 직접 고치기 전이면 브랜드 후킹을 미리보기 줄 수에 맞춰 펼침
+  if(copy && !st.heroLineLocked){
+    var expandedHero = expandThumbHeroLinesForEdit_(copy.hero);
+    if(expandedHero && expandedHero !== copy.hero){
+      copy.hero = expandedHero;
+      if(st.fields) st.fields.hero = expandedHero;
+    }
+  }
   st.hitRegions = drawThumbPosterOnCanvas_(ctx, size.w, size.h, copy, st.bgImg || null, {
     activeField: st.activeField || null
   }) || [];
@@ -28242,6 +28785,8 @@ async function exportThumbMakerPngBlob_(opts){
 
 /** JPEG로 초안·로컬 갤러리(최대 5개)에 보관 */
 async function persistThumbMakerToDraft_(copy){
+  var stPersist = ensureThumbMakerState_();
+  if(state.showAdd || stPersist.draftId === '__add_form__') return false;
   var draftId = state.selectedId;
   if(!draftId) return false;
   var canvas = document.getElementById('thumb-preview-canvas');

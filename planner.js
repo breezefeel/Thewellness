@@ -66,8 +66,8 @@ const CATEGORIES = [
       {id:"d6-5", topic:"오늘 찍힌 사진 그대로", angle:"생일 사진 톤 · 꾸민 썸네일 금지"},
       {id:"d6-6", topic:"짧게 남기는 오늘의 몸", angle:"음성 30초 분량 · 문장만 다듬기"},
     ]},
-  { id:7, icon:"", name:"힐자계", color:"#34D399", audience:"입주민",
-    sub:"힐스테이트 자이 계양 — PAR · P-스트레칭 · 자세 · 기능운동 · 작은얼굴",
+  { id:7, icon:"", name:"기타", color:"#34D399", audience:"입주민",
+    sub:"생활건강 · 셀프케어 — PAR · P-스트레칭 · 자세 · 기능운동 · 작은얼굴",
     drafts:[
       {id:"d7-0", topic:"앉아만 있어도 목이 뻐근할 때, 먼저 확인해 보면 좋은 한 가지", angle:"거북목이라고 단정 짓기 전에 — 경추·어깨·호흡을 아주 쉽게"},
       {id:"d7-1", topic:"P-스트레칭이 뭔가요?", angle:"억지로 당기지 말고 '아 시원하다' 선에서 이완 — 고양이 기지개 비유"},
@@ -83,20 +83,26 @@ const CATEGORIES = [
     drafts:[]},
 ];
 
-/** 상단 카테고리 탭: 두 줄 순서·표시명 (데이터 CATEGORIES 인덱스 기준) */
-const CAT_TAB_NAV_ROWS = [[0, 1, 2, 7], [3, 5, 4, 6]];
+/** 상단 카테고리 탭: 두 줄 순서·표시명 (데이터 CATEGORIES 인덱스 기준)
+ *  생활건강 = 드롭다운 1칸(7), 내부 모드로 6(일상 공유)·7(기타) 전환 */
+const CAT_TAB_NAV_ROWS = [[0, 1, 2, 7], [3, 5, 4]];
 const CAT_TAB_SHORT = {
   0: '도수치료',
   1: '리얼 무브먼트',
   2: '리얼 페이스',
-  7: '힐자계',
+  7: '기타',
   3: 'CMT 과정',
   5: 'Re:Al 움직임 과정',
   4: 'IFC 과정',
   6: '일상 공유',
   8: '지점브랜딩'
 };
-const CAT_GROUP_GENERAL = [0, 1, 2, 7, 6];
+const CAT_GROUP_GENERAL = [0, 1, 2, 7];
+const LIFE_HEALTH_LABEL = '생활건강';
+const LIFE_HEALTH_MODE_IDS = [6, 7]; // 6 일상 공유 · 7 기타
+function isLifeHealthCategory_(catId){
+  return catId === 6 || catId === 7;
+}
 const CAT_GROUP_EXPERT = [3, 5, 4];
 /** 지점브랜딩 상단 드롭다운 — opsManual.activeBranch 와 연동 */
 const CAT_GROUP_OPS = [
@@ -2465,7 +2471,7 @@ const CAT_PROGRAM_LINE = {
   4: '미카닥 박준규 · IFC 전문가',
   5: '리얼무브먼트 · 전문가',
   6: '미카닥 박준규 · 일상',
-  7: '힐자계 · 입주민'
+  7: '생활건강 · 기타'
 };
 const CAT_DEFAULT_SERIES = {
   0: 'PSP · 도수 이해',
@@ -2475,7 +2481,7 @@ const CAT_DEFAULT_SERIES = {
   4: 'IFC · 얼굴 구조',
   5: 'Movement · 교육 핵심',
   6: '일상 나눔',
-  7: '힐자계 · 셀프 케어'
+  7: '생활건강 · 셀프 케어'
 };
 const CAT_DEFAULT_PILLAR = {
   0: 'PSP · 구조→기능',
@@ -2497,7 +2503,7 @@ const CAT_IMAGE_THUMBNAIL_FIXED = {
   4: { brand: '미카닥 박준규', program: 'IFC · 얼굴 구조' },
   5: { brand: '리얼무브먼트', program: 'Re:Al 움직임 · 전문가' },
   6: { brand: '미카닥 박준규', program: '일상' },
-  7: { brand: '힐자계', program: '입주민 셀프 케어' }
+  7: { brand: '생활건강', program: '기타 · 셀프 케어' }
 };
 /** 썸네일 여백 밴드 색 (영문 프롬프트용) */
 const CAT_IMAGE_BAND_COLOR_EN = {
@@ -2971,8 +2977,8 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
     ]
   },
   '7': {
-    brandProfile: '힐자계는 입주민이 집 근처에서 부담 없이 따라할 수 있는 생활형 케어가 핵심입니다. **기능재활·움직임 센터**의 쉬운 버전으로, 엘리베이터 앞·거실·출근 전 동선을 기준으로 안내하세요. 도수·카이로·시술 톤은 쓰지 말고, 짧은 루틴·안전한 표현을 우선합니다.',
-    strategyGuide: '기준:\n- 단계는 건강상식 → 통증 셀프케어 → 자세 셀프운동 → 얼굴 셀프운동으로 나눈다.\n- 한 콘텐츠당 동작은 1~2개로 제한한다.\n- 통증 악화·저림 등 경고 신호 시 병원 진료 권유 문구를 포함한다.\n\n의도:\n- 입주민이 "어렵지 않다"는 경험을 반복하게 만든다.\n- 과한 운동 대신 꾸준한 생활형 루틴을 정착시킨다.\n- 지역 커뮤니티 신뢰를 높여 상담 접점을 자연스럽게 만든다.',
+    brandProfile: '생활건강·기타는 집·동네에서 부담 없이 따라할 수 있는 생활형 케어가 핵심입니다. **기능재활·움직임 센터**의 쉬운 버전으로, 엘리베이터 앞·거실·출근 전 동선을 기준으로 안내하세요. 도수·카이로·시술 톤은 쓰지 말고, 짧은 루틴·안전한 표현을 우선합니다.',
+    strategyGuide: '기준:\n- 주제 서랍은 건강상식 → 통증 셀프케어 → 자세 셀프운동 → 얼굴 셀프운동으로 나눈다.\n- 한 콘텐츠당 동작은 1~2개로 제한한다.\n- 통증 악화·저림 등 경고 신호 시 병원 진료 권유 문구를 포함한다.\n\n의도:\n- 독자가 "어렵지 않다"는 경험을 반복하게 만든다.\n- 과한 운동 대신 꾸준한 생활형 루틴을 정착시킨다.\n- 생활건강 접점을 높여 상담으로 자연스럽게 연결한다.',
     steps: [
       { id: '1', title: '건강상식', summary: '입주민이 궁금해하는 몸·생활 상식을 쉽게', rationale: '어려운 이론보다 "이런 말이 맞나?"에 답하는 상식 글이 커뮤니티 진입을 엽니다.' },
       { id: '2', title: '통증 셀프케어', summary: '뻐근함·가벼운 불편을 스스로 다루는 법', rationale: '목·어깨·허리 등 흔한 불편에 짧고 안전한 셀프케어를 붙여 신뢰와 실행을 동시에 만듭니다.' },
@@ -3440,7 +3446,7 @@ function getProgramSeedStrategyGuide_(catId){
   return seed ? normalizeProgramStrategyGuideTemplate_(String(seed.strategyGuide || '').trim()) : '';
 }
 /** 일반인 궁금증 서랍 개정 — 기존 로드맵 단계 제목을 시드와 맞춤 (글 배정 id 유지) */
-const CURIOSITY_HUB_PLAN_REV = { '0': 'curiosity-v3', '1': 'curiosity-v3', '2': 'curiosity-v3', '7': 'curiosity-v3' };
+const CURIOSITY_HUB_PLAN_REV = { '0': 'curiosity-v4', '1': 'curiosity-v3', '2': 'curiosity-v4', '7': 'curiosity-v3' };
 function syncCuriosityHubPlanFromSeed_(catId){
   catId = normalizePendingCatId_(catId);
   var rev = CURIOSITY_HUB_PLAN_REV[String(catId)];
@@ -3450,9 +3456,11 @@ function syncCuriosityHubPlanFromSeed_(catId){
   var key = String(catId);
   var plan = state.branding.subGoalPlans[key];
   if(!plan || !Array.isArray(plan.steps) || !plan.steps.length) return false;
-  if(String(plan.hubRev || '') === rev) return false;
   var seed = getInitialProgramPlanDraft_(catId);
   if(!seed || !seed.steps || !seed.steps.length) return false;
+  var needPad = plan.steps.length < seed.steps.length;
+  var needTrim = plan.steps.length > seed.steps.length;
+  if(String(plan.hubRev || '') === rev && !needPad && !needTrim) return false;
   var n = Math.min(plan.steps.length, seed.steps.length);
   var changed = false;
   for(var i = 0; i < n; i++){
@@ -3463,9 +3471,61 @@ function syncCuriosityHubPlanFromSeed_(catId){
       step.title = ss.title || step.title;
       changed = true;
     }
-    if(ss.summary){ step.summary = ss.summary; changed = true; }
-    if(ss.rationale){ step.rationale = ss.rationale; changed = true; }
+    if(ss.summary && String(step.summary || '') !== String(ss.summary || '')){
+      step.summary = ss.summary;
+      changed = true;
+    }
+    if(ss.rationale && String(step.rationale || '') !== String(ss.rationale || '')){
+      step.rationale = ss.rationale;
+      changed = true;
+    }
+    var wantId = 's' + (i + 1);
+    if(String(step.id || '') !== wantId){
+      step.id = wantId;
+      changed = true;
+    }
   }
+  for(var j = plan.steps.length; j < seed.steps.length; j++){
+    var add = seed.steps[j];
+    plan.steps.push({
+      id: 's' + (j + 1),
+      layer: add.layer || '',
+      title: add.title || '',
+      summary: add.summary || '',
+      rationale: add.rationale || '',
+      pinned: false
+    });
+    changed = true;
+  }
+  if(plan.steps.length > seed.steps.length){
+    var removed = plan.steps.slice(seed.steps.length);
+    plan.steps = plan.steps.slice(0, seed.steps.length);
+    changed = true;
+    var miscLabel = getSubGoalMiscLabel_(plan);
+    removed.forEach(function(rs){
+      var rid = String(rs && rs.id != null ? rs.id : '').trim();
+      if(!rid) return;
+      var orphan = getDraftsForSubGoalStep_(catId, rid, { live: true }) || [];
+      orphan.forEach(function(d, oi){
+        if(!d) return;
+        var miscPeers = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true }) || [];
+        var order = miscPeers.length + oi + 1;
+        applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, order, Math.max(order, 1));
+        try { ensurePendingAssignmentForDraft_(catId, SUBGOAL_MISC_ID, order, d.id); } catch(eAsg){}
+      });
+    });
+  }
+  // 옛 제목 잔재(교정 루틴 등)가 시드 자리 안에 남은 경우 제목으로도 한 번 더 맞춤
+  plan.steps.forEach(function(st, idx){
+    if(!st || !seed.steps[idx]) return;
+    var raw = String(st.title || '');
+    if(/교정\s*루틴|결과\s*유지|원인\s*구조\s*분해|비대칭\s*관찰/.test(raw)){
+      st.title = seed.steps[idx].title || st.title;
+      if(seed.steps[idx].summary) st.summary = seed.steps[idx].summary;
+      if(seed.steps[idx].rationale) st.rationale = seed.steps[idx].rationale;
+      changed = true;
+    }
+  });
   if(seed.strategyGuide){
     var sg = normalizeProgramStrategyGuideTemplate_(seed.strategyGuide);
     if(String(plan.strategyGuide || plan.criteria || plan.intent || '').trim() !== sg){
@@ -3477,7 +3537,7 @@ function syncCuriosityHubPlanFromSeed_(catId){
   }
   plan.hubRev = rev;
   if(changed) plan.updatedAt = new Date().toISOString();
-  return true;
+  return changed || needPad || needTrim;
 }
 function syncAllCuriosityHubPlansFromSeed_(){
   if(!state.branding || !state.branding.subGoalPlans) return false;
@@ -3719,7 +3779,7 @@ const DEFAULT_BRANDING = {
     '4': 'IFC 전문가 — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['4'],
     '5': 'Real Movement 교육 — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['5'],
     '6': '일상 공유 — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['6'],
-    '7': '힐자계 — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['7']
+    '7': '생활건강·기타 — 3개월: ' + CATEGORY_THREE_MONTH_OUTCOME['7']
   }
 };
 
@@ -10920,7 +10980,7 @@ let state = {
 };
 
 function getCatGroupKeyForCat_(catId){
-  if(CAT_GROUP_GENERAL.indexOf(catId) >= 0) return 'general';
+  if(isLifeHealthCategory_(catId) || CAT_GROUP_GENERAL.indexOf(catId) >= 0) return 'general';
   if(CAT_GROUP_EXPERT.indexOf(catId) >= 0) return 'expert';
   if(isOpsManualCategory(catId)) return 'ops';
   return null;
@@ -10929,20 +10989,41 @@ function ensureCatGroupLast_(){
   if(!state.catGroupLast || typeof state.catGroupLast !== 'object'){
     state.catGroupLast = { general: CAT_GROUP_GENERAL[0], expert: CAT_GROUP_EXPERT[0] };
   }
+  if(state.catGroupLast.general === 6) state.catGroupLast.general = 7;
   if(CAT_GROUP_GENERAL.indexOf(state.catGroupLast.general) < 0) state.catGroupLast.general = CAT_GROUP_GENERAL[0];
   if(CAT_GROUP_EXPERT.indexOf(state.catGroupLast.expert) < 0) state.catGroupLast.expert = CAT_GROUP_EXPERT[0];
   return state.catGroupLast;
 }
 function rememberCatGroupSelection_(catId){
+  if(isLifeHealthCategory_(catId)) state.lifeHealthModeCat = catId;
   var key = getCatGroupKeyForCat_(catId);
   if(!key || key === 'ops') return;
-  ensureCatGroupLast_()[key] = catId;
+  ensureCatGroupLast_()[key] = isLifeHealthCategory_(catId) ? 7 : catId;
 }
 function getDisplayCatInGroup_(ids, groupKey){
+  if(groupKey === 'general' && isLifeHealthCategory_(state.currentCat)) return 7;
   if(ids.indexOf(state.currentCat) >= 0) return state.currentCat;
   var remembered = ensureCatGroupLast_()[groupKey];
   if(remembered != null && ids.indexOf(remembered) >= 0) return remembered;
   return ids[0];
+}
+function lifeHealthLandingCat_(){
+  var last = state.lifeHealthModeCat;
+  if(last === 6 || last === 7) return last;
+  if(isLifeHealthCategory_(state.currentCat)) return state.currentCat;
+  return 7;
+}
+function countLifeHealthTopics_(){
+  return countUnpublishedTopicsForCat_(6) + countUnpublishedTopicsForCat_(7);
+}
+function renderLifeHealthModeBarHTML_(){
+  var mode = state.currentCat;
+  var n6 = countTopicListBuckets_(6).total;
+  var n7 = countTopicListBuckets_(7).total;
+  return '<div class="life-health-mode" role="tablist" aria-label="생활건강 모드">' +
+    '<button type="button" class="life-health-mode-btn' + (mode === 6 ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 6 ? 'true' : 'false') + '" onclick="selectCat(6)">일상 공유 <span>' + n6 + '</span></button>' +
+    '<button type="button" class="life-health-mode-btn' + (mode === 7 ? ' on' : '') + '" role="tab" aria-selected="' + (mode === 7 ? 'true' : 'false') + '" onclick="selectCat(7)">기타 <span>' + n7 + '</span></button>' +
+  '</div>';
 }
 
 var minDraftReplenishRunningByCat = {};
@@ -12156,7 +12237,7 @@ const MANGO_PALETTES_BY_CAT = {
   },
   7: {
     key: 'green-bright',
-    label: '힐자계',
+    label: '생활건강 · 기타',
     bg: '#ECFDF5',
     bg2: '#D1FAE5',
     head: '#14532D',
@@ -20444,22 +20525,30 @@ function getSortedCatTabOrder() {
 function renderTabs() {
   function groupSelectorHTML(groupLabel, ids, groupKey){
     var displayCat = getDisplayCatInGroup_(ids, groupKey);
-    var isActive = ids.indexOf(state.currentCat) >= 0;
-    var activeCount = countUnpublishedTopicsForCat_(displayCat);
-    var hasPending = !!(state.pendingSubGoalPlan && ids.some(function(id){ return sameCatId_(state.pendingSubGoalPlan.catId, id); }));
+    var isActive = ids.indexOf(state.currentCat) >= 0 || (groupKey === 'general' && isLifeHealthCategory_(state.currentCat));
+    var activeCount = (displayCat === 7)
+      ? countLifeHealthTopics_()
+      : countUnpublishedTopicsForCat_(displayCat);
+    var hasPending = !!(state.pendingSubGoalPlan && (
+      ids.some(function(id){ return sameCatId_(state.pendingSubGoalPlan.catId, id); }) ||
+      (groupKey === 'general' && isLifeHealthCategory_(state.pendingSubGoalPlan.catId))
+    ));
     var options = ids.map(function(idx){
       var c = CATEGORIES[idx];
       if(!c) return '';
-      var short = CAT_TAB_SHORT[idx] || c.name;
-      var count = countUnpublishedTopicsForCat_(idx);
-      var pending = state.pendingSubGoalPlan && sameCatId_(state.pendingSubGoalPlan.catId, idx);
+      var short = (idx === 7) ? LIFE_HEALTH_LABEL : (CAT_TAB_SHORT[idx] || c.name);
+      var count = (idx === 7) ? countLifeHealthTopics_() : countUnpublishedTopicsForCat_(idx);
+      var pending = state.pendingSubGoalPlan && (
+        sameCatId_(state.pendingSubGoalPlan.catId, idx) ||
+        (idx === 7 && isLifeHealthCategory_(state.pendingSubGoalPlan.catId))
+      );
       return '<option value="' + idx + '"' + (displayCat === idx ? ' selected' : '') + '>' +
         short + ' · ' + count + (pending ? ' • 대기' : '') + '</option>';
     }).join('');
     return '<div class="cat-group-select-wrap' + (isActive ? ' active' : '') + '" role="button" tabindex="0" onclick="activateCatGroup_(\'' + groupKey + '\', event)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();activateCatGroup_(\'' + groupKey + '\', event);}">' +
       '<span class="cat-group-dot' + (isActive ? ' on' : '') + (hasPending ? ' pending' : '') + '" aria-hidden="true"></span>' +
       '<span class="cat-group-label">' + groupLabel + '</span>' +
-      '<select class="cat-group-select" onclick="event.stopPropagation()" onchange="selectCat(parseInt(this.value,10))" aria-label="' + groupLabel + ' 프로그램 선택">' +
+      '<select class="cat-group-select" onclick="event.stopPropagation()" onchange="selectCatFromGroupNav_(parseInt(this.value,10))" aria-label="' + groupLabel + ' 프로그램 선택">' +
       options +
       '</select>' +
       '<span class="cat-group-badge" title="준비 글과 완료 글의 합">' + activeCount + '</span>' +
@@ -20507,9 +20596,17 @@ function activateCatGroup_(groupKey, ev){
   }
   var ids = groupKey === 'expert' ? CAT_GROUP_EXPERT : CAT_GROUP_GENERAL;
   var catId = getDisplayCatInGroup_(ids, groupKey);
+  if(groupKey === 'general' && catId === 7) catId = lifeHealthLandingCat_();
   if(state.currentCat !== catId) selectCat(catId);
 }
 window.activateCatGroup_ = activateCatGroup_;
+
+function selectCatFromGroupNav_(i){
+  i = parseInt(i, 10);
+  if(i === 7) i = lifeHealthLandingCat_();
+  selectCat(i);
+}
+window.selectCatFromGroupNav_ = selectCatFromGroupNav_;
 
 function selectOpsBranchFromNav_(branchId){
   if(!OPS_BRANCH_IDS.includes(branchId)) return;
@@ -22481,7 +22578,8 @@ function renderMain(opts) {
     </div>`;
 
   var bodyHTML = '';
-  var listHead = renderTopicListModeBarHTML_(state.currentCat);
+  var listHead = (isLifeHealthCategory_(state.currentCat) ? renderLifeHealthModeBarHTML_() : '') +
+    renderTopicListModeBarHTML_(state.currentCat);
   if(state.searchQ && String(state.searchQ).trim()){
     var q = state.searchQ;
     var hits = cat.drafts.filter(function(d){
@@ -24432,7 +24530,13 @@ function renderAddForm(){
   const hasPhoto = newItemHasRefImages_();
   const analyzing = !!state.newItem.imageAnalyzing;
   const catOpts = ADD_FORM_CAT_ORDER
-    .map((i) => CATEGORIES[i] ? `<option value="${i}"${state.newItem.catId===i?' selected':''}>${CATEGORIES[i].name} · ${CATEGORIES[i].audience}</option>` : '')
+    .map((i) => {
+      if(!CATEGORIES[i]) return '';
+      var label = i === 7
+        ? (LIFE_HEALTH_LABEL + ' · 기타')
+        : (i === 6 ? (LIFE_HEALTH_LABEL + ' · 일상 공유') : CATEGORIES[i].name);
+      return `<option value="${i}"${state.newItem.catId===i?' selected':''}>${label} · ${CATEGORIES[i].audience}</option>`;
+    })
     .filter(Boolean)
     .join('');
   const imgNames = (state.newItem.refImages || []).map(function(img){ return img && img.name ? img.name : ''; }).filter(Boolean);
@@ -25028,7 +25132,7 @@ function renderMoveDraftPickerHTML_(fromCatId, draftId){
   if(!steps.length && !stepBtns) stepBtns = '<span class="card-move-empty">생성된 단계가 없어요</span>';
   var programs = ADD_FORM_CAT_ORDER.map(function(id){
     if(id === fromCatId || !CATEGORIES[id] || isOpsManualCategory(id)) return '';
-    var name = CAT_TAB_SHORT[id] || CATEGORIES[id].name;
+    var name = (id === 7 ? (LIFE_HEALTH_LABEL + ' · 기타') : (id === 6 ? '일상 공유' : (CAT_TAB_SHORT[id] || CATEGORIES[id].name)));
     return '<button type="button" class="card-move-opt" onclick="event.stopPropagation();moveDraftToCategory_(' +
       fromCatId + ',\'' + draftId + '\',' + id + ')">' + escapeHtml(name) + '</button>';
   }).join('');

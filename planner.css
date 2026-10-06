@@ -832,6 +832,39 @@ margin-left: 4px;
   gap: 6px;
   margin: 0 14px 12px;
 }
+.life-health-mode {
+  display: flex;
+  gap: 6px;
+  margin: 0 14px 8px;
+}
+.life-health-mode-btn {
+  flex: 1;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid #E5E7EB;
+  background: #fff;
+  color: #374151;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.life-health-mode-btn.on {
+  border-color: #059669;
+  background: #ECFDF5;
+  color: #065F46;
+}
+.life-health-mode-btn span {
+  font-size: 12px;
+  font-weight: 800;
+  opacity: .85;
+}
 .topic-list-mode-btn {
   flex: 1;
   border: 1px solid #E5E7EB;

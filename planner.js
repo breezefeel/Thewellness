@@ -2900,32 +2900,35 @@ const CATEGORY_THREE_MONTH_OUTCOME = {
 const PROGRAM_INITIAL_PLAN_DRAFTS = {
   '0': {
     brandProfile: '통증 부위를 단편적으로 다루지 않고, 구조·연부조직·기능을 함께 설명하는 도수치료 관점이 핵심입니다. 독자는 "왜 이 부위가 먼저인지"를 이해해야 치료 순서에 신뢰를 가질 수 있습니다. 과장된 즉효 표현보다 평가 기반 접근(History·Movement·Palpation)을 일관되게 보여 주세요.',
-    strategyGuide: '기준:\n- 주제 서랍은 회원이 찾는 부위(목·등·어깨 / 허리·골반·고관절 / 사지 / 전신)로 나눈다. 분기·단계 순서가 아니라 궁금증 서랍이다. 기타 주제는 서랍 밖이다.\n- 주제는 통증 이름만 나열하지 말고, 글 안에서 "원인 구조·왜 이 부위부터"를 1줄로 설명한다.\n- 각 서랍 글은 독자가 바로 적용할 1가지 행동을 포함한다.\n\n의도:\n- 검색·상담 질문과 서랍이 맞닿게 한다.\n- 단기 완화 기대를 "재발 줄이는 구조 이해"로 전환한다.\n- 상담 시 "왜 지금 이 접근인지"를 설명하는 기준 문장을 확보한다.',
+    strategyGuide: '기준:\n- 주제 서랍은 치료상식 → 부위(목·등·어깨 / 허리·골반·고관절 / 사지 / 전신) 순이다. 분기·단계 순서가 아니라 궁금증 서랍이다. 기타 주제는 서랍 밖이다.\n- 치료상식은 부위 전에 "도수란 무엇인지·오해·기대치"를 잡는다.\n- 주제는 통증 이름만 나열하지 말고, 글 안에서 "원인 구조·왜 이 부위부터"를 1줄로 설명한다.\n- 각 서랍 글은 독자가 바로 적용할 1가지 행동을 포함한다.\n\n의도:\n- 검색·상담 질문과 서랍이 맞닿게 한다.\n- 단기 완화 기대를 "재발 줄이는 구조 이해"로 전환한다.\n- 상담 시 "왜 지금 이 접근인지"를 설명하는 기준 문장을 확보한다.',
     steps: [
-      { id: '1', title: '목·등·어깨', summary: '목·등·어깨 통증과 연쇄 보상', rationale: '목·등·어깨는 가장 흔한 상담·검색 키워드입니다. 부위 글 안에서 왜 인접 구조를 보는지 설명합니다.' },
-      { id: '2', title: '허리·골반·고관절', summary: '허리 통증과 골반·고관절 연결', rationale: '허리만 보면 반복되는 경우가 많습니다. 골반·고관절을 같은 서랍에서 이해하게 합니다.' },
-      { id: '3', title: '사지', summary: '팔·다리·무릎·발목 등 사지 통증', rationale: '사지 통증도 부위만 다루면 재발하기 쉽습니다. 하중·보상·인접 관절 맥락을 함께 둡니다.' },
-      { id: '4', title: '전신', summary: '전신 패턴·오해·재발·유지', rationale: '한 부위로 끝나지 않는 전신 연결, 기대치·재발 질문을 모읍니다.' }
+      { id: '1', title: '치료상식', summary: '도수치료 기본·오해·기대치', rationale: '부위 글 전에 "도수란 무엇인지"를 먼저 둡니다. 상담 전 신뢰를 만드는 진입 서랍입니다.' },
+      { id: '2', title: '목·등·어깨', summary: '목·등·어깨 통증과 연쇄 보상', rationale: '목·등·어깨는 가장 흔한 상담·검색 키워드입니다. 부위 글 안에서 왜 인접 구조를 보는지 설명합니다.' },
+      { id: '3', title: '허리·골반·고관절', summary: '허리 통증과 골반·고관절 연결', rationale: '허리만 보면 반복되는 경우가 많습니다. 골반·고관절을 같은 서랍에서 이해하게 합니다.' },
+      { id: '4', title: '사지', summary: '팔·다리·무릎·발목 등 사지 통증', rationale: '사지 통증도 부위만 다루면 재발하기 쉽습니다. 하중·보상·인접 관절 맥락을 함께 둡니다.' },
+      { id: '5', title: '전신', summary: '전신 패턴·오해·재발·유지', rationale: '한 부위로 끝나지 않는 전신 연결, 기대치·재발 질문을 모읍니다.' }
     ]
   },
   '1': {
     brandProfile: '리얼무브먼트는 **보건의료 배경의 임상가**가 인체를 바탕으로 지도하는 **기능재활·움직임 센터** 컬러가 핵심입니다. PAR·Position으로 "좋은 자세를 고정"이 아니라 "움직임을 조절"하도록 돕습니다. 일상 동작(앉기·걷기·업무)에서 바로 써먹을 표현을 우선하고, 도수치료·카이로프랙틱·시술 장면을 주인공처럼 부각하지 마세요(마이너스). 표기 「리얼무브먼트」붙여 쓰기·한 줄(리:얼 금지), Re:Al 유지. 치료행위 수행 암시 금지 — 「치료를 해도 반복=자세/움직임」 맥락은 허용.',
-    strategyGuide: '기준:\n- 주제 서랍은 회원이 찾는 말(유연성·자세·생활습관·코어 기능운동)로 나눈다. 분기·단계 순서가 아니라 궁금증 서랍이다.\n- 각 글은 왜 1줄 + 바로 할 수 있는 1가지를 포함한다.\n- "정답 자세"보다 상황별 조절 원칙을 제시한다.\n\n의도:\n- 독자가 자세·스트레칭·기능운동을 생활 기술로 인식하게 한다.\n- 검색·상담 질문과 서랍이 맞닿게 한다.\n- 센터 방문 전후 모두 유지 가능한 자기조절 프레임을 만든다.',
+    strategyGuide: '기준:\n- 주제 서랍은 운동상식 → 유연성·자세·생활습관·코어 기능운동 순이다. 분기·단계 순서가 아니라 궁금증 서랍이다.\n- 운동상식은 세부 주제 전에 "왜 움직이는지·무엇을 먼저"를 잡는다.\n- 각 글은 왜 1줄 + 바로 할 수 있는 1가지를 포함한다.\n- "정답 자세"보다 상황별 조절 원칙을 제시한다.\n\n의도:\n- 독자가 자세·스트레칭·기능운동을 생활 기술로 인식하게 한다.\n- 검색·상담 질문과 서랍이 맞닿게 한다.\n- 센터 방문 전후 모두 유지 가능한 자기조절 프레임을 만든다.',
     steps: [
-      { id: '1', title: '유연성·스트레칭', summary: '안 풀리는 이유와 올바른 스트레칭·이완', rationale: '회원이 가장 먼저 찾는 말인 유연성·스트레칭을 서랍으로 둡니다. 억지 당기기와 Passive 방법의 차이를 먼저 잡습니다.' },
-      { id: '2', title: '자세·거북목·라운드 숄더', summary: '거북목·라운드숄더·정렬을 스스로 조절하기', rationale: '자세·거북목은 상담·검색의 핵심 키워드입니다. 고정 자세가 아니라 조절 가능한 움직임을 안내합니다.' },
-      { id: '3', title: '앉기·걷기 생활습관', summary: '앉기·걷기·업무 동선에 붙이는 습관', rationale: '운동 시간보다 생활 시간이 깁니다. 앉기·걷기 같은 장면 루틴으로 실행 장벽을 낮춥니다.' },
-      { id: '4', title: '코어 기능운동', summary: '코어·기능운동으로 일상·보행에 연결', rationale: '스트레칭·자세만으로는 유지가 어렵습니다. 코어를 쓰는 기능운동으로 결과를 체감하게 합니다.' }
+      { id: '1', title: '운동상식', summary: '움직임·운동의 기본·오해·순서', rationale: '세부 주제 전에 "왜 움직이는지·무엇을 먼저"를 둡니다. 진입 신뢰를 만드는 서랍입니다.' },
+      { id: '2', title: '유연성·스트레칭', summary: '안 풀리는 이유와 올바른 스트레칭·이완', rationale: '회원이 가장 먼저 찾는 말인 유연성·스트레칭을 서랍으로 둡니다. 억지 당기기와 Passive 방법의 차이를 먼저 잡습니다.' },
+      { id: '3', title: '자세·거북목·라운드 숄더', summary: '거북목·라운드숄더·정렬을 스스로 조절하기', rationale: '자세·거북목은 상담·검색의 핵심 키워드입니다. 고정 자세가 아니라 조절 가능한 움직임을 안내합니다.' },
+      { id: '4', title: '앉기·걷기 생활습관', summary: '앉기·걷기·업무 동선에 붙이는 습관', rationale: '운동 시간보다 생활 시간이 깁니다. 앉기·걷기 같은 장면 루틴으로 실행 장벽을 낮춥니다.' },
+      { id: '5', title: '코어 기능운동', summary: '코어·기능운동으로 일상·보행에 연결', rationale: '스트레칭·자세만으로는 유지가 어렵습니다. 코어를 쓰는 기능운동으로 결과를 체감하게 합니다.' }
     ]
   },
   '2': {
     brandProfile: '리얼 페이스는 **임상가가 구조를 아는 기능·웰니스 접근**으로, 얼굴만 따로 보지 않고 경추·호흡·생활습관까지 함께 봅니다. "작은 얼굴" 기대는 과장 없이. 미용·시술·도수/카이로 장면을 주인공처럼 부각하지 말고, 균형·순환·긴장 완화·습관 조절을 강조하세요. 표기 「리얼 페이스」(리:얼 금지), Re:Al Face 유지. 치료행위 수행 암시 금지.',
-    strategyGuide: '기준:\n- 단계는 회원이 찾는 말(비대칭·윤곽·턱관절·목·자세)로 나눈다. 수업 순서가 아니라 궁금증 서랍이다.\n- 전/후 기대치는 기간·개인차를 반드시 함께 안내한다.\n- 얼굴 문제를 경추·호흡·저작 패턴과 연결해 설명한다.\n\n의도:\n- 검색·상담 질문과 단계가 맞닿게 한다.\n- 단기 외형 집착을 줄이고 구조 기반 관리 관점을 심는다.\n- 상담 시 현실적인 목표 설정으로 이탈을 줄인다.',
+    strategyGuide: '기준:\n- 주제 서랍은 얼굴상식 → 비대칭·윤곽·턱관절·목·자세 순이다. 수업 순서가 아니라 궁금증 서랍이다.\n- 얼굴상식은 세부 주제 전에 기대치·구조 관점을 잡는다.\n- 전/후 기대치는 기간·개인차를 반드시 함께 안내한다.\n- 얼굴 문제를 경추·호흡·저작 패턴과 연결해 설명한다.\n\n의도:\n- 검색·상담 질문과 서랍이 맞닿게 한다.\n- 단기 외형 집착을 줄이고 구조 기반 관리 관점을 심는다.\n- 상담 시 현실적인 목표 설정으로 이탈을 줄인다.',
     steps: [
-      { id: '1', title: '비대칭·한쪽 얼굴', summary: '셀카·짝짝이·한쪽만 작아 보이는 패턴', rationale: '비대칭·한쪽 얼굴은 가장 흔한 진입 키워드입니다. 관찰 기준과 과장 없는 해석을 먼저 둡니다.' },
-      { id: '2', title: '윤곽·이중턱·붓기', summary: '살·붓기·윤곽·작은얼굴 기대치', rationale: '윤곽·이중턱·붓기는 관심도가 높습니다. 다이어트만의 문제로 보지 않도록 구조를 나눕니다.' },
-      { id: '3', title: '턱관절·씹기', summary: '이갈이·한쪽으로 씹기·턱관절 불편', rationale: '저작·턱 습관이 얼굴 패턴을 만듭니다. 습관과 구조를 연결하는 서랍입니다.' },
-      { id: '4', title: '목·자세와 얼굴', summary: '경추·자세·호흡이 얼굴에 미치는 영향', rationale: '얼굴만 따로 보지 않는 브랜드 강점입니다. 목·자세 연결로 차별을 만듭니다.' }
+      { id: '1', title: '얼굴상식', summary: '얼굴 관리의 기본·오해·기대치', rationale: '세부 주제 전에 "얼굴만 따로 보지 않는" 관점과 현실 기대치를 먼저 둡니다.' },
+      { id: '2', title: '비대칭·한쪽 얼굴', summary: '셀카·짝짝이·한쪽만 작아 보이는 패턴', rationale: '비대칭·한쪽 얼굴은 가장 흔한 진입 키워드입니다. 관찰 기준과 과장 없는 해석을 먼저 둡니다.' },
+      { id: '3', title: '윤곽·이중턱·붓기', summary: '살·붓기·윤곽·작은얼굴 기대치', rationale: '윤곽·이중턱·붓기는 관심도가 높습니다. 다이어트만의 문제로 보지 않도록 구조를 나눕니다.' },
+      { id: '4', title: '턱관절·씹기', summary: '이갈이·한쪽으로 씹기·턱관절 불편', rationale: '저작·턱 습관이 얼굴 패턴을 만듭니다. 습관과 구조를 연결하는 서랍입니다.' },
+      { id: '5', title: '목·자세와 얼굴', summary: '경추·자세·호흡이 얼굴에 미치는 영향', rationale: '얼굴만 따로 보지 않는 브랜드 강점입니다. 목·자세 연결로 차별을 만듭니다.' }
     ]
   },
   '3': {
@@ -2991,27 +2994,34 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
 const PROGRAM_INITIAL_STEP_TOPICS = {
   '0': {
     '1': [
+      { topic: '도수치료와 마사지는 어떻게 다른가요?', angle: '치료상식·차이' },
+      { topic: '아픈 곳만 눌러주면 왜 금방 다시 아플까요?', angle: '치료상식·원인 구조' },
+      { topic: '"뼈가 틀어졌다"는 말, 어디까지 사실일까요?', angle: '치료상식·오해 해소' },
+      { topic: '도수치료 전에 꼭 알아야 할 한 가지', angle: '치료상식·기대치' },
+      { topic: '통증이 사라져도 관리가 필요한 이유', angle: '치료상식·재발·유지' }
+    ],
+    '2': [
       { topic: '목 통증인데 어깨·등을 함께 보는 진짜 이유', angle: '목·등·어깨 연쇄' },
       { topic: '승모근만 풀면 왜 금방 다시 뻐근해질까요?', angle: '목·어깨 구조 관점' },
       { topic: '등이 굳으면 목이 먼저 아픈 이유', angle: '등·경추 연결' },
       { topic: '거북목처럼 보여도, 먼저 확인할 한 가지', angle: '경추·어깨 단정 전에' },
       { topic: '어깨가 올라간 채 버티는 하루, 어디서부터 풀까요?', angle: '목·등·어깨 우선순위' }
     ],
-    '2': [
+    '3': [
       { topic: '허리가 뻐근한데, 왜 고관절부터 보나요?', angle: '허리·골반·고관절 연결' },
       { topic: '같은 허리 통증, 사람마다 다른 이유 3가지', angle: '구조·습관·기능 개인차' },
       { topic: '골반이 틀어졌다는 말, 어디까지 사실일까요?', angle: '과장 없이 골반 설명' },
       { topic: '앉았다 일어날 때 허리가 먼저 아픈 이유', angle: '고관절·허리 하중' },
       { topic: '허리만 스트레칭해도 안 풀릴 때', angle: '인접 관절 관점' }
     ],
-    '3': [
+    '4': [
       { topic: '무릎이 아픈데 발목·엉덩이부터 보는 이유', angle: '사지·하중 사슬' },
       { topic: '팔꿈치·손목이 뻐근할 때, 어깨만 보면 안 되는 이유', angle: '상지 보상' },
       { topic: '발목이 자주 접질리는 패턴, 무릎과 연결되나요?', angle: '하지 안정성' },
       { topic: '오래 서 있으면 무릎 앞이 무거운 이유', angle: '하지 하중·정렬' },
       { topic: '손·발 저림, 사지 끝만의 문제일까요?', angle: '사지·신경 경로 오해' }
     ],
-    '4': [
+    '5': [
       { topic: '한 부위만 아픈데 전신을 보는 이유', angle: '전신 패턴' },
       { topic: '"딱 소리"가 나야 치료가 된 걸까요?', angle: '도수 오해 해소' },
       { topic: '도수치료 횟수, 얼마나 해야 방향이 보이나요?', angle: '기대치·재평가' },
@@ -3021,27 +3031,34 @@ const PROGRAM_INITIAL_STEP_TOPICS = {
   },
   '1': {
     '1': [
+      { topic: '운동을 해도 몸이 안 바뀌는 흔한 이유', angle: '운동상식·오해 해소' },
+      { topic: '스트레칭·근력·기능운동, 뭐부터 할까요?', angle: '운동상식·순서' },
+      { topic: '"매일 운동"보다 중요한 한 가지', angle: '운동상식·습관' },
+      { topic: '아프다고 쉬기만 하면 안 되는 경우', angle: '운동상식·움직임 필요' },
+      { topic: '운동 전후에 꼭 확인할 몸의 신호', angle: '운동상식·안전·자가체크' }
+    ],
+    '2': [
       { topic: '스트레칭을 매일 해도 몸이 안 풀리는 이유', angle: '유연성·스트레칭 오해 해소' },
       { topic: 'P-스트레칭, 억지로 당기면 안 되는 이유', angle: 'Passive 이완의 올바른 강도' },
       { topic: '유연한데 왜 자꾸 삐끗할까요', angle: '가동성과 안정성 순서' },
       { topic: '호흡이 먼저인 이유, 3분만 해보면 압니다', angle: '스트레칭 전 기준선' },
       { topic: '오늘 내 몸이 뻣뻣한지 확인하는 30초', angle: '자가 유연성 체크' }
     ],
-    '2': [
+    '3': [
       { topic: '"바른 자세"를 오래 유지하면 오히려 독인 이유', angle: '정적 자세 vs 동적 조절' },
       { topic: '거북목이라고 단정하기 전에 볼 한 가지', angle: '경추·어깨·호흡 연결' },
       { topic: '라운드 숄더, 어깨만 뒤로 젖히면 안 되는 이유', angle: '흉추·견갑 패턴' },
       { topic: '어깨가 올라간 채 걷는 습관, 어떻게 바꾸나요?', angle: '보행·어깨 긴장 패턴 수정' },
       { topic: '핸드폰 볼 때 목만 들어올리는 착각', angle: '경추-흉추 연동' }
     ],
-    '3': [
+    '4': [
       { topic: '앉아서 일하는 당신을 위한 3분 루틴', angle: '사무 장면 생활습관' },
       { topic: '걷기만 해도 자세가 바뀌는 조건 3가지', angle: '보행 습관 연결' },
       { topic: '집안일·육아 중에도 가능한 정렬 리셋', angle: '생활 동선형 적용' },
       { topic: '오래 앉아 있을 때 허리가 먼저 뻐근해지는 이유', angle: '앉기 습관과 고관절' },
       { topic: '출퇴근길에 붙이는 짧은 리셋', angle: '동선에 붙는 생활습관' }
     ],
-    '4': [
+    '5': [
       { topic: '코어가 안 잡히면 허리가 먼저 아픈 이유', angle: '코어 기능운동' },
       { topic: '스쿼트보다 먼저 해야 할 코어 동작', angle: '기능운동 우선순위' },
       { topic: '운동 전 5분, 코어만 깨워도 부상이 준다', angle: '코어 워밍업' },
@@ -3051,27 +3068,34 @@ const PROGRAM_INITIAL_STEP_TOPICS = {
   },
   '2': {
     '1': [
+      { topic: '얼굴 운동만으로 작아질까요? 먼저 알 사실', angle: '얼굴상식·기대치' },
+      { topic: '붓기·살·비대칭, 같은 문제로 보면 안 되는 이유', angle: '얼굴상식·구분' },
+      { topic: '얼굴은 왜 목·턱과 함께 보나요?', angle: '얼굴상식·구조 관점' },
+      { topic: '셀카·거울로 판단하면 빠지기 쉬운 함정', angle: '얼굴상식·관찰 오해' },
+      { topic: '얼굴 관리, 기대치를 현실로 잡는 법', angle: '얼굴상식·현실 목표' }
+    ],
+    '2': [
       { topic: '셀카에서 한쪽 얼굴만 작아 보이는 진짜 이유', angle: '비대칭·한쪽 얼굴' },
       { topic: '거울로 내 얼굴 패턴 확인하는 3가지 포인트', angle: '비대칭 관찰 체크' },
       { topic: '사진 각도 탓일까, 구조 차이일까?', angle: '과도한 해석 줄이기' },
       { topic: '짝짝이 턱선, 먼저 볼 균형 지표', angle: '비대칭 현실 목표' },
       { topic: '아침/저녁 좌우가 다르게 느껴지는 이유', angle: '부종·긴장·습관' }
     ],
-    '2': [
+    '3': [
       { topic: '얼굴 살이 안 빠지는 이유, 다이어트가 아닐 때', angle: '윤곽·순환·긴장' },
       { topic: '이중턱이 생기는 구조적 이유 3가지', angle: '이중턱·윤곽' },
       { topic: '광대가 도드라져 보일 때, 턱이 원인인 경우', angle: '윤곽·저작 관계' },
       { topic: '붓기만 빼면 윤곽이 살아날까요?', angle: '붓기 기대치' },
       { topic: '"작아 보이게"보다 먼저 볼 균형', angle: '작은얼굴 기대치' }
     ],
-    '3': [
+    '4': [
       { topic: '한쪽으로만 씹는 습관이 남기는 흔적', angle: '턱관절·씹기' },
       { topic: '이갈이·악물기가 얼굴 긴장에 미치는 영향', angle: '턱·저작 습관' },
       { topic: '턱이 딱딱거릴 때, 얼굴 윤곽과 연결되나요?', angle: '턱관절 불편' },
       { topic: '씹을 때 한쪽으로만 힘이 가는 느낌', angle: '저작 패턴' },
       { topic: '턱관절 불편한데 얼굴 운동만 해도 될까요?', angle: '기대치·순서' }
     ],
-    '4': [
+    '5': [
       { topic: '목 긴장이 얼굴을 바꾸게 만드는 경로', angle: '목·자세와 얼굴' },
       { topic: '집에서 할 수 있는 얼굴-목 호흡 루틴', angle: '경추·호흡 연결' },
       { topic: '자는 자세·베개가 얼굴 비대칭에 미치는 영향', angle: '자세 습관' },
@@ -3445,8 +3469,13 @@ function getProgramSeedStrategyGuide_(catId){
   var seed = PROGRAM_INITIAL_PLAN_DRAFTS[String(catId)];
   return seed ? normalizeProgramStrategyGuideTemplate_(String(seed.strategyGuide || '').trim()) : '';
 }
-/** 일반인 궁금증 서랍 개정 — 기존 로드맵 단계 제목을 시드와 맞춤 (글 배정 id 유지) */
-const CURIOSITY_HUB_PLAN_REV = { '0': 'curiosity-v4', '1': 'curiosity-v3', '2': 'curiosity-v4', '7': 'curiosity-v3' };
+/** 일반인 궁금증 서랍 개정 — 제목 매칭으로 단계 재정렬·삽입 (글 배정 유지) */
+const CURIOSITY_HUB_PLAN_REV = { '0': 'curiosity-v5', '1': 'curiosity-v4', '2': 'curiosity-v5', '7': 'curiosity-v3' };
+function curiosityStepTitleKey_(title, catId){
+  return displaySubGoalStepTitle_(String(title || ''), catId)
+    .replace(/[·․.\s\-–—_/]/g, '')
+    .toLowerCase();
+}
 function syncCuriosityHubPlanFromSeed_(catId){
   catId = normalizePendingCatId_(catId);
   var rev = CURIOSITY_HUB_PLAN_REV[String(catId)];
@@ -3458,74 +3487,95 @@ function syncCuriosityHubPlanFromSeed_(catId){
   if(!plan || !Array.isArray(plan.steps) || !plan.steps.length) return false;
   var seed = getInitialProgramPlanDraft_(catId);
   if(!seed || !seed.steps || !seed.steps.length) return false;
-  var needPad = plan.steps.length < seed.steps.length;
-  var needTrim = plan.steps.length > seed.steps.length;
-  if(String(plan.hubRev || '') === rev && !needPad && !needTrim) return false;
-  var n = Math.min(plan.steps.length, seed.steps.length);
+  var titlesAligned = plan.steps.length === seed.steps.length;
+  if(titlesAligned){
+    for(var ti = 0; ti < seed.steps.length; ti++){
+      if(curiosityStepTitleKey_(plan.steps[ti] && plan.steps[ti].title, catId) !==
+         curiosityStepTitleKey_(seed.steps[ti] && seed.steps[ti].title, catId)){
+        titlesAligned = false;
+        break;
+      }
+    }
+  }
+  if(String(plan.hubRev || '') === rev && titlesAligned) return false;
+
+  var byKey = {};
+  plan.steps.forEach(function(st){
+    if(!st) return;
+    var k = curiosityStepTitleKey_(st.title, catId);
+    if(k && !byKey[k]) byKey[k] = st;
+  });
+
+  var idMap = {};
+  var newSteps = [];
   var changed = false;
-  for(var i = 0; i < n; i++){
-    var step = plan.steps[i];
-    var ss = seed.steps[i];
-    if(!step || !ss) continue;
-    if(String(step.title || '') !== String(ss.title || '')){
-      step.title = ss.title || step.title;
-      changed = true;
-    }
-    if(ss.summary && String(step.summary || '') !== String(ss.summary || '')){
-      step.summary = ss.summary;
-      changed = true;
-    }
-    if(ss.rationale && String(step.rationale || '') !== String(ss.rationale || '')){
-      step.rationale = ss.rationale;
-      changed = true;
-    }
+  seed.steps.forEach(function(ss, i){
     var wantId = 's' + (i + 1);
-    if(String(step.id || '') !== wantId){
-      step.id = wantId;
-      changed = true;
-    }
-  }
-  for(var j = plan.steps.length; j < seed.steps.length; j++){
-    var add = seed.steps[j];
-    plan.steps.push({
-      id: 's' + (j + 1),
-      layer: add.layer || '',
-      title: add.title || '',
-      summary: add.summary || '',
-      rationale: add.rationale || '',
-      pinned: false
-    });
-    changed = true;
-  }
-  if(plan.steps.length > seed.steps.length){
-    var removed = plan.steps.slice(seed.steps.length);
-    plan.steps = plan.steps.slice(0, seed.steps.length);
-    changed = true;
-    var miscLabel = getSubGoalMiscLabel_(plan);
-    removed.forEach(function(rs){
-      var rid = String(rs && rs.id != null ? rs.id : '').trim();
-      if(!rid) return;
-      var orphan = getDraftsForSubGoalStep_(catId, rid, { live: true }) || [];
-      orphan.forEach(function(d, oi){
-        if(!d) return;
-        var miscPeers = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true }) || [];
-        var order = miscPeers.length + oi + 1;
-        applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, order, Math.max(order, 1));
-        try { ensurePendingAssignmentForDraft_(catId, SUBGOAL_MISC_ID, order, d.id); } catch(eAsg){}
+    var k = curiosityStepTitleKey_(ss.title, catId);
+    var prev = (k && byKey[k]) ? byKey[k] : null;
+    if(prev){
+      var oldId = String(prev.id || '');
+      newSteps.push({
+        id: wantId,
+        layer: prev.layer || ss.layer || '',
+        title: ss.title || prev.title || '',
+        summary: ss.summary || prev.summary || '',
+        rationale: ss.rationale || prev.rationale || '',
+        pinned: !!prev.pinned
       });
-    });
-  }
-  // 옛 제목 잔재(교정 루틴 등)가 시드 자리 안에 남은 경우 제목으로도 한 번 더 맞춤
-  plan.steps.forEach(function(st, idx){
-    if(!st || !seed.steps[idx]) return;
-    var raw = String(st.title || '');
-    if(/교정\s*루틴|결과\s*유지|원인\s*구조\s*분해|비대칭\s*관찰/.test(raw)){
-      st.title = seed.steps[idx].title || st.title;
-      if(seed.steps[idx].summary) st.summary = seed.steps[idx].summary;
-      if(seed.steps[idx].rationale) st.rationale = seed.steps[idx].rationale;
+      if(oldId && oldId !== wantId){
+        idMap[oldId] = wantId;
+        if(/^\d+$/.test(oldId)) idMap['s' + oldId] = wantId;
+        var bare = oldId.replace(/^s/i, '');
+        if(bare && bare !== oldId) idMap[bare] = wantId;
+      }
+      if(String(prev.title || '') !== String(ss.title || '') ||
+         (ss.summary && String(prev.summary || '') !== String(ss.summary || '')) ||
+         (ss.rationale && String(prev.rationale || '') !== String(ss.rationale || '')) ||
+         oldId !== wantId){
+        changed = true;
+      }
+      delete byKey[k];
+    } else {
+      newSteps.push({
+        id: wantId,
+        layer: ss.layer || '',
+        title: ss.title || '',
+        summary: ss.summary || '',
+        rationale: ss.rationale || '',
+        pinned: false
+      });
       changed = true;
     }
   });
+
+  var miscLabel = getSubGoalMiscLabel_(plan);
+  Object.keys(byKey).forEach(function(k){
+    var rs = byKey[k];
+    if(!rs) return;
+    changed = true;
+    var rid = String(rs.id != null ? rs.id : '').trim();
+    if(!rid) return;
+    var orphan = getDraftsForSubGoalStep_(catId, rid, { live: true }) || [];
+    orphan.forEach(function(d, oi){
+      if(!d) return;
+      var miscPeers = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true }) || [];
+      var order = miscPeers.length + oi + 1;
+      applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, order, Math.max(order, 1));
+      try { ensurePendingAssignmentForDraft_(catId, SUBGOAL_MISC_ID, order, d.id); } catch(eAsg){}
+    });
+  });
+
+  if(plan.steps.length !== newSteps.length) changed = true;
+  plan.steps = newSteps;
+
+  if(Object.keys(idMap).length){
+    try {
+      remapDraftStepIdsForCat_({ draftBrandOverrides: state.draftBrandOverrides }, catId, idMap);
+    } catch(eMap){}
+    changed = true;
+  }
+
   if(seed.strategyGuide){
     var sg = normalizeProgramStrategyGuideTemplate_(seed.strategyGuide);
     if(String(plan.strategyGuide || plan.criteria || plan.intent || '').trim() !== sg){
@@ -3537,7 +3587,7 @@ function syncCuriosityHubPlanFromSeed_(catId){
   }
   plan.hubRev = rev;
   if(changed) plan.updatedAt = new Date().toISOString();
-  return changed || needPad || needTrim;
+  return changed || !titlesAligned;
 }
 function syncAllCuriosityHubPlansFromSeed_(){
   if(!state.branding || !state.branding.subGoalPlans) return false;

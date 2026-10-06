@@ -10,7 +10,7 @@ const CATEGORIES = [
       {id:"d0-3", topic:"연부조직 치료, 어디까지 해야 효과가 날까요?",         angle:"근막·인대·건 각각의 치료 접근과 적절한 치료 횟수 가이드"},
       {id:"d0-4", topic:"목·허리·어깨 중 가장 먼저 치료해야 할 곳은?",        angle:"연쇄 보상 패턴 설명으로 치료 순서의 중요성 강조"},
     ]},
-  { id:1, icon:"", name:"리:얼 무브먼트",   color:"#1f1f1f", audience:"일반인",
+  { id:1, icon:"", name:"리얼 무브먼트",   color:"#1f1f1f", audience:"일반인",
     sub:"Re-Alignment Movement Center — 패시브 스트레칭 · 기능운동 · 자세교정",
     drafts:[
       {id:"d1-0", topic:"스트레칭을 매일 해도 왜 몸이 안 풀릴까요?",           angle:"패시브 스트레칭의 올바른 방법과 잘못된 습관 교정"},
@@ -87,7 +87,7 @@ const CATEGORIES = [
 const CAT_TAB_NAV_ROWS = [[0, 1, 2, 7], [3, 5, 4, 6]];
 const CAT_TAB_SHORT = {
   0: '도수치료',
-  1: '리:얼 무브먼트',
+  1: '리얼 무브먼트',
   2: '리얼 페이스',
   7: '힐자계',
   3: 'CMT 과정',
@@ -2894,32 +2894,32 @@ const CATEGORY_THREE_MONTH_OUTCOME = {
 const PROGRAM_INITIAL_PLAN_DRAFTS = {
   '0': {
     brandProfile: '통증 부위를 단편적으로 다루지 않고, 구조·연부조직·기능을 함께 설명하는 도수치료 관점이 핵심입니다. 독자는 "왜 이 부위가 먼저인지"를 이해해야 치료 순서에 신뢰를 가질 수 있습니다. 과장된 즉효 표현보다 평가 기반 접근(History·Movement·Palpation)을 일관되게 보여 주세요.',
-    strategyGuide: '기준:\n- 주제는 통증 이름보다 "원인 구조"를 먼저 설명한다.\n- 단계는 인식(오해 해소) → 원인 이해 → 우선순위 결정 → 유지 전략 순으로 배치한다.\n- 각 단계는 독자가 바로 적용할 1가지 행동을 포함한다.\n\n의도:\n- 치료 전 불안을 낮추고, 치료 순서를 스스로 납득하게 만든다.\n- 단기 완화 기대를 "재발 줄이는 구조 이해"로 전환한다.\n- 상담 시 "왜 지금 이 접근인지"를 설명하는 기준 문장을 확보한다.',
+    strategyGuide: '기준:\n- 단계는 회원이 찾는 부위·질문(목·어깨 / 허리·골반·고관절 / 무릎·발목 / 도수 오해·횟수·재발)으로 나눈다. 수업 순서가 아니라 궁금증 서랍이다.\n- 주제는 통증 이름만 나열하지 말고, 글 안에서 "원인 구조·왜 이 부위부터"를 1줄로 설명한다.\n- 각 단계는 독자가 바로 적용할 1가지 행동을 포함한다.\n\n의도:\n- 검색·상담 질문과 단계가 맞닿게 한다.\n- 단기 완화 기대를 "재발 줄이는 구조 이해"로 전환한다.\n- 상담 시 "왜 지금 이 접근인지"를 설명하는 기준 문장을 확보한다.',
     steps: [
-      { id: '1', title: '1단계 · 통증 오해 정리', summary: '통증을 근육만의 문제로 보는 오해를 바로잡기', rationale: '독자가 현재 통증 해석을 바꾸지 않으면 이후 설명을 받아들이기 어렵습니다. 먼저 흔한 오해를 짚어 방어를 낮추고, 구조적 접근의 필요성을 받아들이게 합니다.' },
-      { id: '2', title: '2단계 · 원인 구조 파악', summary: '관절·연부조직·보상 패턴을 연결해서 이해시키기', rationale: '통증 위치와 원인 위치가 다를 수 있음을 이해해야 치료 방향이 명확해집니다. 독자가 자기 몸의 패턴을 설명할 수 있게 만드는 단계입니다.' },
-      { id: '3', title: '3단계 · 치료 우선순위 설계', summary: '무엇을 먼저, 무엇을 나중에 할지 기준 제시', rationale: '치료 순서를 제시하면 막연한 불안을 줄이고 실행 의지를 높일 수 있습니다. "왜 이 부위부터"에 대한 근거를 제시해 상담 전환을 돕습니다.' },
-      { id: '4', title: '4단계 · 재발 방지 루틴 연결', summary: '도수 후 생활·움직임 루틴으로 유지 전략 만들기', rationale: '치료 효과를 유지하려면 일상 행동 변화가 필요합니다. 독자가 스스로 관리 가능한 최소 루틴을 확보하도록 마무리합니다.' }
+      { id: '1', title: '1단계 · 목·어깨', summary: '거북목·승모·어깨 통증과 연쇄 보상', rationale: '목·어깨는 가장 흔한 상담·검색 키워드입니다. 부위 글 안에서 왜 인접 구조를 보는지 설명합니다.' },
+      { id: '2', title: '2단계 · 허리·골반·고관절', summary: '허리 통증과 골반·고관절 연결', rationale: '허리만 보면 반복되는 경우가 많습니다. 골반·고관절을 같은 서랍에서 이해하게 합니다.' },
+      { id: '3', title: '3단계 · 무릎·발목', summary: '무릎·발목 통증과 하중·보행 패턴', rationale: '하체 통증도 부위만 다루면 재발하기 쉽습니다. 하중과 보행 맥락을 함께 둡니다.' },
+      { id: '4', title: '4단계 · 도수 오해·횟수·재발', summary: '소리·횟수·재발에 대한 기대치와 유지', rationale: '치료 전 불안과 재발 걱정이 이탈을 만듭니다. 오해 해소와 유지 루틴을 한 서랍에 둡니다.' }
     ]
   },
   '1': {
     brandProfile: '리얼무브먼트는 **보건의료 배경의 임상가**가 인체를 바탕으로 지도하는 **기능재활·움직임 센터** 컬러가 핵심입니다. PAR·Position으로 "좋은 자세를 고정"이 아니라 "움직임을 조절"하도록 돕습니다. 일상 동작(앉기·걷기·업무)에서 바로 써먹을 표현을 우선하고, 도수치료·카이로프랙틱·시술 장면을 주인공처럼 부각하지 마세요(마이너스). 표기 「리얼무브먼트」붙여 쓰기·한 줄(리:얼 금지), Re:Al 유지. 치료행위 수행 암시 금지 — 「치료를 해도 반복=자세/움직임」 맥락은 허용.',
-    strategyGuide: '기준:\n- 단계는 감각 깨우기 → 동작 패턴 교정 → 일상 적용 → 유지 습관 순으로 구성한다.\n- 각 단계는 3~5분 내 가능한 마이크로 루틴을 포함한다.\n- "정답 자세"보다 상황별 조절 원칙을 제시한다.\n\n의도:\n- 독자가 자세 교정을 부담이 아닌 생활 기술로 인식하게 한다.\n- 통증 예방과 피로 감소를 일상 동작에서 체감하게 만든다.\n- 센터 방문 전후 모두 유지 가능한 자기조절 프레임을 만든다.',
+    strategyGuide: '기준:\n- 단계는 회원이 찾는 말(유연성·자세·생활습관·기능운동)로 나눈다. 수업 순서가 아니라 궁금증 서랍이다.\n- 각 글은 왜 1줄 + 바로 할 수 있는 1가지를 포함한다.\n- "정답 자세"보다 상황별 조절 원칙을 제시한다.\n\n의도:\n- 독자가 자세·스트레칭·기능운동을 생활 기술로 인식하게 한다.\n- 검색·상담 질문과 단계가 맞닿게 한다.\n- 센터 방문 전후 모두 유지 가능한 자기조절 프레임을 만든다.',
     steps: [
-      { id: '1', title: '1단계 · 감각 깨우기', summary: '호흡·기준선 회복으로 몸 상태를 먼저 인식하기', rationale: '몸 상태를 모르면 교정 신호를 받아들이기 어렵습니다. 가장 쉬운 감각 입력부터 시작해 "지금 내 몸"을 파악하도록 돕습니다.' },
-      { id: '2', title: '2단계 · 움직임 패턴 정리', summary: 'PAR 기반으로 잘못된 반복 동작을 수정하기', rationale: '반복 패턴을 바꾸지 않으면 통증과 피로가 재생산됩니다. 작은 동작 수정으로 즉시 체감 가능한 변화를 만들도록 구성합니다.' },
-      { id: '3', title: '3단계 · 일상 동작 연결', summary: '앉기·걷기·업무 동작에 교정 원칙 적용하기', rationale: '운동 시간보다 생활 시간이 더 길기 때문에, 실제 생활 장면에 연결해야 효과가 유지됩니다. 상황별 적용 예시로 실행 장벽을 낮춥니다.' },
-      { id: '4', title: '4단계 · 1주 유지 루틴', summary: '무리 없는 주간 루틴으로 습관화하기', rationale: '좋은 움직임은 반복으로 굳어집니다. 과도한 계획 대신 유지 가능한 최소 루틴을 제시해 장기 지속을 유도합니다.' }
+      { id: '1', title: '1단계 · 유연성·스트레칭', summary: '안 풀리는 이유와 올바른 스트레칭·이완', rationale: '회원이 가장 먼저 찾는 말인 유연성·스트레칭을 서랍으로 둡니다. 억지 당기기와 Passive 방법의 차이를 먼저 잡습니다.' },
+      { id: '2', title: '2단계 · 자세·거북목·라운드 숄더', summary: '거북목·라운드숄더·정렬을 스스로 조절하기', rationale: '자세·거북목은 상담·검색의 핵심 키워드입니다. 고정 자세가 아니라 조절 가능한 움직임을 안내합니다.' },
+      { id: '3', title: '3단계 · 앉기·걷기 생활습관', summary: '앉기·걷기·업무 동선에 붙이는 습관', rationale: '운동 시간보다 생활 시간이 깁니다. 앉기·걷기 같은 장면 루틴으로 실행 장벽을 낮춥니다.' },
+      { id: '4', title: '4단계 · 기능운동', summary: '일상·보행에 쓰는 기능운동으로 연결', rationale: '스트레칭·자세만으로는 유지가 어렵습니다. 기능을 쓰는 동작으로 결과를 체감하게 합니다.' }
     ]
   },
   '2': {
     brandProfile: '리얼 페이스는 **임상가가 구조를 아는 기능·웰니스 접근**으로, 얼굴만 따로 보지 않고 경추·호흡·생활습관까지 함께 봅니다. "작은 얼굴" 기대는 과장 없이. 미용·시술·도수/카이로 장면을 주인공처럼 부각하지 말고, 균형·순환·긴장 완화·습관 조절을 강조하세요. 표기 「리얼 페이스」(리:얼 금지), Re:Al Face 유지. 치료행위 수행 암시 금지.',
-    strategyGuide: '기준:\n- 단계는 관찰(비대칭 인식) → 원인 분해(습관·구조) → 교정 루틴 → 유지 관리 순으로 구성한다.\n- 전/후 기대치는 기간·개인차를 반드시 함께 안내한다.\n- 얼굴 문제를 경추·호흡·저작 패턴과 연결해 설명한다.\n\n의도:\n- 단기 외형 집착을 줄이고 구조 기반 관리 관점을 심는다.\n- 스스로 악화 습관을 파악·교정할 수 있게 만든다.\n- 상담 시 현실적인 목표 설정으로 이탈을 줄인다.',
+    strategyGuide: '기준:\n- 단계는 회원이 찾는 말(비대칭·윤곽·턱관절·목·자세)로 나눈다. 수업 순서가 아니라 궁금증 서랍이다.\n- 전/후 기대치는 기간·개인차를 반드시 함께 안내한다.\n- 얼굴 문제를 경추·호흡·저작 패턴과 연결해 설명한다.\n\n의도:\n- 검색·상담 질문과 단계가 맞닿게 한다.\n- 단기 외형 집착을 줄이고 구조 기반 관리 관점을 심는다.\n- 상담 시 현실적인 목표 설정으로 이탈을 줄인다.',
     steps: [
-      { id: '1', title: '1단계 · 비대칭 관찰', summary: '내 얼굴 패턴을 객관적으로 확인하는 법 익히기', rationale: '문제를 정확히 보지 못하면 잘못된 관리가 반복됩니다. 먼저 관찰 기준을 제공해 자기 인식을 높입니다.' },
-      { id: '2', title: '2단계 · 원인 구조 분해', summary: '습관·저작·경추 요인을 나눠서 이해하기', rationale: '원인을 분해해야 해결 순서를 정할 수 있습니다. "왜 한쪽이 더 쓰이는지"를 설명해 납득을 만듭니다.' },
-      { id: '3', title: '3단계 · 교정 루틴 적용', summary: '얼굴-목-호흡을 묶은 실천 루틴 시작하기', rationale: '이론만으로는 변화가 생기지 않습니다. 부담 없는 루틴으로 실제 체감 변화를 시작하도록 구성합니다.' },
-      { id: '4', title: '4단계 · 결과 유지 전략', summary: '재발 습관을 줄이는 생활 관리 기준 만들기', rationale: '유지 전략이 없으면 초기 변화가 금방 흐려집니다. 일상 습관 점검 포인트를 고정해 지속 가능성을 높입니다.' }
+      { id: '1', title: '1단계 · 비대칭·한쪽 얼굴', summary: '셀카·짝짝이·한쪽만 작아 보이는 패턴', rationale: '비대칭·한쪽 얼굴은 가장 흔한 진입 키워드입니다. 관찰 기준과 과장 없는 해석을 먼저 둡니다.' },
+      { id: '2', title: '2단계 · 윤곽·이중턱·붓기', summary: '살·붓기·윤곽·작은얼굴 기대치', rationale: '윤곽·이중턱·붓기는 관심도가 높습니다. 다이어트만의 문제로 보지 않도록 구조를 나눕니다.' },
+      { id: '3', title: '3단계 · 턱관절·씹기', summary: '이갈이·한쪽으로 씹기·턱관절 불편', rationale: '저작·턱 습관이 얼굴 패턴을 만듭니다. 습관과 구조를 연결하는 서랍입니다.' },
+      { id: '4', title: '4단계 · 목·자세와 얼굴', summary: '경추·자세·호흡이 얼굴에 미치는 영향', rationale: '얼굴만 따로 보지 않는 브랜드 강점입니다. 목·자세 연결로 차별을 만듭니다.' }
     ]
   },
   '3': {
@@ -2972,12 +2972,12 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
   },
   '7': {
     brandProfile: '힐자계는 입주민이 집 근처에서 부담 없이 따라할 수 있는 생활형 케어가 핵심입니다. **기능재활·움직임 센터**의 쉬운 버전으로, 엘리베이터 앞·거실·출근 전 동선을 기준으로 안내하세요. 도수·카이로·시술 톤은 쓰지 말고, 짧은 루틴·안전한 표현을 우선합니다.',
-    strategyGuide: '기준:\n- 단계는 불편 공감 → 쉬운 이완 → 자세·움직임 연결 → 생활 고정 순으로 구성한다.\n- 한 콘텐츠당 동작은 1~2개로 제한한다.\n- 통증 악화·저림 등 경고 신호 시 병원 진료 권유 문구를 포함한다.\n\n의도:\n- 입주민이 "어렵지 않다"는 경험을 반복하게 만든다.\n- 과한 운동 대신 꾸준한 생활형 루틴을 정착시킨다.\n- 지역 커뮤니티 신뢰를 높여 상담 접점을 자연스럽게 만든다.',
+    strategyGuide: '기준:\n- 단계는 건강상식 → 통증 셀프케어 → 자세 셀프운동 → 얼굴 셀프운동으로 나눈다.\n- 한 콘텐츠당 동작은 1~2개로 제한한다.\n- 통증 악화·저림 등 경고 신호 시 병원 진료 권유 문구를 포함한다.\n\n의도:\n- 입주민이 "어렵지 않다"는 경험을 반복하게 만든다.\n- 과한 운동 대신 꾸준한 생활형 루틴을 정착시킨다.\n- 지역 커뮤니티 신뢰를 높여 상담 접점을 자연스럽게 만든다.',
     steps: [
-      { id: '1', title: '1단계 · 불편 공감 시작', summary: '입주민 일상에서 자주 겪는 불편을 정확히 짚기', rationale: '내 이야기라고 느껴야 행동이 시작됩니다. 생활 맥락의 불편을 먼저 공감해 참여를 유도합니다.' },
-      { id: '2', title: '2단계 · 1분 이완 루틴', summary: '누구나 바로 가능한 짧은 이완 동작 제시', rationale: '복잡한 설명보다 즉시 실행이 중요합니다. 1분 루틴으로 첫 성공 경험을 만들도록 구성합니다.' },
-      { id: '3', title: '3단계 · 자세·기능 연결', summary: '이완 후 자세와 가벼운 기능동작으로 확장', rationale: '이완만으로는 유지가 어렵습니다. 자세와 기능을 연결해 일상 체감 효과를 높입니다.' },
-      { id: '4', title: '4단계 · 생활 루틴 고정', summary: '집·직장 동선에 붙이는 반복 습관 만들기', rationale: '지역 프로그램은 지속성이 성패를 가릅니다. 생활 동선에 붙는 습관으로 장기 실행을 돕습니다.' }
+      { id: '1', title: '1단계 · 건강상식', summary: '입주민이 궁금해하는 몸·생활 상식을 쉽게', rationale: '어려운 이론보다 "이런 말이 맞나?"에 답하는 상식 글이 커뮤니티 진입을 엽니다.' },
+      { id: '2', title: '2단계 · 통증 셀프케어', summary: '뻐근함·가벼운 불편을 스스로 다루는 법', rationale: '목·어깨·허리 등 흔한 불편에 짧고 안전한 셀프케어를 붙여 신뢰와 실행을 동시에 만듭니다.' },
+      { id: '3', title: '3단계 · 자세 셀프운동', summary: '집·동선에서 하는 짧은 자세 운동', rationale: '엘리베이터·거실·재택 장면의 자세 루틴으로 "나도 할 수 있다"를 반복합니다.' },
+      { id: '4', title: '4단계 · 얼굴 셀프운동', summary: '붓기·긴장 완화를 위한 가벼운 얼굴 움직임', rationale: '얼굴은 관심도가 높고 부담이 낮습니다. 과장 없이 짧은 셀프운동으로 연결합니다.' }
     ]
   }
 };
@@ -2985,92 +2985,92 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
 const PROGRAM_INITIAL_STEP_TOPICS = {
   '0': {
     '1': [
-      { topic: '통증이 근육만의 문제라면, 왜 스트레칭으로 안 풀릴까요?', angle: '통증=근육 오해 해소 + 구조 관점 입문' },
-      { topic: '"쉬면 괜찮아지겠죠?"가 위험한 말이 되는 경우', angle: '휴식과 방치의 차이, 조기 평가 필요성' },
-      { topic: '치료 받고 더 아플 때, 호전 반응일까 문제일까?', angle: '호전 반응 vs 부작용 구분 기준' },
-      { topic: '통증 위치와 원인 위치가 다를 수 있는 이유', angle: '방사통·보상 패턴을 쉽게 설명' },
-      { topic: '"딱 소리"가 나야 치료가 된 걸까요?', angle: '관절가동 오해 해소와 신뢰 기준' }
+      { topic: '목 통증인데 어깨를 함께 보는 진짜 이유', angle: '목·어깨 연쇄 보상' },
+      { topic: '승모근만 풀면 왜 금방 다시 뻐근해질까요?', angle: '목·어깨 구조 관점' },
+      { topic: '거북목처럼 보여도, 먼저 확인할 한 가지', angle: '경추·어깨 단정 전에' },
+      { topic: '어깨가 올라간 채 버티는 하루, 어디서부터 풀까요?', angle: '목·어깨 우선순위' },
+      { topic: '목·어깨 중 이번 주에 먼저 손댈 곳은?', angle: '부위 선택 체크' }
     ],
     '2': [
-      { topic: '허리가 뻐근한데, 왜 고관절부터 보나요?', angle: '인접 관절·연부조직 연결 설명' },
-      { topic: '목 통증인데 어깨를 치료하는 진짜 이유', angle: '연쇄 보상과 치료 순서 논리' },
-      { topic: '관절·근막·건, 어디를 먼저 봐야 하나요?', angle: '연부조직·관절 우선순위 프레임' },
-      { topic: '같은 허리 통증, 사람마다 다른 이유 3가지', angle: '구조·습관·기능 개인차 설명' },
-      { topic: '"뼈가 틀어졌다"는 말, 어디까지 사실일까요?', angle: '과장 없이 구조 변화 설명' }
+      { topic: '허리가 뻐근한데, 왜 고관절부터 보나요?', angle: '허리·골반·고관절 연결' },
+      { topic: '같은 허리 통증, 사람마다 다른 이유 3가지', angle: '구조·습관·기능 개인차' },
+      { topic: '골반이 틀어졌다는 말, 어디까지 사실일까요?', angle: '과장 없이 골반 설명' },
+      { topic: '앉았다 일어날 때 허리가 먼저 아픈 이유', angle: '고관절·허리 하중' },
+      { topic: '허리만 스트레칭해도 안 풀릴 때', angle: '인접 관절 관점' }
     ],
     '3': [
-      { topic: '목·허리·어깨 중, 이번 달에 먼저 손댈 곳은?', angle: '우선순위 결정 체크리스트' },
-      { topic: '통증 줄이기와 원인 해결, 뭐가 먼저인가요?', angle: '증상 완화 vs 구조 개입 순서' },
-      { topic: '도수치료 횟수, 얼마나 해야 방향이 보이나요?', angle: '기대치·재평가 기준 제시' },
-      { topic: '병원에서 검사 정상인데도 아픈 이유', angle: '기능·구조 관점의 해석 프레임' },
-      { topic: '오늘 상담에서 확인할 질문 5가지', angle: '환자가 스스로 확인할 우선순위 질문' }
+      { topic: '무릎이 아픈데 발목·엉덩이부터 보는 이유', angle: '무릎·발목 하중 사슬' },
+      { topic: '계단만 오르내려도 무릎이 뻐근할 때', angle: '무릎 통증 생활 장면' },
+      { topic: '발목이 자주 접질리는 패턴, 무릎과 연결되나요?', angle: '발목·무릎 안정성' },
+      { topic: '오래 서 있으면 무릎 앞이 무거운 이유', angle: '하중·정렬 관점' },
+      { topic: '무릎 보호, 근력만 키우면 충분할까요?', angle: '기능·구조 균형' }
     ],
     '4': [
-      { topic: '치료 후 3일, 집에선 무엇을 하면 좋을까요?', angle: '재발 방지 최소 루틴' },
-      { topic: '앉아서 일할 때 통증 재발 막는 2분 루틴', angle: '직장 환경형 유지 전략' },
-      { topic: '스트레칭만 늘리면 왜 다시 뻐근해질까요?', angle: '단순 스트레칭의 한계 + 순서' },
-      { topic: '통증 없는 날에도 해야 하는 관리가 있나요?', angle: '예방형 최소 루틴 안내' },
-      { topic: '좋아졌다 싶다가 다시 아픈 사이클 끊는 법', angle: '재발 신호 인식과 조기 대응' }
+      { topic: '"딱 소리"가 나야 치료가 된 걸까요?', angle: '도수 오해 해소' },
+      { topic: '도수치료 횟수, 얼마나 해야 방향이 보이나요?', angle: '기대치·재평가' },
+      { topic: '치료 받고 더 아플 때, 호전 반응일까 문제일까?', angle: '호전 반응 vs 문제' },
+      { topic: '좋아졌다 싶다가 다시 아픈 사이클 끊는 법', angle: '재발 신호·조기 대응' },
+      { topic: '치료 후 3일, 집에선 무엇을 하면 좋을까요?', angle: '재발 방지 최소 루틴' }
     ]
   },
   '1': {
     '1': [
-      { topic: '스트레칭을 매일 해도 몸이 안 풀리는 이유', angle: '감각·기준선 회복이 먼저인 이유' },
-      { topic: '"바른 자세"를 오래 유지하면 오히려 독인 이유', angle: '정적 자세 vs 동적 조절' },
-      { topic: '호흡이 먼저인 이유, 3분만 해보면 압니다', angle: '호흡-긴장 기준선 체감' },
-      { topic: '누워서 시작하는 게 운동보다 중요한 날', angle: 'Position 1 감각 깨우기' },
-      { topic: '오늘 내 몸이 뻣뻣한지 확인하는 30초', angle: '자가 감각 체크 루틴' }
+      { topic: '스트레칭을 매일 해도 몸이 안 풀리는 이유', angle: '유연성·스트레칭 오해 해소' },
+      { topic: 'P-스트레칭, 억지로 당기면 안 되는 이유', angle: 'Passive 이완의 올바른 강도' },
+      { topic: '유연한데 왜 자꾸 삐끗할까요', angle: '가동성과 안정성 순서' },
+      { topic: '호흡이 먼저인 이유, 3분만 해보면 압니다', angle: '스트레칭 전 기준선' },
+      { topic: '오늘 내 몸이 뻣뻣한지 확인하는 30초', angle: '자가 유연성 체크' }
     ],
     '2': [
-      { topic: '운동 전 5분, 이것만 하면 부상이 준다', angle: '기능적 워밍업·PAR 입문' },
-      { topic: 'P-스트레칭, 억지로 당기면 안 되는 이유', angle: 'Passive 이완의 올바른 강도' },
-      { topic: '고관절이 안 열리면 허리가 먼저 아파요', angle: '움직임 사슬 패턴 교정' },
+      { topic: '"바른 자세"를 오래 유지하면 오히려 독인 이유', angle: '정적 자세 vs 동적 조절' },
+      { topic: '거북목이라고 단정하기 전에 볼 한 가지', angle: '경추·어깨·호흡 연결' },
+      { topic: '라운드 숄더, 어깨만 뒤로 젖히면 안 되는 이유', angle: '흉추·견갑 패턴' },
       { topic: '어깨가 올라간 채 걷는 습관, 어떻게 바꾸나요?', angle: '보행·어깨 긴장 패턴 수정' },
-      { topic: '"힘을 빼라"는 말, 실제로 어떻게 하나요?', angle: '이완 큐·감각 안내' }
+      { topic: '핸드폰 볼 때 목만 들어올리는 착각', angle: '경추-흉추 연동' }
     ],
     '3': [
-      { topic: '앉아서 일하는 당신을 위한 3분 루틴', angle: '사무 장면 적용' },
+      { topic: '앉아서 일하는 당신을 위한 3분 루틴', angle: '사무 장면 생활습관' },
       { topic: '걷기만 해도 자세가 바뀌는 조건 3가지', angle: '보행 습관 연결' },
       { topic: '집안일·육아 중에도 가능한 정렬 리셋', angle: '생활 동선형 적용' },
-      { topic: '스쿼트보다 먼저 해야 할 일상 동작', angle: '기능동작 우선순위' },
-      { topic: '핸드폰 볼 때 목만 들어올리는 착각', angle: '경추-흉추 연동 습관 교정' }
+      { topic: '오래 앉아 있을 때 허리가 먼저 뻐근해지는 이유', angle: '앉기 습관과 고관절' },
+      { topic: '출퇴근길에 붙이는 짧은 리셋', angle: '동선에 붙는 생활습관' }
     ],
     '4': [
-      { topic: '바쁜 주를 위한 움직임 루틴 템플릿', angle: '주 3회 최소 유지 설계' },
-      { topic: '컨디션 저하일 때 강도 낮추는 기준', angle: 'progression / regression' },
-      { topic: '좋아진 감각을 놓치지 않는 체크리스트', angle: '자기점검 습관화' },
-      { topic: '운동을 쉬어도 패턴이 안 흐트러지게', angle: '유지형 마이크로 루틴' },
-      { topic: '한 달 후를 위한 이번 주 한 가지 약속', angle: '습관 고정 CTA' }
+      { topic: '스쿼트보다 먼저 해야 할 일상 동작', angle: '기능운동 우선순위' },
+      { topic: '운동 전 5분, 이것만 하면 부상이 준다', angle: '기능적 워밍업' },
+      { topic: '고관절이 안 열리면 허리가 먼저 아파요', angle: '기능 사슬 연결' },
+      { topic: '앉기·서기·걷기를 기능으로 쓰는 법', angle: 'Position·기능운동 입문' },
+      { topic: '한 달 후를 위한 이번 주 기능운동 한 가지', angle: '습관 고정 CTA' }
     ]
   },
   '2': {
     '1': [
-      { topic: '셀카에서 한쪽 얼굴만 작아 보이는 진짜 이유', angle: '비대칭 관찰 기준 잡기' },
-      { topic: '거울로 내 얼굴 패턴 확인하는 3가지 포인트', angle: '관찰 체크리스트' },
+      { topic: '셀카에서 한쪽 얼굴만 작아 보이는 진짜 이유', angle: '비대칭·한쪽 얼굴' },
+      { topic: '거울로 내 얼굴 패턴 확인하는 3가지 포인트', angle: '비대칭 관찰 체크' },
       { topic: '사진 각도 탓일까, 구조 차이일까?', angle: '과도한 해석 줄이기' },
-      { topic: '아침/저녁 얼굴이 다르게 느껴지는 이유', angle: '부종·긴장·습관 관찰' },
-      { topic: '"작아 보이게"보다 먼저 볼 균형 지표', angle: '현실적 목표 설정' }
+      { topic: '짝짝이 턱선, 먼저 볼 균형 지표', angle: '비대칭 현실 목표' },
+      { topic: '아침/저녁 좌우가 다르게 느껴지는 이유', angle: '부종·긴장·습관' }
     ],
     '2': [
-      { topic: '얼굴 살이 안 빠지는 이유, 다이어트가 아닐 때', angle: '순환·골격·긴장 분리' },
-      { topic: '광대가 도드라져 보일 때, 턱이 원인인 경우', angle: '저작근·골격 관계' },
-      { topic: '이중턱이 생기는 구조적 이유 3가지', angle: '피부·지방·골격 분리 설명' },
-      { topic: '목 긴장이 얼굴을 바꾸게 만드는 경로', angle: '경추-안면 연결' },
-      { topic: '한쪽으로만 씹는 습관이 남기는 흔적', angle: '생활 습관 원인 분해' }
+      { topic: '얼굴 살이 안 빠지는 이유, 다이어트가 아닐 때', angle: '윤곽·순환·긴장' },
+      { topic: '이중턱이 생기는 구조적 이유 3가지', angle: '이중턱·윤곽' },
+      { topic: '광대가 도드라져 보일 때, 턱이 원인인 경우', angle: '윤곽·저작 관계' },
+      { topic: '붓기만 빼면 윤곽이 살아날까요?', angle: '붓기 기대치' },
+      { topic: '"작아 보이게"보다 먼저 볼 균형', angle: '작은얼굴 기대치' }
     ],
     '3': [
-      { topic: '얼굴 교정, 몇 번부터 변화가 느껴질까요?', angle: '기대치·기간 조율' },
-      { topic: '집에서 할 수 있는 얼굴-목 호흡 루틴', angle: '부담 없는 실천 루틴' },
-      { topic: '림프 마사지만으로는 부족한 순간', angle: '표면 vs 구조 접근' },
-      { topic: '자는 자세·베개가 얼굴 비대칭에 미치는 영향', angle: '생활 교정 포인트' },
-      { topic: '기기와 도수, 어떤 순서로 접근하나요?', angle: '통합 접근 입문' }
+      { topic: '한쪽으로만 씹는 습관이 남기는 흔적', angle: '턱관절·씹기' },
+      { topic: '이갈이·악물기가 얼굴 긴장에 미치는 영향', angle: '턱·저작 습관' },
+      { topic: '턱이 딱딱거릴 때, 얼굴 윤곽과 연결되나요?', angle: '턱관절 불편' },
+      { topic: '씹을 때 한쪽으로만 힘이 가는 느낌', angle: '저작 패턴' },
+      { topic: '턱관절 불편한데 얼굴 운동만 해도 될까요?', angle: '기대치·순서' }
     ],
     '4': [
-      { topic: '좋아진 윤곽을 유지하는 습관 관리표', angle: '재발 습관 점검' },
-      { topic: '스트레스·수면이 얼굴을 다시 붓게 할 때', angle: '유지 전략과 컨디션' },
-      { topic: '주 1회 셀프체크 포인트', angle: '관찰 루틴 고정' },
-      { topic: '교정 후 "다시 예전처럼"이 되는 신호', angle: '조기 대응 기준' },
-      { topic: '작은 변화도 오래가는 관리 원칙', angle: '과장 없는 유지 메시지' }
+      { topic: '목 긴장이 얼굴을 바꾸게 만드는 경로', angle: '목·자세와 얼굴' },
+      { topic: '집에서 할 수 있는 얼굴-목 호흡 루틴', angle: '경추·호흡 연결' },
+      { topic: '자는 자세·베개가 얼굴 비대칭에 미치는 영향', angle: '자세 습관' },
+      { topic: '핸드폰 볼 때 목이 얼굴을 당기는 순간', angle: '생활 자세' },
+      { topic: '얼굴만 관리하는데 목이 먼저인 이유', angle: '브랜드 차별 연결' }
     ]
   },
   '3': {
@@ -3196,32 +3196,32 @@ const PROGRAM_INITIAL_STEP_TOPICS = {
   },
   '7': {
     '1': [
-      { topic: '앉아만 있어도 목이 뻐근할 때 먼저 볼 한 가지', angle: '입주민 불편 공감' },
-      { topic: '엘리베이터 앞에서 어깨가 올라가는 순간', angle: '동선형 불편 장면' },
-      { topic: '장보기 다녀온 뒤 허리가 무거운 날', angle: '생활 맥락 공감' },
-      { topic: '아이 등원 후 목이 먼저 굳어지는 아침', angle: '바쁜 일상 공감' },
-      { topic: '"운동할 시간이 없다"가 진짜 고민일 때', angle: '진입 장벽 공감' }
+      { topic: '앉아만 있어도 목이 뻐근할 때 먼저 볼 한 가지', angle: '건강상식 · 단정 전에 관찰' },
+      { topic: '"운동할 시간이 없다"가 진짜 고민일 때', angle: '건강상식 · 진입 장벽' },
+      { topic: '자세 교정, 하루아침에 바뀌지 않는 이유', angle: '건강상식 · 기대치' },
+      { topic: '얼굴이 붓는 날, 물만 마시면 된다는 말의 빈틈', angle: '건강상식 · 과장 없이' },
+      { topic: '아파지면 멈추고, 병원 먼저인 경우', angle: '건강상식 · 안전 신호' }
     ],
     '2': [
-      { topic: 'P-스트레칭이 뭔가요?', angle: '쉬운 이완 개념' },
-      { topic: '엘리베이터 앞에서 할 수 있는 30초 골반 정리', angle: '초단시간 루틴' },
-      { topic: '소파에 앉기 전 1분 목·어깨 이완', angle: '집 동선 루틴' },
-      { topic: '고양이 기지개처럼 가볍게 푸는 법', angle: '강도 낮은 이완' },
-      { topic: '아픈데 억지로 늘리지 말라는 말의 의미', angle: '안전 이완 기준' }
+      { topic: '엘리베이터 앞에서 어깨가 올라가는 순간', angle: '통증 셀프케어 · 목·어깨' },
+      { topic: '장보기 다녀온 뒤 허리가 무거운 날', angle: '통증 셀프케어 · 허리' },
+      { topic: '소파에 앉기 전 1분 목·어깨 이완', angle: '통증 셀프케어 · 짧은 이완' },
+      { topic: '아픈데 억지로 늘리지 말라는 말의 의미', angle: '통증 셀프케어 · 안전 기준' },
+      { topic: '아이 등원 후 목이 먼저 굳어지는 아침', angle: '통증 셀프케어 · 일상 장면' }
     ],
     '3': [
-      { topic: '자세 교정, 하루아침에 바뀌지 않는 이유', angle: '감각부터 바꾸는 접근' },
-      { topic: '얼굴이 붓는 날, 물만 마시면 된다는 말의 빈틈', angle: '가벼운 구조·순환 연결' },
-      { topic: '단지 커뮤니티 다녀온 날 목·어깨 가볍게 푸는 법', angle: '계절+자세 연결' },
-      { topic: '단지 산책 늘린 뒤 종아리 뻐근할 때', angle: '기능 동작 확장' },
-      { topic: '서서 일하는 시간, 골반만 리셋하기', angle: '자세·기능 짧은 연결' }
+      { topic: '엘리베이터 앞에서 할 수 있는 30초 골반 정리', angle: '자세 셀프운동 · 초단시간' },
+      { topic: 'P-스트레칭이 뭔가요?', angle: '자세 셀프운동 · 쉬운 이완' },
+      { topic: '고양이 기지개처럼 가볍게 푸는 법', angle: '자세 셀프운동 · 강도' },
+      { topic: '서서 일하는 시간, 골반만 리셋하기', angle: '자세 셀프운동 · 동선' },
+      { topic: '단지 산책 늘린 뒤 종아리 뻐근할 때', angle: '자세 셀프운동 · 걷기 후' }
     ],
     '4': [
-      { topic: '출퇴근길에 붙이는 주 3회 루틴', angle: '생활 습관 고정' },
-      { topic: '문손잡이 볼 때마다 어깨 내리기', angle: '동선 리마인더' },
-      { topic: '같이 사는 사람과 웃으며 해보는 30초 루틴', angle: '커뮤니티형 유지' },
-      { topic: '아파지면 멈추고, 병원 먼저인 경우', angle: '안전 경고+권유' },
-      { topic: '아파트 생활에서 꾸준함이 생기는 조건', angle: '장기 실행 팁' }
+      { topic: '얼굴이 무겁게 느껴질 때 할 수 있는 30초', angle: '얼굴 셀프운동 · 부담 없이' },
+      { topic: '턱·볼 긴장을 가볍게 푸는 법', angle: '얼굴 셀프운동 · 저작 긴장' },
+      { topic: '목과 함께 하는 짧은 얼굴 리셋', angle: '얼굴 셀프운동 · 경추 연결' },
+      { topic: '아침에 거울 보기 전 가벼운 얼굴 움직임', angle: '얼굴 셀프운동 · 동선' },
+      { topic: '과장 없이 하는 얼굴 셀프케어의 선', angle: '얼굴 셀프운동 · 기대치' }
     ]
   }
 };
@@ -3439,6 +3439,54 @@ function getProgramSeedStrategyGuide_(catId){
   var seed = PROGRAM_INITIAL_PLAN_DRAFTS[String(catId)];
   return seed ? normalizeProgramStrategyGuideTemplate_(String(seed.strategyGuide || '').trim()) : '';
 }
+/** 일반인 궁금증 서랍 개정 — 기존 로드맵 단계 제목을 시드와 맞춤 (글 배정 id 유지) */
+const CURIOSITY_HUB_PLAN_REV = { '0': 'curiosity-v1', '1': 'curiosity-v1', '2': 'curiosity-v1', '7': 'curiosity-v1' };
+function syncCuriosityHubPlanFromSeed_(catId){
+  catId = normalizePendingCatId_(catId);
+  var rev = CURIOSITY_HUB_PLAN_REV[String(catId)];
+  if(!rev) return false;
+  if(!state.branding || typeof state.branding !== 'object') return false;
+  if(!state.branding.subGoalPlans) state.branding.subGoalPlans = {};
+  var key = String(catId);
+  var plan = state.branding.subGoalPlans[key];
+  if(!plan || !Array.isArray(plan.steps) || !plan.steps.length) return false;
+  if(String(plan.hubRev || '') === rev) return false;
+  var seed = getInitialProgramPlanDraft_(catId);
+  if(!seed || !seed.steps || !seed.steps.length) return false;
+  var n = Math.min(plan.steps.length, seed.steps.length);
+  var changed = false;
+  for(var i = 0; i < n; i++){
+    var step = plan.steps[i];
+    var ss = seed.steps[i];
+    if(!step || !ss) continue;
+    if(String(step.title || '') !== String(ss.title || '')){
+      step.title = ss.title || step.title;
+      changed = true;
+    }
+    if(ss.summary){ step.summary = ss.summary; changed = true; }
+    if(ss.rationale){ step.rationale = ss.rationale; changed = true; }
+  }
+  if(seed.strategyGuide){
+    var sg = normalizeProgramStrategyGuideTemplate_(seed.strategyGuide);
+    if(String(plan.strategyGuide || plan.criteria || plan.intent || '').trim() !== sg){
+      plan.strategyGuide = sg;
+      plan.criteria = sg;
+      plan.intent = sg;
+      changed = true;
+    }
+  }
+  plan.hubRev = rev;
+  if(changed) plan.updatedAt = new Date().toISOString();
+  return true;
+}
+function syncAllCuriosityHubPlansFromSeed_(){
+  if(!state.branding || !state.branding.subGoalPlans) return false;
+  var changed = false;
+  Object.keys(CURIOSITY_HUB_PLAN_REV).forEach(function(k){
+    if(syncCuriosityHubPlanFromSeed_(k)) changed = true;
+  });
+  return changed;
+}
 /** 1~2단계만 남은 깨진 로드맵을 시드 3~4단계로 보완 (커스텀 1단계는 유지) */
 function repairIncompleteSubGoalPlan_(catId){
   catId = normalizePendingCatId_(catId);
@@ -3495,6 +3543,7 @@ function repairAllIncompleteSubGoalPlans_(){
   Object.keys(state.branding.subGoalPlans).forEach(function(k){
     if(repairIncompleteSubGoalPlan_(k)) changed = true;
   });
+  if(syncAllCuriosityHubPlansFromSeed_()) changed = true;
   return changed;
 }
 function ensureProgramIdentityPlan_(catId){
@@ -5345,6 +5394,7 @@ function scheduleSubGoalPlanNormalizePersist_(){
 function ensureSubGoalPlanNormalized_(catId){
   var plan = peekSubGoalPlan_(catId);
   if(!plan) return null;
+  try { if(syncCuriosityHubPlanFromSeed_(catId)) state._planNormalizeDirty = true; } catch(eHub){}
   var res = dedupeSubGoalPlanStepsInPlace_(plan, { collectIdMap: true });
   if(res.changed){
     if(res.idMap && Object.keys(res.idMap).length){
@@ -5352,6 +5402,8 @@ function ensureSubGoalPlanNormalized_(catId){
     }
     plan.updatedAt = new Date().toISOString();
     state._planNormalizeDirty = true;
+    scheduleSubGoalPlanNormalizePersist_();
+  } else if(state._planNormalizeDirty){
     scheduleSubGoalPlanNormalizePersist_();
   }
   return plan;
@@ -5881,7 +5933,7 @@ function countFilledStepTopics_(drafts, catId){
   }
   return filterDraftsByTopicListMode_(drafts, catId).length;
 }
-/** 준비 글 탭에서 발행분만 숨겼을 때 「올린 N」 힌트가 보이게 */
+/** 준비↔올린 탭에서 반대편 개수를 링크로 보여 줌 */
 function formatSubGoalStepCountHTML_(drafts, catId){
   var mode = getTopicListMode_();
   var shownN = countFilledStepTopics_(drafts, catId);
@@ -5891,6 +5943,13 @@ function formatSubGoalStepCountHTML_(drafts, catId){
     }).length;
     if(pubN > 0){
       return '(' + shownN + ' · <button type="button" class="subgoal-step-pub-link" title="블로그·인스타 등 발행한 글" onclick="event.stopPropagation();setTopicListMode_(\'published\')">올린 ' + pubN + '</button>)';
+    }
+  } else if(mode === 'published'){
+    var writeN = (drafts || []).filter(function(d){
+      return d && d.id && !draftShowsOnPublishedList_(d.id, catId) && !draftIsShelfEmpty_(d, catId);
+    }).length;
+    if(writeN > 0){
+      return '(' + shownN + ' · <button type="button" class="subgoal-step-pub-link" title="아직 올리지 않은 준비 글" onclick="event.stopPropagation();setTopicListMode_(\'write\')">준비 ' + writeN + '</button>)';
     }
   }
   return '(' + shownN + ')';

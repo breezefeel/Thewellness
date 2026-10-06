@@ -14820,6 +14820,10 @@ function shouldSkipPlannerConflict_(key, localVal, remoteVal){
   key = String(key || '');
   var l = unwrapSyncEntityValue_(localVal);
   var r = unwrapSyncEntityValue_(remoteVal);
+  // 양쪽 모두 없음 = 충돌 아님 (가짜 충돌 루프 방지)
+  if(l === undefined && r === undefined) return true;
+  // UI 기억값·기기 로컬 선호 키는 팀 충돌로 올리지 않음
+  if(key === 'setting:catGroupLast' || key === 'setting:plannerSetupDismissed') return true;
   // 순수 추가: 한쪽만 있으면 충돌 아님 (합치면 됨)
   if(l !== undefined && r === undefined) return true;
   if(l === undefined && r !== undefined) return true;
@@ -14833,17 +14837,54 @@ function detectPlannerEntityConflicts_(local, remote){
   var base = state.syncBaseEntityUpdatedAt || {};
   var lTimes = ensureSyncEntityTimes_(local);
   var rTimes = ensureSyncEntityTimes_(remote);
-  // 키 수가 너무 많으면 fingerprint/collect 전에 중단 → keep-local 빠른 경로로
   var roughKeys = Object.keys(lTimes).length + Object.keys(rTimes).length;
-  if(roughKeys > 250 || isPlannerLocalStoreHeavy_()){
-    var dirty = Object.keys(state.syncDirtyEntityKeys || {});
-    if(!dirty.length && !state.syncDirty) return [];
-    return (dirty.length ? dirty : Object.keys(lTimes).slice(0, 30)).slice(0, 40).map(function(key){
-      return { key: key, local: undefined, remote: undefined, localAt: lTimes[key] || '', remoteAt: rTimes[key] || '' };
+  var heavy = roughKeys > 250 || isPlannerLocalStoreHeavy_();
+  var lEntities = null;
+  var rEntities = null;
+  function entitiesL_(){
+    if(!lEntities) lEntities = collectSyncEntities_(local, { skipEnsureIds: true });
+    return lEntities;
+  }
+  function entitiesR_(){
+    if(!rEntities) rEntities = collectSyncEntities_(remote, { skipEnsureIds: true });
+    return rEntities;
+  }
+  function pushIfRealConflict_(conflicts, key){
+    var lEnt = entitiesL_()[key];
+    var rEnt = entitiesR_()[key];
+    if(shouldSkipPlannerConflict_(key, lEnt, rEnt)) return;
+    if(syncValueFingerprint_(lEnt) === syncValueFingerprint_(rEnt)) return;
+    conflicts.push({
+      key: key,
+      local: lEnt,
+      remote: rEnt,
+      localAt: lTimes[key] || '',
+      remoteAt: rTimes[key] || ''
     });
   }
-  var lEntities = collectSyncEntities_(local, { skipEnsureIds: true });
-  var rEntities = collectSyncEntities_(remote, { skipEnsureIds: true });
+  // 대용량: dirty 키만 실제 비교 (예전엔 undefined/undefined 가짜 충돌을 만들어 미리보기가 무한 반복됨)
+  if(heavy){
+    var dirty = Object.keys(state.syncDirtyEntityKeys || {});
+    if(!dirty.length && !state.syncDirty) return [];
+    if(!dirty.length) return [];
+    var heavyConflicts = [];
+    dirty.slice(0, 80).forEach(function(key){
+      if(Object.keys(base).length){
+        var bt = parseIsoMs_(base[key]);
+        var lt = parseIsoMs_(lTimes[key]);
+        var rt = parseIsoMs_(rTimes[key]);
+        if(!(lt > bt && rt > bt)){
+          // base 이후 양쪽이 안 바뀐 dirty는 내용만 같으면 정리
+          if(syncValueFingerprint_(entitiesL_()[key]) === syncValueFingerprint_(entitiesR_()[key])){
+            try { delete state.syncDirtyEntityKeys[key]; } catch(eClr){}
+          }
+          return;
+        }
+      }
+      pushIfRealConflict_(heavyConflicts, key);
+    });
+    return heavyConflicts;
+  }
   var conflicts = [];
   var baseEmpty = !Object.keys(base).length;
   // base 맵이 비어 있으면 예전엔 무음 LWW였음 → dirty 키와 원격이 다르면 충돌로 올려 유실 방지
@@ -14854,17 +14895,7 @@ function detectPlannerEntityConflicts_(local, remote){
     // snapshot-only(키 목록 없음)일 때 전 엔티티 fingerprint는 수백 초안 × 본문 stringify로 페이지가 멈춤
     // → dirty 키가 없으면 충돌 UI 생략(병합·로컬 본문 우선 로직이 유실을 막음)
     if(!keysToCheck.length) return [];
-    keysToCheck.forEach(function(key){
-      if(shouldSkipPlannerConflict_(key, lEntities[key], rEntities[key])) return;
-      if(syncValueFingerprint_(lEntities[key]) === syncValueFingerprint_(rEntities[key])) return;
-      conflicts.push({
-        key: key,
-        local: lEntities[key],
-        remote: rEntities[key],
-        localAt: lTimes[key] || '',
-        remoteAt: rTimes[key] || ''
-      });
-    });
+    keysToCheck.forEach(function(key){ pushIfRealConflict_(conflicts, key); });
     return conflicts;
   }
   var keys = {};
@@ -14876,11 +14907,27 @@ function detectPlannerEntityConflicts_(local, remote){
     var localChanged = lt > bt;
     var remoteChanged = rt > bt;
     if(!(localChanged && remoteChanged)) return;
-    if(shouldSkipPlannerConflict_(key, lEntities[key], rEntities[key])) return;
-    if(syncValueFingerprint_(lEntities[key]) === syncValueFingerprint_(rEntities[key])) return;
-    conflicts.push({ key: key, local: lEntities[key], remote: rEntities[key], localAt: lTimes[key] || '', remoteAt: rTimes[key] || '' });
+    pushIfRealConflict_(conflicts, key);
   });
   return conflicts;
+}
+/** 서버와 내용이 같은 dirty 키·가짜 충돌 잔재를 정리 */
+function prunePhantomSyncDirtyKeys_(local, remote){
+  if(!state.syncDirtyEntityKeys) return 0;
+  var lEntities = collectSyncEntities_(local || getPersistPayload(), { skipEnsureIds: true });
+  var rEntities = collectSyncEntities_(remote || {}, { skipEnsureIds: true });
+  var removed = 0;
+  Object.keys(state.syncDirtyEntityKeys).forEach(function(key){
+    if(shouldSkipPlannerConflict_(key, lEntities[key], rEntities[key]) ||
+       syncValueFingerprint_(lEntities[key]) === syncValueFingerprint_(rEntities[key])){
+      delete state.syncDirtyEntityKeys[key];
+      removed++;
+    }
+  });
+  if(removed && !Object.keys(state.syncDirtyEntityKeys).length && !(state.syncOutbox || []).length && !state.syncNeedsSnapshot){
+    state.syncDirty = false;
+  }
+  return removed;
 }
 function plannerConflictLabel_(key){
   var p = String(key).split(':');
@@ -17418,25 +17465,38 @@ function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts){
     } else if(!(state.syncBaseEntityUpdatedAt && Object.keys(state.syncBaseEntityUpdatedAt).length)){
       state.syncBaseEntityUpdatedAt = Object.assign({}, state.syncEntityUpdatedAt || {});
     }
+    try { prunePhantomSyncDirtyKeys_(getPersistPayload(), remote); } catch(ePr){}
     var kept = 0;
     (conflicts || []).forEach(function(conflict){
       var key = String(conflict.key || '');
       if(!key) return;
+      // 실제 내용이 같거나 스킵 대상이면 dirty로 다시 올리지 않음 (반복 루프 방지)
+      if(shouldSkipPlannerConflict_(key, conflict.local, conflict.remote)) return;
+      if(syncValueFingerprint_(conflict.local) === syncValueFingerprint_(conflict.remote)) return;
       state.syncDirtyEntityKeys[key] = true;
       kept++;
     });
-    state.syncDirty = true;
-    state.syncNeedsSnapshot = true;
+    if(kept){
+      state.syncDirty = true;
+      state.syncNeedsSnapshot = true;
+    } else if(!Object.keys(state.syncDirtyEntityKeys || {}).length && !(state.syncOutbox || []).length){
+      state.syncDirty = false;
+      state.syncNeedsSnapshot = false;
+    }
     plannerSyncConflictPending_ = null;
     var ov = document.getElementById('sync-conflict-overlay');
     closeScrollLockedOverlayEl_(ov);
     if(!plannerSyncBootstrapReady_) plannerSyncBootstrapReady_ = true;
     save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
     if(typeof setAppToast === 'function'){
-      setAppToast('충돌 ' + (conflicts || []).length + '건을 이 기기 기준으로 맞췄어요' +
-        (kept ? ' (로컬 유지 ' + kept + '건)' : '') + '.\n서버 반영은 백그라운드에서 이어갑니다.', { duration: 5500, variant: 'ok' });
+      if(kept){
+        setAppToast('충돌 ' + (conflicts || []).length + '건을 이 기기 기준으로 맞췄어요' +
+          ' (로컬 유지 ' + kept + '건).\n서버 반영은 백그라운드에서 이어갑니다.', { duration: 5500, variant: 'ok' });
+      } else {
+        setAppToast('가짜 충돌을 정리했어요. 서버와 같으면 바로 맞춥니다.', { duration: 4200, variant: 'ok' });
+      }
     }
-    schedulePlannerGasPush_(true);
+    if(kept || state.syncDirty) schedulePlannerGasPush_(true);
   } catch(err){
     console.warn('[충돌 빠른해결]', err);
     if(typeof setAppToast === 'function') setAppToast('충돌 자동 적용에 실패했어요. 「이 기기 데이터로 열기」 후 다시 시도해 주세요.', { duration: 6500, variant: 'err' });
@@ -17899,6 +17959,7 @@ function estimateManualSyncSeconds_(localPayload, remotePayload){
 }
 function buildManualSyncPreview_(localPayload, remotePayload, remoteRevision){
   remoteRevision = parseInt(remoteRevision, 10) || getPayloadRevision_(remotePayload);
+  try { prunePhantomSyncDirtyKeys_(localPayload, remotePayload); } catch(ePrune){}
   var localRev = parseInt(state.syncRevision, 10) || getPayloadRevision_(localPayload);
   var localDirty = hasPendingLocalSyncChanges_();
   var conflicts = detectPlannerEntityConflicts_(localPayload, remotePayload);

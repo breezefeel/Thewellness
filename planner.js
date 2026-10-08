@@ -16203,8 +16203,18 @@ function countPendingSyncItems_(){
   var outbox = (state.syncOutbox || []).length;
   var dirtyKeys = Object.keys(state.syncDirtyEntityKeys || {}).length;
   var n = Math.max(outbox, dirtyKeys);
-  // 키·outbox 없이 dirty/snapshot만 남은 고착은 0건 — UI 「미반영 1건」루프 차단
-  if(n < 1 && state.syncNeedsSnapshot && hasPendingLocalSyncChanges_()) n = 1;
+  // 키·outbox 없이 snapshot만 남은 경우: 서버 rev와 이미 같으면 0건으로 치유
+  if(n < 1 && state.syncNeedsSnapshot){
+    var localRevCnt = parseInt(state.syncRevision, 10) || 0;
+    var serverStoredCnt = 0;
+    try { serverStoredCnt = parseInt(localStorage.getItem(GAS_LAST_SYNC_REV_KEY) || '0', 10) || 0; } catch(eCnt){}
+    if(localRevCnt > 0 && serverStoredCnt > 0 && localRevCnt === serverStoredCnt){
+      state.syncNeedsSnapshot = false;
+      state.syncDirty = false;
+      return 0;
+    }
+    if(hasPendingLocalSyncChanges_()) n = 1;
+  }
   return n;
 }
 function isServerSyncConfigured_(){
@@ -16409,6 +16419,18 @@ function refreshSyncStatusBodyHtml_(info){
   bindSyncSettingsEmployeeDraftOnce_();
 }
 function updateSyncStatusUI_(){
+  // 헤더「남은 1건」고착: outbox·dirty키 없이 snapshot/dirty만 남은 경우 즉시 치유
+  try {
+    if((state.syncNeedsSnapshot || state.syncDirty) &&
+        !((state.syncOutbox || []).length) &&
+        !Object.keys(state.syncDirtyEntityKeys || {}).length){
+      if(clearStuckSyncFlagsIfClean_(null)){
+        try {
+          save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+        } catch(eHealSave){}
+      }
+    }
+  } catch(eHealUi){}
   var btn = document.getElementById('btn-sync-status');
   var dot = document.getElementById('sync-dot');
   var label = document.getElementById('sync-status-label');
@@ -16905,8 +16927,18 @@ async function runPlannerBootstrapInBackground_(){
         markGasSyncOk_(remoteRevision, remotePayload.savedAt || remotePayload.localSavedAt);
         try {
           state._forceStepIntegrityPass = true;
+          // skipGasPush: integrity가 snapshot dirty를 다시 켜도 아래에서 정리·필요 시만 푸시
           runPlannerStepIntegrityPass_({ toast: false, render: false, skipGasPush: true });
         } catch(eIntOk){}
+        // 「남은 1건」고착 원인: 이미 맞춘 뒤 integrity가 syncNeedsSnapshot만 다시 켬
+        try {
+          if(clearStuckSyncFlagsIfClean_(remotePayload)){
+            save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+          }
+        } catch(eClrOk){}
+        if(hasPendingLocalSyncChanges_()){
+          try { schedulePlannerGasPush_(true); } catch(ePushOk){}
+        }
         try { updateSyncStatusUI_(); } catch(eUiOk){}
         if(msg && typeof setAppToast === 'function'){
           setAppToast(msg, { duration: 2800, variant: 'ok' });
@@ -16921,21 +16953,25 @@ async function runPlannerBootstrapInBackground_(){
           localPayload = getPersistPayload();
         } catch(ePrSame){}
 
-        var stillPendingSameRev = false;
-        try { stillPendingSameRev = hasPendingLocalSyncChanges_(); } catch(ePend){}
-        if(!stillPendingSameRev ||
-            plannerSyncFingerprint_(localPayload) === plannerSyncFingerprint_(remotePayload)){
+        var diffReportSame = { counts: {}, items: [] };
+        try { diffReportSame = buildBootstrapDiffReport_(localPayload, remotePayload); } catch(eDiffSame){}
+        var actionableSame = false;
+        try { actionableSame = bootstrapDiffReportHasActionableDiff_(diffReportSame); } catch(eAct){}
+        var fpSame = false;
+        try { fpSame = plannerSyncFingerprint_(localPayload) === plannerSyncFingerprint_(remotePayload); } catch(eFp){}
+
+        // 실질 콘텐츠 차이 없으면 dirty/outbox/snapshot 전부 폐기 (가짜「남은 1건」루프)
+        if(!actionableSame || fpSame){
           markLocalInSyncWithServer_(remotePayload);
           try {
             save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
           } catch(eSv0){}
-          finishBootstrapAlreadyInSync_(stillPendingSameRev ? '' : '서버와 이미 같은 내용이에요.');
+          finishBootstrapAlreadyInSync_('서버와 이미 같은 내용이에요.');
           return;
         }
 
         // 같은 rev인데 로컬에만 남은 실제 수정 → 선택창 없이 조용히 업로드
         finishBootstrapAlreadyInSync_('');
-        try { schedulePlannerGasPush_(true); } catch(ePushSame){}
         return;
       }
 

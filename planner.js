@@ -9600,6 +9600,12 @@ function renderProgramRoadmapHTML_(catId){
       '<button type="button" class="program-pending-banner-btn" onclick="forceDedupeSubGoalSteps_(' + catId + ')">중복 단계 정리</button>' +
     '</div>';
   }
+  if(plan && plan.steps && plan.steps.length && getTopicListMode_() === 'write' && !pendingPreview && canBulkReassignCategory_(catId)){
+    html += '<div class="bulk-reassign-bar">' +
+      '<span class="bulk-reassign-bar-txt">서랍이 뒤섞였나요? 제목을 보고 맞는 서랍을 제안해요.</span>' +
+      '<button type="button" class="bulk-reassign-bar-btn" onclick="openBulkReassignModal_(' + catId + ')">서랍 정리</button>' +
+    '</div>';
+  }
   if(!plan || !plan.steps.length){
     var legacyCards = filterDraftsByTopicListMode_(cat.drafts || [], catId).map(function(d){
       return draftCardHTML(d, cat, false, cat.drafts.indexOf(d), false);
@@ -11729,6 +11735,10 @@ function closeTopmostPlannerOverlay_(){
   }
   if(plannerOverlayIsOpen_('prompt-modal-overlay')){
     closePromptModal();
+    return true;
+  }
+  if(plannerOverlayIsOpen_('bulk-reassign-overlay')){
+    closeBulkReassignModal_();
     return true;
   }
   if(plannerOverlayIsOpen_('links-modal-overlay')){
@@ -14027,6 +14037,7 @@ var SCROLL_LOCKED_OVERLAY_IDS_ = {
   'sync-preview-overlay': 1,
   'drive-modal-overlay': 1,
   'links-modal-overlay': 1,
+  'bulk-reassign-overlay': 1,
   'sync-conflict-overlay': 1,
   'sync-bootstrap-choice-overlay': 1
 };
@@ -26097,23 +26108,17 @@ function reindexDraftsInStep_(catId, stepId, ordered){
   try { densifyStepSlotTotalsOnly_(catId, stepId); } catch(eD){}
 }
 
-window.dropDraftOnStep_ = function(catId, draftId, targetStepId, beforeDraftId){
-  catId = parseInt(catId, 10);
-  targetStepId = String(targetStepId || '');
-  beforeDraftId = beforeDraftId ? String(beforeDraftId) : '';
+/** 저장·렌더 없이 단계 배정만 바꾼다. 일괄 이동은 끝에서 한 번만 save. */
+function relocateDraftToStepNoSave_(catId, draft, targetStepId, beforeDraftId){
   var cat = CATEGORIES[catId];
-  if(!cat || !draftId || !targetStepId) return;
-  var draft = (cat.drafts || []).find(function(d){ return d && d.id === draftId; });
-  if(!draft){
-    if(typeof setAppToast === 'function') setAppToast('주제를 찾을 수 없어요.', { duration: 3200 });
-    return;
-  }
+  if(!cat || !draft || !draft.id || !targetStepId) return null;
   var plan = getSubGoalPlan_(catId);
-  if(!plan) return;
+  if(!plan) return null;
   if(targetStepId !== SUBGOAL_MISC_ID){
     var ok = (plan.steps || []).some(function(s){ return s && String(s.id) === targetStepId; });
-    if(!ok) return;
+    if(!ok) return null;
   }
+  var draftId = draft.id;
   var di = cat.drafts.indexOf(draft);
   var fromStep = String(getDraftRoadmapStepId_(draft, catId, di) || '');
   var peers = getDraftsForSubGoalStep_(catId, targetStepId, { live: true }).filter(function(d){
@@ -26128,7 +26133,7 @@ window.dropDraftOnStep_ = function(catId, draftId, targetStepId, beforeDraftId){
   var ordered = peers.slice();
   ordered.splice(insertAt, 0, draft);
   var sameStep = fromStep === targetStepId;
-  if(sameStep && beforeDraftId === draftId) return;
+  if(sameStep && beforeDraftId === draftId) return null;
   reindexDraftsInStep_(catId, targetStepId, ordered);
   if(!sameStep && fromStep){
     var left = getDraftsForSubGoalStep_(catId, fromStep, { live: true }).filter(function(d){
@@ -26136,6 +26141,23 @@ window.dropDraftOnStep_ = function(catId, draftId, targetStepId, beforeDraftId){
     });
     reindexDraftsInStep_(catId, fromStep, left);
   }
+  return { sameStep: sameStep, fromStep: fromStep };
+}
+
+window.dropDraftOnStep_ = function(catId, draftId, targetStepId, beforeDraftId){
+  catId = parseInt(catId, 10);
+  targetStepId = String(targetStepId || '');
+  beforeDraftId = beforeDraftId ? String(beforeDraftId) : '';
+  var cat = CATEGORIES[catId];
+  if(!cat || !draftId || !targetStepId) return;
+  var draft = (cat.drafts || []).find(function(d){ return d && d.id === draftId; });
+  if(!draft){
+    if(typeof setAppToast === 'function') setAppToast('주제를 찾을 수 없어요.', { duration: 3200 });
+    return;
+  }
+  var moved = relocateDraftToStepNoSave_(catId, draft, targetStepId, beforeDraftId);
+  if(!moved) return;
+  var sameStep = moved.sameStep;
   save({ driveImmediate: true, gasImmediate: true });
   renderMain();
   if(typeof setAppToast === 'function'){
@@ -26148,6 +26170,226 @@ window.dropDraftOnStep_ = function(catId, draftId, targetStepId, beforeDraftId){
         : ('「' + short + '」을(를) ' + label + '로 옮겼어요.'),
       { duration: 3000, variant: 'ok' }
     );
+  }
+};
+
+/** 서랍 일괄 정리 규칙 — 단계 제목으로 현재 기획안의 단계 id를 찾는다. 주제 제목 2점·각도 1점. */
+var BULK_STEP_KEYWORD_RULES_ = {
+  '0': [
+    { title: '치료상식', re: /딱\s*소리|마사지|도수치료|도수|카이로|기대|오해|몇\s*번|횟수|호전|치료\s*(후|받|중)|병원|원인\s*위치|통증\s*위치/g },
+    { title: '목·등·어깨', re: /거북목|목디스크|경추|어깨|오십견|회전근|날개뼈|견갑|승모|등\s*(이|을|은|통증|뻐근|결림)|목(이|을|은|과|·|,|\s|$)/g },
+    { title: '허리·골반·고관절', re: /허리|요통|디스크|골반|고관절|엉덩|좌골|천장관절|척추관|꼬리뼈/g },
+    { title: '사지', re: /무릎|발목|발바닥|족저|팔꿈치|엘보|손목|손가락|다리|종아리|허벅지|햄스트링|아킬레스|팔(이|을|은|이|\s|$)|발(이|을|은|\s|$)/g },
+    { title: '전신', re: /전신|재발|만성|온몸|여러\s*곳|자세\s*패턴|패턴|유지|습관|연결/g }
+  ],
+  '1': [
+    { title: '운동상식', re: /운동상식|무엇부터|오해|기본|왜\s*움직|근력|순서|횟수/g },
+    { title: '유연성·스트레칭', re: /스트레칭|유연|이완|뻣뻣|가동|햄스트링/g },
+    { title: '자세·거북목·라운드 숄더', re: /자세|거북목|라운드|굽은\s*등|정렬|어깨\s*말림/g },
+    { title: '앉기·걷기 생활습관', re: /앉|걷|보행|출퇴근|업무|책상|의자|계단|생활/g },
+    { title: '코어 기능운동', re: /코어|기능\s*운동|복근|플랭크|버드독|균형|밸런스|호흡/g }
+  ],
+  '2': [
+    { title: '얼굴상식', re: /얼굴\s*관리|얼굴상식|기대|오해|기본|작은\s*얼굴|효과/g },
+    { title: '비대칭·한쪽 얼굴', re: /비대칭|짝짝이|한쪽|셀카|틀어/g },
+    { title: '윤곽·이중턱·붓기', re: /윤곽|이중턱|붓기|부종|턱선|광대|팔자|처짐/g },
+    { title: '턱관절·씹기', re: /턱관절|이갈|씹|저작|입\s*벌|딱딱\s*소리/g },
+    { title: '목·자세와 얼굴', re: /목(이|을|은|과|·|,|\s|$)|자세|경추|거북목|어깨/g }
+  ]
+};
+
+function countBulkKeywordHits_(re, text){
+  if(!re || !text) return 0;
+  re.lastIndex = 0;
+  var m = String(text).match(re);
+  return m ? m.length : 0;
+}
+
+/** 규칙 표가 없는 카테고리: 단계 제목을 ·/공백으로 쪼갠 2글자 이상 토큰 */
+function buildBulkStepRulesForPlan_(catId, plan){
+  var out = [];
+  var table = BULK_STEP_KEYWORD_RULES_[String(catId)];
+  if(table){
+    table.forEach(function(r){
+      var sid = findPlanStepIdByTitle_(plan, r.title);
+      if(sid) out.push({ stepId: sid, re: r.re });
+    });
+    if(out.length) return out;
+  }
+  (plan.steps || []).forEach(function(s){
+    if(!s || !s.id) return;
+    var toks = String(s.title || '').split(/[·,\/\s]+/).filter(function(t){ return t.length >= 2; });
+    if(!toks.length) return;
+    var src = toks.map(function(t){ return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|');
+    out.push({ stepId: String(s.id), re: new RegExp(src, 'g') });
+  });
+  return out;
+}
+
+function suggestBulkStepForDraft_(rules, d){
+  var topic = String((d && d.topic) || '');
+  var angle = String((d && (d.angle || d.hook || '')) || '');
+  var best = null;
+  var bestScore = 0;
+  var tie = false;
+  rules.forEach(function(r){
+    var score = countBulkKeywordHits_(r.re, topic) * 2 + countBulkKeywordHits_(r.re, angle);
+    if(score > bestScore){ bestScore = score; best = r.stepId; tie = false; }
+    else if(score && score === bestScore && r.stepId !== best){ tie = true; }
+  });
+  if(!best || tie) return { stepId: '', score: bestScore, tie: tie };
+  return { stepId: best, score: bestScore, tie: false };
+}
+
+function canBulkReassignCategory_(catId){
+  if(isDailyShareCategory(catId) || isOpsManualCategory(catId)) return false;
+  var plan = getSubGoalPlan_(catId);
+  return !!(plan && plan.steps && plan.steps.length);
+}
+
+/** 준비 글(완료·빈 서랍 제외)만. 이동 제안(moves)과 규칙 미매칭(held) */
+function previewBulkReassignDraftSteps_(catId){
+  catId = parseInt(catId, 10);
+  var res = { catId: catId, moves: [], held: [] };
+  var cat = CATEGORIES[catId];
+  if(!cat || !canBulkReassignCategory_(catId)) return res;
+  var plan = getSubGoalPlan_(catId);
+  var rules = buildBulkStepRulesForPlan_(catId, plan);
+  if(!rules.length) return res;
+  (cat.drafts || []).forEach(function(d, di){
+    if(!d || !d.id) return;
+    if(draftShowsOnPublishedList_(d.id, catId)) return;
+    if(draftIsShelfEmpty_(d, catId)) return;
+    var cur = String(getDraftRoadmapStepId_(d, catId, di) || '');
+    var sug = suggestBulkStepForDraft_(rules, d);
+    var item = {
+      draftId: d.id,
+      topic: d.topic || '(제목 없음)',
+      fromStepId: cur,
+      fromLabel: cur ? (cur === SUBGOAL_MISC_ID ? getSubGoalMiscLabel_(plan) : (getSubGoalStepTitle_(plan, cur) || cur)) : '미배정',
+      toStepId: sug.stepId,
+      toLabel: sug.stepId ? (getSubGoalStepTitle_(plan, sug.stepId) || sug.stepId) : ''
+    };
+    if(!sug.stepId){
+      if(!cur || cur === SUBGOAL_MISC_ID) res.held.push(item);
+      return;
+    }
+    if(sug.stepId === cur) return;
+    res.moves.push(item);
+  });
+  return res;
+}
+
+/** items: [{draftId, toStepId}] — 각 이동 후 끝에서 한 번 저장·동기화 */
+function applyBulkReassignDraftSteps_(catId, items){
+  catId = parseInt(catId, 10);
+  var cat = CATEGORIES[catId];
+  if(!cat || !items || !items.length) return 0;
+  var n = 0;
+  items.forEach(function(it){
+    if(!it || !it.draftId || !it.toStepId) return;
+    var draft = (cat.drafts || []).find(function(d){ return d && d.id === it.draftId; });
+    if(!draft) return;
+    var r = relocateDraftToStepNoSave_(catId, draft, String(it.toStepId), null);
+    if(r && !r.sameStep) n++;
+  });
+  if(n){
+    save({ driveImmediate: true, gasImmediate: true });
+    renderMain();
+  }
+  return n;
+}
+
+var _bulkReassignPreview = null;
+
+window.openBulkReassignModal_ = function(catId){
+  catId = parseInt(catId != null ? catId : state.currentCat, 10);
+  var ov = document.getElementById('bulk-reassign-overlay');
+  if(!ov) return;
+  if(!canBulkReassignCategory_(catId)){
+    if(typeof setAppToast === 'function') setAppToast('이 카테고리는 단계 기획안이 있어야 정리할 수 있어요.', { duration: 3200 });
+    return;
+  }
+  _bulkReassignPreview = previewBulkReassignDraftSteps_(catId);
+  renderBulkReassignModalBody_();
+  var wasOpen = ov.classList.contains('open');
+  ov.classList.add('open');
+  if(!wasOpen && typeof lockBodyScroll_ === 'function') lockBodyScroll_();
+};
+
+window.closeBulkReassignModal_ = function(e){
+  if(e && e.target && e.target.id !== 'bulk-reassign-overlay') return;
+  _bulkReassignPreview = null;
+  dismissPlannerOverlayOpenState_('bulk-reassign-overlay');
+};
+
+function renderBulkReassignModalBody_(){
+  var body = document.getElementById('bulk-reassign-body');
+  var applyBtn = document.getElementById('bulk-reassign-apply');
+  var titleEl = document.getElementById('bulk-reassign-title');
+  var p = _bulkReassignPreview;
+  if(!body || !p) return;
+  var cat = CATEGORIES[p.catId];
+  if(titleEl) titleEl.textContent = '서랍 정리 · ' + (cat ? cat.name : '');
+  var html = '';
+  if(!p.moves.length){
+    html += '<div class="bulk-reassign-empty">옮길 주제가 없어요. 모두 맞는 서랍에 있거나, 제목만으로는 판단이 어려워요.</div>';
+  } else {
+    html += '<div class="bulk-reassign-toolbar">' +
+      '<span>옮길 주제 <strong>' + p.moves.length + '</strong>개 · 체크한 것만 옮겨요</span>' +
+      '<button type="button" class="bulk-reassign-toggle" onclick="toggleAllBulkReassign_()">전체 선택/해제</button>' +
+    '</div><div class="bulk-reassign-list">';
+    p.moves.forEach(function(m, i){
+      html += '<label class="bulk-reassign-row">' +
+        '<input type="checkbox" class="bulk-reassign-chk" data-idx="' + i + '" checked onchange="updateBulkReassignApplyBtn_()">' +
+        '<span class="bulk-reassign-txt">' +
+          '<span class="bulk-reassign-topic">' + escapeHtml(m.topic) + '</span>' +
+          '<span class="bulk-reassign-path">' + escapeHtml(m.fromLabel) + ' → <strong>' + escapeHtml(m.toLabel) + '</strong></span>' +
+        '</span>' +
+      '</label>';
+    });
+    html += '</div>';
+  }
+  if(p.held.length){
+    html += '<details class="bulk-reassign-held"><summary>보류 ' + p.held.length + '개 · 제목만으로 서랍을 정할 수 없어요 (직접 옮겨 주세요)</summary><ul>';
+    p.held.forEach(function(h){
+      html += '<li>' + escapeHtml(h.topic) + '</li>';
+    });
+    html += '</ul></details>';
+  }
+  body.innerHTML = html;
+  if(applyBtn) applyBtn.style.display = p.moves.length ? '' : 'none';
+  updateBulkReassignApplyBtn_();
+}
+
+window.toggleAllBulkReassign_ = function(){
+  var chks = document.querySelectorAll('#bulk-reassign-body .bulk-reassign-chk');
+  var anyOff = Array.prototype.some.call(chks, function(c){ return !c.checked; });
+  Array.prototype.forEach.call(chks, function(c){ c.checked = anyOff; });
+  updateBulkReassignApplyBtn_();
+};
+
+window.updateBulkReassignApplyBtn_ = function(){
+  var btn = document.getElementById('bulk-reassign-apply');
+  if(!btn) return;
+  var n = document.querySelectorAll('#bulk-reassign-body .bulk-reassign-chk:checked').length;
+  btn.disabled = !n;
+  btn.textContent = n ? ('선택 ' + n + '개 옮기기') : '옮길 주제를 선택하세요';
+};
+
+window.applyBulkReassignFromModal_ = function(){
+  var p = _bulkReassignPreview;
+  if(!p) return;
+  var items = [];
+  document.querySelectorAll('#bulk-reassign-body .bulk-reassign-chk:checked').forEach(function(c){
+    var m = p.moves[parseInt(c.getAttribute('data-idx'), 10)];
+    if(m) items.push({ draftId: m.draftId, toStepId: m.toStepId });
+  });
+  if(!items.length) return;
+  var n = applyBulkReassignDraftSteps_(p.catId, items);
+  closeBulkReassignModal_();
+  if(typeof setAppToast === 'function'){
+    setAppToast(n ? ('주제 ' + n + '개를 서랍으로 옮겼어요.') : '옮긴 주제가 없어요.', { duration: 3200, variant: n ? 'ok' : undefined });
   }
 };
 

@@ -1075,6 +1075,42 @@ margin-left: 4px;
   cursor: pointer;
 }
 .program-pending-banner-btn:hover { background: #FEF3C7; }
+.bulk-reassign-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 0 0 10px; padding: 8px 12px;
+  border: 1px dashed #CBD5E1; border-radius: 10px; background: #F8FAFC;
+  font-size: 12px; color: #64748B;
+}
+.bulk-reassign-bar-btn {
+  flex-shrink: 0; padding: 6px 12px; border-radius: 8px;
+  border: 1px solid #94A3B8; background: #fff; color: #334155;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.bulk-reassign-bar-btn:hover { background: #F1F5F9; }
+.bulk-reassign-box { max-width: 520px; max-height: 88vh; display: flex; flex-direction: column; }
+#bulk-reassign-body { overflow-y: auto; flex: 1; min-height: 0; }
+.bulk-reassign-toolbar {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  font-size: 12px; color: #475569; margin-bottom: 8px;
+}
+.bulk-reassign-toggle {
+  border: none; background: none; color: #0D9488; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.bulk-reassign-list { display: flex; flex-direction: column; gap: 6px; }
+.bulk-reassign-row {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 8px 10px; border: 1px solid #E2E8F0; border-radius: 10px; cursor: pointer;
+}
+.bulk-reassign-row input { margin-top: 3px; flex-shrink: 0; }
+.bulk-reassign-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bulk-reassign-topic { font-size: 13px; color: #1E293B; line-height: 1.4; }
+.bulk-reassign-path { font-size: 11px; color: #64748B; }
+.bulk-reassign-path strong { color: #0D9488; }
+.bulk-reassign-empty { font-size: 13px; color: #64748B; padding: 16px 0; text-align: center; }
+.bulk-reassign-held { margin-top: 12px; font-size: 12px; color: #64748B; }
+.bulk-reassign-held summary { cursor: pointer; }
+.bulk-reassign-held ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.6; }
+#bulk-reassign-apply:disabled { opacity: .5; cursor: not-allowed; }
 .program-prune-banner {
   border-color: #FCD34D;
   background: #FFFBEB;

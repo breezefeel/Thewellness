@@ -13826,8 +13826,7 @@ function collectSyncEntities_(payload, opts){
 }
 function syncEntityFallbackMs_(key, value, payload){
   var v = value && value.value ? value.value : value;
-  return parseIsoMs_(v && (v.updatedAt || v.savedAt || v.createdAt)) ||
-    getPayloadSavedMs_(payload) || 0;
+  return parseIsoMs_(v && (v.updatedAt || v.savedAt || v.createdAt)) || 0;
 }
 function ensureSyncEntityTimes_(payload){
   if(!payload || typeof payload !== 'object') return {};
@@ -14650,7 +14649,13 @@ function ensureOutboxFromLegacyDirty_(payload){
     state.syncDirty = false;
   }
 }
-var SYNC_OUTBOX_PATCH_BATCH_ = 40;
+var SYNC_OUTBOX_PATCH_BATCH_ = 80;
+function canPlannerPatchPushFast_(){
+  if(state.syncNeedsSnapshot) return false;
+  if((parseInt(state.syncProtocolVersion, 10) || 1) < 2) return false;
+  if((state.syncOutbox || []).length) return true;
+  return Object.keys(state.syncDirtyEntityKeys || {}).length > 0;
+}
 function buildPendingSyncMutations_(payload){
   ensureOutboxFromLegacyDirty_(payload);
   migrateIndexedPlanEntityKeysInPayload_(payload || {}, state.syncOutbox);
@@ -14797,11 +14802,16 @@ function schedulePlannerGasPush_(immediate){
     }
   } catch(eStuck){}
   if(!hasPendingLocalSyncChanges_()) return;
-  // 부팅 직후·대용량이면 즉시 푸시 금지 — JSON.stringify 로 「응답 없는 페이지」 방지
+  if(_plannerSyncUiBusy){
+    _syncPushAgain_ = true;
+    try { updateSyncStatusUI_(); } catch(eBusyUi){}
+    return;
+  }
+  // 부팅 직후·전체 스냅샷만 지연. 주제 삭제처럼 조각만 올리는 패치는 바로 보냄
   var quietUntil = state._bootQuietUntil || 0;
+  var patchFast = canPlannerPatchPushFast_();
   var forceDelay = Date.now() < quietUntil ||
-    isPlannerLocalStoreHeavy_() ||
-    !!(plannerLastDiskPayloadStr_ && plannerLastDiskPayloadStr_.length > 200000);
+    (!patchFast && (isPlannerLocalStoreHeavy_() || !!(plannerLastDiskPayloadStr_ && plannerLastDiskPayloadStr_.length > 200000)));
   if(plannerGasRetryTimer_){
     clearTimeout(plannerGasRetryTimer_);
     plannerGasRetryTimer_ = null;
@@ -14830,7 +14840,8 @@ function schedulePlannerGasPush_(immediate){
   };
   if(immediate && !forceDelay) run();
   else {
-    plannerGasPushTimer = setTimeout(run, forceDelay ? Math.max(2500, quietUntil - Date.now()) : 2500);
+    var waitMs = forceDelay ? Math.max(800, quietUntil - Date.now()) : 600;
+    plannerGasPushTimer = setTimeout(run, waitMs);
     try { updateSyncStatusUI_(); } catch(eUiPush){}
   }
 }
@@ -14894,7 +14905,13 @@ async function plannerPullRemoteIntoStateCore_(){
   }
 
   if(!remote) return false;
-  if(state.syncDirty && remoteRevision !== (parseInt(state.syncRevision, 10) || 0)){
+  var localRevNow = parseInt(state.syncRevision, 10) || 0;
+  // 최신 직후 로컬 삭제·수정: 서버 revision이 같으면 옛 목록과 합치지 않음 (삭제 복구·가짜 충돌 방지)
+  if(state.syncDirty && remoteRevision === localRevNow &&
+      ((state.syncOutbox || []).length || Object.keys(state.syncDirtyEntityKeys || {}).length)){
+    return false;
+  }
+  if(state.syncDirty && remoteRevision !== localRevNow){
     if((state.syncOutbox || []).length){
       applyServerPayloadPreservingOutbox_(remote, remoteRevision);
       return true;
@@ -14933,7 +14950,16 @@ async function plannerGasPushNow_(){
         return { ok: true, cleared: true };
       }
     } catch(ePreStuck){}
-    await plannerPullRemoteIntoStateCore_();
+    var skipPull = false;
+    try {
+      var preBody = getPersistPayload();
+      var preMut = buildPendingSyncMutations_(preBody);
+      var prePatch = preMut.length > 0 && !state.syncNeedsSnapshot && (state.syncProtocolVersion || 1) >= 2;
+      var locRev = parseInt(state.syncRevision, 10) || 0;
+      var storedRev = readStoredSyncRev_(GAS_LAST_SYNC_REV_KEY);
+      skipPull = prePatch && locRev > 0 && locRev === storedRev;
+    } catch(eSkipPull){}
+    if(!skipPull) await plannerPullRemoteIntoStateCore_();
     if(plannerSyncConflictPending_) return { ok: false, conflict: true };
     if(!hasPendingLocalSyncChanges_()){
       markLocalInSyncWithServer_({ syncRevision: state.syncRevision });
@@ -15524,6 +15550,7 @@ function startPlannerIdleSync_() {
 /** Drive(appData) · GAS 서버 백업을 이 기기와 합침 (주제·초안·발행본 누락 방지) */
 var _plannerSyncMutexTail = Promise.resolve();
 let _plannerSyncUiBusy = false;
+let _syncPushAgain_ = false;
 let _syncStatusUiTimer = null;
 let _syncStatusModalRemote = null;
 function withPlannerSyncMutex_(fn){
@@ -15536,6 +15563,12 @@ function withPlannerSyncMutex_(fn){
   }).finally(function(){
     _plannerSyncUiBusy = false;
     updateSyncStatusUI_();
+    if(_syncPushAgain_){
+      _syncPushAgain_ = false;
+      if(hasPendingLocalSyncChanges_() && !plannerSyncConflictPending_){
+        schedulePlannerGasPush_(true);
+      }
+    }
   });
   _plannerSyncMutexTail = run.catch(function(){});
   return run;
@@ -15624,7 +15657,7 @@ function formatSyncHeaderSub_(info){
     return n > 0 ? ('남은 ' + n + '건') : '반영 대기';
   }
   if(info.overall === 'ok') return '최신 · ' + info.localRev;
-  if(info.overall === 'warn') return '확인 필요';
+  if(info.overall === 'warn') return nTxt ? ('다시 시도 · ' + nTxt) : '확인 필요';
   return String(info.localRev || '');
 }
 function armSyncProgressTicker_(info){
@@ -15690,8 +15723,13 @@ function getSyncStatusInfo_(remoteMeta){
     phase = 'queued';
     overall = 'pending';
   } else if(plannerLastSyncError_ && !retryScheduled){
-    phase = 'warn';
-    overall = 'warn';
+    if(serverOn && localPending){
+      phase = 'queued';
+      overall = 'pending';
+    } else {
+      phase = 'warn';
+      overall = 'warn';
+    }
   } else if(!serverOn && location.protocol === 'file:'){
     phase = 'warn';
     overall = 'warn';
@@ -15895,6 +15933,10 @@ function updateSyncStatusUI_(){
     (info.actionHint ? '\n\n할 일: ' + info.actionHint : '');
   try { refreshSyncStatusBodyHtml_(info); } catch(eBody){}
   try { armSyncProgressTicker_(info); } catch(eTickArm){}
+  if(info.phase === 'queued' && info.lastError && info.pendingCount &&
+      !plannerGasPushTimer && !plannerGasRetryTimer_ && !_plannerSyncUiBusy){
+    try { schedulePlannerGasPush_(false); } catch(eReQ){}
+  }
 }
 function renderSyncStatusBodyHTML_(info){
   function row(title, badgeClass, badgeText, metaHtml, actionsHtml){
@@ -17304,7 +17346,12 @@ function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts){
     });
     if(kept){
       state.syncDirty = true;
-      state.syncNeedsSnapshot = true;
+      var onlyTopicEdits = (conflicts || []).every(function(c){
+        var k = String(c.key || '');
+        return k.indexOf('deleted:') === 0 || k.indexOf('draft:') === 0 ||
+          k.indexOf('override:') === 0 || k.indexOf('pinned:') === 0;
+      });
+      if(!onlyTopicEdits) state.syncNeedsSnapshot = true;
     } else if(!Object.keys(state.syncDirtyEntityKeys || {}).length && !(state.syncOutbox || []).length){
       state.syncDirty = false;
       state.syncNeedsSnapshot = false;
@@ -18991,10 +19038,10 @@ function persistSyncMetaIfNeeded_(){
 }
 function save(opts) {
   var o = opts || {};
-  // 대용량일 때 즉시 Drive/GAS 푸시는 메인 스레드를 오래 막아 「응답 없음」이 남
+  // 대용량 전체 저장만 즉시 푸시 금지. 패치(삭제·서랍 이동)는 바로 올려도 UI가 안 멈춤
   if(isPlannerLocalStoreHeavy_() || (plannerLastDiskPayloadStr_ && plannerLastDiskPayloadStr_.length > 200000)){
     if(o.driveImmediate) o.driveImmediate = false;
-    if(o.gasImmediate) o.gasImmediate = false;
+    if(o.gasImmediate && !canPlannerPatchPushFast_()) o.gasImmediate = false;
   }
   // 부트스트랩·adopt 등 메타만 디스크에 쓰는 경로: 전체 payload fingerprint는 UI를 멈춤
   if(o.skipEntityStamp && o.skipMarkDirty){

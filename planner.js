@@ -15080,21 +15080,39 @@ function detectPlannerEntityConflicts_(local, remote){
   });
   return conflicts;
 }
-/** 서버와 내용이 같은 dirty 키·가짜 충돌 잔재를 정리 */
+/** 서버와 내용이 같은 dirty 키·outbox·가짜 충돌 잔재를 정리 */
 function prunePhantomSyncDirtyKeys_(local, remote){
-  if(!state.syncDirtyEntityKeys) return 0;
   var lEntities = collectSyncEntities_(local || getPersistPayload(), { skipEnsureIds: true });
   var rEntities = collectSyncEntities_(remote || {}, { skipEnsureIds: true });
   var removed = 0;
+  if(!state.syncDirtyEntityKeys) state.syncDirtyEntityKeys = {};
   Object.keys(state.syncDirtyEntityKeys).forEach(function(key){
-    if(shouldSkipPlannerConflict_(key, lEntities[key], rEntities[key]) ||
+    if(isDeviceLocalSyncEntityKey_(key) ||
+       shouldSkipPlannerConflict_(key, lEntities[key], rEntities[key]) ||
        syncValueFingerprint_(lEntities[key]) === syncValueFingerprint_(rEntities[key])){
       delete state.syncDirtyEntityKeys[key];
       removed++;
     }
   });
-  if(removed && !Object.keys(state.syncDirtyEntityKeys).length && !(state.syncOutbox || []).length && !state.syncNeedsSnapshot){
-    state.syncDirty = false;
+  // outbox에만 남은「이미 서버와 같은」항목도 제거 (F5 후 「남은 N건」루프)
+  if(Array.isArray(state.syncOutbox) && state.syncOutbox.length){
+    var beforeOut = state.syncOutbox.length;
+    state.syncOutbox = state.syncOutbox.filter(function(op){
+      if(!op || !op.key) return false;
+      if(isDeviceLocalSyncEntityKey_(op.key)) return false;
+      var localVal = Object.prototype.hasOwnProperty.call(lEntities, op.key) ? lEntities[op.key] : undefined;
+      var remoteVal = Object.prototype.hasOwnProperty.call(rEntities, op.key) ? rEntities[op.key] : undefined;
+      if(shouldSkipPlannerConflict_(op.key, localVal, remoteVal)) return false;
+      if(syncValueFingerprint_(localVal) === syncValueFingerprint_(remoteVal)) return false;
+      // outbox value가 서버와 같아도 전송 불필요
+      if(!op.deleted && syncValueFingerprint_(op.value) === syncValueFingerprint_(remoteVal)) return false;
+      return true;
+    });
+    removed += Math.max(0, beforeOut - state.syncOutbox.length);
+  }
+  try { rebuildDirtyStateFromOutbox_(); } catch(eRb){}
+  if(!Object.keys(state.syncDirtyEntityKeys || {}).length && !(state.syncOutbox || []).length){
+    if(!state.syncNeedsSnapshot) state.syncDirty = false;
   }
   return removed;
 }
@@ -16881,8 +16899,6 @@ async function runPlannerBootstrapInBackground_(){
       var remoteRevision = parseInt(bootstrapData.serverRevision, 10) || getPayloadRevision_(remotePayload);
       var localPayload = getPersistPayload();
       var localRev = parseInt(state.syncRevision, 10) || 0;
-      var storedGasRev = 0;
-      try { storedGasRev = parseInt(localStorage.getItem(GAS_LAST_SYNC_REV_KEY) || '0', 10) || 0; } catch(eGasRev){}
 
       function finishBootstrapAlreadyInSync_(msg){
         state._bootstrapChoiceDone = true;
@@ -16891,34 +16907,62 @@ async function runPlannerBootstrapInBackground_(){
           state._forceStepIntegrityPass = true;
           runPlannerStepIntegrityPass_({ toast: false, render: false, skipGasPush: true });
         } catch(eIntOk){}
+        try { updateSyncStatusUI_(); } catch(eUiOk){}
         if(msg && typeof setAppToast === 'function'){
           setAppToast(msg, { duration: 2800, variant: 'ok' });
         }
       }
 
-      // 같은 기기: 방금 이 rev로 동기화 성공했고 미반영 없음 → 선택 불필요
-      if(localRev > 0 && remoteRevision > 0 && localRev === remoteRevision &&
-          storedGasRev === remoteRevision && !hasPendingLocalSyncChanges_()){
+      // 같은 revision = 이미 같은 세대. 선택창 금지.
+      // F5마다 「남은 N건」·서버/기기 선택이 뜨던 원인: 전송 완료 잔재 dirty/outbox + 메타 노이즈
+      if(localRev > 0 && remoteRevision > 0 && localRev === remoteRevision){
+        try {
+          prunePhantomSyncDirtyKeys_(localPayload, remotePayload);
+          localPayload = getPersistPayload();
+        } catch(ePrSame){}
+
+        var stillPendingSameRev = false;
+        try { stillPendingSameRev = hasPendingLocalSyncChanges_(); } catch(ePend){}
+        if(!stillPendingSameRev ||
+            plannerSyncFingerprint_(localPayload) === plannerSyncFingerprint_(remotePayload)){
+          markLocalInSyncWithServer_(remotePayload);
+          try {
+            save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+          } catch(eSv0){}
+          finishBootstrapAlreadyInSync_(stillPendingSameRev ? '' : '서버와 이미 같은 내용이에요.');
+          return;
+        }
+
+        // 같은 rev인데 로컬에만 남은 실제 수정 → 선택창 없이 조용히 업로드
         finishBootstrapAlreadyInSync_('');
+        try { schedulePlannerGasPush_(true); } catch(ePushSame){}
         return;
       }
 
-      if(plannerSyncFingerprint_(localPayload) === plannerSyncFingerprint_(remotePayload) &&
-          localRev === remoteRevision){
+      if(plannerSyncFingerprint_(localPayload) === plannerSyncFingerprint_(remotePayload)){
+        try { prunePhantomSyncDirtyKeys_(localPayload, remotePayload); } catch(ePrFp){}
+        markLocalInSyncWithServer_(remotePayload);
+        try {
+          save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+        } catch(eSvFp){}
         finishBootstrapAlreadyInSync_('서버와 이미 같은 내용이에요.');
         return;
       }
 
       var diffReport = { counts: {}, items: [] };
       try { diffReport = buildBootstrapDiffReport_(localPayload, remotePayload); } catch(eDiff0){}
-      // rev가 같고 실질 콘텐츠 차이도 없으면(메타·updatedAt 노이즈) 선택 창 생략
-      if(localRev > 0 && localRev === remoteRevision && !bootstrapDiffReportHasActionableDiff_(diffReport) &&
-          !hasPendingLocalSyncChanges_()){
+      // 실질 콘텐츠 차이 없고 미전송도 없으면(메타·updatedAt 노이즈) 선택 창 생략
+      if(!bootstrapDiffReportHasActionableDiff_(diffReport) && !hasPendingLocalSyncChanges_()){
+        try { prunePhantomSyncDirtyKeys_(localPayload, remotePayload); } catch(ePr2){}
+        markLocalInSyncWithServer_(remotePayload);
+        try {
+          save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+        } catch(eSv2){}
         finishBootstrapAlreadyInSync_('서버와 이미 같은 내용이에요.');
         return;
       }
 
-      // 자동 적용 금지 — 내려받을 부분을 확인·선택한 뒤 진행 (기본: 서버)
+      // revision이 다를 때만 서버/이 기기 선택 (다른 기기에서 바뀐 경우)
       openPlannerBootstrapSyncChoice_(localPayload, remotePayload, remoteRevision);
       if(typeof setAppToast === 'function'){
         setAppToast('서버와 비교했어요. 내려받을 내용을 확인한 뒤 적용해 주세요.', { duration: 5500, variant: 'ok' });

@@ -109,7 +109,7 @@ flex-wrap: nowrap; gap: 10px;
   .btn-sync-status .sync-btn-main { font-size: 10px; }
   .btn-sync-status .sync-btn-sub {
     font-size: 8px;
-    max-width: 56px;
+    max-width: 72px;
   }
   .btn-prompt-settings { padding: 5px 6px; }
   .btn-add { padding: 5px 8px; }
@@ -4034,7 +4034,7 @@ outline: 2px solid #2DD4BF; outline-offset: 2px;
 .sync-dot.warn { background: #EF4444; }
 @keyframes syncDotPulse { 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
 .sync-btn-sub {
-font-size: 9px; color: #6B7280; max-width: 140px; margin-top: 2px;
+font-size: 9px; color: #6B7280; max-width: 168px; margin-top: 2px;
 white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .btn-sync-status.ok { border-color: #0F766E; color: #5EEAD4; }

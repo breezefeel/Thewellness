@@ -10300,6 +10300,10 @@ const PLANNER_PUBLIC_URL = 'https://breezefeel.github.io/Thewellness/';
 let plannerGasPushTimer = null;
 let plannerGasRetryTimer_ = null;
 let plannerGasRetryCount_ = 0;
+let plannerGasRetryDueAt_ = 0;
+let _syncSendingNow_ = 0;
+let _syncSendingSnapshot_ = false;
+let _syncProgressTickTimer_ = null;
 let plannerDirtyGeneration_ = 0;
 let plannerLastSyncError_ = '';
 let plannerProtocolDowngraded_ = false;
@@ -14646,7 +14650,7 @@ function ensureOutboxFromLegacyDirty_(payload){
     state.syncDirty = false;
   }
 }
-var SYNC_OUTBOX_PATCH_BATCH_ = 200;
+var SYNC_OUTBOX_PATCH_BATCH_ = 40;
 function buildPendingSyncMutations_(payload){
   ensureOutboxFromLegacyDirty_(payload);
   migrateIndexedPlanEntityKeysInPayload_(payload || {}, state.syncOutbox);
@@ -14801,6 +14805,7 @@ function schedulePlannerGasPush_(immediate){
   if(plannerGasRetryTimer_){
     clearTimeout(plannerGasRetryTimer_);
     plannerGasRetryTimer_ = null;
+    plannerGasRetryDueAt_ = 0;
   }
   clearTimeout(plannerGasPushTimer);
   plannerGasPushTimer = null;
@@ -14833,6 +14838,7 @@ function clearPlannerGasRetry_(){
   if(plannerGasRetryTimer_) clearTimeout(plannerGasRetryTimer_);
   plannerGasRetryTimer_ = null;
   plannerGasRetryCount_ = 0;
+  plannerGasRetryDueAt_ = 0;
   plannerLastSyncError_ = '';
 }
 function schedulePlannerGasRetry_(error){
@@ -14844,9 +14850,13 @@ function schedulePlannerGasRetry_(error){
   plannerLastSyncError_ = slow
     ? '서버 응답이 지연되어 자동 재시도 중'
     : String((error && error.message) || error || '서버 동기화 지연');
-  var delay = Math.min(5 * 60 * 1000, 3000 * Math.pow(2, Math.min(plannerGasRetryCount_ - 1, 6)));
+  var delay = slow
+    ? Math.min(20000, 4000 * Math.pow(2, Math.min(plannerGasRetryCount_ - 1, 2)))
+    : Math.min(60 * 1000, 3000 * Math.pow(2, Math.min(plannerGasRetryCount_ - 1, 6)));
+  plannerGasRetryDueAt_ = Date.now() + delay;
   plannerGasRetryTimer_ = setTimeout(function(){
     plannerGasRetryTimer_ = null;
+    plannerGasRetryDueAt_ = 0;
     plannerGasPushNow_().catch(function(err){ console.warn('[서버 동기화 재시도]', err); });
   }, delay);
   updateSyncStatusUI_();
@@ -14938,7 +14948,7 @@ async function plannerGasPushNow_(){
     var mutations = buildPendingSyncMutations_(body);
     var requestDirtyGeneration = plannerDirtyGeneration_;
     var usePatch = mutations.length > 0 && !state.syncNeedsSnapshot && state.syncProtocolVersion >= 2;
-    var maxPatchRounds = usePatch ? 8 : 1;
+    var maxPatchRounds = usePatch ? 12 : 1;
     var round = 0;
     var lastOkRevision = state.syncRevision;
     while(round < maxPatchRounds){
@@ -14960,6 +14970,8 @@ async function plannerGasPushNow_(){
           );
         }
       }
+    noteSyncSending_(usePatch ? mutations.length : Math.max(1, countPendingSyncItems_()), !usePatch);
+    try { updateSyncStatusUI_(); } catch(eSendUi){}
     var requestPayload = usePatch
       ? {
           action: 'plannerSyncPatch',
@@ -14973,7 +14985,7 @@ async function plannerGasPushNow_(){
           baseRevision: parseInt(state.syncRevision, 10) || 0
         };
     var pushController = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    var pushTimeout = pushController ? setTimeout(function(){ pushController.abort(); }, 60000) : null;
+    var pushTimeout = pushController ? setTimeout(function(){ pushController.abort(); }, 90000) : null;
     var r;
     try {
       r = await fetch(url, {
@@ -14985,7 +14997,7 @@ async function plannerGasPushNow_(){
       });
     } catch(fetchErr){
       if(fetchErr && fetchErr.name === 'AbortError'){
-        throw new Error('서버 응답이 조금 오래 걸려요. (약 60초) 데이터가 크거나 Apps Script가 느릴 때 나와요. 자동으로 다시 시도합니다.');
+        throw new Error('서버 응답이 조금 오래 걸려요. (약 90초) 데이터가 크거나 Apps Script가 느릴 때 나와요. 자동으로 다시 시도합니다.');
       }
       throw fetchErr;
     } finally {
@@ -15137,6 +15149,9 @@ async function plannerGasPushNow_(){
     notifyPlannerSyncIssue_(err, { manual: false });
     updateSyncStatusUI_();
     return { ok: false, error: err, slow: slow };
+  } finally {
+    clearSyncSending_();
+    try { updateSyncStatusUI_(); } catch(eFinUi){}
   }
   });
 }
@@ -15569,6 +15584,70 @@ function countPendingSyncItems_(){
   }
   return n;
 }
+function noteSyncSending_(n, snapshot){
+  _syncSendingNow_ = parseInt(n, 10) || 0;
+  _syncSendingSnapshot_ = !!snapshot;
+}
+function clearSyncSending_(){
+  _syncSendingNow_ = 0;
+  _syncSendingSnapshot_ = false;
+}
+function syncRetryWaitSec_(){
+  if(!plannerGasRetryDueAt_) return 0;
+  return Math.max(0, Math.ceil((plannerGasRetryDueAt_ - Date.now()) / 1000));
+}
+function formatSyncPendingPhrase_(n, snapshot){
+  n = parseInt(n, 10) || 0;
+  if(snapshot && n < 2) return '전체';
+  if(n > 0) return n + '건';
+  return '';
+}
+function formatSyncHeaderSub_(info){
+  var n = info.pendingCount || 0;
+  var nTxt = formatSyncPendingPhrase_(n, info.sendingSnapshot);
+  if(info.phase === 'transferring'){
+    if(info.sendingNow > 0 && n > info.sendingNow){
+      return '전송 ' + info.sendingNow + '/' + n + '건';
+    }
+    return nTxt ? ('전송 · ' + nTxt) : '전송 중';
+  }
+  if(info.phase === 'retry_wait'){
+    var sec = info.retryInSec || 0;
+    var wait = sec > 0 ? (sec + '초 후') : '재시도';
+    return nTxt ? (wait + ' · ' + nTxt) : wait;
+  }
+  if(info.phase === 'queued'){
+    return nTxt ? ('곧 · ' + nTxt) : '곧 전송';
+  }
+  if(info.phase === 'pull') return '받을 내용';
+  if(info.phase === 'pending'){
+    return n > 0 ? ('남은 ' + n + '건') : '반영 대기';
+  }
+  if(info.overall === 'ok') return '최신 · ' + info.localRev;
+  if(info.overall === 'warn') return '확인 필요';
+  return String(info.localRev || '');
+}
+function armSyncProgressTicker_(info){
+  var need = !!(info && (info.phase === 'retry_wait' || info.phase === 'transferring'));
+  if(!need){
+    if(_syncProgressTickTimer_){
+      clearInterval(_syncProgressTickTimer_);
+      _syncProgressTickTimer_ = null;
+    }
+    return;
+  }
+  if(_syncProgressTickTimer_) return;
+  _syncProgressTickTimer_ = setInterval(function(){
+    try {
+      var cur = getSyncStatusInfo_();
+      if(cur.phase !== 'retry_wait' && cur.phase !== 'transferring'){
+        clearInterval(_syncProgressTickTimer_);
+        _syncProgressTickTimer_ = null;
+      }
+      updateSyncStatusUI_();
+    } catch(eTick){}
+  }, 1000);
+}
 function isServerSyncConfigured_(){
   return !!(getPlannerGasUrl_() && location.protocol !== 'file:');
 }
@@ -15596,6 +15675,9 @@ function getSyncStatusInfo_(remoteMeta){
   var drivePending = driveOn && localPending;
   var remoteNewer = remoteRev != null && remoteRev > localRev;
   var pendingCount = countPendingSyncItems_();
+  var sendingNow = _syncSendingNow_ || 0;
+  var sendingSnapshot = !!_syncSendingSnapshot_;
+  var retryInSec = syncRetryWaitSec_();
   var phase = 'ok';
   var overall = 'ok';
   if(transferring){
@@ -15627,15 +15709,27 @@ function getSyncStatusInfo_(remoteMeta){
   var actionHint = '';
   var summary = '';
   if(phase === 'transferring'){
-    summary = '지금 서버·Drive와 주고받는 중이에요. 끝날 때까지 잠시만 기다려 주세요.';
+    summary = '지금 서버·Drive와 주고받는 중이에요.';
+    if(pendingCount){
+      summary += ' 남은 약 ' + pendingCount + '건';
+      if(sendingNow > 0 && pendingCount > sendingNow) summary += ' · 이번 ' + sendingNow + '건';
+      summary += '.';
+    } else if(sendingSnapshot){
+      summary += ' 전체 저장본을 올리는 중이에요.';
+    } else {
+      summary += ' 끝날 때까지 잠시만 기다려 주세요.';
+    }
     actionHint = '기다리면 됩니다. 헤더 「동기화」는 눌러도 되고, 안 눌러도 자동으로 끝납니다.';
   } else if(phase === 'retry_wait'){
     summary = '서버 응답이 느려 자동 재시도 대기 중이에요' +
       (plannerGasRetryCount_ ? ' (' + plannerGasRetryCount_ + '회차)' : '') +
+      (retryInSec ? ', ' + retryInSec + '초 후' : '') +
+      (pendingCount ? ', 남은 약 ' + pendingCount + '건' : '') +
       (plannerLastSyncError_ ? '. ' + plannerLastSyncError_ : '.');
     actionHint = '기본적으로 기다리면 됩니다. 급하면 「동기화」→ 하단 「지금 동기화」를 누르세요.';
   } else if(phase === 'queued'){
-    summary = '곧 자동으로 올리도록 예약돼 있어요. (보통 수 초 뒤)';
+    summary = '곧 자동으로 올리도록 예약돼 있어요.' +
+      (pendingCount ? ' 남은 약 ' + pendingCount + '건.' : ' (보통 수 초 뒤)');
     actionHint = '기다리면 됩니다. 급하면 「동기화」→「지금 동기화」.';
   } else if(phase === 'pull'){
     summary = '서버에 이 기기보다 최신 데이터(rev ' + remoteRev + ')가 있어요.';
@@ -15672,6 +15766,9 @@ function getSyncStatusInfo_(remoteMeta){
     queuedPush: queuedPush,
     phase: phase,
     pendingCount: pendingCount,
+    sendingNow: sendingNow,
+    sendingSnapshot: sendingSnapshot,
+    retryInSec: retryInSec,
     actionHint: actionHint,
     serverOn: serverOn,
     driveOn: driveOn,
@@ -15793,23 +15890,11 @@ function updateSyncStatusUI_(){
   if(dot) dot.className = 'sync-dot ' + info.overall;
   btn.classList.add(info.overall);
   if(label) label.textContent = '동기화';
-  if(sub){
-    if(info.phase === 'transferring') sub.textContent = '전송 중';
-    else if(info.phase === 'retry_wait') sub.textContent = '대기·재시도';
-    else if(info.phase === 'queued') sub.textContent = '대기·곧 전송';
-    else if(info.phase === 'pull') sub.textContent = '받을 내용';
-    else if(info.phase === 'pending'){
-      sub.textContent = info.pendingCount > 0
-        ? ('남은 ' + info.pendingCount + '건')
-        : '반영 대기';
-    }
-    else if(info.overall === 'ok') sub.textContent = '최신 · ' + info.localRev;
-    else if(info.overall === 'warn') sub.textContent = '확인 필요';
-    else sub.textContent = String(info.localRev);
-  }
+  if(sub) sub.textContent = formatSyncHeaderSub_(info);
   btn.title = '동기화 및 설정\n' + info.summary +
     (info.actionHint ? '\n\n할 일: ' + info.actionHint : '');
   try { refreshSyncStatusBodyHtml_(info); } catch(eBody){}
+  try { armSyncProgressTicker_(info); } catch(eTickArm){}
 }
 function renderSyncStatusBodyHTML_(info){
   function row(title, badgeClass, badgeText, metaHtml, actionsHtml){
@@ -15861,21 +15946,29 @@ function renderSyncStatusBodyHTML_(info){
 
   // 2. 이 기기
   var localBadge = info.transferring ? 'syncing' : (info.phase === 'pending' || info.phase === 'queued' || info.phase === 'retry_wait' ? 'pending' : 'ok');
-  var localText = info.transferring
-    ? '전송 중'
-    : (info.phase === 'retry_wait'
-      ? '대기·재시도'
-      : (info.phase === 'queued'
-        ? '대기·곧 전송'
-        : (info.pendingCount > 0 && (info.serverPending || info.drivePending)
-          ? ('남은 ' + info.pendingCount + '건')
-          : '기준')));
+  var localText = (info.phase === 'transferring' || info.phase === 'retry_wait' || info.phase === 'queued' || info.phase === 'pending')
+    ? formatSyncHeaderSub_(info)
+    : (info.pendingCount > 0 && (info.serverPending || info.drivePending)
+      ? ('남은 ' + info.pendingCount + '건')
+      : '기준');
+  var pendingMeta = '';
+  if(info.pendingCount){
+    pendingMeta = '<br>미반영 변경 약 <strong>' + info.pendingCount + '</strong>건';
+    if(info.sendingNow > 0 && info.phase === 'transferring'){
+      pendingMeta += ' · 지금 올리는 중 <strong>' + info.sendingNow + '</strong>건';
+    }
+    if(info.phase === 'retry_wait' && info.retryInSec){
+      pendingMeta += ' · <strong>' + info.retryInSec + '</strong>초 후 재시도';
+    }
+  } else if(info.sendingSnapshot && info.phase === 'transferring'){
+    pendingMeta = '<br>전체 저장본을 올리는 중이에요.';
+  }
   html += row(
     '2. 이 기기',
     localBadge,
     localText,
     'revision <strong>' + info.localRev + '</strong> · 마지막 저장 <strong>' + escapeHtml(localFmt) + '</strong>' +
-      (info.pendingCount ? '<br>미반영 변경 약 <strong>' + info.pendingCount + '</strong>건' : '') +
+      pendingMeta +
       '<br>기기 ID는 자동으로 관리됩니다.'
   );
 
@@ -15883,11 +15976,11 @@ function renderSyncStatusBodyHTML_(info){
   if(info.serverOn){
     var sBadge = info.transferring ? 'syncing' : (info.serverPending || info.retryScheduled || info.queuedPush ? 'pending' : (info.remoteNewer ? 'pending' : (info.serverRev ? 'ok' : 'off')));
     var sText = info.transferring
-      ? '전송 중'
+      ? formatSyncHeaderSub_(info)
       : (info.retryScheduled
-        ? '대기·재시도'
+        ? formatSyncHeaderSub_(info)
         : (info.queuedPush
-          ? '대기·곧 전송'
+          ? formatSyncHeaderSub_(info)
           : (info.serverPending
             ? (info.pendingCount ? ('남은 ' + info.pendingCount + '건') : '반영 대기')
             : (info.remoteNewer ? '서버가 더 최신' : (info.serverRev ? '일치' : '미확인')))));
@@ -15917,7 +16010,7 @@ function renderSyncStatusBodyHTML_(info){
     var dText = !info.driveOn
       ? '로그인 필요'
       : (info.transferring && info.drivePending
-        ? '전송 중'
+        ? formatSyncHeaderSub_(info)
         : (info.drivePending
           ? (info.pendingCount ? ('남은 ' + info.pendingCount + '건') : '반영 대기')
           : (info.driveRev ? '일치' : '미업로드')));
@@ -15952,7 +16045,7 @@ function renderSyncStatusBodyHTML_(info){
     '<button type="button" class="modal-btn sync-settings-mini-btn" onclick="openApiModalFromSync_()">AI·토큰·자동초안 설정</button>' +
       '<button type="button" class="modal-btn-ghost sync-settings-mini-btn" onclick="copyPlannerTeamInviteLink_()">직원 초대 링크 복사</button>'
   );
-  html += '<div class="sync-status-row-meta" style="padding:0 2px;color:#9CA3AF;">헤더 문구 안내: <strong>전송 중</strong>=지금 주고받는 중 · <strong>대기·재시도/곧 전송</strong>=기다리거나 급하면 「지금 동기화」 · <strong>남은 N건</strong>=아직 안 올라간 변경. revision은 성공 시 서버가 발급합니다.</div>';
+  html += '<div class="sync-status-row-meta" style="padding:0 2px;color:#9CA3AF;">헤더 문구 안내: <strong>전송 · N건</strong>=지금 올리는 중 · <strong>N초 후 · N건</strong>=재시도 대기 · <strong>곧 · N건</strong>=잠시 후 전송 · <strong>남은 N건</strong>=아직 안 올라간 변경. revision은 성공 시 서버가 발급합니다.</div>';
   html += '<div data-sync-history-slot>' + renderSyncHistoryListHtml_(_syncHistoryMetaCache_) + '</div>';
   var backupMeta = readPreSyncBackupMeta_();
   if(backupMeta){

@@ -2654,13 +2654,16 @@ function buildImageGptVisualsJsonExample_(catId, opts){
 }
 const SUBGOAL_MISC_ID = 'misc';
 const SUBGOAL_MISC_LABEL = '기타 주제';
-/** 단계당 주제: 기본 기획·AI는 5개, 이미 있는 주제는 최대 10개까지 유지 */
+/** 단계당 주제: 기본 기획·AI는 5개. 이미 있는 주제는 개수 제한 없음. */
 const STEP_TOPIC_SLOTS_DEFAULT = 5;
-const STEP_TOPIC_SLOTS_MAX = 10;
+function isValidStepTopicSlot_(n){
+  n = parseInt(n, 10);
+  return n >= 1 && isFinite(n);
+}
 function stepTopicSlotTotalForCount_(n){
   n = parseInt(n, 10) || 0;
   if(n <= STEP_TOPIC_SLOTS_DEFAULT) return STEP_TOPIC_SLOTS_DEFAULT;
-  return Math.min(STEP_TOPIC_SLOTS_MAX, Math.max(STEP_TOPIC_SLOTS_DEFAULT, n));
+  return n;
 }
 /** 주제 고정: 기본값 ON. 명시적으로 false 인 경우만 해제 */
 function isDraftPinned_(draftId){
@@ -3447,14 +3450,9 @@ function migrateExpertPspCurriculum_(){
       Object.keys(buckets).forEach(function(sid){
         var title = getSubGoalStepTitle_(plan, sid);
         var list = buckets[sid];
-        var total = String(sid) === SUBGOAL_MISC_ID ? Math.max(list.length, 1) : stepTopicSlotTotalForCount_(Math.min(list.length, STEP_TOPIC_SLOTS_MAX));
+        var total = String(sid) === SUBGOAL_MISC_ID ? Math.max(list.length, 1) : stepTopicSlotTotalForCount_(list.length);
         list.forEach(function(draft, idx){
           var order = idx + 1;
-          if(String(sid) !== SUBGOAL_MISC_ID && order > STEP_TOPIC_SLOTS_MAX){
-            var miscTitle = getSubGoalMiscLabel_(plan);
-            applyDraftRoadmapAssignment_(draft, catId, SUBGOAL_MISC_ID, miscTitle, order, Math.max(order, 1));
-            return;
-          }
           applyDraftRoadmapAssignment_(draft, catId, sid, title, order, total);
         });
       });
@@ -4884,7 +4882,7 @@ function getDraftForStepSlot_(catId, stepId, slotNum, opts){
   var cat = CATEGORIES[catId];
   if(!cat || !cat.drafts) return null;
   var slot = parseInt(slotNum, 10);
-  if(slot < 1 || slot > STEP_TOPIC_SLOTS_MAX) return null;
+  if(!isValidStepTopicSlot_(slot)) return null;
   var sid = String(stepId);
   if(!opts.live && usePendingProgramPreview_(catId)){
     var found = null;
@@ -4991,8 +4989,8 @@ function sortDraftsForStepSlotNormalize_(drafts, catId){
     if(aHas !== bHas) return bHas - aHas;
     var pa = getDraftStepParts_(a, catId, ia).step;
     var pb = getDraftStepParts_(b, catId, ib).step;
-    var sa = (pa >= 1 && pa <= STEP_TOPIC_SLOTS_MAX) ? pa : 99;
-    var sb = (pb >= 1 && pb <= STEP_TOPIC_SLOTS_MAX) ? pb : 99;
+    var sa = isValidStepTopicSlot_(pa) ? pa : 1e9;
+    var sb = isValidStepTopicSlot_(pb) ? pb : 1e9;
     if(sa !== sb) return sa - sb;
     return ia - ib;
   });
@@ -5021,7 +5019,7 @@ function densifyStepSlotTotalsOnly_(catId, stepId){
   }
   return changed;
 }
-/** 단계 안 주제 슬롯을 1/5…5/5로 고유 부여. 6번째부터는 기타로 이동.
+/** 단계 안 주제 슬롯을 1/n…n/n 으로 고유 부여. 개수 제한 없음(기타로 넘기지 않음).
  *  반환: { changed, movedToMisc }
  *  자동 호출 시에는 canReassignDraftSteps_ 가 false 라 no-op (기존 자리 고정). */
 function normalizeStepDraftSlots_(catId, stepId){
@@ -5039,32 +5037,14 @@ function normalizeStepDraftSlots_(catId, stepId){
   );
   if(!drafts.length) return empty;
   var changed = false;
-  var movedToMisc = 0;
-  var keep = drafts.slice(0, STEP_TOPIC_SLOTS_MAX);
-  var overflow = drafts.slice(STEP_TOPIC_SLOTS_MAX);
-  var totalSlots = stepTopicSlotTotalForCount_(keep.length);
-  keep.forEach(function(d, idx){
+  var totalSlots = stepTopicSlotTotalForCount_(drafts.length);
+  drafts.forEach(function(d, idx){
     var order = idx + 1;
     if(draftStepAssignEquals_(d, sid, title, order, totalSlots)) return;
     applyDraftRoadmapAssignment_(d, catId, sid, title, order, totalSlots);
     changed = true;
   });
-  if(overflow.length){
-    var miscLabel = getSubGoalMiscLabel_(plan);
-    overflow.forEach(function(d){
-      var miscDrafts = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true });
-      var already = miscDrafts.indexOf(d) >= 0;
-      var order = already ? miscDrafts.indexOf(d) + 1 : miscDrafts.length + 1;
-      var total = Math.max(miscDrafts.length + (already ? 0 : 1), order);
-      if(!draftStepAssignEquals_(d, SUBGOAL_MISC_ID, miscLabel, order, total)){
-        applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, order, total, { dropRescueHints: true });
-        changed = true;
-      }
-      movedToMisc++;
-    });
-    if(normalizeMiscUserAddedOrder_(catId)) changed = true;
-  }
-  return { changed: changed, movedToMisc: movedToMisc };
+  return { changed: changed, movedToMisc: 0 };
 }
 function normalizeAllStepDraftSlots_(catId){
   var plan = getSubGoalPlan_(catId);
@@ -5079,17 +5059,47 @@ function normalizeAllStepDraftSlots_(catId){
 }
 function buildStepSlotDraftMap_(catId, stepId, opts){
   opts = opts || {};
-  var maxSlots = opts.maxSlots != null ? opts.maxSlots : STEP_TOPIC_SLOTS_MAX;
-  var slots = [];
-  for(var si = 0; si < maxSlots; si++) slots.push(null);
   var cat = CATEGORIES[catId];
   var useLive = opts.live || !usePendingProgramPreview_(catId);
-  getDraftsForSubGoalStep_(catId, stepId, { live: useLive }).forEach(function(d){
-    var idx = cat.drafts.indexOf(d);
+  var drafts = getDraftsForSubGoalStep_(catId, stepId, { live: useLive });
+  var maxSlots = opts.maxSlots;
+  if(maxSlots == null){
+    var highest = 0;
+    drafts.forEach(function(d){
+      var idx = cat && cat.drafts ? cat.drafts.indexOf(d) : -1;
+      var step = getDraftStepParts_(d, catId, idx).step;
+      if(isValidStepTopicSlot_(step) && step > highest) highest = step;
+    });
+    var floor = Math.max(STEP_TOPIC_SLOTS_DEFAULT, drafts.length);
+    if(highest > floor + 50) highest = floor + 50;
+    maxSlots = Math.max(floor, highest);
+  }
+  var slots = [];
+  for(var si = 0; si < maxSlots; si++) slots.push(null);
+  drafts.forEach(function(d){
+    var idx = cat && cat.drafts ? cat.drafts.indexOf(d) : -1;
     var step = getDraftStepParts_(d, catId, idx).step;
     if(step >= 1 && step <= maxSlots && !slots[step - 1]) slots[step - 1] = d;
   });
+  drafts.forEach(function(d){
+    var already = false;
+    for(var i = 0; i < slots.length; i++){
+      if(slots[i] === d){ already = true; break; }
+    }
+    if(already) return;
+    for(var j = 0; j < slots.length; j++){
+      if(!slots[j]){ slots[j] = d; return; }
+    }
+    slots.push(d);
+  });
   return slots;
+}
+function findEmptyTopicSlot_(catId, stepId){
+  var map = buildStepSlotDraftMap_(catId, stepId, { live: true });
+  for(var i = 0; i < map.length; i++){
+    if(!map[i]) return i + 1;
+  }
+  return map.length + 1;
 }
 function countFilledTopicSlots_(catId, stepId){
   var map = buildStepSlotDraftMap_(catId, stepId);
@@ -5109,22 +5119,111 @@ function stepNeedsMoreTopics_(catId, stepId){
   }
   return countFilledTopicSlots_(catId, stepId) < STEP_TOPIC_SLOTS_DEFAULT;
 }
+function findDraftByNormalizedTopicInCat_(catId, topic){
+  var cat = CATEGORIES[catId];
+  var key = typeof normalizeTopicKey_ === 'function' ? normalizeTopicKey_(topic) : String(topic || '').replace(/\s+/g, '').toLowerCase();
+  if(!cat || !key) return null;
+  var found = null;
+  (cat.drafts || []).forEach(function(d){
+    if(found || !d || !d.id) return;
+    var dk = typeof normalizeTopicKey_ === 'function' ? normalizeTopicKey_(d.topic) : String(d.topic || '').replace(/\s+/g, '').toLowerCase();
+    if(dk === key) found = d;
+  });
+  return found;
+}
+function draftDuplicateKeepScore_(d, catId){
+  if(!d || !d.id) return -1;
+  var score = 0;
+  if(typeof draftShowsOnPublishedList_ === 'function' && draftShowsOnPublishedList_(d.id, catId)) score += 400;
+  else if(typeof draftIsPublished_ === 'function' && draftIsPublished_(d.id)) score += 350;
+  if(typeof draftHasContent === 'function' && draftHasContent(d)) score += 200;
+  else if(typeof draftIsPendingPublish_ === 'function' && draftIsPendingPublish_(d)) score += 180;
+  if(typeof isDraftPinned_ === 'function' && isDraftPinned_(d.id)) score += 20;
+  if(typeof isUserAddedDraftId_ === 'function' && !isUserAddedDraftId_(d.id)) score += 8;
+  if(String(d.angle || '').trim()) score += 1;
+  if(String(d.rationale || '').trim()) score += 1;
+  return score;
+}
+function absorbDraftKeyedMaps_(fromId, toId){
+  if(!fromId || !toId || fromId === toId) return;
+  if(state.published && state.published[fromId] && !state.published[toId]){
+    state.published[toId] = state.published[fromId];
+  }
+  if(state.generatedOnly && state.generatedOnly[fromId] && !state.generatedOnly[toId]){
+    state.generatedOnly[toId] = state.generatedOnly[fromId];
+  }
+  if(state.pinnedDraftIds && state.pinnedDraftIds[fromId] && state.pinnedDraftIds[toId] == null){
+    state.pinnedDraftIds[toId] = state.pinnedDraftIds[fromId];
+  }
+  if(state.draftBrandOverrides && state.draftBrandOverrides[fromId] && !state.draftBrandOverrides[toId]){
+    state.draftBrandOverrides[toId] = Object.assign({}, state.draftBrandOverrides[fromId]);
+  }
+}
+/** 같은 카테고리·같은 제목 카드 중 초안/발행이 있는 1장만 남김. 제거한 개수 반환. */
+function dedupeSameTopicDraftsInCat_(catId){
+  var cat = CATEGORIES[catId];
+  if(!cat || !(cat.drafts || []).length) return 0;
+  var groups = {};
+  (cat.drafts || []).forEach(function(d){
+    if(!d || !d.id) return;
+    var key = typeof normalizeTopicKey_ === 'function' ? normalizeTopicKey_(d.topic) : String(d.topic || '').replace(/\s+/g, '').toLowerCase();
+    if(!key) return;
+    if(!groups[key]) groups[key] = [];
+    groups[key].push(d);
+  });
+  var dropIds = [];
+  Object.keys(groups).forEach(function(key){
+    var list = groups[key];
+    if(list.length < 2) return;
+    var keep = list[0];
+    list.forEach(function(d){
+      if(d === keep) return;
+      var ks = draftDuplicateKeepScore_(keep, catId);
+      var ds = draftDuplicateKeepScore_(d, catId);
+      if(ds > ks) keep = d;
+      else if(ds === ks){
+        var kt = parseIsoMs_(keep.updatedAt || keep.createdAt);
+        var dt = parseIsoMs_(d.updatedAt || d.createdAt);
+        if(dt > kt) keep = d;
+      }
+    });
+    list.forEach(function(d){
+      if(d && d.id && d.id !== keep.id){
+        absorbDraftKeyedMaps_(d.id, keep.id);
+        dropIds.push(d.id);
+      }
+    });
+  });
+  if(!dropIds.length) return 0;
+  dropIds.forEach(function(id){ deleteDraftSilent_(catId, id); });
+  return dropIds.length;
+}
+
 function applyTopicToStepSlot_(catId, stepId, slotNum, topicData){
   if(!topicData || !topicData.topic) return false;
   var plan = getEffectiveSubGoalPlan_(catId);
   var cat = CATEGORIES[catId];
   if(!plan || !cat) return false;
   var slot = parseInt(slotNum, 10);
-  if(slot < 1 || slot > STEP_TOPIC_SLOTS_MAX) return false;
+  if(!isValidStepTopicSlot_(slot)) return false;
   var existing = getDraftForStepSlot_(catId, stepId, slot);
   if(existing && isDraftPinned_(existing.id)) return false;
   if(existing && draftIsPublished_(existing.id)) return false;
   var title = getSubGoalStepTitle_(plan, stepId);
+  var topicStr = String(topicData.topic).trim();
+  var other = findDraftByNormalizedTopicInCat_(catId, topicStr);
   var filled = countFilledTopicSlots_(catId, stepId);
   if(!existing) filled += 1;
   var totalSlots = stepTopicSlotTotalForCount_(filled);
+  if(other && (!existing || other.id !== existing.id)){
+    if(existing) return false;
+    applyDraftRoadmapAssignment_(other, catId, stepId, title, slot, totalSlots);
+    ensurePendingAssignmentForDraft_(catId, stepId, slot, other.id);
+    densifyStepSlotTotalsOnly_(catId, stepId);
+    return true;
+  }
   if(existing){
-    existing.topic = String(topicData.topic).trim();
+    existing.topic = topicStr;
     if(topicData.angle != null) existing.angle = String(topicData.angle).trim();
     if(topicData.rationale) existing.rationale = stripTopicRationaleStepPrefix_(String(topicData.rationale).trim());
     existing.updatedAt = new Date().toISOString();
@@ -5191,7 +5290,7 @@ function rebuildPendingProgramAssignments_(payload, oldSteps){
     var newSid = String(newStep.id);
     var di = cat.drafts.indexOf(d);
     var slot = getDraftStepParts_(d, catId, di).step;
-    if(slot < 1 || slot > STEP_TOPIC_SLOTS_MAX) slot = parseInt(a.order, 10) || 1;
+    if(!isValidStepTopicSlot_(slot)) slot = parseInt(a.order, 10) || 1;
     newAssignments.push({ draftId: a.draftId, stepId: newSid, order: slot });
     applyDraftRoadmapAssignment_(d, catId, newSid, newStep.title || '', slot, stepTopicSlotTotalForCount_(slot));
   });
@@ -5670,7 +5769,7 @@ function resolveUserAddedDraftStepAssignment_(draft, catId){
   if(sid){
     var filled = countFilledTopicSlots_(catId, sid) || 0;
     var total = stepTopicSlotTotalForCount_(Math.max(order, filled));
-    return { stepId: sid, order: (order >= 1 && order <= STEP_TOPIC_SLOTS_MAX) ? order : 1, total: total };
+    return { stepId: sid, order: isValidStepTopicSlot_(order) ? order : 1, total: total };
   }
   if(state.pendingSubGoalPlan && Number(state.pendingSubGoalPlan.catId) === Number(catId)){
     var pa = (state.pendingSubGoalPlan.assignments || []).find(function(a){
@@ -5679,7 +5778,7 @@ function resolveUserAddedDraftStepAssignment_(draft, catId){
     var psid = pa ? normalizeStepIdAgainstPlan_(plan, pa.stepId) : '';
     if(psid){
       var po = parseInt(pa.order, 10) || order || 1;
-      if(po < 1 || po > STEP_TOPIC_SLOTS_MAX) po = 1;
+      if(!isValidStepTopicSlot_(po)) po = 1;
       var pfilled = countFilledTopicSlots_(catId, psid) || 0;
       return { stepId: psid, order: po, total: stepTopicSlotTotalForCount_(Math.max(po, pfilled)) };
     }
@@ -6242,7 +6341,7 @@ function formatDraftStepBadgeForDisplay_(draft, catId, draftIndex){
   var stepId = getDraftRoadmapStepId_(draft, catId, idx);
   if(String(stepId) === SUBGOAL_MISC_ID) return '기타';
   var parts = getDraftStepParts_(draft, catId, idx);
-  if(parts.step >= 1 && parts.step <= STEP_TOPIC_SLOTS_MAX && parts.total >= 1 && parts.total <= STEP_TOPIC_SLOTS_MAX && parts.step <= parts.total){
+  if(isValidStepTopicSlot_(parts.step) && parts.total >= 1 && parts.step <= parts.total){
     return parts.step + '/' + parts.total;
   }
   var slotMap = buildStepSlotDraftMap_(catId, stepId, { live: true });
@@ -6255,51 +6354,30 @@ function formatDraftStepBadgeForDisplay_(draft, catId, draftIndex){
   }
   var inStep = getDraftsForSubGoalStep_(catId, stepId, { live: true });
   var pos = inStep.indexOf(draft);
-  if(pos >= 0 && pos < STEP_TOPIC_SLOTS_MAX){
+  if(pos >= 0){
     return (pos + 1) + '/' + stepTopicSlotTotalForCount_(inStep.length);
   }
-  if(pos >= STEP_TOPIC_SLOTS_MAX || parts.step > STEP_TOPIC_SLOTS_MAX || parts.total > STEP_TOPIC_SLOTS_MAX) return '기타';
-  if(parts.step >= 1 && parts.step <= STEP_TOPIC_SLOTS_MAX){
+  if(isValidStepTopicSlot_(parts.step)){
     return parts.step + '/' + stepTopicSlotTotalForCount_(parts.total || parts.step);
   }
   return '기타';
 }
-/** step 배지가 6/15·7/5·27/27 등으로 깨진 초안을 정리 (슬롯 정규화는 normalizeAllStepDraftSlots_ 에서) */
+/** step 배지가 7/5처럼 분모보다 큰 초안을 정리 (슬롯 정규화는 normalizeAllStepDraftSlots_ 에서) */
 function repairInvalidStepBadgeDrafts_(catId){
   if(!canReassignDraftSteps_()) return false;
   var cat = CATEGORIES[catId];
   var plan = getSubGoalPlan_(catId);
   if(!cat || !plan || !plan.steps) return false;
   var changed = false;
-  var miscLabel = getSubGoalMiscLabel_(plan);
   var stepsNeedingDensify = {};
   (cat.drafts || []).forEach(function(d, di){
     if(!d || !d.id) return;
     var parts = getDraftStepParts_(d, catId, di);
-    var badRange = parts.total > STEP_TOPIC_SLOTS_MAX || parts.step > STEP_TOPIC_SLOTS_MAX;
-    var badDenom = parts.step >= 1 && parts.total >= 1 && parts.step > parts.total && parts.total <= STEP_TOPIC_SLOTS_MAX;
-    if(!badRange && !badDenom) return;
+    var badDenom = parts.step >= 1 && parts.total >= 1 && parts.step > parts.total;
+    if(!badDenom) return;
     var sid = getDraftRoadmapStepId_(d, catId, di);
-    if(badDenom && sid && String(sid) !== SUBGOAL_MISC_ID){
+    if(sid && String(sid) !== SUBGOAL_MISC_ID){
       stepsNeedingDensify[sid] = true;
-      return;
-    }
-    if(!sid || String(sid) === SUBGOAL_MISC_ID){
-      if(badRange && String(d.roadmapStepId || '') === SUBGOAL_MISC_ID){
-        var miscDrafts = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true });
-        var order = Math.max(1, miscDrafts.indexOf(d) + 1);
-        var total = Math.max(miscDrafts.length, order);
-        if(!draftStepAssignEquals_(d, SUBGOAL_MISC_ID, miscLabel, order, total)){
-          applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, order, total, { dropRescueHints: true });
-          changed = true;
-        }
-      }
-      return;
-    }
-    var inStep = getDraftsForSubGoalStep_(catId, sid, { live: true });
-    if(inStep.indexOf(d) >= STEP_TOPIC_SLOTS_MAX){
-      applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, 1, 1, { dropRescueHints: true });
-      changed = true;
     }
   });
   Object.keys(stepsNeedingDensify).forEach(function(sid){
@@ -6533,7 +6611,7 @@ function buildSubGoalAssignmentsFromDrafts_(catId){
       if(!d || !d.id) return;
       var di = cat.drafts.indexOf(d);
       var slot = getDraftStepParts_(d, catId, di).step;
-      if(slot < 1 || slot > STEP_TOPIC_SLOTS_MAX) slot = 1;
+      if(!isValidStepTopicSlot_(slot)) slot = 1;
       assignments.push({ draftId: d.id, stepId: sid, order: slot });
     });
   });
@@ -6590,24 +6668,15 @@ function reconcileSubGoalDraftSteps_(catId){
   Object.keys(byStep).forEach(function(sid){
     var list = byStep[sid];
     list.sort(function(a, b){
-      var sa = (a.slot >= 1 && a.slot <= STEP_TOPIC_SLOTS_MAX) ? a.slot : 99;
-      var sb = (b.slot >= 1 && b.slot <= STEP_TOPIC_SLOTS_MAX) ? b.slot : 99;
+      var sa = isValidStepTopicSlot_(a.slot) ? a.slot : 1e9;
+      var sb = isValidStepTopicSlot_(b.slot) ? b.slot : 1e9;
       if(sa !== sb) return sa - sb;
       return a.di - b.di;
     });
     var title = getSubGoalStepTitle_(plan, sid);
-    var keepN = Math.min(list.length, STEP_TOPIC_SLOTS_MAX);
-    var wantTotal = stepTopicSlotTotalForCount_(keepN);
+    var wantTotal = stepTopicSlotTotalForCount_(list.length);
     list.forEach(function(item, idx){
       var d = item.d;
-      if(idx >= STEP_TOPIC_SLOTS_MAX){
-        var miscDrafts = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true });
-        var alreadyMisc = miscDrafts.indexOf(d) >= 0;
-        var miscOrder = alreadyMisc ? miscDrafts.indexOf(d) + 1 : miscDrafts.length + 1;
-        var miscTotal = Math.max(miscDrafts.length + (alreadyMisc ? 0 : 1), miscOrder);
-        applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, miscOrder, miscTotal, { dropRescueHints: true });
-        return;
-      }
       var order = idx + 1;
       var wantStep = order + '/' + wantTotal;
       if(String(d.roadmapStepId || '') !== sid || String(d.series || '') !== title || String(d.step || '') !== wantStep){
@@ -6659,7 +6728,6 @@ function rescueOrphanedStepDrafts_(catId){
       findPlanStepIdByTitle_(plan, (d.series && d.series !== miscLabel) ? d.series : '') ||
       findPlanStepIdBySeedTopic_(catId, plan, d.topic);
     if(!target || target === SUBGOAL_MISC_ID) return;
-    if((counts[target] || 0) >= STEP_TOPIC_SLOTS_MAX) return;
     counts[target] = (counts[target] || 0) + 1;
     applyDraftRoadmapAssignment_(
       d, catId, target,
@@ -7446,7 +7514,7 @@ function ensurePendingSubGoalPlanFromCurrent_(catId){
       if(!d || !d.id) return;
       var di = cat.drafts.indexOf(d);
       var slot = getDraftStepParts_(d, catId, di).step;
-      if(slot < 1 || slot > STEP_TOPIC_SLOTS_MAX) slot = 1;
+      if(!isValidStepTopicSlot_(slot)) slot = 1;
       assignments.push({ draftId: d.id, stepId: sid, order: slot });
     });
   });
@@ -7478,7 +7546,7 @@ function renderTopicWorkshopStripHTML_(catId, step, idx, opts){
   var filled = countFilledTopicSlots_(catId, sid);
   var topicCount = getDraftsForSubGoalStep_(catId, sid).length;
   var totalSlots = stepTopicSlotTotalForCount_(Math.max(filled, topicCount));
-  var topicCountShown = Math.min(topicCount, STEP_TOPIC_SLOTS_MAX);
+  var topicCountShown = topicCount;
   var compact = !!opts.compact;
   var active = !!opts.active;
   var slotLabel = filled + '/' + totalSlots;
@@ -7759,17 +7827,14 @@ window.applySelectedStepTopics_ = function(){
       if(existingTopics[key]){ skipped++; return; }
       existingTopics[key] = true;
       var placed = false;
-      for(var slot = 1; slot <= STEP_TOPIC_SLOTS_MAX; slot++){
-        if(getDraftForStepSlot_(catId, step.id, slot, { live: true })) continue;
-        if(applyTopicToStepSlot_(catId, step.id, slot, {
-          topic: topic,
-          angle: it.angle || '',
-          rationale: it.rationale || ''
-        })){
-          added++;
-          placed = true;
-          break;
-        }
+      var slot = findEmptyTopicSlot_(catId, step.id);
+      if(applyTopicToStepSlot_(catId, step.id, slot, {
+        topic: topic,
+        angle: it.angle || '',
+        rationale: it.rationale || ''
+      })){
+        added++;
+        placed = true;
       }
       if(!placed) skipped++;
     });
@@ -8192,7 +8257,7 @@ function applySubGoalRoadmapPlan_(payload){
     var total = String(sid) === SUBGOAL_MISC_ID ? Math.max(list.length, 1) : stepTopicSlotTotalForCount_(list.length);
     list.forEach(function(entry, idx){
       var order = (entry.meta && entry.meta.order) ? entry.meta.order : (idx + 1);
-      if(String(sid) !== SUBGOAL_MISC_ID && (order < 1 || order > STEP_TOPIC_SLOTS_MAX)) order = Math.min(Math.max(order, 1), STEP_TOPIC_SLOTS_MAX);
+      if(String(sid) !== SUBGOAL_MISC_ID && !isValidStepTopicSlot_(order)) order = idx + 1;
       applyDraftRoadmapAssignment_(entry.draft, catId, sid, title, order, total);
       if(entry.meta && entry.meta.rationale) entry.draft.rationale = stripTopicRationaleStepPrefix_(String(entry.meta.rationale).trim());
       if(entry.meta && entry.meta.angle) entry.draft.angle = String(entry.meta.angle).trim();
@@ -9146,7 +9211,7 @@ function renderTopicWorkshopBodyHTML_(catId, stepId){
   var slotDrafts = buildStepSlotDraftMap_(catId, stepId);
   var filled = 0;
   for(var fi = 0; fi < slotDrafts.length; fi++) if(slotDrafts[fi]) filled++;
-  var showN = Math.min(STEP_TOPIC_SLOTS_MAX, Math.max(STEP_TOPIC_SLOTS_DEFAULT, filled));
+  var showN = Math.max(STEP_TOPIC_SLOTS_DEFAULT, filled, slotDrafts.length);
   var stepIdx = plan && plan.steps ? plan.steps.findIndex(function(s){ return String(s.id) === String(stepId); }) : 0;
   if(stepIdx < 0) stepIdx = 0;
   var html = '';
@@ -9157,7 +9222,7 @@ function renderTopicWorkshopBodyHTML_(catId, stepId){
     });
     html += '</div>';
   }
-  html += '<p class="ws-intro">이 <strong>하위 목표</strong>에 맞는 콘텐츠 주제는 <strong>기본 5개</strong>로 기획하고, 이미 있는 주제는 <strong>최대 10개</strong>까지 유지해요. 수정은 바로 반영됩니다.</p>' +
+  html += '<p class="ws-intro">이 <strong>하위 목표</strong>에 맞는 콘텐츠 주제는 <strong>기본 5개</strong>로 기획하고, 이미 있는 주제는 개수 제한 없이 유지해요. 수정은 바로 반영됩니다.</p>' +
     '<p class="ws-intro-ref">PSP·PAR·프로그램 구조: <a href="' + PROFILE_BRAND_URL + '" target="_blank" rel="noopener">미카닥 박준규 프로필 PSP 가이드</a></p>' +
     renderIntentRefBlockHTML_('분기별·프로그램·단계 의도 (주제 기획 시 참고)', buildMainGoalContextBlock_() + '\n\n' + buildProgramPlanContextBlock_(catId, stepId), { open: false });
   if(step){
@@ -9542,7 +9607,7 @@ window.moveDraftCardOrder_ = function(catId, draftId, dir){
   }
   if(slotIndex < 0){
     var parts = getDraftStepParts_(draft, catId, di);
-    if(parts.step >= 1 && parts.step <= STEP_TOPIC_SLOTS_MAX) slotIndex = parts.step - 1;
+    if(isValidStepTopicSlot_(parts.step)) slotIndex = parts.step - 1;
   }
   if(slotIndex < 0) return;
   window.moveTopicDraftOrder_(catId, stepId, slotIndex, dir);
@@ -15133,7 +15198,26 @@ function mergeExtraDraftsByCat_(a, b, deletedIds, preferRemote){
       (src[k] || []).forEach(function(d){
         if(!d || !d.id || deleted[d.id]) return;
         var ix = out[k].findIndex(function(x){ return x.id === d.id; });
-        if(ix === -1) out[k].push(Object.assign({}, d));
+        if(ix === -1){
+          var tkey = typeof normalizeTopicKey_ === 'function'
+            ? normalizeTopicKey_(d.topic)
+            : String(d.topic || '').replace(/\s+/g, '').toLowerCase();
+          var sameIx = tkey ? out[k].findIndex(function(x){
+            var xk = typeof normalizeTopicKey_ === 'function'
+              ? normalizeTopicKey_(x.topic)
+              : String(x.topic || '').replace(/\s+/g, '').toLowerCase();
+            return xk === tkey;
+          }) : -1;
+          if(sameIx >= 0){
+            var keep = out[k][sameIx];
+            if(d.id && keep.id && d.id !== keep.id) deleted[d.id] = deleted[d.id] || new Date().toISOString();
+            var mergedSame = mergeDraftPair(keep, d);
+            mergedSame.id = keep.id;
+            out[k][sameIx] = mergedSame;
+          } else {
+            out[k].push(Object.assign({}, d));
+          }
+        }
         else out[k][ix] = mergeDraftPair(out[k][ix], d);
       });
     });
@@ -15215,11 +15299,12 @@ function mergePlannerPayloads_(local, remote){
   var preferRemote = preferRemotePayload_(local, remote);
   var localMs = getPayloadSavedMs_(local);
   var remoteMs = getPayloadSavedMs_(remote);
+  var deletedUnion = Object.assign({}, remote.deletedDraftIds || {}, local.deletedDraftIds || {});
   var out = Object.assign({}, preferRemote ? remote : local, {
     published: mergePublishedMaps_(local.published, remote.published, preferRemote),
     generatedOnly: mergeGeneratedMaps_(local.generatedOnly, remote.generatedOnly, preferRemote),
-    extraDraftsByCat: mergeExtraDraftsByCat_(local.extraDraftsByCat, remote.extraDraftsByCat, Object.assign({}, remote.deletedDraftIds || {}, local.deletedDraftIds || {}), preferRemote),
-    deletedDraftIds: Object.assign({}, remote.deletedDraftIds || {}, local.deletedDraftIds || {}),
+    extraDraftsByCat: mergeExtraDraftsByCat_(local.extraDraftsByCat, remote.extraDraftsByCat, deletedUnion, preferRemote),
+    deletedDraftIds: deletedUnion,
     promptRefineMilestones: Object.assign({}, local.promptRefineMilestones || {}, remote.promptRefineMilestones || {}),
   });
   if(remote.prompts != null && (preferRemote || local.prompts == null)) out.prompts = remote.prompts;
@@ -19981,7 +20066,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=171').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=172').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -22324,7 +22409,7 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
       }
       if(ordIdx < 0){
         var op = getDraftStepParts_(d, cat.id, draftIndex);
-        if(op.step >= 1 && op.step <= STEP_TOPIC_SLOTS_MAX) ordIdx = op.step - 1;
+        if(isValidStepTopicSlot_(op.step)) ordIdx = op.step - 1;
       }
       if(ordIdx >= 0){
         var canUpCard = false;
@@ -25079,13 +25164,14 @@ function canBulkReassignCategory_(catId){
   return !!(plan && plan.steps && plan.steps.length);
 }
 
-/** 준비 글 + 완료 글(빈 기획 칸 제외). 이동 제안(moves)과 규칙 미매칭(held) */
+/** 준비 글 + 완료 글(빈 기획 칸 제외). 이동 제안(moves), 규칙 미매칭(held), 같은 제목 중복(dups) */
 function previewBulkReassignDraftSteps_(catId){
   catId = parseInt(catId, 10);
-  var res = { catId: catId, moves: [], held: [] };
+  var res = { catId: catId, moves: [], held: [], dups: [] };
   var cat = CATEGORIES[catId];
   if(!cat || !canBulkReassignCategory_(catId)) return res;
   var plan = getSubGoalPlan_(catId);
+  res.dups = previewBulkDuplicateDrafts_(catId, plan);
   var rules = buildBulkStepRulesForPlan_(catId, plan);
   if(!rules.length) return res;
   (cat.drafts || []).forEach(function(d, di){
@@ -25112,8 +25198,62 @@ function previewBulkReassignDraftSteps_(catId){
   return res;
 }
 
-/** items: [{draftId, toStepId}] — 각 이동 후 끝에서 한 번 저장·동기화 */
-function applyBulkReassignDraftSteps_(catId, items){
+function previewBulkDuplicateDrafts_(catId, plan){
+  catId = parseInt(catId, 10);
+  var cat = CATEGORIES[catId];
+  var groups = [];
+  if(!cat) return groups;
+  plan = plan || peekSubGoalPlan_(catId) || getSubGoalPlan_(catId);
+  var byKey = {};
+  (cat.drafts || []).forEach(function(d, di){
+    if(!d || !d.id) return;
+    if(draftIsShelfEmpty_(d, catId)) return;
+    var key = typeof normalizeTopicKey_ === 'function'
+      ? normalizeTopicKey_(d.topic)
+      : String(d.topic || '').replace(/\s+/g, '').toLowerCase();
+    if(!key) return;
+    if(!byKey[key]) byKey[key] = [];
+    var cur = String(getDraftRoadmapStepId_(d, catId, di) || '');
+    var hasDraft = !!(typeof draftHasContent === 'function' && draftHasContent(d)) ||
+      !!(typeof draftIsPendingPublish_ === 'function' && draftIsPendingPublish_(d));
+    byKey[key].push({
+      draftId: d.id,
+      topic: d.topic || '(제목 없음)',
+      published: draftShowsOnPublishedList_(d.id, catId),
+      hasDraft: hasDraft,
+      stepLabel: cur
+        ? (cur === SUBGOAL_MISC_ID ? getSubGoalMiscLabel_(plan) : (getSubGoalStepTitle_(plan, cur) || cur))
+        : '미배정',
+      score: draftDuplicateKeepScore_(d, catId)
+    });
+  });
+  Object.keys(byKey).forEach(function(key){
+    var list = byKey[key];
+    if(list.length < 2) return;
+    list.sort(function(a, b){ return (b.score || 0) - (a.score || 0); });
+    var keep = list[0];
+    groups.push({
+      topic: keep.topic,
+      keepId: keep.draftId,
+      keepLabel: keep.stepLabel,
+      keepPublished: keep.published,
+      keepHasDraft: keep.hasDraft,
+      drops: list.slice(1)
+    });
+  });
+  return groups;
+}
+
+function bulkDupStatusLabel_(row){
+  if(!row) return '';
+  if(row.published) return '완료';
+  if(row.hasDraft) return '초안';
+  return '빈 카드';
+}
+
+/** items: [{draftId, toStepId}] — 기본은 끝에서 저장·렌더. skipSave 면 호출측에서 한 번만. */
+function applyBulkReassignDraftSteps_(catId, items, opts){
+  opts = opts || {};
   catId = parseInt(catId, 10);
   var cat = CATEGORIES[catId];
   if(!cat || !items || !items.length) return 0;
@@ -25125,7 +25265,7 @@ function applyBulkReassignDraftSteps_(catId, items){
     var r = relocateDraftToStepNoSave_(catId, draft, String(it.toStepId), null);
     if(r && !r.sameStep) n++;
   });
-  if(n){
+  if(n && !opts.skipSave){
     save({ driveImmediate: true, gasImmediate: true });
     renderMain();
   }
@@ -25163,14 +25303,46 @@ function renderBulkReassignModalBody_(){
   if(!body || !p) return;
   var cat = CATEGORIES[p.catId];
   if(titleEl) titleEl.textContent = '서랍 정리 · ' + (cat ? cat.name : '');
+  var dups = p.dups || [];
+  var dupDropN = 0;
+  dups.forEach(function(g){ dupDropN += (g.drops || []).length; });
   var html = '';
+  if(dups.length){
+    html += '<div class="bulk-reassign-section">' +
+      '<div class="bulk-reassign-toolbar">' +
+        '<span>중복 제목 <strong>' + dups.length + '</strong>묶음 · 체크한 복사본만 삭제</span>' +
+        '<button type="button" class="bulk-reassign-toggle" onclick="toggleAllBulkDupDelete_()">전체 선택/해제</button>' +
+      '</div><div class="bulk-reassign-dup-list">';
+    dups.forEach(function(g){
+      html += '<div class="bulk-reassign-dup-group">' +
+        '<div class="bulk-reassign-topic">' + escapeHtml(g.topic) + '</div>' +
+        '<div class="bulk-reassign-path">남김 · ' + escapeHtml(g.keepLabel || '미배정') +
+          ' · ' + escapeHtml(bulkDupStatusLabel_({ published: g.keepPublished, hasDraft: g.keepHasDraft })) + '</div>';
+      (g.drops || []).forEach(function(d){
+        html += '<label class="bulk-reassign-row bulk-reassign-dup-row">' +
+          '<input type="checkbox" class="bulk-reassign-dup-chk" data-draft-id="' + escapeHtml(d.draftId) +
+            '" data-keep-id="' + escapeHtml(g.keepId) + '" checked onchange="updateBulkReassignApplyBtn_()">' +
+          '<span class="bulk-reassign-txt">' +
+            '<span class="bulk-reassign-topic">삭제 · ' + (d.published ? '<span class="bulk-reassign-pub">완료</span>' : '') +
+              escapeHtml(d.stepLabel || '미배정') + '</span>' +
+            '<span class="bulk-reassign-path">' + escapeHtml(bulkDupStatusLabel_(d)) + '</span>' +
+          '</span>' +
+        '</label>';
+      });
+      html += '</div>';
+    });
+    html += '</div></div>';
+  }
   if(!p.moves.length){
-    html += '<div class="bulk-reassign-empty">옮길 주제가 없어요. 모두 맞는 서랍에 있거나, 제목만으로는 판단이 어려워요.</div>';
+    if(!dups.length){
+      html += '<div class="bulk-reassign-empty">옮길 주제와 중복 제목이 없어요. 모두 맞는 서랍에 있거나, 제목만으로는 판단이 어려워요.</div>';
+    }
   } else {
-    html += '<div class="bulk-reassign-toolbar">' +
-      '<span>옮길 주제 <strong>' + p.moves.length + '</strong>개 · 체크한 것만 옮겨요</span>' +
-      '<button type="button" class="bulk-reassign-toggle" onclick="toggleAllBulkReassign_()">전체 선택/해제</button>' +
-    '</div><div class="bulk-reassign-list">';
+    html += '<div class="bulk-reassign-section">' +
+      '<div class="bulk-reassign-toolbar">' +
+        '<span>옮길 주제 <strong>' + p.moves.length + '</strong>개 · 체크한 것만 옮겨요</span>' +
+        '<button type="button" class="bulk-reassign-toggle" onclick="toggleAllBulkReassign_()">전체 선택/해제</button>' +
+      '</div><div class="bulk-reassign-list">';
     p.moves.forEach(function(m, i){
       html += '<label class="bulk-reassign-row">' +
         '<input type="checkbox" class="bulk-reassign-chk" data-idx="' + i + '" checked onchange="updateBulkReassignApplyBtn_()">' +
@@ -25180,7 +25352,7 @@ function renderBulkReassignModalBody_(){
         '</span>' +
       '</label>';
     });
-    html += '</div>';
+    html += '</div></div>';
   }
   if(p.held.length){
     html += '<details class="bulk-reassign-held"><summary>보류 ' + p.held.length + '개 · 제목만으로 서랍을 정할 수 없어요 (직접 옮겨 주세요)</summary><ul>';
@@ -25190,7 +25362,7 @@ function renderBulkReassignModalBody_(){
     html += '</ul></details>';
   }
   body.innerHTML = html;
-  if(applyBtn) applyBtn.style.display = p.moves.length ? '' : 'none';
+  if(applyBtn) applyBtn.style.display = (p.moves.length || dupDropN) ? '' : 'none';
   updateBulkReassignApplyBtn_();
 }
 
@@ -25201,27 +25373,53 @@ window.toggleAllBulkReassign_ = function(){
   updateBulkReassignApplyBtn_();
 };
 
+window.toggleAllBulkDupDelete_ = function(){
+  var chks = document.querySelectorAll('#bulk-reassign-body .bulk-reassign-dup-chk');
+  var anyOff = Array.prototype.some.call(chks, function(c){ return !c.checked; });
+  Array.prototype.forEach.call(chks, function(c){ c.checked = anyOff; });
+  updateBulkReassignApplyBtn_();
+};
+
 window.updateBulkReassignApplyBtn_ = function(){
   var btn = document.getElementById('bulk-reassign-apply');
   if(!btn) return;
-  var n = document.querySelectorAll('#bulk-reassign-body .bulk-reassign-chk:checked').length;
-  btn.disabled = !n;
-  btn.textContent = n ? ('선택 ' + n + '개 옮기기') : '옮길 주제를 선택하세요';
+  var nMove = document.querySelectorAll('#bulk-reassign-body .bulk-reassign-chk:checked').length;
+  var nDup = document.querySelectorAll('#bulk-reassign-body .bulk-reassign-dup-chk:checked').length;
+  btn.disabled = !nMove && !nDup;
+  if(nMove && nDup) btn.textContent = '옮기기 ' + nMove + ' · 중복 ' + nDup + '개 삭제';
+  else if(nDup) btn.textContent = '중복 ' + nDup + '개 삭제';
+  else if(nMove) btn.textContent = '선택 ' + nMove + '개 옮기기';
+  else btn.textContent = '옮기거나 삭제할 항목을 선택하세요';
 };
 
 window.applyBulkReassignFromModal_ = function(){
   var p = _bulkReassignPreview;
   if(!p) return;
+  var dropIds = [];
+  document.querySelectorAll('#bulk-reassign-body .bulk-reassign-dup-chk:checked').forEach(function(c){
+    var id = c.getAttribute('data-draft-id');
+    var keepId = c.getAttribute('data-keep-id');
+    if(id && keepId) absorbDraftKeyedMaps_(id, keepId);
+    if(id) dropIds.push(id);
+  });
+  var dropSet = {};
+  dropIds.forEach(function(id){ dropSet[id] = true; });
   var items = [];
   document.querySelectorAll('#bulk-reassign-body .bulk-reassign-chk:checked').forEach(function(c){
     var m = p.moves[parseInt(c.getAttribute('data-idx'), 10)];
-    if(m) items.push({ draftId: m.draftId, toStepId: m.toStepId });
+    if(m && m.draftId && !dropSet[m.draftId]) items.push({ draftId: m.draftId, toStepId: m.toStepId });
   });
-  if(!items.length) return;
-  var n = applyBulkReassignDraftSteps_(p.catId, items);
+  if(!items.length && !dropIds.length) return;
+  var n = items.length ? applyBulkReassignDraftSteps_(p.catId, items, { skipSave: true }) : 0;
+  dropIds.forEach(function(id){ deleteDraftSilent_(p.catId, id); });
+  save({ driveImmediate: true, gasImmediate: true });
   closeBulkReassignModal_();
+  renderMain();
   if(typeof setAppToast === 'function'){
-    setAppToast(n ? ('주제 ' + n + '개를 서랍으로 옮겼어요.') : '옮긴 주제가 없어요.', { duration: 3200, variant: n ? 'ok' : undefined });
+    var parts = [];
+    if(n) parts.push('주제 ' + n + '개를 서랍으로 옮겼어요');
+    if(dropIds.length) parts.push('중복 ' + dropIds.length + '개를 삭제했어요');
+    setAppToast(parts.length ? parts.join('. ') + '.' : '변경한 항목이 없어요.', { duration: 3600, variant: (n || dropIds.length) ? 'ok' : undefined });
   }
 };
 

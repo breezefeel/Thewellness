@@ -963,6 +963,14 @@ margin-left: 4px;
 .bulk-reassign-path { font-size: 11px; color: #64748B; }
 .bulk-reassign-path strong { color: #0D9488; }
 .bulk-reassign-empty { font-size: 13px; color: #64748B; padding: 16px 0; text-align: center; }
+.bulk-reassign-section + .bulk-reassign-section { margin-top: 16px; padding-top: 12px; border-top: 1px solid #E2E8F0; }
+.bulk-reassign-dup-list { display: flex; flex-direction: column; gap: 10px; }
+.bulk-reassign-dup-group {
+  padding: 10px; border: 1px solid #FDE68A; border-radius: 10px; background: #FFFBEB;
+}
+.bulk-reassign-dup-group > .bulk-reassign-topic { font-weight: 800; margin-bottom: 2px; }
+.bulk-reassign-dup-group > .bulk-reassign-path { margin-bottom: 8px; }
+.bulk-reassign-dup-row { background: #fff; margin-top: 6px; }
 .bulk-reassign-held { margin-top: 12px; font-size: 12px; color: #64748B; }
 .bulk-reassign-held summary { cursor: pointer; }
 .bulk-reassign-held ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.6; }

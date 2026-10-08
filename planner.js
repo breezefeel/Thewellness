@@ -15660,8 +15660,21 @@ function formatSyncHeaderSub_(info){
   if(info.overall === 'warn') return nTxt ? ('다시 시도 · ' + nTxt) : '확인 필요';
   return String(info.localRev || '');
 }
+let _syncPendingKickAt_ = 0;
+function kickPendingSyncIfIdle_(info){
+  if(!info || !info.serverOn || !info.pendingCount) return;
+  if(info.phase !== 'pending' && info.phase !== 'queued') return;
+  if(_plannerSyncUiBusy || plannerGasPushTimer || plannerGasRetryTimer_) return;
+  if(plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return;
+  if(!plannerSyncBootstrapReady_) return;
+  var now = Date.now();
+  if(_syncPendingKickAt_ && (now - _syncPendingKickAt_) < 3000) return;
+  _syncPendingKickAt_ = now;
+  try { schedulePlannerGasPush_(true); } catch(eKick){}
+}
 function armSyncProgressTicker_(info){
-  var need = !!(info && (info.phase === 'retry_wait' || info.phase === 'transferring'));
+  var waiting = !!(info && info.pendingCount && (info.phase === 'pending' || info.phase === 'queued'));
+  var need = !!(info && (info.phase === 'retry_wait' || info.phase === 'transferring' || waiting));
   if(!need){
     if(_syncProgressTickTimer_){
       clearInterval(_syncProgressTickTimer_);
@@ -15673,10 +15686,12 @@ function armSyncProgressTicker_(info){
   _syncProgressTickTimer_ = setInterval(function(){
     try {
       var cur = getSyncStatusInfo_();
-      if(cur.phase !== 'retry_wait' && cur.phase !== 'transferring'){
+      if(cur.phase !== 'retry_wait' && cur.phase !== 'transferring' &&
+          !(cur.pendingCount && (cur.phase === 'pending' || cur.phase === 'queued'))){
         clearInterval(_syncProgressTickTimer_);
         _syncProgressTickTimer_ = null;
       }
+      kickPendingSyncIfIdle_(cur);
       updateSyncStatusUI_();
     } catch(eTick){}
   }, 1000);
@@ -15933,10 +15948,7 @@ function updateSyncStatusUI_(){
     (info.actionHint ? '\n\n할 일: ' + info.actionHint : '');
   try { refreshSyncStatusBodyHtml_(info); } catch(eBody){}
   try { armSyncProgressTicker_(info); } catch(eTickArm){}
-  if(info.phase === 'queued' && info.lastError && info.pendingCount &&
-      !plannerGasPushTimer && !plannerGasRetryTimer_ && !_plannerSyncUiBusy){
-    try { schedulePlannerGasPush_(false); } catch(eReQ){}
-  }
+  try { kickPendingSyncIfIdle_(info); } catch(eKickUi){}
 }
 function renderSyncStatusBodyHTML_(info){
   function row(title, badgeClass, badgeText, metaHtml, actionsHtml){

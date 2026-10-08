@@ -22350,8 +22350,7 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
         '<button type="button" class="draft-card-delete-mini" title="이 주제 카드 삭제" onclick="event.stopPropagation();deleteDraft(' + cat.id + ',\'' + d.id + '\')">삭제</button>' +
         orderBtns +
       '</div>' +
-    '</div>' +
-    renderMoveDraftProgramBlockHTML_(cat.id, d.id);
+    '</div>';
   var stepIdAttr = '';
   try {
     var sidAttr = getDraftRoadmapStepId_(d, cat.id, draftIndex);
@@ -24859,29 +24858,6 @@ function renderMoveDraftStepChipsHTML_(fromCatId, draftId){
   return stepBtns;
 }
 
-function renderMoveDraftProgramBlockHTML_(fromCatId, draftId){
-  var programs = ADD_FORM_CAT_ORDER.map(function(id){
-    if(id === fromCatId || !CATEGORIES[id] || isOpsManualCategory(id)) return '';
-    var name = (id === 7 ? (LIFE_HEALTH_LABEL + ' · 기타') : (id === 6 ? '일상 공유' : (CAT_TAB_SHORT[id] || CATEGORIES[id].name)));
-    return '<button type="button" class="card-move-opt" onclick="event.stopPropagation();moveDraftToCategory_(' +
-      fromCatId + ',\'' + draftId + '\',' + id + ')">' + escapeHtml(name) + '</button>';
-  }).join('');
-  return '<div class="card-move-picker card-move-picker--inline" onclick="event.stopPropagation()">' +
-    '<div class="card-move-steps">' +
-      '<button type="button" class="card-move-program-btn" aria-expanded="false" onclick="event.stopPropagation();toggleMoveProgramList_(this)">프로그램</button>' +
-    '</div>' +
-    '<div class="card-move-programs">' + programs + '</div>' +
-  '</div>';
-}
-
-window.toggleMoveProgramList_ = function(btn){
-  var picker = btn && btn.closest ? btn.closest('.card-move-picker') : null;
-  var list = picker ? picker.querySelector('.card-move-programs') : null;
-  if(!list) return;
-  var open = !list.classList.contains('open');
-  list.classList.toggle('open', open);
-  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-};
 window.moveDraftToStep_ = function(catId, draftId, stepId){
   catId = parseInt(catId, 10);
   stepId = String(stepId || '');

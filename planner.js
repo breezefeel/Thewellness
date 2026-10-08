@@ -14039,10 +14039,20 @@ function markLocalInSyncWithServer_(serverPayload, opts){
   } catch(eMk){}
   return true;
 }
+/** 실제 서버 payload 가 있을 때만 phantom prune. 로컬↔로컬 비교는 미전송 변경을 전부 지움. */
+function remotePayloadUsableForPhantomPrune_(remote){
+  if(!remote || typeof remote !== 'object') return false;
+  try {
+    var ents = collectSyncEntities_(remote, { skipEnsureIds: true });
+    return !!(ents && Object.keys(ents).length);
+  } catch(e){ return false; }
+}
 /** outbox·dirty 키 없이 남은 snapshot/dirty 고착 해제 */
 function clearStuckSyncFlagsIfClean_(remotePayload){
   try {
-    prunePhantomSyncDirtyKeys_(getPersistPayload(), remotePayload || getPersistPayload());
+    if(remotePayloadUsableForPhantomPrune_(remotePayload)){
+      prunePhantomSyncDirtyKeys_(getPersistPayload(), remotePayload);
+    }
   } catch(ePr){}
   // 기기 로컬·UI 전용 키 정리 (outbox에서도 제거)
   Object.keys(state.syncDirtyEntityKeys || {}).forEach(function(key){
@@ -14130,6 +14140,20 @@ function reconcileLocalWithServerPayload_(localPayload, remotePayload, remoteRev
   remoteRevision = parseInt(remoteRevision, 10) || getPayloadRevision_(remotePayload);
   ensureOutboxFromLegacyDirty_(localPayload || getPersistPayload());
   if(!hasPendingLocalSyncChanges_()){
+    var localNow = localPayload || getPersistPayload();
+    var localMs = getPayloadSavedMs_(localNow);
+    var remoteMs = getPayloadSavedMs_(remotePayload);
+    // dirty 소실 시에도, 이 기기 저장이 더 최신·내용이 다르면 서버 옛 배정으로 덮지 않음
+    if(localMs > remoteMs){
+      var localFp = plannerSyncFingerprint_(localNow);
+      var remoteFp = plannerSyncFingerprint_(remotePayload);
+      if(localFp && remoteFp && localFp !== remoteFp){
+        applyServerPayloadPreservingOutbox_(remotePayload, remoteRevision);
+        state.syncDirty = true;
+        state.syncNeedsSnapshot = true;
+        return 'merged';
+      }
+    }
     adoptServerPayloadAuthoritatively_(remotePayload, remoteRevision);
     return 'adopted';
   }
@@ -14324,16 +14348,19 @@ function detectPlannerEntityConflicts_(local, remote){
   });
   return conflicts;
 }
-/** 서버와 내용이 같은 dirty 키·outbox·가짜 충돌 잔재를 정리 */
+/** 서버와 내용이 같은 dirty 키·outbox만 정리. 로컬에만 있는 변경(서랍 배정 등)은 미전송이므로 유지. */
 function prunePhantomSyncDirtyKeys_(local, remote){
   var lEntities = collectSyncEntities_(local || getPersistPayload(), { skipEnsureIds: true });
   var rEntities = collectSyncEntities_(remote || {}, { skipEnsureIds: true });
   var removed = 0;
   if(!state.syncDirtyEntityKeys) state.syncDirtyEntityKeys = {};
   Object.keys(state.syncDirtyEntityKeys).forEach(function(key){
-    if(isDeviceLocalSyncEntityKey_(key) ||
-       shouldSkipPlannerConflict_(key, lEntities[key], rEntities[key]) ||
-       syncValueFingerprint_(lEntities[key]) === syncValueFingerprint_(rEntities[key])){
+    if(isDeviceLocalSyncEntityKey_(key)){
+      delete state.syncDirtyEntityKeys[key];
+      removed++;
+      return;
+    }
+    if(syncValueFingerprint_(lEntities[key]) === syncValueFingerprint_(rEntities[key])){
       delete state.syncDirtyEntityKeys[key];
       removed++;
     }
@@ -14346,7 +14373,6 @@ function prunePhantomSyncDirtyKeys_(local, remote){
       if(isDeviceLocalSyncEntityKey_(op.key)) return false;
       var localVal = Object.prototype.hasOwnProperty.call(lEntities, op.key) ? lEntities[op.key] : undefined;
       var remoteVal = Object.prototype.hasOwnProperty.call(rEntities, op.key) ? rEntities[op.key] : undefined;
-      if(shouldSkipPlannerConflict_(op.key, localVal, remoteVal)) return false;
       if(syncValueFingerprint_(localVal) === syncValueFingerprint_(remoteVal)) return false;
       // outbox value가 서버와 같아도 전송 불필요
       if(!op.deleted && syncValueFingerprint_(op.value) === syncValueFingerprint_(remoteVal)) return false;
@@ -15072,6 +15098,8 @@ function mergeDraftBrandOverrides_(local, remote, preferRemote){
       out[id] = Object.assign({}, lAt > rAt ? l : r);
       return;
     }
+    if(lAt && !rAt){ out[id] = Object.assign({}, l); return; }
+    if(!lAt && rAt){ out[id] = Object.assign({}, r); return; }
     out[id] = Object.assign({}, preferRemote ? l : r, preferRemote ? r : l);
   });
   return out;

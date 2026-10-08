@@ -113,13 +113,6 @@ function isLifeHealthDailyStepTitle_(title){
 function isLifeHealthDailyStep_(step){
   return !!(step && isLifeHealthDailyStepTitle_(step.title));
 }
-function findLifeHealthDailyStepId_(plan){
-  var steps = (plan && plan.steps) || [];
-  for(var i = 0; i < steps.length; i++){
-    if(isLifeHealthDailyStep_(steps[i])) return String(steps[i].id);
-  }
-  return 's5';
-}
 function isLifeHealthDailyFocus_(){
   return state.lifeHealthModeCat === LIFE_HEALTH_DAILY_CAT;
 }
@@ -3518,6 +3511,7 @@ function syncCuriosityHubPlanFromSeed_(catId){
   var key = String(catId);
   var plan = state.branding.subGoalPlans[key];
   if(!plan || !Array.isArray(plan.steps) || !plan.steps.length) return false;
+  if(plan.hubCustom) return false;
   var seed = getInitialProgramPlanDraft_(catId);
   if(!seed || !seed.steps || !seed.steps.length) return false;
   var titlesAligned = plan.steps.length === seed.steps.length;
@@ -3639,7 +3633,7 @@ function repairIncompleteSubGoalPlan_(catId){
   var key = String(catId);
   var plan = state.branding.subGoalPlans[key];
   if(!plan || !Array.isArray(plan.steps)) return false;
-  if(plan.steps.length >= 3) return false;
+  if(plan.hubCustom || plan.steps.length >= 3) return false;
   var seed = getInitialProgramPlanDraft_(catId);
   if(!seed || !seed.steps || seed.steps.length < 3) return false;
   var idMap = {};
@@ -4305,9 +4299,6 @@ function buildMasterBrandContextBlock_(){
     PERSONAL_BRAND_PROFILE
   ].join('\n');
 }
-function getPersonalBrandProfileForPrompt_(){
-  return PERSONAL_BRAND_PROFILE;
-}
 function getBrandFoundationForPrompt_(){
   return DEFAULT_BRAND_FOUNDATION;
 }
@@ -4376,14 +4367,6 @@ function normalizeDailySharePlan_(raw){
 function getDailySharePlan_(){
   return getBranding_().dailySharePlan || normalizeDailySharePlan_(null);
 }
-function hasDailyShareThemesCustomized_(){
-  var plan = getDailySharePlan_();
-  if(plan.intent) return true;
-  return plan.themes.some(function(t, idx){
-    var def = DEFAULT_DAILY_SHARE_THEMES[idx];
-    return def && String(t.note || '').trim() !== String(def.note || '').trim();
-  });
-}
 function buildDailyShareContextBlock_(draft){
   var plan = getDailySharePlan_();
   var thought = isDailyThoughtDraft_(draft);
@@ -4397,30 +4380,6 @@ function buildDailyShareContextBlock_(draft){
   });
   return lines.join('\n');
 }
-window.updateDailyShareIntent_ = function(value){
-  if(!state.branding || typeof state.branding !== 'object') state.branding = {};
-  if(!state.branding.dailySharePlan) state.branding.dailySharePlan = normalizeDailySharePlan_(null);
-  state.branding.dailySharePlan.intent = String(value || '').trim();
-  stampBrandingPlanUpdatedAt_(state.branding.dailySharePlan);
-  save({ skipDriveUpload: true, skipGasPush: true });
-};
-window.updateDailyShareThemeNote_ = function(themeId, value){
-  if(!state.branding || typeof state.branding !== 'object') state.branding = {};
-  if(!state.branding.dailySharePlan) state.branding.dailySharePlan = normalizeDailySharePlan_(null);
-  var themes = state.branding.dailySharePlan.themes || normalizeDailySharePlan_(null).themes;
-  themes = themes.map(function(t){
-    if(String(t.id) !== String(themeId)) return t;
-    return Object.assign({}, t, { note: String(value || '').trim() });
-  });
-  state.branding.dailySharePlan.themes = themes;
-  stampBrandingPlanUpdatedAt_(state.branding.dailySharePlan);
-  save({ skipDriveUpload: true, skipGasPush: true });
-};
-window.toggleDailySharePanel_ = function(forceOpen){
-  if(forceOpen === true) state.dailyShareCollapsed = false;
-  else state.dailyShareCollapsed = state.dailyShareCollapsed === false;
-  renderMain();
-};
 window.toggleDailyMonthGroup_ = function(monthKey){
   monthKey = String(monthKey || '');
   if(!monthKey) return;
@@ -4840,92 +4799,6 @@ function hasSubGoalPlan_(catId){
   var plan = getSubGoalPlan_(catId);
   return !!(plan && plan.steps && plan.steps.length);
 }
-function hasTopicsFilledInPlan_(catId){
-  var plan = getSubGoalPlan_(catId);
-  if(!plan || !plan.steps.length) return false;
-  return plan.steps.some(function(s){
-    return countFilledTopicSlots_(catId, String(s.id)) > 0;
-  });
-}
-function isYearPlanCustomized_(){
-  if(!state.branding || !state.branding.yearPlan || !state.branding.yearPlan.periods) return false;
-  if(state.branding.yearPlan.confirmed) return true;
-  var periods = state.branding.yearPlan.periods;
-  for(var i = 0; i < periods.length; i++){
-    var g = String((periods[i] && periods[i].goal) || '').trim();
-    if(!g) continue;
-    if(i === 0 && g === DEFAULT_BRANDING.message) continue;
-    return true;
-  }
-  return false;
-}
-function needsPlannerSetupGuide_(){
-  if(state.plannerSetupDismissed) return false;
-  if(isOpsManualCategory(state.currentCat)) return false;
-  if(isDailyShareCategory(state.currentCat)){
-    var dailyCat = CATEGORIES[state.currentCat];
-    var draftCount = dailyCat && dailyCat.drafts ? dailyCat.drafts.filter(function(d){ return d && d.id; }).length : 0;
-    return draftCount < 2;
-  }
-  return !isYearPlanCustomized_() || !hasSubGoalPlan_(state.currentCat) || !hasTopicsFilledInPlan_(state.currentCat);
-}
-function renderDailyShareSetupGuideHTML_(){
-  return '<div class="planner-setup-guide daily-setup-guide">' +
-    '<button type="button" class="planner-setup-dismiss" onclick="dismissPlannerSetupGuide_()" aria-label="안내 닫기">×</button>' +
-    '<div class="planner-setup-title">일상 공유, 이렇게 시작해요</div>' +
-    '<ol class="planner-setup-steps">' +
-      '<li class="planner-setup-step setup-tone-program">' +
-        '<span class="planner-setup-step-label">① 추가에서 그날의 장면 또는 생각 한 줄로 주제 만들기</span>' +
-        '<button type="button" class="setup-step-btn" onclick="openAddForm_()">추가</button>' +
-      '</li>' +
-      '<li class="planner-setup-step setup-tone-topic">' +
-        '<span class="planner-setup-step-label">② 이미지 탭에서 원본 4:5 맞추기</span>' +
-        '<span class="planner-setup-hint">썸네일을 새로 만들지 않습니다</span>' +
-      '</li>' +
-    '</ol>' +
-  '</div>';
-}
-function renderPlannerSetupGuideHTML_(){
-  if(!needsPlannerSetupGuide_()) return '';
-  if(isDailyShareCategory(state.currentCat)){
-    return renderDailyShareSetupGuideHTML_();
-  }
-  var yearDone = isYearPlanCustomized_();
-  var subDone = hasSubGoalPlan_(state.currentCat);
-  var topicsDone = subDone && hasTopicsFilledInPlan_(state.currentCat);
-  return '<div class="planner-setup-guide">' +
-    '<button type="button" class="planner-setup-dismiss" onclick="dismissPlannerSetupGuide_()" aria-label="안내 닫기">×</button>' +
-    '<div class="planner-setup-title">3단계로 시작해요</div>' +
-    '<ol class="planner-setup-steps">' +
-      '<li class="planner-setup-step setup-tone-year' + (yearDone ? ' done' : '') + '">' +
-        '<span class="planner-setup-step-label">① 분기별 목표 · 1년 4기간</span>' +
-        (yearDone ? '<span class="planner-setup-check">✓</span>' : '<button type="button" class="setup-step-btn" onclick="openPlanWorkshop_(\'year\')">기획</button>') +
-      '</li>' +
-      '<li class="planner-setup-step setup-tone-program' + (subDone ? ' done' : '') + '">' +
-        '<span class="planner-setup-step-label">② 하위 목표 · 이 프로그램</span>' +
-        (subDone ? '<span class="planner-setup-check">✓</span>' : '<button type="button" class="setup-step-btn" onclick="runProgramSetupWithAI_()">AI 기획</button>') +
-      '</li>' +
-      '<li class="planner-setup-step setup-tone-topic' + (topicsDone ? ' done' : ' pending') + '">' +
-        '<span class="planner-setup-step-label">③ 주제 · 이번 분기 결론의 장면</span>' +
-        (topicsDone ? '<span class="planner-setup-check">✓</span>' : (subDone ? '<button type="button" class="setup-step-btn" onclick="openTopicPlanningForActiveStep_()">기획</button>' : '<span class="planner-setup-hint">② 이후</span>')) +
-      '</li>' +
-    '</ol>' +
-  '</div>';
-}
-window.openTopicPlanningForActiveStep_ = function(){
-  var catId = state.currentCat;
-  var plan = getSubGoalPlan_(catId);
-  if(!plan || !plan.steps.length){
-    if(typeof setAppToast === 'function') setAppToast('먼저 프로그램 하위 목표를 기획해 주세요.', { duration: 3500, variant: 'err' });
-    return;
-  }
-  openPlanWorkshop_('topic', getActiveSubGoalStepId_(catId));
-};
-window.dismissPlannerSetupGuide_ = function(){
-  state.plannerSetupDismissed = true;
-  save({ skipDriveUpload: true, skipGasPush: true });
-  renderMain();
-};
 window.toggleLegacyDrafts_ = function(){
   state.legacyDraftsOpen = !state.legacyDraftsOpen;
   renderTabs();
@@ -5335,15 +5208,6 @@ function rebuildPendingProgramAssignments_(payload, oldSteps){
   });
   if(!payload.assignments.length) payload.assignments = newAssignments;
 }
-function countMissingInSubGoalStep_(catId, stepId){
-  var slotMap = buildStepSlotDraftMap_(catId, stepId, { maxSlots: STEP_TOPIC_SLOTS_DEFAULT });
-  var n = 0;
-  for(var i = 0; i < STEP_TOPIC_SLOTS_DEFAULT; i++){
-    var d = slotMap[i];
-    if(d && !draftHasContent(d)) n++;
-  }
-  return n;
-}
 function getVisibleDraftsInMain_(catId){
   var cat = CATEGORIES[catId];
   if(!cat || !cat.drafts) return [];
@@ -5377,9 +5241,6 @@ function getVisibleDraftsInMain_(catId){
     (cat.drafts || []).forEach(pushDraft);
   }
   return out;
-}
-function countVisibleDraftsInMain_(catId){
-  return getVisibleDraftsInMain_(catId).length;
 }
 function persistPendingSubGoalPlan_(){
   try {
@@ -5795,9 +5656,6 @@ function applyDraftRoadmapAssignment_(draft, catId, stepId, stepTitle, order, to
     draft.updatedAt = new Date().toISOString();
   }
 }
-function isValidSubGoalStepId_(plan, stepId){
-  return !!normalizeStepIdAgainstPlan_(plan, stepId);
-}
 /** 주제 기획안·수동 추가 초안의 단계 배정. 유효한 step이면 유지, 없으면 기타. */
 function resolveUserAddedDraftStepAssignment_(draft, catId){
   if(!draft || !isUserAddedDraftId_(draft.id)) return null;
@@ -5935,58 +5793,6 @@ function ensureUserAddedDraftsInMisc_(catId){
   toMigrate.forEach(function(d){ assignUserAddedDraftToMisc_(d, catId); });
   normalizeMiscUserAddedOrder_(catId);
 }
-function isUnassignedDraftForSubGoal_(draft){
-  if(!draft || !draft.id) return false;
-  if(isUserAddedDraftId_(draft.id)) return false;
-  var ov = state.draftBrandOverrides && state.draftBrandOverrides[draft.id];
-  if(ov && ov.roadmapStepId) return false;
-  if(draft.roadmapStepId) return false;
-  return true;
-}
-function countOrphanDraftsForSubGoal_(catId){
-  var cat = CATEGORIES[catId];
-  var plan = getSubGoalPlan_(catId);
-  if(!cat || !plan) return 0;
-  return (cat.drafts || []).filter(function(d){ return isUnassignedDraftForSubGoal_(d); }).length;
-}
-function firstEmptyStepSlot_(catId, stepId){
-  var map = buildStepSlotDraftMap_(catId, stepId);
-  var lim = Math.min(map.length, STEP_TOPIC_SLOTS_MAX);
-  for(var i = 0; i < lim; i++){
-    if(!map[i]) return i + 1;
-  }
-  return null;
-}
-function assignOrphanDraftsToSubGoalSteps_(catId){
-  if(!canReassignDraftSteps_()) return { assigned: 0, leftover: 0 };
-  var cat = CATEGORIES[catId];
-  var plan = getSubGoalPlan_(catId);
-  if(!cat || !plan || !plan.steps.length) return { assigned: 0, leftover: 0 };
-  var orphans = (cat.drafts || []).filter(function(d){ return isUnassignedDraftForSubGoal_(d); });
-  orphans.sort(function(a, b){
-    var ia = cat.drafts.indexOf(a);
-    var ib = cat.drafts.indexOf(b);
-    var pa = getDraftStepParts_(a, catId, ia);
-    var pb = getDraftStepParts_(b, catId, ib);
-    if(pa.step !== pb.step) return pa.step - pb.step;
-    return ia - ib;
-  });
-  var assigned = 0;
-  orphans.forEach(function(d){
-    for(var si = 0; si < plan.steps.length; si++){
-      var sid = String(plan.steps[si].id);
-      if(countFilledTopicSlots_(catId, sid) >= STEP_TOPIC_SLOTS_MAX) continue;
-      var slot = firstEmptyStepSlot_(catId, sid);
-      if(!slot) continue;
-      var total = stepTopicSlotTotalForCount_(countFilledTopicSlots_(catId, sid) + 1);
-      applyDraftRoadmapAssignment_(d, catId, sid, plan.steps[si].title, slot, total);
-      assigned++;
-      return;
-    }
-  });
-  var leftover = orphans.length - assigned;
-  return { assigned: assigned, leftover: leftover };
-}
 function getActiveSubGoalStepId_(catId){
   var plan = getEffectiveSubGoalPlan_(catId);
   var cat = CATEGORIES[catId];
@@ -6016,17 +5822,6 @@ function plannerFnClickAttr_(fnName){
   var parts = Array.prototype.slice.call(arguments, 1);
   var call = fnName + '(' + parts.map(function(a){ return JSON.stringify(a); }).join(',') + ')';
   return " onclick='" + call + "'";
-}
-function plannerClampTextHTML_(text, opts){
-  opts = opts || {};
-  var lines = opts.lines != null ? opts.lines : 2;
-  var extraClass = opts.className || '';
-  var t = String(text || '').trim();
-  if(!t) return '';
-  if(opts.passive){
-    return '<span class="planner-clamp-text' + (extraClass ? ' ' + extraClass : '') + '" data-clamp="' + lines + '">' + escapeHtml(t) + '</span>';
-  }
-  return '<span class="planner-clamp-text' + (extraClass ? ' ' + extraClass : '') + '" data-clamp="' + lines + '" title="클릭하면 전체 보기" role="button" tabindex="0" aria-expanded="false">' + escapeHtml(t) + '</span>';
 }
 function bindPlannerMainClickDelegation_(){
   if(document._plannerStepClickBound) return;
@@ -6066,12 +5861,6 @@ function parseSubGoalStepKey_(key){
   var idx = String(key).indexOf(marker);
   if(idx < 0) return null;
   return { catId: key.slice(0, idx), stepId: key.slice(idx + marker.length) };
-}
-function getFirstUnpublishedDraftInStep_(drafts){
-  for(var i = 0; i < (drafts || []).length; i++){
-    if(!draftIsPublished_(drafts[i].id)) return drafts[i];
-  }
-  return null;
 }
 function renderSubGoalStepCardsHTML_(catId, drafts, collapsed){
   var cat = CATEGORIES[catId];
@@ -6291,11 +6080,6 @@ function syncDraftRationalesFromRoadmap_(catIds, skipPublished){
 function isPublishRecCurrentTabOnly_(){
   return !!state.publishRecCurrentTabOnly;
 }
-window.togglePublishRecCurrentTabOnly_ = function(on){
-  state.publishRecCurrentTabOnly = !!on;
-  save({ driveImmediate: true });
-  renderMain();
-};
 function getCategoryProgramLine_(catId){
   var cat = CATEGORIES[catId];
   if(!cat) return '';
@@ -6895,6 +6679,7 @@ function repairMislabeledSubGoalSteps_(catId){
   catId = normalizePendingCatId_(catId);
   var plan = state.branding && state.branding.subGoalPlans && state.branding.subGoalPlans[String(catId)];
   if(!plan || !plan.steps || plan.steps.length < 2) return false;
+  if(plan.hubCustom) return false;
   var changed = false;
   // 먼저 중복 줄을 잘라냄 — 예전에 제목만 고치고 줄 수를 유지해 ④~⑧이 늘었음
   var dedupeRes = dedupeSubGoalPlanStepsInPlace_(plan, { collectIdMap: true });
@@ -7189,15 +6974,6 @@ function refreshPlanWorkshopModal_(){
     if(titleEl) titleEl.textContent = state.planWorkshopFocus === 'quarter' ? '분기별 목표와 의도' : '1년 목표와 의도';
     body.innerHTML = renderYearWorkshopBodyHTML_();
     footer.innerHTML = renderYearWorkshopFooterHTML_();
-  } else if(mode === 'month'){
-    var sugM = state.monthPlanSuggest;
-    if(titleEl){
-      titleEl.textContent = (sugM && sugM.quarterIndex >= 0 && !sugM.picking)
-        ? ((parseInt(sugM.quarterIndex, 10) + 1) + '분기 매월 목표')
-        : '매월 목표';
-    }
-    body.innerHTML = renderMonthSuggestBodyHTML_();
-    footer.innerHTML = renderMonthSuggestFooterHTML_();
   } else if(mode === 'stepTopics'){
     if(titleEl) titleEl.textContent = '주제 5개';
     body.innerHTML = renderStepTopicSuggestBodyHTML_();
@@ -7696,16 +7472,6 @@ window.openProgramPlanWorkshop_ = function(){
   ensurePendingSubGoalPlanFromCurrent_(state.currentCat);
   openPlanWorkshop_('program');
 };
-function renderPlanWorkshopStripHTML_(catId){
-  if(state.subGoalPlanGenerating && sameCatId_(state.subGoalPlanGenerating.catId, catId)){
-    var leftP = getCountdownSec_(state.subGoalPlanGenerating.startedAt, state.subGoalPlanGenerating.estimateSec);
-    return '<button type="button" class="plan-workshop-strip generating ' + getPlanTierClass_('program') + '" data-plan-tier="2" onclick="openProgramPlanWorkshop_()">' +
-      '<span class="plan-workshop-strip-label" id="plan-strip-program-label">프로그램 기획 중 · ' + escapeHtml(formatCountdownShort_(leftP)) + '</span><span class="plan-workshop-strip-cta">열기</span></button>';
-  }
-  return '<button type="button" class="plan-workshop-strip ' + getPlanTierClass_('program') + '" data-plan-tier="2" onclick="openProgramPlanWorkshop_()">' +
-    '<span class="plan-workshop-strip-label">세부 목표 기획안</span>' +
-    '<span class="plan-workshop-strip-cta">함께 검토 →</span></button>';
-}
 function renderTopicWorkshopStripHTML_(catId, step, idx, opts){
   opts = opts || {};
   var sid = String(step.id);
@@ -7724,16 +7490,6 @@ function renderTopicWorkshopStripHTML_(catId, step, idx, opts){
   return '<button type="button" class="' + cls + '" data-plan-tier="3"' + plannerStepActionAttrs_('openTopicStepWorkshop_', sid) + '>' +
     '<span class="plan-workshop-strip-label">' + escapeHtml(label) + '</span>' +
     '<span class="plan-workshop-strip-cta">' + escapeHtml(cta) + '</span></button>';
-}
-function renderYearWorkshopStripHTML_(){
-  if(state.yearPlanGenerating){
-    var leftY = getCountdownSec_(state.yearPlanGenerating.startedAt, state.yearPlanGenerating.estimateSec);
-    return '<button type="button" class="plan-workshop-strip generating ' + getPlanTierClass_('year') + '" data-plan-tier="1"' + plannerStepActionAttrs_('openYearPlanWorkshop_', '') + '>' +
-      '<span class="plan-workshop-strip-label" id="plan-strip-year-label">1년 기획 중 · ' + escapeHtml(formatCountdownShort_(leftY)) + '</span><span class="plan-workshop-strip-cta">열기</span></button>';
-  }
-  return '<button type="button" class="plan-workshop-strip ' + getPlanTierClass_('year') + '" data-plan-tier="1"' + plannerStepActionAttrs_('openYearPlanWorkshop_', '') + '>' +
-    '<span class="plan-workshop-strip-label">1년 브랜드 기획안</span>' +
-    '<span class="plan-workshop-strip-cta">함께 검토 →</span></button>';
 }
 window.generateYearGoalWithAI_ = async function(opts){
   opts = opts || {};
@@ -7793,19 +7549,10 @@ window.openYearPlanWorkshop_ = function(focus){
 function quarterStepRangeLabel_(qi){
   return ['1~3단계', '4~6단계', '7~9단계', '10~12단계'][qi] || '';
 }
-function quarterStepBounds_(qi){
-  var start = qi * 3 + 1;
-  return { start: start, end: start + 2 };
-}
 function stepMonthIndex_(step, arrayIndex){
   var n = parseInt(step && step.monthIndex, 10);
   if(n >= 1 && n <= 12) return n;
   return (arrayIndex || 0) + 1;
-}
-function monthGoalTitle_(n, title){
-  var t = String(title || '').trim();
-  if(/^\d+\s*단계/.test(t)) return t;
-  return n + '단계 · ' + t;
 }
 function quarterPlanContext_(qi){
   var plan = getYearPlan_();
@@ -7820,321 +7567,9 @@ function quarterPlanContext_(qi){
     yearIntent: String(year.intent || '').trim()
   };
 }
-function assignMonthGoalStep_(plan, monthIndex, title, rationale){
-  var n = parseInt(monthIndex, 10);
-  if(!plan.steps) plan.steps = [];
-  plan.steps.forEach(function(s, i){
-    if(s && !(parseInt(s.monthIndex, 10) >= 1)) s.monthIndex = i + 1;
-  });
-  var step = null;
-  plan.steps.forEach(function(s){
-    if(s && parseInt(s.monthIndex, 10) === n) step = s;
-  });
-  if(step && step.pinned) return null;
-  if(!step){
-    step = { id: 's' + n, title: '', summary: '', rationale: '', pinned: false, monthIndex: n };
-    plan.steps.push(step);
-  }
-  step.monthIndex = n;
-  step.title = monthGoalTitle_(n, title);
-  step.rationale = rationale || '';
-  step.summary = String(rationale || title).replace(/\s+/g, ' ').trim().slice(0, 90);
-  plan.steps.sort(function(a, b){
-    return (parseInt(a.monthIndex, 10) || 99) - (parseInt(b.monthIndex, 10) || 99);
-  });
-  return step;
-}
-function monthGoalPlainTitle_(title){
-  return String(title || '').replace(/^\d+\s*단계\s*[·—\-:.]?\s*/u, '').trim();
-}
-function monthSlotsForQuarter_(catId, qi){
-  var bounds = quarterStepBounds_(qi);
-  var steps = (getProgramPlanMeta_(catId).steps) || [];
-  var byIndex = {};
-  steps.forEach(function(s, i){
-    var n = stepMonthIndex_(s, i);
-    if(n >= bounds.start && n <= bounds.end) byIndex[n] = s;
-  });
-  var slots = [];
-  for(var n = bounds.start; n <= bounds.end; n++){
-    var s = byIndex[n];
-    var title = s ? String(s.title || '').trim() : '';
-    var rationale = s ? String(s.rationale || s.summary || '').trim() : '';
-    slots.push({
-      index: n,
-      title: title,
-      rationale: rationale,
-      selected: !!title,
-      deleted: false
-    });
-  }
-  return slots;
-}
-function clearMonthGoalStep_(plan, monthIndex){
-  var n = parseInt(monthIndex, 10);
-  if(!plan || !plan.steps) return false;
-  plan.steps.forEach(function(s, i){
-    if(s && !(parseInt(s.monthIndex, 10) >= 1)) s.monthIndex = i + 1;
-  });
-  var step = null;
-  plan.steps.forEach(function(s){
-    if(s && parseInt(s.monthIndex, 10) === n) step = s;
-  });
-  if(!step || !String(step.title || '').trim()) return false;
-  step.title = '';
-  step.rationale = '';
-  step.summary = '';
-  return true;
-}
-function renderMonthQuarterPickerHTML_(){
-  var periods = (getYearPlan_().periods) || [];
-  var html = '<p class="ws-intro">분기를 누르면 매월 목표가 펼쳐집니다. 있는 목표는 그대로 보이고, 없는 칸은 비어 있습니다.</p>';
-  html += '<div class="quarter-pick-list">';
-  for(var i = 0; i < 4; i++){
-    var p = periods[i] || {};
-    var goal = String(p.goal || p.topic || '').trim();
-    html += '<button type="button" class="quarter-pick-btn" onclick="expandMonthQuarter_(' + i + ')">' +
-      '<span class="quarter-pick-kicker">' + (i + 1) + '분기 · ' + escapeHtml(quarterStepRangeLabel_(i)) + '</span>' +
-      '<span class="quarter-pick-goal">' + escapeHtml(goal || '분기 목표 없음') + '</span>' +
-    '</button>';
-  }
-  html += '</div>';
-  return html;
-}
-function renderMonthSuggestBodyHTML_(){
-  var sug = state.monthPlanSuggest;
-  if(sug && sug.loading && sameCatId_(sug.catId, state.currentCat)){
-    var qLabel = (parseInt(sug.quarterIndex, 10) + 1) + '분기 · ' + quarterStepRangeLabel_(sug.quarterIndex);
-    var emptyN = (sug.months || []).filter(function(it){ return !String(it && it.title || '').trim(); }).length;
-    var genWord = emptyN && emptyN < 3 ? '비어 있는 칸만' : '매월 목표';
-    return renderWsGeneratingHTML_(escapeHtml(qLabel) + '의 <strong>' + genWord + '</strong>를 이 프로그램에 맞춰 추천하고 있어요.', 22, { startedAt: sug.startedAt || Date.now(), estimateSec: 22 });
-  }
-  if(!sug || !sameCatId_(sug.catId, state.currentCat) || sug.picking || !(sug.quarterIndex >= 0)){
-    return renderMonthQuarterPickerHTML_();
-  }
-  var months = sug.months || [];
-  var ctx = quarterPlanContext_(sug.quarterIndex);
-  var html = '<p class="ws-intro"><strong>' + escapeHtml(ctx.label + ' · ' + ctx.range) + '</strong></p>';
-  if(ctx.goal) html += '<p class="ws-intro">분기 목표: ' + escapeHtml(ctx.goal) + '</p>';
-  html += '<div class="month-goal-list">';
-  months.forEach(function(it, idx){
-    var title = monthGoalPlainTitle_(it.title);
-    var empty = !title;
-    html += '<div class="month-goal-box' + (empty ? ' is-empty' : '') + (it.selected && !empty ? ' is-selected' : '') + '"' +
-      (empty ? '' : ' onclick="toggleMonthSuggestItem_(\'month\',' + idx + ')"') + '>' +
-      (empty ? '' : '<button type="button" class="month-goal-del" onclick="event.stopPropagation();deleteMonthSuggestSlot_(' + idx + ')">삭제</button>') +
-      '<div class="month-goal-kicker">' + (it.index || (idx + 1)) + '단계' + (it.selected && !empty ? ' · 적용' : '') + '</div>' +
-      '<div class="month-goal-title">' + escapeHtml(empty ? '비어 있음' : title) + '</div>' +
-      (!empty && it.rationale ? '<div class="month-goal-rationale">' + escapeHtml(it.rationale) + '</div>' : '') +
-    '</div>';
-  });
-  html += '</div>';
-  return html;
-}
-function renderMonthSuggestFooterHTML_(){
-  var sug = state.monthPlanSuggest;
-  if(!sug || !sameCatId_(sug.catId, state.currentCat) || sug.picking || !(sug.quarterIndex >= 0)){
-    return '<div class="ws-actions"><button type="button" class="modal-btn-ghost" onclick="closePlanWorkshop_()">취소</button></div>';
-  }
-  if(sug.loading) return '';
-  var months = sug.months || [];
-  var filled = months.filter(function(it){ return String(it && it.title || '').trim(); }).length;
-  var monthN = months.filter(function(it){ return it && it.selected && String(it.title || '').trim(); }).length;
-  var clearedN = months.filter(function(it){ return it && it.deleted && !String(it.title || '').trim(); }).length;
-  var qi = parseInt(sug.quarterIndex, 10) || 0;
-  var genLabel = filled ? '재생성' : '생성';
-  var applyLabel = monthN ? ('선택 ' + monthN + '개 적용') : '비운 칸 적용';
-  return '<div class="ws-actions">' +
-    '<button type="button" class="modal-btn ws-btn-ai" onclick="generateMonthPlanSuggest_(' + qi + ')">' + genLabel + '</button>' +
-    '<button type="button" class="modal-btn" onclick="applySelectedMonthSuggest_()"' + ((monthN || clearedN) ? '' : ' disabled') + '>' + applyLabel + '</button>' +
-    '<button type="button" class="modal-btn-ghost" onclick="monthSuggestPickQuarter_()">다른 분기</button>' +
-  '</div>';
-}
-window.toggleMonthSuggestItem_ = function(kind, idx){
-  var sug = state.monthPlanSuggest;
-  if(!sug) return;
-  var list = kind === 'topic' ? sug.topics : sug.months;
-  if(!list || !list[idx]) return;
-  list[idx].selected = !list[idx].selected;
-  refreshPlanWorkshopModal_();
-};
-window.expandMonthQuarter_ = function(quarterIndex){
-  quarterIndex = parseInt(quarterIndex, 10);
-  if(!(quarterIndex >= 0 && quarterIndex <= 3)) return;
-  var catId = state.currentCat;
-  state.planWorkshopFocus = 'month';
-  state.planWorkshopMode = 'month';
-  state.monthPlanSuggest = {
-    catId: catId,
-    quarterIndex: quarterIndex,
-    picking: false,
-    loading: false,
-    months: monthSlotsForQuarter_(catId, quarterIndex)
-  };
-  refreshPlanWorkshopModal_();
-};
-window.deleteMonthSuggestSlot_ = function(idx){
-  var sug = state.monthPlanSuggest;
-  if(!sug || !sug.months || !sug.months[idx]) return;
-  var it = sug.months[idx];
-  it.title = '';
-  it.rationale = '';
-  it.selected = false;
-  it.deleted = true;
-  refreshPlanWorkshopModal_();
-};
-window.generateMonthPlanSuggest_ = async function(quarterIndex){
-  quarterIndex = parseInt(quarterIndex, 10);
-  if(!(quarterIndex >= 0 && quarterIndex <= 3)) quarterIndex = 0;
-  if(!state.apiKey){ openApiModal(); return; }
-  if(plannerAiBusy) return;
-  var catId = state.currentCat;
-  var cat = CATEGORIES[catId];
-  if(!cat || isOpsManualCategory(catId)) return;
-  var bounds = quarterStepBounds_(quarterIndex);
-  var ctx = quarterPlanContext_(quarterIndex);
-  var prev = (state.monthPlanSuggest && sameCatId_(state.monthPlanSuggest.catId, catId) && state.monthPlanSuggest.quarterIndex === quarterIndex && state.monthPlanSuggest.months && state.monthPlanSuggest.months.length)
-    ? state.monthPlanSuggest.months
-    : monthSlotsForQuarter_(catId, quarterIndex);
-  var need = prev.filter(function(it){ return !String(it && it.title || '').trim(); });
-  if(!need.length){
-    if(typeof setAppToast === 'function') setAppToast('채워진 목표는 그대로 둡니다.\n삭제하거나 비운 칸만 다시 만들어요.', { duration: 3600 });
-    return;
-  }
-  plannerAiBusy = true;
-  state.planWorkshopFocus = 'month';
-  state.monthPlanSuggest = { catId: catId, quarterIndex: quarterIndex, picking: false, loading: true, startedAt: Date.now(), months: prev };
-  if(!document.getElementById('plan-workshop-overlay').classList.contains('open')) openPlanWorkshop_('month');
-  else refreshPlanWorkshopModal_();
-  var keepLines = prev.filter(function(it){ return String(it && it.title || '').trim(); }).map(function(it){
-    return it.index + '. ' + monthGoalPlainTitle_(it.title) + (it.rationale ? ' — ' + it.rationale : '');
-  }).join('\n');
-  var needIndexes = need.map(function(it){ return it.index; });
-  try {
-    var prompt =
-buildBrandStrategyPromptPrefix_() + '\n\n' +
-buildProgramPlanContextBlock_(catId) + '\n\n' +
-'프로그램: ' + cat.name + '\n' +
-'[1년 목표] ' + (ctx.yearGoal || '(없음)') + '\n' +
-(ctx.yearIntent ? '[1년 의도] ' + ctx.yearIntent + '\n' : '') +
-'[' + ctx.label + ' · ' + ctx.range + ']\n' +
-'분기 목표: ' + (ctx.goal || '(없음)') + '\n' +
-'분기 의도: ' + (ctx.rationale || '(없음)') + '\n\n' +
-'이 분기에서 비어 있는 매월 목표만 추천하세요. 주제 글은 쓰지 마세요.\n' +
-(keepLines ? '[유지할 목표 — 출력하지 마세요]\n' + keepLines + '\n\n' : '') +
-'- months: 길이 ' + need.length + '. index는 ' + needIndexes.join(', ') + ' 만.\n' +
-'- title은 단계 번호 없이 그 달의 목표 한 줄. rationale은 의도 2문장.\n' +
-'JSON: {"months":[{"index":' + needIndexes[0] + ',"title":"…","rationale":"…"}]}';
-    var text = await callClaudePlanner_(prompt, { maxTokens: 1400 });
-    var obj = parsePlannerAiJsonObject_(text);
-    var used = {};
-    (obj.months || []).forEach(function(m, i){
-      var title = sanitizePersonalBrandText_(String((m && (m.title || m.goal)) || '').trim());
-      title = title.replace(/^\d+\s*단계\s*[·—\-:.]?\s*/u, '').trim();
-      if(!title) return;
-      var index = parseInt(m && m.index, 10);
-      var slot = null;
-      if(needIndexes.indexOf(index) >= 0 && !used[index]){
-        prev.forEach(function(it){ if(it.index === index) slot = it; });
-      }
-      if(!slot){
-        need.forEach(function(it){
-          if(slot || used[it.index]) return;
-          if(i === need.indexOf(it)) slot = it;
-        });
-      }
-      if(!slot || used[slot.index] || String(slot.title || '').trim()) return;
-      used[slot.index] = true;
-      slot.title = monthGoalTitle_(slot.index, title);
-      slot.rationale = sanitizePersonalBrandText_(String((m && m.rationale) || '').trim());
-      slot.selected = true;
-      slot.deleted = false;
-    });
-    var filledNow = Object.keys(used).length;
-    if(!filledNow) throw new Error('추천 결과를 찾지 못했어요');
-    state.monthPlanSuggest = { catId: catId, quarterIndex: quarterIndex, picking: false, loading: false, months: prev };
-    if(typeof setAppToast === 'function'){
-      setAppToast(ctx.label + '에서 빈 칸 ' + filledNow + '개를 채웠어요.\n적용할 항목을 고른 뒤 적용해 주세요.', { duration: 4500, variant: 'ok' });
-    }
-  } catch(e){
-    state.monthPlanSuggest = { catId: catId, quarterIndex: quarterIndex, picking: false, loading: false, months: prev };
-    if(typeof setAppToast === 'function') setAppToast('매월 기획 실패\n' + ((e && e.message) || e), { duration: 6500, variant: 'err' });
-  } finally {
-    plannerAiBusy = false;
-    if(document.getElementById('plan-workshop-overlay').classList.contains('open')) refreshPlanWorkshopModal_();
-    renderMain();
-  }
-};
-window.monthSuggestPickQuarter_ = function(){
-  var catId = state.currentCat;
-  state.monthPlanSuggest = { catId: catId, picking: true, loading: false, months: [] };
-  state.planWorkshopMode = 'month';
-  refreshPlanWorkshopModal_();
-};
 window.openExpertCategoryNote_ = function(){
   if(typeof setAppToast === 'function'){
     setAppToast('전문가 과정은 분기 대신 Philosophy · Science · Practice 카테고리입니다.\n주제는 각 칸의 「주제 생성」으로 쓰거나 추천받으세요.\n여러 칸에 걸치면, 이번에 알릴 칸 하나에만 둡니다.', { duration: 6500 });
-  }
-};
-window.openMonthPlanSuggest_ = function(){
-  if(isExpertCourseCategory(state.currentCat)){
-    openExpertCategoryNote_();
-    return;
-  }
-  state.planWorkshopFocus = 'month';
-  state.monthPlanSuggest = { catId: state.currentCat, picking: true, loading: false, months: [] };
-  openPlanWorkshop_('month');
-};
-window.applySelectedMonthSuggest_ = function(){
-  var sug = state.monthPlanSuggest;
-  var catId = state.currentCat;
-  if(isExpertCourseCategory(catId)){
-    openExpertCategoryNote_();
-    return;
-  }
-  if(!sug || sug.loading || sug.picking || !sameCatId_(sug.catId, catId)) return;
-  var months = (sug.months || []).filter(function(it){ return it && it.selected && String(it.title || '').trim(); });
-  var cleared = (sug.months || []).filter(function(it){ return it && it.deleted && !String(it.title || '').trim(); });
-  if(!months.length && !cleared.length){
-    if(typeof setAppToast === 'function') setAppToast('적용할 월 목표를 선택해 주세요.', { duration: 3000, variant: 'err' });
-    return;
-  }
-  var ctx = quarterPlanContext_(sug.quarterIndex);
-  var confirmMsg = ctx.label + '에서 선택한 월 목표 ' + months.length + '개를 적용할까요?';
-  if(cleared.length) confirmMsg = ctx.label + '에서 월 목표 ' + months.length + '개를 적용하고, 비운 ' + cleared.length + '개를 지울까요?';
-  if(!confirm(confirmMsg)) return;
-  if(!state.branding || typeof state.branding !== 'object') state.branding = {};
-  if(!state.branding.subGoalPlans) state.branding.subGoalPlans = {};
-  var plan = peekSubGoalPlan_(catId);
-  if(!plan){
-    state.branding.subGoalPlans[String(catId)] = {
-      steps: [],
-      miscLabel: SUBGOAL_MISC_LABEL,
-      updatedAt: new Date().toISOString()
-    };
-    plan = state.branding.subGoalPlans[String(catId)];
-  }
-  var applied = 0;
-  var pinned = 0;
-  var removed = 0;
-  cleared.forEach(function(m){
-    if(clearMonthGoalStep_(plan, m.index)) removed++;
-  });
-  months.slice().sort(function(a, b){ return (a.index || 0) - (b.index || 0); }).forEach(function(m){
-    var step = assignMonthGoalStep_(plan, m.index, monthGoalPlainTitle_(m.title), m.rationale || '');
-    if(step) applied++;
-    else pinned++;
-  });
-  plan.updatedAt = new Date().toISOString();
-  state.monthPlanSuggest = null;
-  save({ driveImmediate: true, gasImmediate: true });
-  closePlanWorkshopForce_();
-  renderMain();
-  if(typeof setAppToast === 'function'){
-    var msg = ctx.label + ' 월 목표 ' + applied + '개를 적용했어요.';
-    if(removed) msg += '\n비운 ' + removed + '개는 지웠어요.';
-    if(pinned) msg += '\n고정된 단계 ' + pinned + '개는 그대로 두었어요.';
-    setAppToast(msg, { duration: 4200, variant: 'ok' });
   }
 };
 function renderStepTopicSuggestBodyHTML_(){
@@ -8385,13 +7820,6 @@ function refreshPlanWorkshopOrMain_(){
   renderMain();
   if(document.getElementById('plan-workshop-overlay').classList.contains('open')) refreshPlanWorkshopModal_();
 }
-function updatePendingSubGoalPlanAndRender_(){ refreshPlanWorkshopOrMain_(); }
-window.updatePendingPlanIntent_ = function(value){
-  var p = state.pendingSubGoalPlan;
-  if(!p || !p.plan) return;
-  p.plan.intent = String(value || '');
-  persistPendingSubGoalPlan_();
-};
 window.updatePendingPlanBrandProfile_ = function(value){
   var p = state.pendingSubGoalPlan;
   if(!p || !p.plan) return;
@@ -8456,16 +7884,6 @@ window.clearYearPeriod_ = function(idx){
   per.rationale = '';
   persistPendingYearPlan_();
   refreshPlanWorkshopModal_();
-};
-window.updatePendingYearPeriodGoal_ = function(idx, value){
-  if(!state.pendingYearPlan || !state.pendingYearPlan.periods[idx]) return;
-  state.pendingYearPlan.periods[idx].goal = String(value || '').trim();
-  persistPendingYearPlan_();
-};
-window.updatePendingYearPeriodLabel_ = function(idx, value){
-  if(!state.pendingYearPlan || !state.pendingYearPlan.periods[idx]) return;
-  state.pendingYearPlan.periods[idx].label = String(value || '').trim();
-  persistPendingYearPlan_();
 };
 window.updatePendingStepField_ = function(stepIdx, field, value){
   var p = state.pendingSubGoalPlan;
@@ -9192,47 +8610,17 @@ buildProgramPlanContextBlock_(p.catId) + '\n\n' +
     stopPlanGenTimer_('program');
   }
 };
-window.generateSubGoalRoadmapWithAI_ = async function(){
-  return regenerateProgramWorkshop_();
-};
-window.runProgramSetupWithAI_ = async function(){
-  openPlanWorkshop_('program');
-  if(!state.apiKey){ openApiModal(); return; }
-  if(!getCurrentMainGoal_()){
-    if(typeof setAppToast === 'function') setAppToast('먼저 분기별 목표를 설정해 주세요.', { duration: 4500, variant: 'err' });
-    openPlanWorkshop_('year');
-    return;
-  }
-  if(plannerAiBusy) return;
-  var catId = state.currentCat;
-  var p = ensurePendingProgramPlanShell_(catId);
-  var hasFoundation = !!String((p.plan.brandProfile || '') + (p.plan.strategyGuide || p.plan.criteria || p.plan.intent || '')).trim();
-  if(hasFoundation) return;
-  plannerAiBusy = true;
-  startPlanGenTimer_('program', catId);
-  try {
-    await suggestProgramFoundationWithAI_(catId, 'both');
-    renderMain();
-    if(document.getElementById('plan-workshop-overlay').classList.contains('open')) refreshPlanWorkshopModal_();
-    if(typeof setAppToast === 'function'){
-      setAppToast('프로그램 브랜딩 요소·생성 기준을 먼저 제안했어요. 확인 후 단계 생성을 눌러 주세요.', { duration: 5200, variant: 'ok' });
-    }
-  } catch(e){
-    if(typeof setAppToast === 'function') setAppToast('프로그램 기준 제안 실패\n' + ((e && e.message) || e), { duration: 6500, variant: 'err' });
-  } finally {
-    plannerAiBusy = false;
-    stopPlanGenTimer_('program');
-  }
-};
 function planLayerParagraphsHTML_(text){
   var parts = String(text || '').split(/\n+/).map(function(line){ return line.trim(); }).filter(Boolean);
   if(!parts.length) return '';
   return parts.map(function(line){ return '<p>' + escapeHtml(line) + '</p>'; }).join('');
 }
-function planLayerCardHTML_(num, title, bodyHtml, onclickJs, tone){
+function planLayerCardHTML_(num, title, bodyHtml, onclickJs, tone, opts){
+  opts = opts || {};
   var btn = onclickJs
-    ? '<button type="button" class="plan-layer-edit" onclick="' + onclickJs + '">기획 하기</button>'
+    ? '<button type="button" class="plan-layer-edit" onclick="' + onclickJs + '">' + escapeHtml(opts.btnLabel || '기획 하기') + '</button>'
     : '';
+  if(opts.extraBtnHTML) btn = '<span class="plan-layer-actions">' + opts.extraBtnHTML + btn + '</span>';
   return '<section class="plan-layer-block tone-' + tone + '">' +
     '<div class="plan-layer-head">' +
       '<span class="plan-layer-kicker">' + num + ' · ' + escapeHtml(title) + '</span>' +
@@ -9322,7 +8710,7 @@ function renderPlanLayerMonthHTML_(catId){
         (note ? '<div class="plan-layer-item-intent">' + planLayerParagraphsHTML_(note) + '</div>' : '') +
       '</div>');
     });
-    return planLayerCardHTML_('3', '매월 목표와 의도', bits.join('') || '<p class="plan-layer-empty">아직 없습니다.</p>', '', 'month');
+    return planLayerCardHTML_('3', '일상 공유 의도와 테마', bits.join('') || '<p class="plan-layer-empty">아직 없습니다.</p>', '', 'month');
   }
   var meta = getProgramPlanMeta_(catId);
   if(isExpertCourseCategory(catId) && planUsesExpertPsp_(meta)){
@@ -9356,7 +8744,10 @@ function renderPlanLayerMonthHTML_(catId){
       '</div>');
     });
     var flatItems = flatParts.join('') || '<p class="plan-layer-empty">주제 서랍이 아직 없습니다.</p>';
-    return planLayerCardHTML_('3', '주제 서랍', flatItems, 'openMonthPlanSuggest_()', 'month');
+    var tidyBtn = canBulkReassignCategory_(catId)
+      ? '<button type="button" class="plan-layer-edit" onclick="openBulkReassignModal_(' + catId + ')">서랍 정리</button>'
+      : '';
+    return planLayerCardHTML_('3', '주제 서랍', flatItems, 'openDrawerEditor_(' + catId + ')', 'month', { btnLabel: '서랍 편집', extraBtnHTML: tidyBtn });
   }
   var groups = monthStepGroups_(meta.steps || []);
   var parts = [];
@@ -9374,7 +8765,7 @@ function renderPlanLayerMonthHTML_(catId){
   });
   var items = parts.join('');
   if(!items) items = '<p class="plan-layer-empty">이 프로그램의 월별 단계가 아직 없습니다.</p>';
-  return planLayerCardHTML_('3', '매월 목표와 의도', items, 'openMonthPlanSuggest_()', 'month');
+  return planLayerCardHTML_('3', '매월 목표와 의도', items, isExpertCourseCategory(catId) ? 'openExpertCategoryNote_()' : '', 'month');
 }
 function renderPlanLayersHTML_(catId){
   return '<section class="plan-layers">' +
@@ -9385,36 +8776,6 @@ function renderPlanLayersHTML_(catId){
     '</div>' +
   '</section>';
 }
-function renderMainGoalCollapsedPreviewHTML_(plan, ymeta, current, rangeLabel){
-  var yearGoal = (ymeta.intent || plan.intent || '').trim() || MASTER_BRAND_NORTH_STAR;
-  var quarterGoal = String(current.topic || current.goal || '').trim() || '분기 목표 미설정';
-  return '<div class="main-goal-collapsed-cards planner-layer-compact-toggle" onclick="toggleMainGoalPanel_()" role="button" tabindex="0" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleMainGoalPanel_();}">' +
-    '<div class="main-goal-preview-card year">' +
-      '<span class="main-goal-preview-label">1년 브랜드 목표</span>' +
-      '<span class="main-goal-preview-text">' + escapeHtml(yearGoal) + '</span>' +
-    '</div>' +
-    '<div class="main-goal-preview-card quarter ' + getQuarterToneClass_(0) + '">' +
-      '<span class="main-goal-preview-label">현재 분기 · ' + escapeHtml(rangeLabel) + '</span>' +
-      '<span class="main-goal-preview-text">' + escapeHtml(quarterGoal) + '</span>' +
-    '</div>' +
-  '</div>';
-}
-function renderMainGoalPanelHTML_(){
-  var plan = getYearPlan_();
-  var current = plan.periods[0] || {};
-  var rangeLabel = formatPeriodRangeLabel_(current.start, current.end) || getBranding_().quarterLabel;
-  var text = String(current.topic || current.goal || '').trim() || '이번 분기 결론을 한 줄로 적어 주세요.';
-  return renderYearWorkshopStripHTML_() +
-    '<button type="button" class="quarter-conclusion ' + getQuarterToneClass_(0) + '" onclick="openYearPlanWorkshop_(\'quarter\')">' +
-      '<span class="quarter-conclusion-label">이번 분기 · ' + escapeHtml(rangeLabel) + '</span>' +
-      '<span class="quarter-conclusion-text">' + escapeHtml(text) + '</span>' +
-      '<span class="quarter-conclusion-cta">자세히</span>' +
-    '</button>';
-}
-window.toggleMainGoalPanel_ = function(){
-  state.mainGoalCollapsed = state.mainGoalCollapsed === false;
-  renderMain();
-};
 function renderSubGoalStepBlockHTML_(catId, step, idx, activeId){
   var sid = String(step.id);
   if(isHeiljagyaeCategory(catId) && isLifeHealthDailyStep_(step)){
@@ -9468,9 +8829,6 @@ function renderLifeHealthDailyStepBlockHTML_(hostCatId, step, idx, activeId){
   html += renderSubGoalStepCardsHTML_(dailyCat, drafts, collapsed);
   html += '</div>';
   return html;
-}
-function getDailyThemeToneClass_(idx){
-  return 'daily-theme-tone-' + (Math.max(0, parseInt(idx, 10) || 0) % 5);
 }
 function renderDailyTopicSuggestHTML_(monthKey){
   var sug = state.dailyTopicSuggestions;
@@ -9598,12 +8956,6 @@ function renderProgramRoadmapHTML_(catId){
       '<span class="program-pending-banner-label">단계 중복</span>' +
       '같은 단계가 <strong>' + plan.steps.length + '줄</strong>로 쌓여 있어요. 동기화 잔재를 정리합니다.' +
       '<button type="button" class="program-pending-banner-btn" onclick="forceDedupeSubGoalSteps_(' + catId + ')">중복 단계 정리</button>' +
-    '</div>';
-  }
-  if(plan && plan.steps && plan.steps.length && getTopicListMode_() === 'write' && !pendingPreview && canBulkReassignCategory_(catId)){
-    html += '<div class="bulk-reassign-bar">' +
-      '<span class="bulk-reassign-bar-txt">서랍이 뒤섞였나요? 제목을 보고 맞는 서랍을 제안해요.</span>' +
-      '<button type="button" class="bulk-reassign-bar-btn" onclick="openBulkReassignModal_(' + catId + ')">서랍 정리</button>' +
     '</div>';
   }
   if(!plan || !plan.steps.length){
@@ -10120,9 +9472,6 @@ window.refreshTopicWorkshop_ = function(){
     refreshPlanWorkshopModal_();
   }
 };
-window.openTopicSlotsModal_ = function(stepId){
-  openPlanWorkshop_('topic', stepId);
-};
 window.togglePinDraft_ = function(draftId){
   if(!draftId) return;
   if(!state.pinnedDraftIds) state.pinnedDraftIds = {};
@@ -10268,48 +9617,6 @@ buildTopicPlanPromptPrefix_(catId, stepId) + '\n\n' +
     plannerAiBusy = false;
   }
 };
-window.suggestFiveTopicsForStep_ = async function(stepId, opts){
-  opts = opts || {};
-  if(!state.apiKey){ if(!opts.silent) openApiModal(); return 0; }
-  if(!opts.silent && plannerAiBusy) return 0;
-  if(!opts.silent) plannerAiBusy = true;
-  if(!opts.silent && opts.btnSelector) startPlannerAiWait_({
-    estimateSec: TOPIC_FIVE_ESTIMATE_SEC,
-    busyLabel: '생성 중',
-    btnSelector: opts.btnSelector,
-    btnIdleText: opts.btnIdleText || 'AI로 주제 5개 제안'
-  });
-  var catId = state.currentCat;
-  var cat = CATEGORIES[catId];
-  var plan = getSubGoalPlan_(catId);
-  var step = plan && plan.steps ? plan.steps.find(function(s){ return String(s.id) === String(stepId); }) : null;
-  if(!opts.silent && typeof setAppToast === 'function') setAppToast('주제 5개를 추천하고 있어요…', { duration: 3000, variant: 'ok' });
-  try {
-    var existing = getDraftsForSubGoalStep_(catId, stepId).map(function(d){ return d.topic; }).join(', ');
-    var prompt =
-buildTopicPlanPromptPrefix_(catId, stepId) + '\n' +
-'기존 주제: ' + existing + '\n\n' +
-'새 주제 5개. 각 topic·angle·rationale은 단계·프로그램·분기별 목표 의도와 연결. rationale에 "N단계 —" 표기 금지.\n' +
-'JSON: {"topics":[{"topic":"…","angle":"…","rationale":"…"},…5개]}';
-    var text = await callClaudePlanner_(prompt, { maxTokens: 2800 });
-    var obj = parsePlannerAiJsonObject_(text);
-    var merged = mergeAiTopicsToStepSlots_(catId, stepId, obj.topics || []);
-    var applied = withDraftStepReassignAllowed_(function(){
-      return applyTopicsArrayToStep_(catId, stepId, merged);
-    });
-    save({ driveImmediate: true });
-    refreshTopicWorkshop_();
-    renderMain();
-    if(!opts.silent && typeof setAppToast === 'function') setAppToast('주제 5개를 반영했어요. 고정한 주제는 유지됩니다.', { duration: 4000, variant: 'ok' });
-    return applied;
-  } catch(e){
-    if(!opts.silent && typeof setAppToast === 'function') setAppToast('주제 추천 실패\n' + ((e && e.message) || e), { duration: 5000, variant: 'err' });
-    return 0;
-  } finally {
-    if(!opts.silent && opts.btnSelector) stopPlannerAiWait_();
-    if(!opts.silent) plannerAiBusy = false;
-  }
-};
 window.addTopicSlotSuggestion_ = async function(stepId, slotIndex){
   if(!state.apiKey){ openApiModal(); return; }
   if(plannerAiBusy) return;
@@ -10337,31 +9644,6 @@ window.addTopicSlotSuggestion_ = async function(stepId, slotIndex){
     if(typeof setAppToast === 'function') setAppToast('주제 추천 실패', { duration: 4000, variant: 'err' });
   } finally {
     stopPlannerAiWait_();
-    plannerAiBusy = false;
-  }
-};
-window.genAllMissingForSubGoalStep_ = async function(stepId){
-  if(plannerAiBusy) return;
-  var catId = state.currentCat;
-  var slotMap = buildStepSlotDraftMap_(catId, stepId);
-  var drafts = [];
-  for(var i = 0; i < slotMap.length; i++){
-    var d = slotMap[i];
-    if(d && !draftHasContent(d)) drafts.push(d);
-  }
-  if(!drafts.length){
-    if(typeof setAppToast === 'function') setAppToast('미작성 주제가 없어요.', { duration: 2800, variant: 'ok' });
-    return;
-  }
-  if(!state.apiKey){ openApiModal(); return; }
-  plannerAiBusy = true;
-  try {
-    for(var i = 0; i < drafts.length; i++){
-      await window.enqueueDraftGeneration(catId, drafts[i].id, { batch: true });
-    }
-    refreshTopicWorkshop_();
-    renderMain();
-  } finally {
     plannerAiBusy = false;
   }
 };
@@ -11175,10 +10457,6 @@ function lifeHealthLandingCat_(){
 function countLifeHealthTopics_(){
   return countUnpublishedTopicsForCat_(LIFE_HEALTH_DAILY_CAT) + countUnpublishedTopicsForCat_(LIFE_HEALTH_HOST_CAT);
 }
-function renderLifeHealthModeBarHTML_(){
-  // 모드 토글 제거 — 생활건강은 서랍 하나로 통합
-  return '';
-}
 
 var minDraftReplenishRunningByCat = {};
 var minDraftReplenishLastAttemptByCat = {};
@@ -11729,16 +11007,16 @@ function closeTopmostPlannerOverlay_(){
     if(typeof closeSyncStatusModal_ === 'function') closeSyncStatusModal_();
     return true;
   }
-  if(plannerOverlayIsOpen_('drive-modal-overlay')){
-    if(typeof closeDriveModal === 'function') closeDriveModal();
-    return true;
-  }
   if(plannerOverlayIsOpen_('prompt-modal-overlay')){
     closePromptModal();
     return true;
   }
   if(plannerOverlayIsOpen_('bulk-reassign-overlay')){
     closeBulkReassignModal_();
+    return true;
+  }
+  if(plannerOverlayIsOpen_('drawer-edit-overlay')){
+    closeDrawerEditor_();
     return true;
   }
   if(plannerOverlayIsOpen_('links-modal-overlay')){
@@ -12021,9 +11299,6 @@ function getInstagramUsernameForCat_(catId){
 function getInstagramUrlForCat_(catId){
   return 'https://www.instagram.com/' + getInstagramUsernameForCat_(catId) + '/';
 }
-function getInstagramUsernameFromExt_(){
-  return getInstagramUsernameForCat_(getActiveInstagramCatId_());
-}
 /** 도수·CMT → cmt_academy / 리얼페이스·IFC → face / 리얼무브먼트·움직임 → movement */
 function getInstagramCollabProgramKeyForCat_(catId){
   var id = parseInt(catId, 10);
@@ -12269,10 +11544,6 @@ const MANGO_COVER_COMPARISON_HOOK_RULE = `${MANGO_COVER_COMPARISON_HOOK_MARKER}
 - 1장 표지 큰 타이틀은 「좋아요」가 아니라 **흔한 방법 vs 직접 비교한 한 줄**.
 - 전/후는 치료 결과가 아니라 **동작·손 느낌·같은 자리 비교**로. 입력에 없는 성과를 그리지 말 것.`;
 
-function isRealMovementCollectiveCategory_(catId){
-  var id = parseInt(catId, 10);
-  return id === 1 || id === 5;
-}
 function buildComparisonExperienceHookRule_(catId){
   var id = parseInt(catId, 10);
   var extra = '';
@@ -12347,29 +11618,6 @@ function buildExpertCourseThreadsPrompt_(opts){
 const MANGO_DETAIL_TITLE_MAX = 30;
 const MANGO_DETAIL_INTRO_MAX = 2000;
 
-/** hex 색상 밝기 조절 (amount<0 어둡게, amount>0 밝게) — 망고·썸네일 공용 */
-function shadeHexColor_(hex, amount){
-  var h = String(hex || '#7AF0C8').replace('#', '').trim();
-  if(h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
-  var n = parseInt(h, 16);
-  if(isNaN(n) || h.length !== 6) return '#7AF0C8';
-  var r = (n >> 16) & 255;
-  var g = (n >> 8) & 255;
-  var b = n & 255;
-  if(amount < 0){
-    var f = 1 + amount;
-    r = Math.round(r * f);
-    g = Math.round(g * f);
-    b = Math.round(b * f);
-  } else {
-    r = Math.round(r + (255 - r) * amount);
-    g = Math.round(g + (255 - g) * amount);
-    b = Math.round(b + (255 - b) * amount);
-  }
-  function clamp(v){ return Math.max(0, Math.min(255, v)); }
-  function pad(v){ var s = clamp(v).toString(16); return s.length < 2 ? '0' + s : s; }
-  return '#' + pad(r) + pad(g) + pad(b);
-}
 
 /** 프로그램별 망고보드 7장 팔레트 — navy / sage / devon / green + 전문가 변형
  * 망고보드 팔레트 — 색상 미리보기 모달·카테고리 상수와 동일 소스.
@@ -13093,21 +12341,6 @@ window.downloadProgramColorPreviewLive_ = function(){
   var focusHint = payload.focusCatName ? ('「' + payload.focusCatName + '」 포함 · ') : '';
   if(typeof setAppToast === 'function'){
     setAppToast(focusHint + 'planner-colors-live.json 저장을 시작했어요.\n홈페이지 폴더에 두면 Cursor가 현재 색상을 참고해 반영할 수 있어요.', { duration: 7000, variant: 'ok' });
-  }
-};
-window.copyProgramColorSwatch_ = function(btn){
-  if(!btn) return;
-  var hex = sanitizeCssHexColor_(btn.getAttribute('data-hex'), '');
-  if(!hex) return;
-  var done = function(){
-    btn.classList.add('copied');
-    setTimeout(function(){ btn.classList.remove('copied'); }, 900);
-    if(typeof setAppToast === 'function') setAppToast(hex.toUpperCase() + ' 복사됨', { duration: 1600, variant: 'ok' });
-  };
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(hex).then(done).catch(function(){ window.prompt('복사할 색상:', hex); });
-  } else {
-    window.prompt('복사할 색상:', hex);
   }
 };
 
@@ -14035,9 +13268,9 @@ var SCROLL_LOCKED_OVERLAY_IDS_ = {
   'api-modal': 1,
   'sync-status-overlay': 1,
   'sync-preview-overlay': 1,
-  'drive-modal-overlay': 1,
   'links-modal-overlay': 1,
   'bulk-reassign-overlay': 1,
+  'drawer-edit-overlay': 1,
   'sync-conflict-overlay': 1,
   'sync-bootstrap-choice-overlay': 1
 };
@@ -15919,12 +15152,6 @@ function mergeGeneratedMaps_(a, b, preferB){
     else out[id] = preferB ? bv : av;
   });
   return out;
-}
-/** 두 기기·Drive·서버 payload를 합침 — 주제(extraDrafts)는 항상 합집합, 발행·초안은 더 최신 쪽 우선 */
-/** 브랜딩 하위 기획(yearPlan/subGoalPlans/dailySharePlan)에 수정 시각 도장을 찍는다. */
-function stampBrandingPlanUpdatedAt_(plan){
-  if(plan && typeof plan === 'object') plan.updatedAt = new Date().toISOString();
-  return plan;
 }
 /** 두 기획 객체 중 자체 updatedAt이 더 최신인 것을 고른다. 없으면 전체 payload 우선순위(preferRemote)로 폴백. */
 function pickNewerBrandingPlan_(localPlan, remotePlan, preferRemote){
@@ -19115,19 +18342,6 @@ function runPlannerStepIntegrityPass_(opts){
   return changed;
 }
 
-function estimatePlannerLocalStorageBytes_(){
-  try {
-    if(plannerLastDiskPayloadStr_) return plannerLastDiskPayloadStr_.length * 2;
-    var raw = localStorage.getItem(SK) || '';
-    if(isPlannerLsIdbStubRaw_(raw)){
-      try {
-        var j = JSON.parse(raw);
-        if(j && j._payloadChars) return (parseInt(j._payloadChars, 10) || 0) * 2;
-      } catch(e0){}
-    }
-    return raw.length * 2;
-  } catch(e){ return 0; }
-}
 /** localStorage 한도 초과 시: 미발행 생성 초안 본문만 비워 주제 카드는 유지 */
 function pruneGeneratedDraftsForQuota_(opts){
   opts = opts || {};
@@ -19832,8 +19046,6 @@ function checkDriveOAuthStuck_(){
   if(readCachedDriveToken_()){ hideDriveOAuthBusy_(); return; }
   hideDriveOAuthBusy_();
   try { sessionStorage.removeItem('ht_drive_oauth_started'); } catch(e2){}
-  var errEl = document.getElementById('drive-modal-err');
-  if(errEl) errEl.textContent = '';
   if(typeof setAppToast === 'function'){
     setAppToast('Drive 로그인이 완료되지 않았어요.\n① Safari·Chrome에서 열기 ② Google Cloud에 리디렉션 URI 등록\n' + getDriveRedirectUri_(), { duration: 9000, variant: 'err' });
   }
@@ -19941,7 +19153,6 @@ async function finishDrivePendingAction_(pendingAction){
     updateDriveButtonState();
     if(typeof setAppToast === 'function') setAppToast('Drive에서 불러왔어요.', { duration: 4000, variant: 'ok' });
   }
-  closeDriveModal();
   return true;
 }
 function startDriveRedirectAuth_(prompt, pendingAction){
@@ -19981,7 +19192,6 @@ function startDriveRedirectAuth_(prompt, pendingAction){
     sessionStorage.setItem('ht_drive_oauth_started', String(Date.now()));
     sessionStorage.setItem('ht_drive_redirect_uri', getDriveRedirectUri_());
   } catch(e3){}
-  closeDriveModal();
   showDriveOAuthBusy_('Google 연동을 준비하는 중…');
   window.__htDriveTokenClient = null;
   window.__htDriveTokenClientCid = null;
@@ -20018,17 +19228,12 @@ async function driveLoginInteractive_(pendingAction, promptMode){
     throw new Error('카카오톡·인스타 등 앱 안 브라우저에서는 Google 로그인이 안 될 수 있어요.\n링크를 복사해 Safari 또는 Chrome에서 열어 주세요.');
   }
   var pr = normalizeDriveOAuthPrompt_(promptMode || 'consent');
-  var errEl = document.getElementById('drive-modal-err');
-  if(errEl) errEl.textContent = '';
   if(!readCachedDriveToken_()){
     var hashLogin = readDriveOAuthHash_();
     if(hashLogin.indexOf('access_token=') !== -1){
       var got = consumeDriveOAuthRedirect_();
       if(got && readCachedDriveToken_()){
-        try { await finishDrivePendingAction_(pendingAction); } catch(fe){
-          if(errEl) errEl.textContent = String(fe.message || fe);
-          throw fe;
-        }
+        await finishDrivePendingAction_(pendingAction);
         return true;
       }
     }
@@ -20066,7 +19271,6 @@ async function driveLoginInteractive_(pendingAction, promptMode){
     updateDriveButtonState();
     if(typeof setAppToast === 'function') setAppToast('Drive에서 불러왔어요.', { duration: 4000, variant: 'ok' });
   }
-  closeDriveModal();
   return true;
 }
 async function handleDrivePendingActionAfterRedirect_(){
@@ -20084,8 +19288,6 @@ async function handleDrivePendingActionAfterRedirect_(){
   try {
     await finishDrivePendingAction_(act);
   } catch(err){
-    var errEl = document.getElementById('drive-modal-err');
-    if(errEl) errEl.textContent = String(err.message || err);
     console.warn('[Drive redirect 후 작업]', err);
     if(typeof setAppToast === 'function') setAppToast(String(err.message || err), { duration: 6500, variant: 'err' });
   } finally {
@@ -20340,52 +19542,6 @@ function updateDriveButtonState(){
     : 'Drive 연결됨 — 탭하면 지금 동기화';
   if(!lastFmt) b.setAttribute('data-drive-sync-pending', '1');
 }
-function isDriveSyncPending_(){
-  if(!hasDriveValidToken_()) return false;
-  try { return !localStorage.getItem(DRIVE_LAST_SYNC_KEY); } catch(e){ return false; }
-}
-function isDriveNeedsReauth_(){
-  return hasDriveConnection_() && !hasDriveValidToken_();
-}
-window.onDriveButtonClick = async function(){
-  if(location.protocol === 'file:'){
-    alert('Drive 연동은 https 또는 http로 이 페이지를 연 뒤에만 동작합니다.');
-    return;
-  }
-  var btn = document.getElementById('btn-drive-sync');
-  var sub = document.getElementById('drive-btn-sub');
-  var needsReauth = isDriveNeedsReauth_();
-  var syncPending = isDriveSyncPending_();
-
-  if(!needsReauth && !syncPending){
-    openDriveModal();
-    return;
-  }
-
-  if(btn) btn.disabled = true;
-  if(sub) sub.textContent = needsReauth ? '로그인 중…' : '동기화 중…';
-  try {
-    if(needsReauth){
-      var loginResult = await driveLoginInteractive_('upload', getDriveInteractivePrompt_());
-      if(loginResult === false) return;
-      return;
-    }
-    await driveUploadNow();
-    if(typeof setAppToast === 'function'){
-      setAppToast('Drive에 동기화했어요.', { duration: 4200, variant: 'ok' });
-    }
-  } catch(err){
-    var msg = (err && err.message) ? err.message : String(err);
-    if(typeof setAppToast === 'function'){
-      setAppToast('Drive 동기화에 실패했어요.\n' + msg, { duration: 8000, variant: 'err' });
-    } else {
-      alert(msg);
-    }
-  } finally {
-    if(btn) btn.disabled = false;
-    updateDriveButtonState();
-  }
-};
 function markDriveSyncOk_(){
   try {
     localStorage.setItem(DRIVE_LAST_SYNC_KEY, new Date().toISOString());
@@ -20394,32 +19550,11 @@ function markDriveSyncOk_(){
   updateDriveButtonState();
   updateSyncStatusUI_();
 }
-window.openDriveModal = function(){
-  if(location.protocol === 'file:'){
-    alert('Drive 연동은 https 또는 http로 이 페이지를 연 뒤에만 동작합니다.');
+window.driveLoginAndUpload = async function(){
+  if(!getDriveClientId()){
+    if(typeof setAppToast === 'function') setAppToast('Drive 클라이언트 ID가 없습니다', { duration: 4500, variant: 'err' });
     return;
   }
-  var err = document.getElementById('drive-modal-err');
-  if(err) err.textContent = '';
-  var ov = document.getElementById('drive-modal-overlay');
-  if(!ov) return;
-  var alreadyOpen = ov.classList.contains('open');
-  ov.classList.add('open');
-  if(!alreadyOpen) lockBodyScroll_();
-  trapFocusIn_(document.querySelector('#drive-modal-overlay .modal-box'));
-};
-window.closeDriveModal = function(ev){
-  if(ev && ev.target !== document.getElementById('drive-modal-overlay')) return;
-  var ov = document.getElementById('drive-modal-overlay');
-  var wasOpen = !!(ov && ov.classList.contains('open'));
-  if(ov) ov.classList.remove('open');
-  releaseModalFocusTrap_();
-  if(wasOpen) unlockBodyScroll_();
-};
-window.driveLoginAndUpload = async function(){
-  var errEl = document.getElementById('drive-modal-err');
-  if(!getDriveClientId()){ if(errEl) errEl.textContent = 'Drive 클라이언트 ID가 없습니다'; return; }
-  if(errEl) errEl.textContent = '';
   try{
     var firstConnect = !hasDriveConnection_() && !readCachedDriveToken_();
     if(firstConnect){
@@ -20432,12 +19567,11 @@ window.driveLoginAndUpload = async function(){
       return;
     }
     await driveUploadNow();
-    closeDriveModal();
     if(typeof setAppToast === 'function') setAppToast('Drive에 저장했어요. 이후 저장은 자동으로 올라가요.', { duration: 4500, variant: 'ok' });
     else alert('Drive에 저장했습니다.');
   } catch(e5){
     hideDriveOAuthBusy_();
-    if(errEl) errEl.textContent = String(e5.message || e5);
+    if(typeof setAppToast === 'function') setAppToast(String(e5.message || e5), { duration: 6500, variant: 'err' });
   }
 };
 async function driveDownloadCloudPayload_(token){
@@ -20477,7 +19611,6 @@ window.driveDisconnect = function(){
   window.__htDriveTokenClient = null;
   window.__htDriveTokenClientCid = null;
   updateDriveButtonState();
-  closeDriveModal();
   if(typeof setAppToast === 'function') setAppToast('Drive에서 로그아웃했어요.', { duration: 3500, variant: 'ok' });
 };
 /** JSON 문자열에서 최상위 객체 속성 값만 교체 (대용량 parse 전에 generatedOnly 제거용) */
@@ -21000,9 +20133,6 @@ function normalizeChatgptOpenUrl(raw){
   } catch(e){ return '__invalid__'; }
 }
 
-function getChatgptOpenUrl(){
-  return getMangoDesignerOpenUrl_();
-}
 
 function getMangoDesignerOpenUrl_(){
   const n = normalizeChatgptOpenUrl(state.chatgptOpenUrl);
@@ -21180,10 +20310,6 @@ function updateApiBadge() {
   if(status) status.textContent = label;
 }
 
-// ── Tabs ──
-function getSortedCatTabOrder() {
-  return CAT_TAB_NAV_ROWS[0].concat(CAT_TAB_NAV_ROWS[1]);
-}
 
 function renderTabs() {
   function groupSelectorHTML(groupLabel, ids, groupKey){
@@ -21493,9 +20619,6 @@ window.setTopicListMode_ = function(mode){
   state.topicListMode = mode === 'published' ? 'published' : (mode === 'plan' ? 'plan' : 'write');
   renderMain();
 };
-function getDraftChannelRemainHTML_(){
-  return '';
-}
 
 function draftIsFullyPublished_(draftId, catId){
   if(catId == null) catId = getCatIdFromDraftId_(draftId);
@@ -21538,12 +20661,6 @@ function draftHasContent(d) {
   return hasUsableAiDraftContent_(g) || !!(g.content || g.blog || g.thread || g.community || g.insta || g.threads);
 }
 
-/** 초안·발행 본문이 없는 주제 카드 수 */
-function countTopicsWithoutDraft_(catId){
-  var cat = CATEGORIES[catId];
-  if(!cat || !cat.drafts) return 0;
-  return cat.drafts.filter(function(d){ return draftIsShelfEmpty_(d, catId); }).length;
-}
 
 /**
  * 초안(생성본)·발행 본문이 없는 주제 카드만 삭제.
@@ -21625,86 +20742,6 @@ function pruneTopicsWithoutDraftCore_(catId, opts){
   };
 }
 
-window.pruneTopicsWithoutDraft_ = function(catId){
-  // 이미 진행 중이면 confirm 도 다시 띄우지 않음
-  if(state._pruneTopicsBusy){
-    if(typeof setAppToast === 'function'){
-      setAppToast('이미 주제 정리 중이에요. 잠시만 기다려 주세요.', { duration: 2800, variant: 'ok' });
-    }
-    return;
-  }
-  catId = parseInt(catId, 10);
-  if(isNaN(catId)) catId = state.currentCat;
-  var cat = CATEGORIES[catId];
-  var n = countTopicsWithoutDraft_(catId);
-  if(!n){
-    if(typeof setAppToast === 'function') setAppToast('초안 없는 주제가 없어요.', { duration: 3200, variant: 'ok' });
-    return;
-  }
-  var name = (cat && cat.name) ? cat.name : '이 프로그램';
-  // confirm 전에 busy — 모바일 ghost click 으로 확인 창이 두 번 뜨는 것 방지
-  state._pruneTopicsBusy = true;
-  var quotaHint = '';
-  try {
-    var bytes = estimatePlannerLocalStorageBytes_();
-    if(bytes > 4 * 1024 * 1024){
-      quotaHint = '\n\n※ 데이터가 커서 저장은 IndexedDB로 합니다. 초안 있는 주제는 그대로 둡니다.';
-    }
-  } catch(eQ){}
-  var okConfirm = false;
-  try {
-    okConfirm = confirm(
-      name + '에서 목록에 뺀 빈 주제 ' + n + '개를 삭제할까요?\n' +
-      '(추가한 주제, 초안 있는 주제, 완료 글은 그대로 둡니다)' + quotaHint
-    );
-  } catch(eConf){ okConfirm = false; }
-  if(!okConfirm){
-    state._pruneTopicsBusy = false;
-    return;
-  }
-
-  document.querySelectorAll('.program-prune-banner').forEach(function(el){
-    try { el.style.display = 'none'; } catch(eH){}
-  });
-  document.querySelectorAll('.program-prune-banner button').forEach(function(btn){
-    try { btn.disabled = true; } catch(eB){}
-  });
-  if(typeof setAppToast === 'function'){
-    setAppToast('주제 ' + n + '개 삭제·저장 중…', { duration: 6000, variant: 'ok' });
-  }
-
-  // 확인 직후 바로 실행 (400ms 대기로 인한 "안 됨" 체감 제거)
-  setTimeout(function(){
-    var result = { removed: 0, kept: 0, saved: false, stripped: 0 };
-    try {
-      result = pruneTopicsWithoutDraftCore_(catId, { skipUpload: false });
-    } catch(err){
-      console.warn('[주제 정리]', err);
-      state._pruneTopicsBusy = false;
-      if(typeof setAppToast === 'function'){
-        setAppToast('정리 중 오류가 났어요. 페이지를 새로고침한 뒤 다시 시도해 주세요.', { duration: 7000, variant: 'err' });
-      }
-      return;
-    }
-    state._pruneTopicsBusy = false;
-    if(typeof setAppToast === 'function'){
-      if(result.removed <= 0){
-        setAppToast('삭제할 빈 주제가 없거나, 이미 정리됐어요.', { duration: 4000, variant: 'ok' });
-      } else if(result.saved){
-        setAppToast(
-          '초안 없는 주제 ' + result.removed + '개를 삭제했어요. 남은 주제 ' + result.kept + '개.',
-          { duration: 6500, variant: 'ok' }
-        );
-      } else {
-        setAppToast(
-          '주제 ' + result.removed + '개는 화면에서 지웠어요. 저장이 불안정하면 한 번 더 저장되거나, 새로고침 후 확인해 주세요.',
-          { duration: 8000, variant: 'err' }
-        );
-        try { ensureQuotaRecoveryFab_(); } catch(eFab){}
-      }
-    }
-  }, 30);
-};
 // 예전 캐시/오타 대비 별칭
 window.pruneTopicsWithoutDraftCore_ = pruneTopicsWithoutDraftCore_;
 
@@ -21751,13 +20788,6 @@ function countUnpublishedTopicsForCat_(catIdx) {
   return countTopicListBuckets_(catIdx).total;
 }
 
-function countPendingDraftsInCat_(catId) {
-  const cat = CATEGORIES[catId];
-  if (!cat || !cat.drafts) return 0;
-  return cat.drafts.filter(function (d) {
-    return draftIsPendingPublish_(d);
-  }).length;
-}
 
 /** 카테고리에 생성된 주제 카드 수 (발행·초안 본문 유무와 무관) */
 function countTopicsInCat_(catId) {
@@ -21794,106 +20824,7 @@ function getDraftCreatedDateLabel_(d) {
   }
 }
 
-/** 기타 주제 상태 키 — 서로 배타적으로 분류 */
-function getDraftMiscStatusKey_(d, catId){
-  if(!d || !d.id) return 'noDraft';
-  if(catId == null) catId = getCatIdFromDraftId_(d.id);
-  if(draftIsFullyPublished_(d.id, catId)) return 'published';
-  if(draftHasPartialPublish_(d.id, catId)) return 'partial';
-  if(draftHasContent(d) || draftIsPendingPublish_(d)) return 'hasDraft';
-  return 'noDraft';
-}
-function getMiscTopicFilters_(){
-  if(!state.miscTopicFilters || typeof state.miscTopicFilters !== 'object'){
-    state.miscTopicFilters = {};
-  }
-  return state.miscTopicFilters;
-}
-function hasActiveMiscTopicFilters_(){
-  var f = getMiscTopicFilters_();
-  return !!(f.published || f.partial || f.hasDraft || f.noDraft);
-}
-function filterMiscDraftsByStatus_(drafts, catId){
-  var list = (drafts || []).slice();
-  list.sort(function(a, b){
-    var ta = getDraftCreatedAtMs_(a) || userAddedDraftTimestamp_(a && a.id) || 0;
-    var tb = getDraftCreatedAtMs_(b) || userAddedDraftTimestamp_(b && b.id) || 0;
-    if(ta !== tb) return tb - ta;
-    return 0;
-  });
-  if(!hasActiveMiscTopicFilters_()) return list;
-  var f = getMiscTopicFilters_();
-  return list.filter(function(d){
-    var key = getDraftMiscStatusKey_(d, catId);
-    return !!f[key];
-  });
-}
-function countMiscDraftsByStatus_(drafts, catId){
-  var counts = { published: 0, partial: 0, hasDraft: 0, noDraft: 0 };
-  (drafts || []).forEach(function(d){
-    var k = getDraftMiscStatusKey_(d, catId);
-    if(counts[k] != null) counts[k]++;
-  });
-  return counts;
-}
-function renderMiscTopicFilterBarHTML_(catId, drafts){
-  var f = getMiscTopicFilters_();
-  var counts = countMiscDraftsByStatus_(drafts, catId);
-  var items = [
-    { key: 'published', label: '발행완료' },
-    { key: 'partial', label: '일부발행' },
-    { key: 'hasDraft', label: '초안' },
-    { key: 'noDraft', label: '초안 없음' }
-  ];
-  var html = '<div class="misc-topic-filters" role="group" aria-label="기타 주제 상태 필터" onclick="event.stopPropagation()">';
-  items.forEach(function(it){
-    var on = !!f[it.key];
-    html += '<button type="button" class="misc-topic-filter-btn' + (on ? ' on' : '') + '"' +
-      ' data-status="' + it.key + '"' +
-      ' aria-pressed="' + (on ? 'true' : 'false') + '"' +
-      ' onclick="event.stopPropagation();toggleMiscTopicFilter_(\'' + it.key + '\')">' +
-      '<span class="misc-topic-filter-label">' + escapeHtml(it.label) + '</span>' +
-      '<span class="misc-topic-filter-count">' + (counts[it.key] || 0) + '</span>' +
-      '</button>';
-  });
-  if(hasActiveMiscTopicFilters_()){
-    html += '<button type="button" class="misc-topic-filter-clear" onclick="event.stopPropagation();clearMiscTopicFilters_()">전체</button>';
-  }
-  html += '</div>';
-  return html;
-}
-window.toggleMiscTopicFilter_ = function(key){
-  var f = getMiscTopicFilters_();
-  var k = String(key || '');
-  if(!k) return;
-  f[k] = !f[k];
-  state.miscTopicFilters = f;
-  renderMain();
-};
-window.clearMiscTopicFilters_ = function(){
-  state.miscTopicFilters = {};
-  renderMain();
-};
 
-function sortDraftsForDisplay(drafts) {
-  return (drafts || []).slice().sort(function (a, b) {
-    const ap = draftIsPublished_(a.id) ? 1 : 0;
-    const bp = draftIsPublished_(b.id) ? 1 : 0;
-    if (ap === 1 && bp === 1) {
-      const aSaved = (state.published[a.id] && state.published[a.id].savedAt) ? String(state.published[a.id].savedAt) : '';
-      const bSaved = (state.published[b.id] && state.published[b.id].savedAt) ? String(state.published[b.id].savedAt) : '';
-      if (aSaved !== bSaved) return bSaved.localeCompare(aSaved);
-    }
-    if (ap !== bp) return ap - bp;
-    const ag = draftIsPendingPublish_(a) ? 1 : 0;
-    const bg = draftIsPendingPublish_(b) ? 1 : 0;
-    if (ag !== bg) return bg - ag;
-    const aCreated = getDraftCreatedAtMs_(a);
-    const bCreated = getDraftCreatedAtMs_(b);
-    if (aCreated !== bCreated) return bCreated - aCreated;
-    return 0;
-  });
-}
 
 function getNextPublishRecommendation() {
   const flatOrder = CAT_TAB_NAV_ROWS[0].concat(CAT_TAB_NAV_ROWS[1]);
@@ -25833,87 +24764,6 @@ window.addDraft = async function(){
   }
 };
 
-window.refreshTopicsForCat = async function(catId){
-  if(!state.apiKey){ openApiModal(); return; }
-  const cat = CATEGORIES[catId];
-  if(!cat) return;
-  const list = (cat.drafts || []).filter(function(d){ return d && d.id; });
-  if(list.length === 0){
-    if(typeof setAppToast === 'function') setAppToast('이 카테고리에 리프레쉬할 주제가 없어요.', { duration: 3200 });
-    return;
-  }
-  if(typeof setAppToast === 'function') setAppToast('「' + cat.name + '」 주제를 리프레쉬하고 있어요…', { duration: 2600 });
-
-  const avoidTopics = (cat.drafts || []).map(function(d){ return d && d.topic ? d.topic : ''; }).filter(Boolean).slice(0, 80);
-  const ids = list.map(function(d){ return d.id; });
-
-  const prompt =
-`당신은 "브랜딩 플래너"입니다.
-${buildBrandContextForPrompt_(catId, null)}
-
-카테고리: ${cat.name} (${cat.sub})
-독자: ${getProgramAudienceLine_(catId)}
-
-아래 ID 목록 각각에 대해 topic·angle·series·step·pillar·rationale을 새로 만들어 주세요.
-- topic: 한국어 한 줄(15~32자, **호기심·궁금증을 자극하는 후킹**·질문형 권장)
-- angle: 이 주제를 어떤 관점으로 풀지 한 줄(신뢰/오해해소/실천팁/메커니즘 등)
-${buildTopicBrandJsonGuide_(catId)}
-
-[중복 금지]
-아래 기존 topic들과 최대한 겹치지 않게:
-${avoidTopics.map(t=>' - '+t).join('\n')}
-
-[출력]
-반드시 JSON 배열만 출력:
-[
-  {"id":"${ids[0] || 'dX-0'}","topic":"...","angle":"...","series":"...","step":"...","pillar":"...","rationale":"..."}
-]
-
-ID는 반드시 아래 목록에서만 사용:
-${ids.join(', ')}`;
-
-  try{
-    const text = await callClaudePlanner_(prompt, { maxTokens: 1400 });
-    const arr = parsePlannerAiJsonValue_(text);
-    if(!Array.isArray(arr)) throw new Error('형식이 올바르지 않아요 (JSON 배열 필요)');
-
-    const map = {};
-    arr.forEach(function(x){
-      if(!x || !x.id) return;
-      map[String(x.id)] = x;
-    });
-
-    let changed = 0;
-    (cat.drafts || []).forEach(function(d){
-      if(!d || !d.id) return;
-      const u = map[d.id];
-      if(!u) return;
-      if(u.topic) d.topic = String(u.topic).trim();
-      if(u.angle) d.angle = String(u.angle).trim();
-      applyTopicFieldsToDraft_(d, u, catId);
-      changed++;
-    });
-
-    if(changed > 0){
-      if(state.selectedId){
-        const cur = cat.drafts.find(function(d){ return d.id === state.selectedId; });
-        if(cur){
-          const ttl = document.getElementById('sheet-title');
-          if(ttl) ttl.textContent = cur.topic;
-        }
-      }
-      renderTabs();
-      renderMain();
-      save({ driveImmediate: true });
-      if(typeof setAppToast === 'function') setAppToast('주제를 리프레쉬했어요.', { duration: 4200, variant: 'ok' });
-    } else {
-      if(typeof setAppToast === 'function') setAppToast('바뀐 주제가 없어요. 다시 한 번 눌러주세요.', { duration: 3200 });
-    }
-  } catch(e){
-    const msg = String((e && e.message) ? e.message : e);
-    if(typeof setAppToast === 'function') setAppToast('주제 리프레쉬에 실패했어요.\n' + msg, { duration: 6500, variant: 'err' });
-  }
-};
 
 window.deleteDraft = function(catId, draftId){
   var cat = CATEGORIES[catId];
@@ -25996,31 +24846,6 @@ function renderMoveDraftProgramBlockHTML_(fromCatId, draftId){
   '</div>';
 }
 
-/** @deprecated 자세히 보기에서 「순서」 토글 제거 — 호환용 유지 */
-function renderMoveDraftPickerHTML_(fromCatId, draftId){
-  return '<div class="card-move-picker" onclick="event.stopPropagation()">' +
-    '<div class="card-move-steps">' +
-      '<div class="card-move-step-list">' + renderMoveDraftStepChipsHTML_(fromCatId, draftId) + '</div>' +
-    '</div>' +
-  '</div>' + renderMoveDraftProgramBlockHTML_(fromCatId, draftId);
-}
-window.toggleMoveDraftPicker_ = function(btn){
-  var body = btn && btn.closest ? btn.closest('.card-more-body') : null;
-  var picker = body ? body.querySelector('.card-move-picker') : null;
-  if(!picker) return;
-  var open = !picker.classList.contains('open');
-  document.querySelectorAll('.card-move-picker.open').forEach(function(el){
-    el.classList.remove('open');
-    var programs = el.querySelector('.card-move-programs');
-    if(programs) programs.classList.remove('open');
-    var progBtn = el.querySelector('.card-move-program-btn');
-    if(progBtn) progBtn.setAttribute('aria-expanded', 'false');
-  });
-  if(open){
-    picker.classList.add('open');
-    if(btn) btn.setAttribute('aria-expanded', 'true');
-  }
-};
 window.toggleMoveProgramList_ = function(btn){
   var picker = btn && btn.closest ? btn.closest('.card-move-picker') : null;
   var list = picker ? picker.querySelector('.card-move-programs') : null;
@@ -26208,16 +25033,19 @@ function countBulkKeywordHits_(re, text){
 /** 규칙 표가 없는 카테고리: 단계 제목을 ·/공백으로 쪼갠 2글자 이상 토큰 */
 function buildBulkStepRulesForPlan_(catId, plan){
   var out = [];
+  var covered = {};
   var table = BULK_STEP_KEYWORD_RULES_[String(catId)];
   if(table){
     table.forEach(function(r){
       var sid = findPlanStepIdByTitle_(plan, r.title);
-      if(sid) out.push({ stepId: sid, re: r.re });
+      if(sid && !covered[sid]){
+        covered[sid] = true;
+        out.push({ stepId: sid, re: r.re });
+      }
     });
-    if(out.length) return out;
   }
   (plan.steps || []).forEach(function(s){
-    if(!s || !s.id) return;
+    if(!s || !s.id || covered[String(s.id)]) return;
     var toks = String(s.title || '').split(/[·,\/\s]+/).filter(function(t){ return t.length >= 2; });
     if(!toks.length) return;
     var src = toks.map(function(t){ return t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|');
@@ -26247,7 +25075,7 @@ function canBulkReassignCategory_(catId){
   return !!(plan && plan.steps && plan.steps.length);
 }
 
-/** 준비 글(완료·빈 서랍 제외)만. 이동 제안(moves)과 규칙 미매칭(held) */
+/** 준비 글 + 완료 글(빈 기획 칸 제외). 이동 제안(moves)과 규칙 미매칭(held) */
 function previewBulkReassignDraftSteps_(catId){
   catId = parseInt(catId, 10);
   var res = { catId: catId, moves: [], held: [] };
@@ -26258,13 +25086,13 @@ function previewBulkReassignDraftSteps_(catId){
   if(!rules.length) return res;
   (cat.drafts || []).forEach(function(d, di){
     if(!d || !d.id) return;
-    if(draftShowsOnPublishedList_(d.id, catId)) return;
     if(draftIsShelfEmpty_(d, catId)) return;
     var cur = String(getDraftRoadmapStepId_(d, catId, di) || '');
     var sug = suggestBulkStepForDraft_(rules, d);
     var item = {
       draftId: d.id,
       topic: d.topic || '(제목 없음)',
+      published: draftShowsOnPublishedList_(d.id, catId),
       fromStepId: cur,
       fromLabel: cur ? (cur === SUBGOAL_MISC_ID ? getSubGoalMiscLabel_(plan) : (getSubGoalStepTitle_(plan, cur) || cur)) : '미배정',
       toStepId: sug.stepId,
@@ -26343,7 +25171,7 @@ function renderBulkReassignModalBody_(){
       html += '<label class="bulk-reassign-row">' +
         '<input type="checkbox" class="bulk-reassign-chk" data-idx="' + i + '" checked onchange="updateBulkReassignApplyBtn_()">' +
         '<span class="bulk-reassign-txt">' +
-          '<span class="bulk-reassign-topic">' + escapeHtml(m.topic) + '</span>' +
+          '<span class="bulk-reassign-topic">' + (m.published ? '<span class="bulk-reassign-pub">완료</span>' : '') + escapeHtml(m.topic) + '</span>' +
           '<span class="bulk-reassign-path">' + escapeHtml(m.fromLabel) + ' → <strong>' + escapeHtml(m.toLabel) + '</strong></span>' +
         '</span>' +
       '</label>';
@@ -26353,7 +25181,7 @@ function renderBulkReassignModalBody_(){
   if(p.held.length){
     html += '<details class="bulk-reassign-held"><summary>보류 ' + p.held.length + '개 · 제목만으로 서랍을 정할 수 없어요 (직접 옮겨 주세요)</summary><ul>';
     p.held.forEach(function(h){
-      html += '<li>' + escapeHtml(h.topic) + '</li>';
+      html += '<li>' + (h.published ? '<span class="bulk-reassign-pub">완료</span>' : '') + escapeHtml(h.topic) + '</li>';
     });
     html += '</ul></details>';
   }
@@ -26391,6 +25219,178 @@ window.applyBulkReassignFromModal_ = function(){
   if(typeof setAppToast === 'function'){
     setAppToast(n ? ('주제 ' + n + '개를 서랍으로 옮겼어요.') : '옮긴 주제가 없어요.', { duration: 3200, variant: n ? 'ok' : undefined });
   }
+};
+
+/** 주제 서랍 직접 편집 (도수·무브먼트·페이스·힐자계). 저장 시 plan.hubCustom → 시드 복구가 덮어쓰지 않음 */
+var DRAWER_EDIT_MAX_ = 12;
+var _drawerEdit = null;
+
+window.openDrawerEditor_ = function(catId){
+  catId = parseInt(catId != null ? catId : state.currentCat, 10);
+  var ov = document.getElementById('drawer-edit-overlay');
+  var plan = peekSubGoalPlan_(catId) || ensureProgramIdentityPlan_(catId);
+  if(!ov || !plan) return;
+  _drawerEdit = {
+    catId: catId,
+    custom: !!plan.hubCustom,
+    rows: (plan.steps || []).filter(function(s){ return s && s.id; }).map(function(s){
+      return {
+        id: String(s.id),
+        title: displaySubGoalStepTitle_(s.title || '', catId),
+        rationale: String(s.rationale || s.summary || '').trim(),
+        count: getDraftsForSubGoalStep_(catId, String(s.id), { live: true }).length
+      };
+    })
+  };
+  renderDrawerEditorBody_();
+  var wasOpen = ov.classList.contains('open');
+  ov.classList.add('open');
+  if(!wasOpen && typeof lockBodyScroll_ === 'function') lockBodyScroll_();
+};
+
+window.closeDrawerEditor_ = function(e){
+  if(e && e.target && e.target.id !== 'drawer-edit-overlay') return;
+  _drawerEdit = null;
+  dismissPlannerOverlayOpenState_('drawer-edit-overlay');
+};
+
+function renderDrawerEditorBody_(){
+  var body = document.getElementById('drawer-edit-body');
+  var titleEl = document.getElementById('drawer-edit-title');
+  var ed = _drawerEdit;
+  if(!body || !ed) return;
+  var cat = CATEGORIES[ed.catId];
+  if(titleEl) titleEl.textContent = '주제 서랍 · ' + (cat ? cat.name : '');
+  var n = ed.rows.length;
+  var html = '<div class="drawer-edit-list">';
+  ed.rows.forEach(function(r, i){
+    html += '<div class="drawer-edit-row ' + getStepToneClass_(i) + '">' +
+      '<div class="drawer-edit-row-head">' +
+        '<span class="drawer-edit-num">' + (i + 1) + '</span>' +
+        '<input type="text" class="drawer-edit-title-input" maxlength="30" placeholder="서랍 이름" value="' + escapeHtml(r.title) + '" oninput="drawerEditSetField_(' + i + ',\'title\',this.value)">' +
+        '<button type="button" class="drawer-edit-icon" title="위로" aria-label="위로"' + (i === 0 ? ' disabled' : '') + ' onclick="drawerEditMove_(' + i + ',-1)">↑</button>' +
+        '<button type="button" class="drawer-edit-icon" title="아래로" aria-label="아래로"' + (i === n - 1 ? ' disabled' : '') + ' onclick="drawerEditMove_(' + i + ',1)">↓</button>' +
+        '<button type="button" class="drawer-edit-icon drawer-edit-del" title="서랍 삭제" aria-label="서랍 삭제"' + (n <= 1 ? ' disabled' : '') + ' onclick="drawerEditRemove_(' + i + ')">×</button>' +
+      '</div>' +
+      '<textarea class="drawer-edit-intent" rows="2" placeholder="이 서랍에 어떤 글을 담을지 (선택)" oninput="drawerEditSetField_(' + i + ',\'rationale\',this.value)">' + escapeHtml(r.rationale) + '</textarea>' +
+      (r.count ? '<div class="drawer-edit-count">주제 ' + r.count + '개</div>' : '') +
+    '</div>';
+  });
+  html += '</div>';
+  if(n < DRAWER_EDIT_MAX_){
+    html += '<button type="button" class="drawer-edit-add" onclick="drawerEditAdd_()">+ 서랍 추가</button>';
+  }
+  html += '<p class="drawer-edit-note">서랍을 지우면 안에 있던 주제는 <strong>기타 주제</strong>로 옮겨져요.</p>';
+  if(ed.custom){
+    html += '<button type="button" class="drawer-edit-reset" onclick="drawerEditResetToSeed_()">기본 서랍으로 되돌리기</button>';
+  }
+  body.innerHTML = html;
+}
+
+window.drawerEditSetField_ = function(i, field, value){
+  if(!_drawerEdit || !_drawerEdit.rows[i]) return;
+  _drawerEdit.rows[i][field] = String(value || '');
+};
+
+window.drawerEditMove_ = function(i, dir){
+  if(!_drawerEdit) return;
+  var rows = _drawerEdit.rows;
+  var j = i + dir;
+  if(j < 0 || j >= rows.length) return;
+  var tmp = rows[i]; rows[i] = rows[j]; rows[j] = tmp;
+  renderDrawerEditorBody_();
+};
+
+window.drawerEditRemove_ = function(i){
+  if(!_drawerEdit || _drawerEdit.rows.length <= 1) return;
+  var r = _drawerEdit.rows[i];
+  if(!r) return;
+  if(r.count && !confirm('「' + (r.title || '이 서랍') + '」의 주제 ' + r.count + '개는 기타 주제로 옮겨져요. 지울까요?')) return;
+  _drawerEdit.rows.splice(i, 1);
+  renderDrawerEditorBody_();
+};
+
+window.drawerEditAdd_ = function(){
+  if(!_drawerEdit || _drawerEdit.rows.length >= DRAWER_EDIT_MAX_) return;
+  _drawerEdit.rows.push({ id: '', title: '', rationale: '', count: 0 });
+  renderDrawerEditorBody_();
+  var inputs = document.querySelectorAll('#drawer-edit-body .drawer-edit-title-input');
+  if(inputs.length) inputs[inputs.length - 1].focus();
+};
+
+window.saveDrawerEditor_ = function(){
+  var ed = _drawerEdit;
+  if(!ed) return;
+  var catId = ed.catId;
+  var plan = peekSubGoalPlan_(catId);
+  if(!plan) return;
+  var rows = ed.rows.map(function(r){
+    return { id: r.id, title: String(r.title || '').trim(), rationale: String(r.rationale || '').trim() };
+  });
+  if(!rows.length) return;
+  var seen = {};
+  for(var i = 0; i < rows.length; i++){
+    if(!rows[i].title){
+      setAppToast((i + 1) + '번 서랍 이름을 적어 주세요.', { duration: 3000, variant: 'err' });
+      return;
+    }
+    var key = stepTitleDedupeKey_(rows[i].title);
+    if(seen[key]){
+      setAppToast('「' + rows[i].title + '」 서랍이 두 개예요. 이름을 다르게 적어 주세요.', { duration: 3400, variant: 'err' });
+      return;
+    }
+    seen[key] = true;
+  }
+  var keepIds = {};
+  rows.forEach(function(r){ if(r.id) keepIds[r.id] = true; });
+  (plan.steps || []).forEach(function(s){
+    if(!s || !s.id || keepIds[String(s.id)]) return;
+    getDraftsForSubGoalStep_(catId, String(s.id), { live: true }).forEach(function(d){
+      relocateDraftToStepNoSave_(catId, d, SUBGOAL_MISC_ID, null);
+    });
+  });
+  // 정규화가 id를 위치(s1…sN)로 다시 매기며 연쇄 remap 하면 맞바꾼 서랍의 주제가 엇갈린다 → 목록을 먼저 잡고 직접 재배정
+  var byId = {};
+  var draftsById = {};
+  (plan.steps || []).forEach(function(s){
+    if(!s || !s.id) return;
+    byId[String(s.id)] = s;
+    draftsById[String(s.id)] = getDraftsForSubGoalStep_(catId, String(s.id), { live: true }).slice();
+  });
+  plan.steps = rows.map(function(r, i){
+    var st = (r.id && byId[r.id]) ? byId[r.id] : { layer: '', pinned: false };
+    st.id = 's' + (i + 1);
+    st.title = r.title;
+    st.rationale = r.rationale;
+    st.summary = r.rationale.replace(/\s+/g, ' ').slice(0, 90);
+    return st;
+  });
+  plan.hubCustom = true;
+  plan.updatedAt = new Date().toISOString();
+  rows.forEach(function(r, i){
+    var list = (r.id && draftsById[r.id]) || [];
+    if(list.length) reindexDraftsInStep_(catId, 's' + (i + 1), list);
+  });
+  save({ driveImmediate: true, gasImmediate: true });
+  closeDrawerEditor_();
+  renderMain();
+  setAppToast('주제 서랍을 저장했어요.', { duration: 2800, variant: 'ok' });
+};
+
+window.drawerEditResetToSeed_ = function(){
+  var ed = _drawerEdit;
+  if(!ed) return;
+  if(!confirm('기본 서랍 구성으로 되돌릴까요? 기본에 없는 서랍의 주제는 기타 주제로 옮겨져요.')) return;
+  var plan = peekSubGoalPlan_(ed.catId);
+  if(!plan) return;
+  delete plan.hubCustom;
+  plan.hubRev = '';
+  syncCuriosityHubPlanFromSeed_(ed.catId);
+  plan.updatedAt = new Date().toISOString();
+  save({ driveImmediate: true, gasImmediate: true });
+  closeDrawerEditor_();
+  renderMain();
+  setAppToast('기본 서랍으로 되돌렸어요.', { duration: 2800, variant: 'ok' });
 };
 
 function ensureTopicDragDropBound_(){
@@ -26540,85 +25540,6 @@ window.moveDraftToCategory_ = function(fromCatId, draftId, toCatId){
   if(typeof setAppToast === 'function') setAppToast('「' + short + '」을(를) ' + destName + ' 기타 주제로 옮겼어요.', { duration: 4200, variant: 'ok' });
 };
 
-window.refreshTopicsForDraft = async function(catId, draftId){
-  if(!state.apiKey){ openApiModal(); return; }
-  const cat = CATEGORIES[catId];
-  if(!cat || !draftId) return;
-  const d = (cat.drafts || []).find(function(x){ return x && x.id === draftId; });
-  if(!d){
-    if(typeof setAppToast === 'function') setAppToast('주제를 찾을 수 없어요.', { duration: 3200 });
-    return;
-  }
-  if(typeof setAppToast === 'function'){
-    const t0 = d.topic || '주제';
-    const short = t0.length > 26 ? t0.slice(0, 26) + '…' : t0;
-    setAppToast('「' + short + '」 주제를 리프레쉬하고 있어요…', { duration: 2600 });
-  }
-
-  var startedWait = !(state.plannerAiWait && state.plannerAiWait.regenDraftId === draftId);
-  if(startedWait){
-    startPlannerAiWait_({ estimateSec: TOPIC_REGEN_ESTIMATE_SEC, busyLabel: '재생성 중', regenDraftId: draftId });
-  }
-
-  const avoidTopics = (cat.drafts || [])
-    .map(function(x){ return x && x.topic ? x.topic : ''; })
-    .filter(Boolean)
-    .slice(0, 80);
-
-  const prompt =
-`당신은 "브랜딩 플래너"입니다.
-${buildBrandContextForPrompt_(catId, d)}
-
-카테고리: ${cat.name} (${cat.sub})
-독자: ${getProgramAudienceLine_(catId)}
-
-아래 ID 한 건에 대해 topic·angle·series·step·pillar·rationale을 새로 만들어 주세요.
-- topic: 한국어 한 줄(15~32자, **호기심·궁금증을 자극하는 후킹**·질문형 권장)
-- angle: 이 주제를 어떤 관점으로 풀지 한 줄(신뢰/오해해소/실천팁/메커니즘 등)
-${buildTopicBrandJsonGuide_(catId)}
-
-[중복 금지]
-아래 기존 topic들과 최대한 겹치지 않게:
-${avoidTopics.map(t=>' - '+t).join('\n')}
-
-[출력]
-반드시 JSON 배열만 출력 (원소 1개):
-[
-  {"id":"${draftId}","topic":"...","angle":"...","series":"...","step":"...","pillar":"...","rationale":"..."}
-]`;
-
-  try{
-    const text = await callClaudePlanner_(prompt, { maxTokens: 800 });
-    const arr = parsePlannerAiJsonValue_(text);
-    if(!Array.isArray(arr) || !arr[0]) throw new Error('형식이 올바르지 않아요 (JSON 배열 1개 필요)');
-    const u = arr[0];
-    if(!u || String(u.id) !== String(draftId)) throw new Error('응답 ID가 일치하지 않아요');
-
-    const nt = String(u.topic || '').trim();
-    const na = String(u.angle || '').trim();
-    if(nt) d.topic = nt;
-    if(na) d.angle = na;
-    applyTopicFieldsToDraft_(d, u, catId);
-    if(!nt && !na && !u.series && !u.rationale){
-      if(typeof setAppToast === 'function') setAppToast('바뀐 주제가 없어요. 다시 한 번 눌러주세요.', { duration: 3200 });
-      return;
-    }
-
-    if(state.selectedId === draftId){
-      const ttl = document.getElementById('sheet-title');
-      if(ttl) ttl.textContent = d.topic;
-    }
-    renderTabs();
-    renderMain();
-    save({ driveImmediate: true });
-    if(typeof setAppToast === 'function') setAppToast('이 주제를 리프레쉬했어요.', { duration: 4200, variant: 'ok' });
-  } catch(e){
-    const msg = String((e && e.message) ? e.message : e);
-    if(typeof setAppToast === 'function') setAppToast('주제 리프레쉬에 실패했어요.\n' + msg, { duration: 6500, variant: 'err' });
-  } finally {
-    if(startedWait) stopPlannerAiWait_();
-  }
-};
 
 const AUTO_TOPIC_REPLENISH_ENABLED_KEY = 'ht_auto_topic_replenish_enabled';
 function isAutoTopicReplenishEnabled_(){
@@ -28610,44 +27531,6 @@ function fitThumbTextBlock_(ctx, text, maxWidth, maxSize, minSize, weight, maxLi
   return { size: minSize, lines: wrapThumbLinesAtBreaks_(ctx, t, maxWidth, maxLines) };
 }
 
-/** 후킹 타이틀: 입력 줄바꿈을 그대로 씀(최대 3줄). 한 줄이면 한 줄로 그림 */
-function fitThumbHeroHook_(ctx, text, maxWidth, maxSize, minSize, opts){
-  opts = opts || {};
-  var maxLines = opts.maxLines != null ? opts.maxLines : 3;
-  if(opts.oneLine){
-    return fitThumbTextBlock_(ctx, String(text || '').replace(/\s+/g, ' ').trim(), maxWidth, maxSize, minSize, '900', 1);
-  }
-  var raw = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-  var fontFamily = '"Noto Sans KR","Apple SD Gothic Neo",sans-serif';
-  if(!raw) return { size: maxSize, lines: [''] };
-  var explicit = raw.split('\n').map(function(l){ return l.trim(); }).filter(Boolean).slice(0, maxLines);
-  if(raw.indexOf('\n') >= 0 && explicit.length){
-    var sizeE = maxSize;
-    while(sizeE >= minSize){
-      ctx.font = '900 ' + sizeE + 'px ' + fontFamily;
-      var ok = true;
-      for(var ei = 0; ei < explicit.length; ei++){
-        if(ctx.measureText(explicit[ei]).width > maxWidth + 1){ ok = false; break; }
-      }
-      if(ok) return { size: sizeE, lines: explicit };
-      sizeE -= 1;
-    }
-    ctx.font = '900 ' + minSize + 'px ' + fontFamily;
-    return { size: minSize, lines: explicit };
-  }
-  // 줄바꿈 없는 한 줄 입력 → 이미지에도 한 줄(글씨만 축소)
-  var t = raw.replace(/\s+/g, ' ').trim();
-  var size = maxSize;
-  while(size >= minSize){
-    ctx.font = '900 ' + size + 'px ' + fontFamily;
-    if(ctx.measureText(t).width <= maxWidth){
-      return { size: size, lines: [t] };
-    }
-    size -= 1;
-  }
-  ctx.font = '900 ' + minSize + 'px ' + fontFamily;
-  return { size: minSize, lines: [t] };
-}
 
 /** 브랜드·긴 후킹을 편집칸에 미리보기와 같은 줄 수로 펼침 */
 function expandThumbHeroLinesForEdit_(hero){
@@ -29349,10 +28232,6 @@ async function pickTopAddFormThumbCandidates_(fileList, opts){
   return top;
 }
 
-async function pickBestAddFormThumbMedia_(fileList){
-  var top = await pickTopAddFormThumbCandidates_(fileList, { limit: 1 });
-  return top[0];
-}
 
 window.onAddFormThumbFiles_ = async function(input){
   var files = input && input.files;
@@ -29815,10 +28694,6 @@ window.onThumbMakerPointerUp_ = function(ev){
   paintThumbMakerPreview_();
 };
 
-window.onThumbMakerCanvasClick_ = function(ev){
-  // 하위 호환: pointer 핸들러가 메인
-  if(ev) ev.preventDefault();
-};
 
 function updateThumbPhotoBadge_(){
   var st = ensureThumbMakerState_();
@@ -29937,35 +28812,6 @@ window.onThumbMakerFieldChange_ = function(){
   st._paintTimer = setTimeout(function(){ paintThumbMakerPreview_(); }, 120);
 };
 
-window.setThumbProgramMode_ = function(mode){
-  if(isThumbPhotoOnlyMode_()) return;
-  var st = ensureThumbMakerState_();
-  st.programMode = mode === 'topic' ? 'topic' : 'brand';
-  var content = resolveThumbMakerContent_();
-  var copy = buildThumbMakerCopy_(content, state.selectedCatId, {
-    programMode: st.programMode,
-    preferTopic: st.programMode === 'topic'
-  });
-  var cur = readThumbMakerFields_();
-  // 주제 후킹: 큰 타이틀·브랜드명·핵심 문장 갱신 / 브랜드: 큰 타이틀·브랜드명만, 본문은 유지
-  st.fields = {
-    hero: copy.hero,
-    tagline: cur.tagline || copy.tagline,
-    program: copy.program,
-    body: st.programMode === 'topic' ? copy.body : (cur.body || copy.body),
-    keywords: copy.keywords,
-    brandProgram: copy.brandProgram
-  };
-  st.lastCopy = st.fields;
-  applyThumbFieldsToDom_(st.fields);
-  var btns = document.querySelectorAll('.thumb-maker-mode-btn[data-thumb-mode]');
-  for(var i = 0; i < btns.length; i++){
-    btns[i].classList.toggle('on', btns[i].getAttribute('data-thumb-mode') === st.programMode);
-  }
-  paintThumbMakerPreview_();
-  schedulePersistThumbWorkspace_(true);
-  setAppToast(st.programMode === 'brand' ? '브랜드명을 큰 타이틀로 바꿨어요.' : '주제를 큰 타이틀로 바꿨어요.', { duration: 1600, variant: 'ok' });
-};
 
 window.setThumbFocusX_ = function(v){
   var st = ensureThumbMakerState_();
@@ -29991,13 +28837,6 @@ window.nudgeThumbZoom_ = function(delta){
   paintThumbMakerPreview_();
 };
 
-window.resetThumbZoom_ = function(){
-  var st = ensureThumbMakerState_();
-  st.zoom = 1;
-  updateThumbZoomLabel_();
-  schedulePersistThumbWorkspace_(false);
-  paintThumbMakerPreview_();
-};
 
 window.nudgeThumbTypeScale_ = function(delta){
   var st = ensureThumbMakerState_();
@@ -30007,21 +28846,7 @@ window.nudgeThumbTypeScale_ = function(delta){
   paintThumbMakerPreview_();
 };
 
-window.resetThumbTypeScale_ = function(){
-  var st = ensureThumbMakerState_();
-  st.typeScale = 1;
-  updateThumbTypeLabel_();
-  schedulePersistThumbWorkspace_(false);
-  paintThumbMakerPreview_();
-};
 
-window.toggleThumbHeroOneLine_ = function(){
-  var st = ensureThumbMakerState_();
-  st.heroOneLine = !st.heroOneLine;
-  syncThumbHeroOneLineButton_();
-  schedulePersistThumbWorkspace_(false);
-  paintThumbMakerPreview_();
-};
 
 window.onThumbMakerWheel_ = function(ev){
   if(!ev) return;
@@ -30143,31 +28968,8 @@ window.toggleThumbAiUpscale_ = async function(btn){
   }
 };
 
-/** @deprecated 토글 UI로 대체 — 호환용 */
-window.runThumbAiUpscale_ = function(btn){ return window.toggleThumbAiUpscale_(btn); };
 
-window.undoThumbAiUpscale_ = async function(){
-  var st = ensureThumbMakerState_();
-  if(!st.bgDataUrlOriginal && !st.bgDataUrlBeforeUpscale){
-    setAppToast('되돌릴 업스케일 이전 사진이 없어요.', { duration: 2200, variant: 'err' });
-    return;
-  }
-  if(!st.bgDataUrlOriginal) st.bgDataUrlOriginal = st.bgDataUrlBeforeUpscale;
-  st.aiUpscaleOn = false;
-  await setThumbMakerBackgroundFromDataUrl_(st.bgDataUrlOriginal, thumbBaseFileName_(st.fileName));
-  syncThumbFxButtons_();
-  setAppToast('원본 사진으로 바꿨어요. AI 화질을 다시 켜면 결과가 보여요.', { duration: 2200, variant: 'ok' });
-};
 
-window.toggleThumbOutFocus_ = function(){
-  if(isThumbPhotoOnlyMode_()) return;
-  var st = ensureThumbMakerState_();
-  st.outFocus = !st.outFocus;
-  syncThumbFxButtons_();
-  schedulePersistThumbWorkspace_(false);
-  paintThumbMakerPreview_();
-  setAppToast(st.outFocus ? '아웃포커스를 켰어요.' : '아웃포커스를 껐어요.', { duration: 1400, variant: 'ok' });
-};
 
 window.toggleThumbEnhance_ = function(){
   var st = ensureThumbMakerState_();
@@ -30970,18 +29772,6 @@ function ensureHeiljagyaeImagePrompts_(content, topic){
   return content;
 }
 
-function readHeiljagyaeImagePromptsFromSheet_(){
-  var content = getDraftContent_(state.selectedId);
-  if(!content) content = { images: { gptVisuals: [], mangoBrief: null } };
-  if(!content.images) content.images = { gptVisuals: [], mangoBrief: null };
-  applySheetImageEdits_(content);
-  var slots = getDisplayGptVisuals_(content.images.gptVisuals, 7);
-  if(!slots.length && content.community){
-    ensureHeiljagyaeImagePrompts_(content);
-    slots = getDisplayGptVisuals_(content.images.gptVisuals, 7);
-  }
-  return { content: content, slots: slots };
-}
 
 function getHeiljagyaeFollowPromptText_(slots){
   slots = slots || [];
@@ -30992,10 +29782,6 @@ function getHeiljagyaeFollowPromptText_(slots){
   return '';
 }
 
-/** 일상 공유는 망고보드 분위기·장면 컷을 만들지 않음 */
-function buildDailyShareImagePromptsFromThread_(){
-  return [];
-}
 
 function ensureDailyShareImagePrompts_(content){
   if(!content) return content;
@@ -31065,9 +29851,6 @@ window.copyAllBlogInsertPrompts_ = function(btn){
   });
 };
 
-window.copyHeiljagyaeImageSlot_ = function(index, btn){
-  window.copyCommunityOrDailyImageSlot_(index, btn);
-};
 
 window.copyCommunityOrDailyPromptAndOpenMango_ = function(){
   var pack = readCommunityOrDailyImagePromptsFromSheet_();
@@ -31105,13 +29888,7 @@ window.copyCommunityOrDailyPromptAndOpenMango_ = function(){
   }
 };
 
-window.copyHeiljagyaePromptAndOpenMango_ = function(){
-  window.copyCommunityOrDailyPromptAndOpenMango_();
-};
 
-async function generateDailyShareImagePromptsFromThread_(){
-  return [];
-}
 
 async function generateHeiljagyaeImagePromptsFromCommunity_(catId, community, topic){
   var imageGuide = getCatPromptForGeneration_(catId, 'image');
@@ -31194,38 +29971,9 @@ async function generateBlogInsertPromptsFromBlog_(catId, blog, topic, draft){
   return mapped.slice(0, 3);
 }
 
-window.copyOpenImageToolFromField = function(btn, index){
-  // 슬롯별 영문 메모가 아니라 망고보드 소개를 연다 (상세페이지 입력 흐름)
-  window.copyMangoBriefAndOpen_();
-};
 
-window.copyImagePromptField = function(index){
-  var el = document.getElementById('sheet-image-prompt-' + index);
-  var prompt = el ? String(el.value || '').trim() : '';
-  if(!prompt) return;
-  navigator.clipboard.writeText(prompt).then(function(){
-    setAppToast('배치 메모를 복사했어요.', { duration: 2000, variant: 'ok' });
-  }).catch(function(){
-    window.prompt('복사할 메모:', prompt);
-  });
-};
 
-window.copyOpenImageTool = function(btn){
-  window.copyMangoBriefAndOpen_();
-};
 
-window.copyPromptOnly = function(btn){
-  var raw = btn.getAttribute('data-p');
-  var prompt = raw ? decodeURIComponent(raw) : '';
-  if(!prompt) return;
-  var label = btn.textContent;
-  navigator.clipboard.writeText(prompt).then(function(){
-    btn.textContent = '복사됨';
-    setTimeout(function(){ btn.textContent = label; }, 1500);
-  }).catch(function(){
-    window.prompt('복사할 프롬프트:', prompt);
-  });
-};
 
 window.cp = function(btn, text){
   navigator.clipboard.writeText(text.replace(/\\n/g,'\n'));
@@ -31518,45 +30266,7 @@ function renderSheetContent(content) {
   scrollSheetBodyToStart_();
 }
 
-window.getFullCopy = function(){
-  const content = state.published[state.selectedId]?.content || state.generatedOnly[state.selectedId];
-  if(!content) return '';
-  var copyCatId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
-  let t = '';
-  const b = content.blog;
-  if(b && b.title){
-    t = blogUsesStructuredGeneralFormat_(copyCatId, b)
-      ? '[블로그]\n' + formatGeneralBlogPostText(b, copyCatId)
-      : withExpertCourseBlogFooter_(withRealMovementBlogFooter_('[블로그]\n제목: ' + b.title + '\n\n' + b.hook + '\n\n' + b.draft + '\n\n' + b.cta + '\n\n' + (b.hashtags||[]).map(h=>'#'+h).join(' '), copyCatId), copyCatId);
-  }
-  const th = normalizeThreadBlock(content.thread);
-  if(th && th.summary){
-    t += (t ? '\n\n' : '') + '[일상 공유]\n' + getThreadPlainText(th);
-  }
-  const ig = content.insta;
-  if(ig){
-    t += `\n\n[인스타]\n` + getInstaFullPasteText_(ig, copyCatId);
-  }
-  const com = content.community;
-  if(com){
-    t += '\n\n[힐자계 커뮤니티 게시판]\n' + formatCommunityPostText(com);
-  }
-  const im = content.images;
-  if(im){
-    var imgCatId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
-    var imgText = getImagePromptTextForData_(content, imgCatId);
-    if(imgText) t += '\n\n' + imgText;
-  }
-  return t;
-};
 
-function getSheetGoButtonHTML(tab){
-  if(tab === 'blog') return `<button type="button" class="btn-sheet-link" onclick="openExternalNaverBlog()">블로그 가기</button>`;
-  if(tab === 'insta') return `<button type="button" class="btn-sheet-link" onclick="openExternalInstagram()">인스타 가기</button>`;
-  if(tab === 'community') return `<button type="button" class="btn-sheet-link" onclick="openApartnerApp()">아파트너 열기</button>`;
-  if(tab === 'thread' || tab === 'threads') return `<button type="button" class="btn-sheet-link" onclick="openExternalThreads()">Threads 가기</button>`;
-  return '';
-}
 
 function getTabCopyText(tab, content){
   if(!content) return '';
@@ -31601,20 +30311,6 @@ function getTabCopyText(tab, content){
   return '';
 }
 
-window.copyCurrentTab = function(btn){
-  const content = state.published[state.selectedId]?.content || state.generatedOnly[state.selectedId];
-  const text = getTabCopyText(state.activeTab, content);
-  if(!text){
-    alert('이 탭에 복사할 내용이 없어요.');
-    return;
-  }
-  const label = btn ? btn.textContent : '';
-  navigator.clipboard.writeText(text).then(function(){
-    if(btn){ btn.textContent = '복사됨'; setTimeout(function(){ btn.textContent = label || '복사'; }, 1600); }
-  }).catch(function(){
-    alert('클립보드 복사에 실패했어요. 브라우저에서 권한을 허용했는지 확인해 주세요.');
-  });
-};
 
 window.openExternalNaverBlog = function(){
   var writeUrl = EXT_NAVER_BLOG_WRITE;
@@ -32269,14 +30965,6 @@ async function generateThreadsFromInsta_(catId, insta, topic){
   var block = parsed.threads || parsed;
   return normalizeThreadsSnsBlock_(block);
 }
-async function generateThreadsFromBlog_(catId, blog, topic){
-  var fakeInsta = {
-    hook: (blog && (blog.title || blog.hook)) || topic || '',
-    caption: buildBlogSourceText_(blog, catId),
-    hashtags: (blog && blog.hashtags) || []
-  };
-  return generateThreadsFromInsta_(catId, fakeInsta, topic);
-}
 function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
   opts = opts || {};
   var retryCount = opts.retryCount || 0;
@@ -32371,19 +31059,6 @@ function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
       endGenIndicator();
     }
   })();
-}
-function enqueueThreadsFromBlog_(draftId, catId, topic, blog, opts){
-  var content = getDraftContent_(draftId);
-  if(content && instaContentReady_(content)){
-    return enqueueThreadsFromInsta_(draftId, catId, topic, content.insta, opts);
-  }
-  if(!blog) return;
-  var fakeInsta = {
-    hook: (blog && (blog.title || blog.hook)) || topic || '',
-    caption: buildBlogSourceText_(blog, catId),
-    hashtags: (blog && blog.hashtags) || []
-  };
-  return enqueueThreadsFromInsta_(draftId, catId, topic, fakeInsta, opts);
 }
 function reconcileThreadsPendingJobs_(reason){
   if(!state.apiKey || genActiveJob || genPendingCount > 0) return false;
@@ -32528,133 +31203,9 @@ window.openApartnerApp = function(){
   }, 900);
 };
 
-function wrapLinesForCanvas(ctx, text, maxWidth, maxLines){
-  const out = [];
-  const t = String(text || '').replace(/\r\n/g, '\n');
-  const paragraphs = t.split('\n');
-  for(let pi = 0; pi < paragraphs.length; pi++){
-    let line = '';
-    const para = paragraphs[pi];
-    for(let i = 0; i < para.length; i++){
-      const ch = para[i];
-      const test = line + ch;
-      if(ctx.measureText(test).width > maxWidth && line){
-        out.push(line);
-        line = ch;
-      } else {
-        line = test;
-      }
-    }
-    if(line) out.push(line);
-    if(pi < paragraphs.length - 1) out.push('');
-  }
-  let lines = out;
-  if(maxLines && lines.length > maxLines){
-    lines = lines.slice(0, maxLines);
-    const last = lines[maxLines - 1];
-    lines[maxLines - 1] = last.length > 1 ? last.slice(0, -1) + '…' : '…';
-  }
-  return lines.length ? lines : [''];
-}
 
-function fillRoundRectCanvas(ctx, x, y, w, h, r){
-  const rad = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + rad, y);
-  ctx.lineTo(x + w - rad, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + rad);
-  ctx.lineTo(x + w, y + h - rad);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - rad, y + h);
-  ctx.lineTo(x + rad, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - rad);
-  ctx.lineTo(x, y + rad);
-  ctx.quadraticCurveTo(x, y, x + rad, y);
-  ctx.closePath();
-  ctx.fill();
-}
 
-function drawCarouselSlideOnCanvas(ctx, W, H, slide){
-  ctx.fillStyle = '#FAFAF9';
-  ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = '#E8E8E8';
-  ctx.lineWidth = 3;
-  ctx.strokeRect(1.5, 1.5, W - 3, H - 3);
-  const pad = 56;
-  const badgeText = 'S' + (slide.slide != null ? slide.slide : '');
-  ctx.font = '800 30px "Noto Sans KR",sans-serif';
-  const bw = Math.min(ctx.measureText(badgeText).width + 40, W - pad * 2);
-  ctx.fillStyle = '#F59E0B';
-  fillRoundRectCanvas(ctx, pad, pad, bw, 48, 10);
-  ctx.fillStyle = '#fff';
-  ctx.fillText(badgeText, pad + 20, pad + 33);
-  ctx.fillStyle = '#111827';
-  ctx.font = '800 42px "Noto Sans KR",sans-serif';
-  const titleLines = wrapLinesForCanvas(ctx, slide.title || '', W - pad * 2, 4);
-  let y = pad + 120;
-  titleLines.forEach(function(line){
-    ctx.fillText(line, pad, y);
-    y += 52;
-  });
-  ctx.fillStyle = '#4B5563';
-  ctx.font = '500 30px "Noto Sans KR",sans-serif';
-  const bodyMaxY = H - 52;
-  const bodyLines = wrapLinesForCanvas(ctx, slide.content || '', W - pad * 2, 0);
-  const lh = 44;
-  for(let bi = 0; bi < bodyLines.length; bi++){
-    if(y + lh > bodyMaxY){
-      ctx.fillText('…', pad, y);
-      break;
-    }
-    ctx.fillText(bodyLines[bi], pad, y);
-    y += lh;
-  }
-  ctx.fillStyle = '#9CA3AF';
-  ctx.font = '500 22px "Noto Sans KR",sans-serif';
-  ctx.fillText('미카닥 박준규 · @dr.park_dc.pt', pad, H - 28);
-}
 
-window.downloadInstaCarouselPngs = async function(btn){
-  const content = state.published[state.selectedId]?.content || state.generatedOnly[state.selectedId];
-  const ig = content && content.insta;
-  const list = ig && ig.carousel;
-  if(!list || !list.length){
-    alert('캐러셀 데이터가 없어요.');
-    return;
-  }
-  if(btn){ btn.disabled = true; btn.textContent = '생성 중…'; }
-  try { await document.fonts.ready; } catch(e){}
-  const W = 1080;
-  const H = 1350;
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  for(let i = 0; i < list.length; i++){
-    const slide = list[i];
-    drawCarouselSlideOnCanvas(ctx, W, H, slide);
-    await new Promise(function(resolve){
-      canvas.toBlob(function(blob){
-        if(!blob){
-          resolve();
-          return;
-        }
-        const a = document.createElement('a');
-        const sid = slide.slide != null ? slide.slide : (i + 1);
-        a.href = URL.createObjectURL(blob);
-        a.download = '캐러셀-S' + sid + '.png';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(a.href);
-        setTimeout(resolve, 400);
-      }, 'image/png', 0.95);
-    });
-  }
-  if(btn){
-    btn.disabled = false;
-    btn.textContent = '캐러셀 슬라이드 PNG로 저장 (' + list.length + '장)';
-  }
-};
 
 function cb(label, innerHTML, copyText){
   return `<div class="cb"><div class="cb-label">${label} <button class="copy-btn" onclick="cp(this,\`${esc(copyText)}\`)">복사</button></div>${innerHTML}</div>`;
@@ -34288,18 +32839,6 @@ window.onSheetPublishComplete = async function(){
   }
 };
 
-// planner-detail-ui.js — 브랜딩 플래너 detail
-window.copyCommunityFullPost_ = function(btn){
-  var edits = readSheetCommunityEdits_();
-  if(!edits){ setAppToast('복사할 내용이 없어요.', { duration: 3000, variant: 'err' }); return; }
-  cp(btn, formatCommunityPostText(edits));
-};
-window.copyBlogFullPost_ = function(btn){
-  var edits = readSheetBlogEdits_();
-  if(!edits){ setAppToast('복사할 내용이 없어요.', { duration: 3000, variant: 'err' }); return; }
-  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
-  cp(btn, formatGeneralBlogPostText(edits, catId));
-};
 window.switchTab = function(t){
   if(isThreadCategory(state.selectedCatId) && t !== 'thread' && t !== 'images') return;
   if(isHeiljagyaeCategory(state.selectedCatId) && t !== 'community' && t !== 'images') return;
@@ -34333,9 +32872,6 @@ window.switchNewsChannel_ = function(ch){
   if(content) renderSheetContent(content);
 };
 
-function sheetCloseActionsPrefix_(){
-  return '';
-}
 function setSheetActionsHtml_(inner){
   document.getElementById('sheet-actions').innerHTML = inner || '';
   scheduleAppToastLift_();
@@ -34346,8 +32882,6 @@ function closeSheet(){
   closeSheetUiOnly_();
   if(wasOpen) clearOpenDetailHash_();
 }
-/** 바깥(오버레이) 클릭으로는 닫지 않음 — 「닫기」버튼만 */
-function closeDetail(e){ /* no-op: backdrop dismiss disabled */ }
 
 // planner-detail-publish.js — 브랜딩 플래너 detail
 function getCatIdFromDraftId_(draftId){
@@ -34833,11 +33367,6 @@ function scheduleMinimumPendingDraftsForCat_(catId, reason){
   }, reason === 'load' ? 1200 : 500);
 }
 
-window.fillPendingDraftsForCurrentCat = async function(){
-  await runMinimumPendingDraftsForCat_(state.currentCat, 'manual', true);
-  renderTabs();
-  renderMain();
-};
 
 async function refineCategoryPromptsFromPublished_(catId){
   if(!state.apiKey) return;
@@ -35628,59 +34157,7 @@ function genStatusBusyLabel_(job){
   return '재생성 중';
 }
 
-function getMissingDraftsForCat_(catId){
-  var cat = CATEGORIES[catId];
-  if(!cat || !cat.drafts) return [];
-  return cat.drafts.filter(function(d){ return d && d.id && !draftHasContent(d); });
-}
 
-window.genAllMissingForCurrentCat = async function(forceRegen){
-  var catId = state.currentCat;
-  var cat = CATEGORIES[catId];
-  if(!cat) return;
-  if(!state.apiKey){ openApiModal(); return; }
-  if(genBatchRunning || genPendingCount > 0 || genActiveJob){
-    setAppToast('이미 초안을 만들고 있어요. 끝난 뒤 다시 시도해 주세요.', { duration: 4000, variant: 'err' });
-    return;
-  }
-  var pending = forceRegen
-    ? cat.drafts.filter(function(d){ return d && d.id; })
-    : getMissingDraftsForCat_(catId);
-  if(pending.length === 0){
-    setAppToast(forceRegen ? '생성할 주제가 없어요.' : '「' + cat.name + '」 미작성 주제가 없어요.\n이미 전부 초안이 있어요.', { duration: 4500, variant: 'ok' });
-    return;
-  }
-  var estMin = Math.max(1, Math.ceil(pending.length * estimateDraftMs(catId) / 60000));
-  var msg = '「' + cat.name + '」 ' + pending.length + '건을 순서대로 만듭니다.\n' +
-    '대략 ' + estMin + '분 이상 걸릴 수 있어요. 이 탭·브라우저를 닫지 마세요.\n\n계속할까요?';
-  if(!confirm(msg)) return;
-
-  genBatchRunning = true;
-  genBatchState = { total: pending.length, done: 0, catName: cat.name, ok: 0, fail: 0 };
-  setAppToast('「' + cat.name + '」 미작성 ' + pending.length + '건 생성을 시작했어요…', { duration: 5000, variant: 'ok' });
-  renderMain();
-
-  var okCount = 0;
-  var failCount = 0;
-  for(var i = 0; i < pending.length; i++){
-    var d = pending[i];
-    var ok = await window.enqueueDraftGeneration(catId, d.id, { batch: true });
-    if(ok) okCount++; else failCount++;
-    genBatchState.done = i + 1;
-    updateGenIndicator();
-    renderMain();
-  }
-
-  genBatchRunning = false;
-  genBatchState = null;
-  updateGenIndicator();
-  renderMain();
-  setAppToast(
-    '「' + cat.name + '」 일괄 생성 끝\n성공 ' + okCount + '건' +
-    (failCount ? '\n실패 ' + failCount + '건 — 해당 카드에서 재생성해 주세요' : ''),
-    { duration: 7500, variant: failCount ? 'err' : 'ok' }
-  );
-};
 
 window.enqueueDraftGeneration = async function(jobCatId, jobDraftId, opts){
 opts = opts || {};

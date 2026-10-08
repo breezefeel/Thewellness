@@ -3993,7 +3993,12 @@ function ensurePlanRowStableIdsInPayload_(payload){
   function takeId_(raw, fallback){
     var id = String(raw || '').trim();
     if(!id || used[id]) id = fallback;
-    if(used[id]) id = String(fallback || 'row') + '_' + Math.random().toString(36).slice(2, 6);
+    // 충돌 시 결정적 접미사만 — Math.random 쓰면 저장마다 id가 바뀌어 「미반영 1건」루프가 생김
+    var n = 0;
+    while(used[id]){
+      n++;
+      id = String(fallback || 'row') + '_d' + n;
+    }
     used[id] = true;
     return id;
   }
@@ -4028,7 +4033,11 @@ function ensurePlanRowStableIdsInPayload_(payload){
       if(!preferred || /^\d+$/.test(preferred)) preferred = 's' + (i + 1);
       var next = preferred;
       if(usedInCat[next]) next = 'st_' + catId + '_' + i;
-      if(usedInCat[next]) next = 'st_' + catId + '_' + i + '_' + Math.random().toString(36).slice(2, 5);
+      var dup = 0;
+      while(usedInCat[next]){
+        dup++;
+        next = 'st_' + catId + '_' + i + '_d' + dup;
+      }
       usedInCat[next] = true;
       if(oldId && oldId !== next) idMap[oldId] = next;
       if(String(step.id || '') !== next){ step.id = next; changed = true; }
@@ -8308,33 +8317,38 @@ window.applySelectedStepTopics_ = function(){
   });
   var added = 0;
   var skipped = 0;
-  topics.forEach(function(it){
-    var topic = String(it.topic).trim();
-    var key = topic.replace(/\s+/g, '').toLowerCase();
-    if(existingTopics[key]){ skipped++; return; }
-    existingTopics[key] = true;
-    var draft = {
-      id: makeExtraDraftId_(catId, added),
-      topic: topic,
-      angle: it.angle || '',
-      rationale: it.rationale || '',
-      createdAt: new Date().toISOString(),
-      series: getDefaultSeriesForCat_(catId),
-      pillar: getDefaultPillarForCat_(catId)
-    };
-    cat.drafts.push(draft);
-    var order = getDraftsForSubGoalStep_(catId, step.id, { live: true }).length + 1;
-    applyDraftRoadmapAssignment_(draft, catId, step.id, step.title, order, Math.max(order, 1));
-    added++;
+  withDraftStepReassignAllowed_(function(){
+    topics.forEach(function(it){
+      var topic = String(it.topic).trim();
+      var key = topic.replace(/\s+/g, '').toLowerCase();
+      if(existingTopics[key]){ skipped++; return; }
+      existingTopics[key] = true;
+      var placed = false;
+      for(var slot = 1; slot <= STEP_TOPIC_SLOTS_MAX; slot++){
+        if(getDraftForStepSlot_(catId, step.id, slot, { live: true })) continue;
+        if(applyTopicToStepSlot_(catId, step.id, slot, {
+          topic: topic,
+          angle: it.angle || '',
+          rationale: it.rationale || ''
+        })){
+          added++;
+          placed = true;
+          break;
+        }
+      }
+      if(!placed) skipped++;
+    });
   });
   state.stepTopicSuggest = null;
   save({ driveImmediate: true, gasImmediate: true });
   closePlanWorkshopForce_();
   renderMain();
   if(typeof setAppToast === 'function'){
-    var msg = '주제 ' + added + '개를 이 단계에 넣었어요.';
-    if(skipped) msg += '\n이미 있는 주제 ' + skipped + '개는 건너뛰었어요.';
-    setAppToast(msg, { duration: 4200, variant: 'ok' });
+    var msg = added
+      ? ('주제 ' + added + '개를 이 단계에 넣었어요.')
+      : '넣을 수 있는 빈 칸이 없거나, 이미 있는 주제만 선택됐어요.';
+    if(skipped) msg += '\n건너뛴 항목 ' + skipped + '개';
+    setAppToast(msg, { duration: 4200, variant: added ? 'ok' : 'err' });
   }
 };
 function startPlanGenTimer_(kind, catId){
@@ -11066,7 +11080,7 @@ let state = {
   generatedOnly: {},
   localSavedAt: '',
   showAdd: false,
-  newItem: { date:'', topic:'', catId:0, dailyShareKind:'scene', dailyThought:'', dailyWho:'', dailyWhat:'', dailyBody:'', articleKind:'', articleKindLocked:false, refImages:[], refImage:null, refNote:'', imageAnalyzing:false, imageAnalysisWait:null, flowProposals:[], selectedFlowIdx:0, flowProposalsLoading:false, flowProposalsReady:false, cachedYoutubeAnalysis:'', _cachedFlowYoutubeUrl:'', mediaStudioOpen:false, mediaStudioFocus:'' },
+  newItem: { date:'', topic:'', catId:0, dailyShareKind:'scene', dailyThought:'', dailyWho:'', dailyWhat:'', dailyBody:'', articleKind:'', articleKindLocked:false, refImages:[], refImage:null, refNote:'', imageAnalyzing:false, imageAnalysisWait:null, flowProposals:[], selectedFlowIdx:0, flowProposalsLoading:false, flowProposalsReady:false, cachedYoutubeAnalysis:'', _cachedFlowYoutubeUrl:'', mediaStudioOpen:false, mediaStudioFocus:'', mediaStudioMode:'' },
   apiKey: '',
   plannerClaudeEnabled: false,
   geminiYoutubeEnabled: false,
@@ -11874,6 +11888,11 @@ const APARTNER_ANDROID_PKG = 'kr.co.azsmart.apartner';
 const APARTNER_IOS_STORE = 'https://apps.apple.com/kr/app/id1243505765';
 const APARTNER_PLAY_STORE = 'https://play.google.com/store/apps/details?id=' + APARTNER_ANDROID_PKG;
 const APARTNER_WEB = 'https://www.aptner.com/';
+/** GoPro Quik — iOS Universal Link(/app/*) + App Store / Android 패키지 */
+const GOPRO_QUIK_IOS_STORE = 'https://apps.apple.com/kr/app/gopro-quik/id561350520';
+const GOPRO_QUIK_PLAY_STORE = 'https://play.google.com/store/apps/details?id=com.gopro.smarty';
+const GOPRO_QUIK_UNIVERSAL_STUDIO = 'https://gopro.com/app/studio';
+const GOPRO_QUIK_UNIVERSAL = 'https://gopro.com/app/';
 
 /** iPhone·iPad(요청 데스크톱 UA 포함)·Android 구분 — 바로가기 앱 연동용 */
 function isIOSLikeDevice(){
@@ -11900,6 +11919,67 @@ function openIOSAppScheme_(schemeUrl){
       try { if(ifr.parentNode) ifr.parentNode.removeChild(ifr); } catch(e){}
     }, 2500);
   } catch(e){}
+}
+/** 아이폰·아이패드: GoPro Quik 실행 (가능하면 Studio 경로). 미설치 시 App Store. */
+window.openGoProQuikApp_ = function(){
+  if(typeof setAppToast === 'function'){
+    setAppToast(
+      'GoPro Quik을 여는 중…\n앱에서 하단 Studio 탭 → 「편집본 만들기」로 이어 주세요.',
+      { duration: 5600, variant: 'ok' }
+    );
+  }
+  if(isIOSLikeDevice()){
+    // 1) 커스텀 스킴·iframe (플래너 탭 유지) → 2) Universal Link(/app/studio) → 3) App Store
+    try { window.location.href = 'gopro://studio'; } catch(e0){}
+    openIOSAppScheme_('gopro://studio');
+    openIOSAppScheme_('quik://studio');
+    setTimeout(function(){
+      if(document.hidden) return;
+      openIOSAppScheme_('gopro://');
+      openIOSAppScheme_('quik://');
+    }, 400);
+    setTimeout(function(){
+      if(document.hidden) return;
+      // AASA: gopro.com/app/* → Quik. studio 경로를 우선 시도
+      try { window.location.href = GOPRO_QUIK_UNIVERSAL_STUDIO; } catch(e1){}
+    }, 900);
+    setTimeout(function(){
+      if(document.hidden) return;
+      window.open(GOPRO_QUIK_IOS_STORE, '_blank', 'noopener,noreferrer');
+    }, 1700);
+    return;
+  }
+  if(isAndroidDevice()){
+    var intent =
+      'intent://studio#Intent;scheme=gopro;package=com.gopro.smarty;S.browser_fallback_url=' +
+      encodeURIComponent(GOPRO_QUIK_PLAY_STORE) + ';end';
+    try { window.location.href = intent; } catch(eA){}
+    setTimeout(function(){
+      if(document.hidden) return;
+      window.open(GOPRO_QUIK_PLAY_STORE, '_blank', 'noopener,noreferrer');
+    }, 900);
+    return;
+  }
+  window.open(GOPRO_QUIK_IOS_STORE, '_blank', 'noopener,noreferrer');
+};
+function renderReelQuikRedirectHTML_(){
+  return '<div class="form-field reel-maker reel-quik-redirect" id="reel-maker-root">' +
+    '<div class="reel-maker-hd add-media-section-hd">' +
+      '<label class="form-label">릴스 만들기 <span style="font-weight:600;color:#9CA3AF;">· 모바일</span></label>' +
+      '<button type="button" class="add-media-fold-btn" onclick="closeAddMediaStudio_()" title="접기" aria-label="릴스 만들기 접기">접기 ▴</button>' +
+    '</div>' +
+    '<div class="reel-quik-card">' +
+      '<p class="reel-quik-lead">릴스 만들기는 <strong>데스크톱(PC)</strong>에서 쓰는 것을 권장해요. 아이폰·아이패드에서는 영상 분석이 오래 걸립니다.</p>' +
+      '<p class="reel-quik-sub">모바일에서는 <strong>GoPro Quik</strong>의 <strong>Studio</strong>에서 편집하는 편이 빠릅니다.</p>' +
+      '<button type="button" class="btn-submit reel-quik-open-btn" onclick="openGoProQuikApp_()">GoPro Quik 열기 · Studio</button>' +
+      '<ol class="reel-quik-steps">' +
+        '<li>앱이 열리면 하단 <strong>Studio</strong> 탭</li>' +
+        '<li><strong>편집본 만들기</strong>로 영상·사진 선택</li>' +
+        '<li>완성본을 사진첩에 저장한 뒤 플래너에 올려 주세요</li>' +
+      '</ol>' +
+      '<p class="reel-quik-store-hint">앱이 없으면 App Store로 이동합니다.</p>' +
+    '</div>' +
+  '</div>';
 }
 function openNaverBlogAppOnIOS_(){
   openIOSAppScheme_('naverblog://write');
@@ -14231,9 +14311,18 @@ function stampDraftBrandOverride_(draftId, patch){
   if(!draftId) return;
   if(!state.draftBrandOverrides) state.draftBrandOverrides = {};
   var prev = state.draftBrandOverrides[draftId] || {};
-  state.draftBrandOverrides[draftId] = Object.assign({}, prev, patch || {}, {
-    updatedAt: new Date().toISOString()
-  });
+  var next = Object.assign({}, prev, patch || {});
+  var prevCmp = Object.assign({}, prev);
+  var nextCmp = Object.assign({}, next);
+  delete prevCmp.updatedAt;
+  delete nextCmp.updatedAt;
+  // 값이 같으면 updatedAt만 갱신하지 않음 — 매 로드/동기화마다 override 1건 dirty 되는 루프 차단
+  if(syncValueFingerprint_(prevCmp) === syncValueFingerprint_(nextCmp)){
+    state.draftBrandOverrides[draftId] = prev;
+    return;
+  }
+  next.updatedAt = new Date().toISOString();
+  state.draftBrandOverrides[draftId] = next;
 }
 
 function cloneSyncValue_(value){
@@ -14289,6 +14378,7 @@ function syncUntrackedContentFingerprint_(payload){
   delete copy.publishRecCurrentTabOnly;
   delete copy.syncRationalesOnBrandSave;
   delete copy.promptRefineMilestones;
+  delete copy.promptsUpdatedAt;
   delete copy.deletedDraftIds;
   delete copy.pinnedDraftIds;
   delete copy.draftBrandOverrides;
@@ -14296,6 +14386,9 @@ function syncUntrackedContentFingerprint_(payload){
   delete copy.plannerSetupDismissed;
   delete copy.catGroupLast;
   delete copy.dailyAutoLast;
+  delete copy._blockAutoSeedTopics;
+  delete copy.syncProtocolVersion;
+  delete copy.syncEntitySchemaVersion;
   delete copy.apiKey;
   delete copy.savedAt;
   delete copy.localSavedAt;
@@ -14309,6 +14402,14 @@ function syncUntrackedContentFingerprint_(payload){
   delete copy._syncOutbox;
   delete copy._syncNeedsSnapshot;
   try { return JSON.stringify(copy); } catch(e){ return ''; }
+}
+/** 기기 UI 기억값 — 팀 동기화 outbox에 넣지 않음 (남은 1건 가짜 루프 원인) */
+function isDeviceLocalSyncEntityKey_(key){
+  key = String(key || '');
+  return key === 'setting:catGroupLast' ||
+    key === 'setting:plannerSetupDismissed' ||
+    key === 'setting:dailyAutoLast' ||
+    key === 'ops:meta';
 }
 function collectSyncEntities_(payload, opts){
   payload = payload || {};
@@ -14367,9 +14468,7 @@ function collectSyncEntities_(payload, opts){
       });
     });
   }
-  if(Object.prototype.hasOwnProperty.call(payload, 'plannerSetupDismissed')) out['setting:plannerSetupDismissed'] = !!payload.plannerSetupDismissed;
-  if(payload.catGroupLast) out['setting:catGroupLast'] = payload.catGroupLast;
-  if(payload.dailyAutoLast) out['setting:dailyAutoLast'] = payload.dailyAutoLast;
+  // setting:catGroupLast / plannerSetupDismissed / dailyAutoLast / ops:meta 는 기기 로컬 — 엔티티 수집 제외
   if(branding.yearPlan){
     var yearMeta = Object.assign({}, branding.yearPlan);
     delete yearMeta.periods;
@@ -14649,13 +14748,15 @@ function setSyncEntity_(payload, key, wrapped){
   }
 }
 function listChangedSyncEntityKeys_(previousPayload, currentPayload){
-  var prevEntities = collectSyncEntities_(previousPayload || {});
-  var nextEntities = collectSyncEntities_(currentPayload || {});
+  // dirty 판별 중 id 마이그레이션을 돌리면 branding이 매번 바뀌어 가짜 1건이 생김
+  var prevEntities = collectSyncEntities_(previousPayload || {}, { skipEnsureIds: true });
+  var nextEntities = collectSyncEntities_(currentPayload || {}, { skipEnsureIds: true });
   var keys = {};
   Object.keys(prevEntities).forEach(function(k){ keys[k] = true; });
   Object.keys(nextEntities).forEach(function(k){ keys[k] = true; });
   var changed = [];
   Object.keys(keys).forEach(function(key){
+    if(isDeviceLocalSyncEntityKey_(key)) return;
     if(syncValueFingerprint_(prevEntities[key]) !== syncValueFingerprint_(nextEntities[key])){
       changed.push(key);
     }
@@ -14699,12 +14800,15 @@ function clearStuckSyncFlagsIfClean_(remotePayload){
   try {
     prunePhantomSyncDirtyKeys_(getPersistPayload(), remotePayload || getPersistPayload());
   } catch(ePr){}
-  // UI 전용·빈 키 정리
+  // 기기 로컬·UI 전용 키 정리 (outbox에서도 제거)
   Object.keys(state.syncDirtyEntityKeys || {}).forEach(function(key){
-    if(key === 'setting:catGroupLast' || key === 'setting:plannerSetupDismissed' || key === 'ops:meta'){
-      delete state.syncDirtyEntityKeys[key];
-    }
+    if(isDeviceLocalSyncEntityKey_(key)) delete state.syncDirtyEntityKeys[key];
   });
+  if(Array.isArray(state.syncOutbox) && state.syncOutbox.length){
+    state.syncOutbox = state.syncOutbox.filter(function(op){
+      return op && op.key && !isDeviceLocalSyncEntityKey_(op.key);
+    });
+  }
   var outboxN = (state.syncOutbox || []).length;
   var dirtyN = Object.keys(state.syncDirtyEntityKeys || {}).length;
   if(outboxN || dirtyN){
@@ -15078,7 +15182,7 @@ function ensureSyncEntityRevisions_(payload){
   payload = payload || {};
   var revisions = Object.assign({}, payload.syncEntityRevisions || {});
   var fallbackRevision = parseInt(payload.syncRevision, 10) || 0;
-  var entities = collectSyncEntities_(payload);
+  var entities = collectSyncEntities_(payload, { skipEnsureIds: true });
   Object.keys(entities).forEach(function(key){
     if(revisions[key] == null) revisions[key] = fallbackRevision;
   });
@@ -15090,6 +15194,10 @@ function ensureSyncEntityRevisions_(payload){
   return revisions;
 }
 function rebuildDirtyStateFromOutbox_(){
+  // 기기 로컬 키는 outbox에서 걷어 냄
+  state.syncOutbox = (state.syncOutbox || []).filter(function(op){
+    return op && op.key && !isDeviceLocalSyncEntityKey_(op.key);
+  });
   var keys = {};
   (state.syncOutbox || []).forEach(function(op){ if(op && op.key) keys[op.key] = true; });
   state.syncDirtyEntityKeys = keys;
@@ -15097,6 +15205,7 @@ function rebuildDirtyStateFromOutbox_(){
 }
 function isValidClientSyncEntityKey_(key){
   key = String(key || '');
+  if(isDeviceLocalSyncEntityKey_(key)) return false;
   return key === 'prompt:base' ||
     /^prompt:\d+:[^:]+$/.test(key) ||
     /^plan:year:meta$/.test(key) ||
@@ -15109,15 +15218,18 @@ function isValidClientSyncEntityKey_(key){
     /^setting:.+$/.test(key) ||
     /^(?:milestone|deleted|pinned|override|draft|published|generated):.+$/.test(key) ||
     key === 'ops:root' ||
-    key === 'ops:meta' ||
     /^ops:(?:checked|note|collapsed|review|newBranchMeta|keywordAds):.+$/.test(key);
 }
 function normalizeSyncOutbox_(raw, opts){
   var byKey = {};
   var skipClone = !!(opts && opts.skipClone);
+  var droppedContentful = false;
   (Array.isArray(raw) ? raw : []).forEach(function(item){
-    if(!item || typeof item !== 'object' || !isValidClientSyncEntityKey_(item.key)){
-      state.syncNeedsSnapshot = true;
+    if(!item || typeof item !== 'object') return;
+    if(isDeviceLocalSyncEntityKey_(item.key)) return;
+    if(!isValidClientSyncEntityKey_(item.key)){
+      // 실제 콘텐츠 키가 깨진 경우만 snapshot — UI 키 폐기는 snapshot 재점화 금지
+      droppedContentful = true;
       return;
     }
     var key = String(item.key);
@@ -15138,15 +15250,17 @@ function normalizeSyncOutbox_(raw, opts){
     }
     byKey[key] = normalized;
   });
+  if(droppedContentful) state.syncNeedsSnapshot = true;
   return Object.keys(byKey).map(function(key){ return byKey[key]; });
 }
 function enqueueSyncOutboxChanges_(changedKeys, payload){
   if(!changedKeys || !changedKeys.length) return;
-  var entities = collectSyncEntities_(payload || {});
+  var entities = collectSyncEntities_(payload || {}, { skipEnsureIds: true });
   var times = (payload && payload.syncEntityUpdatedAt) || {};
   var revisions = Object.assign({}, state.syncEntityRevisions || {}, ensureSyncEntityRevisions_(payload));
   if(!Array.isArray(state.syncOutbox)) state.syncOutbox = [];
   changedKeys.forEach(function(key){
+    if(isDeviceLocalSyncEntityKey_(key)) return;
     var hasValue = Object.prototype.hasOwnProperty.call(entities, key);
     var existing = state.syncOutbox.find(function(op){ return op && op.key === key; });
     if(existing){
@@ -15198,16 +15312,38 @@ function buildPendingSyncMutations_(payload){
   });
 }
 function acknowledgeSyncOutbox_(accepted, sentMutations){
-  var ack = {};
-  (accepted || []).forEach(function(item){
-    if(item && item.mutationId) ack[item.mutationId] = parseInt(item.version, 10) || 1;
-  });
+  var ackVer = {};
+  var ackKeys = {};
+  function note_(item){
+    if(!item) return;
+    if(item.mutationId) ackVer[item.mutationId] = parseInt(item.version, 10) || 1;
+    if(item.key) ackKeys[String(item.key)] = true;
+  }
+  (accepted || []).forEach(note_);
   if(!accepted && sentMutations){
-    sentMutations.forEach(function(item){ if(item && item.mutationId) ack[item.mutationId] = parseInt(item.version, 10) || 1; });
+    sentMutations.forEach(note_);
   }
   state.syncOutbox = (state.syncOutbox || []).filter(function(op){
-    if(!op || !op.mutationId) return true;
-    return !ack[op.mutationId] || (parseInt(op.version, 10) || 1) !== ack[op.mutationId];
+    if(!op || !op.key) return false;
+    // 기기 로컬·깨진 항목은 서버 ack 없이 제거
+    if(isDeviceLocalSyncEntityKey_(op.key)) return false;
+    if(!op.mutationId) return false;
+    var key = String(op.key);
+    var opV = parseInt(op.version, 10) || 1;
+    if(ackVer[op.mutationId] != null){
+      // 전송 중 version이 올라간 경우에도, 같은 mutation이면 ack version 이하는 제거
+      if(opV <= ackVer[op.mutationId]) return false;
+      return true;
+    }
+    // mutationId 불일치여도 같은 key가 수락됐으면 제거 (재전송 루프 차단)
+    if(ackKeys[key] && sentMutations){
+      var sent = null;
+      for(var i = 0; i < sentMutations.length; i++){
+        if(sentMutations[i] && String(sentMutations[i].key) === key){ sent = sentMutations[i]; break; }
+      }
+      if(sent && (parseInt(sent.version, 10) || 1) >= opV) return false;
+    }
+    return true;
   });
   rebuildDirtyStateFromOutbox_();
 }
@@ -15942,12 +16078,17 @@ function plannerSyncFingerprint_(payload){
     Object.keys(byCat).sort().forEach(function(k){
       (byCat[k] || []).forEach(function(d){
         if(!d || !d.id) return;
-        extraBits.push(d.id + ':' + String(d.topic || '') + '|' + String(d.angle || '') + '|' + String(d.rationale || ''));
+        extraBits.push(d.id + ':' + bootstrapDraftLiteFp_(d));
       });
+    });
+    // override 전체(JSON)는 updatedAt 때문에 F5마다 달라져 선택 창이 뜸 → lite fp만 사용
+    var ovFp = {};
+    Object.keys(payload.draftBrandOverrides || {}).sort().forEach(function(id){
+      ovFp[id] = bootstrapOverrideLiteFp_(payload.draftBrandOverrides[id]);
     });
     return JSON.stringify({
       extra: extraBits.sort(),
-      overrides: payload.draftBrandOverrides || {},
+      overrides: ovFp,
       pub: Object.keys(payload.published || {}).sort(),
       gen: Object.keys(payload.generatedOnly || {}).sort(),
       del: Object.keys(payload.deletedDraftIds || {}).sort(),
@@ -15956,6 +16097,14 @@ function plannerSyncFingerprint_(payload){
       rev: getPayloadRevision_(payload)
     });
   } catch(e){ return ''; }
+}
+/** 접속 선택 UI를 띄울 실질 차이인지 (시각만 다른 경우 제외) */
+function bootstrapDiffReportHasActionableDiff_(report){
+  var c = (report && report.counts) || {};
+  return !!(c.topicContentDiff || c.topicOnlyLocal || c.topicOnlyRemote ||
+    c.overrideDiff || c.genContentDiff || c.genOnlyLocal || c.genOnlyRemote ||
+    c.pubContentDiff || c.pubOnlyLocal || c.pubOnlyRemote ||
+    c.brandDiff || c.opsDiff || c.stepPlacementDiff);
 }
 
 function promptsFingerprint_(prompts){
@@ -16718,34 +16867,57 @@ async function runPlannerBootstrapInBackground_(){
     if(typeof setAppToast === 'function'){
       setAppToast(
         heavyLocal
-          ? '단계 배치 정리 후 서버를 확인합니다… (데이터가 커서 잠시 걸릴 수 있어요)'
-          : '단계 배치 정리 후 서버 내용을 확인합니다…',
-        { duration: heavyLocal ? 9000 : 4500, variant: 'ok' }
+          ? '서버 내용을 확인합니다… (데이터가 커서 잠시 걸릴 수 있어요)'
+          : '서버 내용을 확인합니다…',
+        { duration: heavyLocal ? 7000 : 3200, variant: 'ok' }
       );
     }
-    // 비교 전에 이 기기 단계 ID/misc 정리 → 미리보기·서버 0 오판 방지
     await yieldPlannerBootstrapUi_(null);
-    try {
-      state._forceStepIntegrityPass = true;
-      runPlannerStepIntegrityPass_({ toast: false, render: false, skipGasPush: true });
-    } catch(eInt){ console.warn('[bootstrap integrity]', eInt); }
-    await yieldPlannerBootstrapUi_(null);
-    // 대용량이어도 접속마다 서버 pull → 적용 전에 내려받을 내용 확인(자동 덮어쓰기 금지)
+    // 비교 전에 integrity를 돌리면 로컬만 바뀌어 F5마다 「선택」창이 뜸 → 비교 후에만 정리
     var bootstrapData = await verifyPlannerServerReachable_();
     await yieldPlannerBootstrapUi_(null);
     if(bootstrapData.result === 'success' && bootstrapData.payload){
       var remotePayload = bootstrapData.payload;
       var remoteRevision = parseInt(bootstrapData.serverRevision, 10) || getPayloadRevision_(remotePayload);
       var localPayload = getPersistPayload();
-      if(plannerSyncFingerprint_(localPayload) === plannerSyncFingerprint_(remotePayload) &&
-        (parseInt(state.syncRevision, 10) || 0) === remoteRevision){
+      var localRev = parseInt(state.syncRevision, 10) || 0;
+      var storedGasRev = 0;
+      try { storedGasRev = parseInt(localStorage.getItem(GAS_LAST_SYNC_REV_KEY) || '0', 10) || 0; } catch(eGasRev){}
+
+      function finishBootstrapAlreadyInSync_(msg){
         state._bootstrapChoiceDone = true;
         markGasSyncOk_(remoteRevision, remotePayload.savedAt || remotePayload.localSavedAt);
-        if(typeof setAppToast === 'function'){
-          setAppToast('서버와 이미 같은 내용이에요.', { duration: 3200, variant: 'ok' });
+        try {
+          state._forceStepIntegrityPass = true;
+          runPlannerStepIntegrityPass_({ toast: false, render: false, skipGasPush: true });
+        } catch(eIntOk){}
+        if(msg && typeof setAppToast === 'function'){
+          setAppToast(msg, { duration: 2800, variant: 'ok' });
         }
+      }
+
+      // 같은 기기: 방금 이 rev로 동기화 성공했고 미반영 없음 → 선택 불필요
+      if(localRev > 0 && remoteRevision > 0 && localRev === remoteRevision &&
+          storedGasRev === remoteRevision && !hasPendingLocalSyncChanges_()){
+        finishBootstrapAlreadyInSync_('');
         return;
       }
+
+      if(plannerSyncFingerprint_(localPayload) === plannerSyncFingerprint_(remotePayload) &&
+          localRev === remoteRevision){
+        finishBootstrapAlreadyInSync_('서버와 이미 같은 내용이에요.');
+        return;
+      }
+
+      var diffReport = { counts: {}, items: [] };
+      try { diffReport = buildBootstrapDiffReport_(localPayload, remotePayload); } catch(eDiff0){}
+      // rev가 같고 실질 콘텐츠 차이도 없으면(메타·updatedAt 노이즈) 선택 창 생략
+      if(localRev > 0 && localRev === remoteRevision && !bootstrapDiffReportHasActionableDiff_(diffReport) &&
+          !hasPendingLocalSyncChanges_()){
+        finishBootstrapAlreadyInSync_('서버와 이미 같은 내용이에요.');
+        return;
+      }
+
       // 자동 적용 금지 — 내려받을 부분을 확인·선택한 뒤 진행 (기본: 서버)
       openPlannerBootstrapSyncChoice_(localPayload, remotePayload, remoteRevision);
       if(typeof setAppToast === 'function'){
@@ -21128,6 +21300,8 @@ function draftShowsOnPublishedList_(draftId, catId){
 /** 주제 추가·일상·참고 메모가 있는 글. 초안이 없어도 쓸 글에 둔다. */
 function draftWasIntentionallyAdded_(d){
   if(!d) return false;
+  // 주제 생성·직접 추가·AI 슬롯 채움 (d{cat}-c{ts}) — 초안 없어도 준비 글에 보여야 함
+  if(isUserAddedDraftId_(d.id)) return true;
   if(String(d.articleKind || '').trim()) return true;
   if(String(d.sourceNote || '').trim()) return true;
   if(d.articleFlow && (d.articleFlow.title || (d.articleFlow.steps && d.articleFlow.steps.length))) return true;
@@ -23215,7 +23389,7 @@ function createEmptyNewItem_(catId){
     refImages: [], refImage: null, refNote: '', imageAnalyzing: false, imageAnalysisWait: null,
     flowProposals: [], selectedFlowIdx: 0, flowProposalsLoading: false,
     flowProposalsReady: false, cachedYoutubeAnalysis: '', _cachedFlowYoutubeUrl: '',
-    mediaStudioOpen: false, mediaStudioFocus: ''
+    mediaStudioOpen: false, mediaStudioFocus: '', mediaStudioMode: ''
   };
 }
 function isDailyThoughtDraft_(item){
@@ -24686,7 +24860,18 @@ window.applyReelMemoToNewItem_ = async function(payload){
   }
 
   renderMain({ force: true });
-  if(typeof setAppToast === 'function'){
+
+  // 통합 흐름(릴스→썸네일): 저장한 릴스 컷을 썸네일 대표 장면으로 이어서 적용
+  var seededThumb = false;
+  if(frames.length && state.newItem && state.newItem.mediaStudioOpen && state.newItem.mediaStudioMode === 'both'){
+    try {
+      await seedAddFormThumbFromReelFrames_(frames, {
+        toast: '릴스 저장 · 컷으로 썸네일 장면을 골랐어요. 아래에서 후킹·구도를 다듬어 주세요.'
+      });
+      seededThumb = true;
+    } catch(eThumb){}
+  }
+  if(!seededThumb && typeof setAppToast === 'function'){
     setAppToast('릴스 내용이 참고 영상·메모에 들어갔습니다.', { duration: 2600, variant: 'ok' });
   }
 };
@@ -25067,30 +25252,42 @@ function renderAddForm(){
     '<div style="margin-top:4px;">' + imgHint + '</div>' +
   '</div>';
   const mediaStudioOpen = !!(state.newItem && state.newItem.mediaStudioOpen);
-  const reelMakerHtml = mediaStudioOpen && (typeof renderReelMakerSectionHTML_ === 'function')
-    ? renderReelMakerSectionHTML_()
+  const reelOnIos = isIOSLikeDevice();
+  const mediaStudioMode = (state.newItem && state.newItem.mediaStudioMode) || 'both';
+  const showReelStudio = mediaStudioOpen && mediaStudioMode !== 'thumb';
+  const showThumbStudio = mediaStudioOpen && mediaStudioMode !== 'reel';
+  const reelMakerHtml = showReelStudio
+    ? (reelOnIos
+        ? renderReelQuikRedirectHTML_()
+        : ((typeof renderReelMakerSectionHTML_ === 'function') ? renderReelMakerSectionHTML_() : ''))
     : '';
-  const thumbMakerHtml = mediaStudioOpen && (typeof renderAddFormThumbSectionHTML_ === 'function')
+  const thumbMakerHtml = showThumbStudio && (typeof renderAddFormThumbSectionHTML_ === 'function')
     ? renderAddFormThumbSectionHTML_()
     : '';
   const mediaPickRowHtml = !mediaStudioOpen
-    ? ('<div class="add-media-pick-row">' +
-        '<button type="button" class="form-field add-photo-field add-media-pick-card" onclick="openAddMediaStudio_(\'thumb\')">' +
-          '<span class="form-label add-media-pick-label">썸네일 만들기<span class="add-media-fold-hint">펼치기 ▾</span></span>' +
-          '<span class="add-media-pick-fake">파일 선택 · 사진·영상·폴더</span>' +
-          '<span class="add-media-pick-hint">키워드에 맞는 장면으로 썸네일 초안</span>' +
-        '</button>' +
-        '<button type="button" class="form-field add-photo-field add-media-pick-card" onclick="openAddMediaStudio_(\'reel\')">' +
-          '<span class="form-label add-media-pick-label">릴스 만들기 <span style="font-weight:600;color:#9CA3AF;">· 4:5</span><span class="add-media-fold-hint">펼치기 ▾</span></span>' +
-          '<span class="add-media-pick-fake">파일 선택 · 영상·사진·폴더</span>' +
-          '<span class="add-media-pick-hint">참고할 영상, 사진, 폴더를 선택해주세요.</span>' +
-        '</button>' +
+    ? ('<div class="add-media-pick-row add-media-pick-row-unified">' +
+        '<div class="form-field add-photo-field add-media-pick-card' + (reelOnIos ? ' add-media-pick-quik' : '') + '">' +
+          '<span class="form-label add-media-pick-label">릴스·썸네일 만들기' +
+            '<span style="font-weight:600;color:#9CA3AF;">' + (reelOnIos ? ' · Quik/썸네일' : ' · 4:5') + '</span>' +
+          '</span>' +
+          '<div class="add-media-pick-actions">' +
+            '<label class="add-media-pick-fake" for="add-unified-file-input">파일 선택 · 사진·영상</label>' +
+            '<label class="add-media-pick-fake add-media-pick-folder" for="add-unified-folder-input">폴더</label>' +
+          '</div>' +
+          '<input type="file" id="add-unified-file-input" accept="image/*,video/*" multiple style="display:none" onchange="onUnifiedMediaStudioFiles_(this)">' +
+          '<input type="file" id="add-unified-folder-input" webkitdirectory multiple style="display:none" onchange="onUnifiedMediaStudioFiles_(this)">' +
+          '<span class="add-media-pick-hint">' +
+            (reelOnIos
+              ? '사진 1장 → 썸네일 · 여러 장·영상 → GoPro Quik(Studio). PC 권장'
+              : '사진 1장 → 썸네일만 · 여러 장·영상 → 릴스 후 썸네일') +
+          '</span>' +
+        '</div>' +
       '</div>')
     : '';
   const mediaStackHtml = '<div class="add-media-stack' + (mediaStudioOpen ? ' is-open' : '') + '">' +
     photoFieldHtml +
     (mediaStudioOpen
-      ? (thumbMakerHtml + reelMakerHtml)
+      ? (reelMakerHtml + thumbMakerHtml)
       : mediaPickRowHtml) +
   '</div>';
   const refNoteFieldHtml = '<div class="form-field">' +
@@ -25133,17 +25330,138 @@ function renderAddForm(){
   ${flowSectionHtml ? `<div class="add-flow-outside">${flowSectionHtml}${regenBtnHtml}${flowsReady ? actionButtonHtml : ''}</div>` : ''}
   </div>`;
 }
+var _pendingUnifiedMediaFiles = null;
+var _pendingUnifiedMediaRoute = '';
+
+window.onUnifiedMediaStudioFiles_ = function(input){
+  var raw = input && input.files ? Array.prototype.slice.call(input.files) : [];
+  var media = raw.filter(function(f){
+    return (typeof isAddFormImageFile_ === 'function' && isAddFormImageFile_(f)) ||
+      (typeof isAddFormVideoFile_ === 'function' && isAddFormVideoFile_(f));
+  });
+  if(input) input.value = '';
+  if(!media.length){
+    setAppToast('사진 또는 영상 파일을 골라 주세요.', { duration: 2600, variant: 'err' });
+    return;
+  }
+  var imgs = media.filter(isAddFormImageFile_);
+  var vids = media.filter(isAddFormVideoFile_);
+  var thumbOnly = imgs.length === 1 && vids.length === 0;
+  if(thumbOnly){
+    _pendingUnifiedMediaFiles = media;
+    _pendingUnifiedMediaRoute = 'thumb';
+    openAddMediaStudio_('thumb');
+    return;
+  }
+  if(isIOSLikeDevice()){
+    _pendingUnifiedMediaFiles = null;
+    _pendingUnifiedMediaRoute = '';
+    openAddMediaStudio_('reel');
+    setAppToast('여러 장·영상은 GoPro Quik에서 편집하세요. 사진 1장만 고르면 썸네일만 만들 수 있어요.', { duration: 4200, variant: 'ok' });
+    return;
+  }
+  _pendingUnifiedMediaFiles = media;
+  _pendingUnifiedMediaRoute = 'both';
+  openAddMediaStudio_('both');
+};
+
+function scheduleConsumePendingUnifiedMedia_(){
+  if(!_pendingUnifiedMediaFiles || !_pendingUnifiedMediaFiles.length) return;
+  var files = _pendingUnifiedMediaFiles;
+  var route = _pendingUnifiedMediaRoute;
+  _pendingUnifiedMediaFiles = null;
+  _pendingUnifiedMediaRoute = '';
+  setTimeout(function(){
+    if(route === 'thumb'){
+      onAddFormThumbFiles_({
+        files: files,
+        id: 'add-unified-file-input',
+        value: '',
+        hasAttribute: function(){ return false; }
+      });
+      return;
+    }
+    if(route === 'both'){
+      runUnifiedReelThenThumb_(files);
+    }
+  }, 60);
+}
+
+async function runUnifiedReelThenThumb_(files){
+  if(!window.ReelMaker || typeof ReelMaker.addFiles !== 'function'){
+    setAppToast('릴스 메이커를 불러오지 못했어요.', { duration: 2800, variant: 'err' });
+    return;
+  }
+  setAppToast('릴스부터 준비합니다…', { duration: 2800, variant: 'ok' });
+  try {
+    await ReelMaker.addFiles(files);
+    await seedAddFormThumbFromMediaFiles_(files, {
+      toast: '릴스 초안이 준비됐어요. 위에서 편집한 뒤, 아래에서 썸네일을 이어서 다듬으세요.'
+    });
+  } catch(err){
+    setAppToast((err && err.message) || '릴스 불러오기에 실패했어요.', { duration: 3200, variant: 'err' });
+  }
+}
+
+async function seedAddFormThumbFromMediaFiles_(files, opts){
+  opts = opts || {};
+  try {
+    var top = await pickTopAddFormThumbCandidates_(files, { limit: 3 });
+    var st = ensureThumbMakerState_();
+    st.addFormPicks = top;
+    st.addFormPickIndex = 0;
+    await applyAddFormThumbPick_(top[0], { silent: true });
+    if(typeof refreshThumbFolderPicksUI_ === 'function') refreshThumbFolderPicksUI_();
+    if(opts.toast) setAppToast(opts.toast, { duration: 4200, variant: 'ok' });
+  } catch(errThumb){
+    setAppToast((errThumb && errThumb.message) || '썸네일 장면을 고르지 못했어요. 아래에서 사진을 다시 골라 주세요.', { duration: 3200, variant: 'err' });
+  }
+}
+
+async function seedAddFormThumbFromReelFrames_(frames, opts){
+  opts = opts || {};
+  var list = (frames || []).filter(function(f){ return f && (f.data || f.dataUrl); });
+  if(!list.length) return;
+  var picks = list.slice(0, 3).map(function(f, i){
+    return {
+      score: 1 - i * 0.02,
+      dataUrl: f.dataUrl || f.data,
+      name: f.name || ('릴스 대표_' + (i + 1)),
+      kind: 'video'
+    };
+  });
+  var st = ensureThumbMakerState_();
+  st.addFormPicks = picks;
+  st.addFormPickIndex = 0;
+  await applyAddFormThumbPick_(picks[0], { silent: true });
+  if(typeof refreshThumbFolderPicksUI_ === 'function') refreshThumbFolderPicksUI_();
+  if(opts.toast) setAppToast(opts.toast, { duration: 3600, variant: 'ok' });
+}
+
 window.openAddMediaStudio_ = function(focus){
   if(!state.newItem) return;
+  var mode = 'both';
+  if(focus === 'thumb') mode = 'thumb';
+  else if(focus === 'reel') mode = 'reel';
+  else if(focus === 'both') mode = 'both';
   state.newItem.mediaStudioOpen = true;
-  state.newItem.mediaStudioFocus = focus === 'reel' ? 'reel' : 'thumb';
+  state.newItem.mediaStudioMode = mode;
+  state.newItem.mediaStudioFocus = mode === 'thumb' ? 'thumb' : 'reel';
   markPlannerComposeActivity_();
   if(typeof renderMain === 'function') renderMain({ force: true });
+  // 아이폰·아이패드에서 릴스 → GoPro Quik(Studio) 바로 열기
+  if(mode !== 'thumb' && isIOSLikeDevice()){
+    setTimeout(function(){ openGoProQuikApp_(); }, 120);
+  }
+  scheduleConsumePendingUnifiedMedia_();
 };
 window.closeAddMediaStudio_ = function(){
   if(!state.newItem) return;
   state.newItem.mediaStudioOpen = false;
   state.newItem.mediaStudioFocus = '';
+  state.newItem.mediaStudioMode = '';
+  _pendingUnifiedMediaFiles = null;
+  _pendingUnifiedMediaRoute = '';
   markPlannerComposeActivity_();
   if(typeof renderMain === 'function') renderMain({ force: true });
 };
@@ -28755,8 +29073,9 @@ function renderThumbMakerCard_(content){
   var refCount = addForm ? 0 : getCurrentDraftRefImagesForThumb_().length;
   var photoName = st.fileName ? st.fileName : (photoOnly ? '일상 사진 올리기 (JPEG/PNG · 첫 장이 피드)' : (addForm ? '사진·영상·폴더에서 장면을 고르세요' : '배경 사진 올리기 (JPEG/PNG 권장 · HEIC는 변환 필요할 수 있어요)'));
   var html = '';
+  var thumbStep = addForm && state.newItem && state.newItem.mediaStudioMode === 'both';
   html += '<div class="img-section-title' + (addForm ? ' add-media-section-hd' : '') + '">' +
-    '<span>' + (photoOnly ? '일상 사진 4:5 보정' : '썸네일 만들기') + '</span>' +
+    '<span>' + (photoOnly ? '일상 사진 4:5 보정' : (thumbStep ? '2. 썸네일 만들기' : '썸네일 만들기')) + '</span>' +
     (addForm
       ? '<button type="button" class="add-media-fold-btn" onclick="closeAddMediaStudio_()" title="접기" aria-label="썸네일 만들기 접기">접기 ▴</button>'
       : '') +
@@ -28765,7 +29084,9 @@ function renderThumbMakerCard_(content){
     (photoOnly
       ? '찍힌 사진을 <strong>4:5</strong>로만 맞춥니다. 글자·망고·후킹은 없습니다. <strong>선명하게</strong>·<strong>AI 화질</strong>로 보정할 수 있어요. 여러 장이면 첫 장이 피드입니다.'
       : (addForm
-        ? '키워드와 맞는 <strong>사진·영상 장면</strong>을 고른 뒤 후킹·슬로건·브랜드를 수정합니다. 폴더를 고르면 그 안 미디어를 훑습니다.'
+        ? (thumbStep
+          ? '릴스에서 고른 <strong>대표 장면</strong>으로 썸네일을 이어 만듭니다. 추천 컷을 바꾸거나 후킹·구도를 수정하세요.'
+          : '키워드와 맞는 <strong>사진·영상 장면</strong>을 고른 뒤 후킹·슬로건·브랜드를 수정합니다. 폴더를 고르면 그 안 미디어를 훑습니다.')
         : '사진 위에 <strong>주제 후킹</strong>을 크게 올립니다. 미리보기에서 드래그로 초점, 글자를 누르면 입력칸으로 이동합니다.')) +
     '</p>';
   html += '<div class="img-tool-card thumb-maker-card">';

@@ -1736,10 +1736,13 @@
     }).join('');
 
     var onAddForm = !!(global.state && global.state.showAdd);
+    var reelStep = onAddForm && global.state && global.state.newItem && global.state.newItem.mediaStudioMode === 'both';
     return '<div class="form-field reel-maker" id="reel-maker-root">' +
       '<div class="reel-maker-hd' + (onAddForm ? ' add-media-section-hd' : '') + '">' +
-        '<label class="form-label">릴스 만들기 <span style="font-weight:600;color:#9CA3AF;">· 4:5</span>' +
-          '<span class="reel-maker-pick-hint">참고할 영상, 사진, 폴더를 선택해주세요.</span></label>' +
+        '<label class="form-label">' + (reelStep ? '1. ' : '') + '릴스 만들기 <span style="font-weight:600;color:#9CA3AF;">· 4:5</span>' +
+          '<span class="reel-maker-pick-hint">' +
+            (reelStep ? '먼저 릴스를 만든 뒤 아래에서 썸네일을 이어 작업합니다.' : '참고할 영상, 사진, 폴더를 선택해주세요.') +
+          '</span></label>' +
         (onAddForm
           ? '<button type="button" class="add-media-fold-btn" onclick="closeAddMediaStudio_()" title="접기" aria-label="릴스 만들기 접기">접기 ▴</button>'
           : '') +
@@ -1750,7 +1753,7 @@
           '<input type="file" webkitdirectory multiple accept="video/*,image/*" onchange="ReelMaker.onFile(this)" ' + (reel.busy ? 'disabled' : '') + ' style="display:none">' +
           '폴더 선택</label>' +
       '</div>' +
-      '<div class="reel-maker-hint">PC: 파일 여러 개·폴더 선택 가능. 큰 폴더는 사진 최대 ' + REEL_MAX_IMAGES_ + '장·영상 ' + REEL_MAX_VIDEOS_ + '개만 빠르게 불러옵니다.<br>모바일·탬플릿: 사진첩에서 영상/사진만 고르기만 가능.</div>' +
+      '<div class="reel-maker-hint">데스크톱(PC)에서 쓰는 것을 권장합니다. 파일 여러 개·폴더 선택 가능. 큰 폴더는 사진 최대 ' + REEL_MAX_IMAGES_ + '장·영상 ' + REEL_MAX_VIDEOS_ + '개만 빠르게 불러옵니다.<br>아이폰·아이패드에서는 영상 분석이 느려 GoPro Quik(Studio) 사용을 권장합니다.</div>' +
       (hasMedia
         ? (renderClipList_() +
           '<div class="reel-maker-meta" id="reel-maker-meta">본편 ' + fmtTime(contentDuration()) +
@@ -1827,6 +1830,12 @@
   }
 
   var api = {
+    addFiles: function (fileList) {
+      return addFiles(fileList);
+    },
+    collectPreviewFrames: function () {
+      return collectPreviewFramesForAnalysis_();
+    },
     onFile: function (input) {
       var files = input && input.files;
       if (!files || !files.length) return;

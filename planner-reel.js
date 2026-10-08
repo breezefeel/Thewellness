@@ -151,12 +151,35 @@
     return null;
   }
 
+  /** 장면·파일명 기반 중립 멘트 (제품·키워드 추측 문구 금지) */
+  function sceneCaptionForClip_(clip, index, total) {
+    var name = String((clip && clip.name) || '').replace(/\.[^.]+$/, '').trim();
+    var human = name.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+    var looksAuto = !human ||
+      /^(DJI|IMG|VID|PXL|MOV|MVI|DSC|WA|Screenshot|스크린샷)/i.test(human) ||
+      /^\d{6,}/.test(human.replace(/\s/g, ''));
+    if (!looksAuto && human.length >= 2 && human.length <= 42) {
+      var lines = splitToTwoLines_(human);
+      return { line1: lines[0] || human, line2: lines[1] || '' };
+    }
+    var n = Math.max(1, total || 1);
+    var i = Math.max(0, index || 0);
+    if (clip && clip.kind === 'image') {
+      if (n <= 1) return { line1: '이 사진의 장면', line2: '그대로 보여 줍니다' };
+      return { line1: '사진 ' + (i + 1), line2: '장면으로 보여 줍니다' };
+    }
+    if (n <= 1) return { line1: '이 구간의 장면', line2: '그대로 보여 줍니다' };
+    if (i === 0) return { line1: '첫 장면', line2: '여기서부터 보여 줍니다' };
+    if (i >= n - 1) return { line1: '마지막 장면', line2: '핵심만 짧게' };
+    return { line1: '이어지는 장면', line2: (i + 1) + '/' + n };
+  }
+
   function defaultCaptionTexts_() {
     return [
-      ['장면을 열고', '핵심 포인트부터 보여 줍니다'],
-      ['손과 프로브가 같이 움직일 때', '반응이 더 선명해집니다'],
-      ['현장에서 바로', '시연할 수 있습니다'],
-      ['휴대형 고주파,', '세미나·실습에 맞춘 흐름입니다']
+      ['이 구간의 장면', '그대로 보여 줍니다'],
+      ['이어지는 장면', '핵심만 짧게'],
+      ['이 장면의 포인트', '먼저 보여 줍니다'],
+      ['마지막 장면', '짧게 마무리합니다']
     ];
   }
 
@@ -199,8 +222,12 @@
   }
 
   function captionTextForIndex_(i) {
+    var ranges = clipTimelineRanges_();
+    if (ranges[i] && ranges[i].clip) {
+      return sceneCaptionForClip_(ranges[i].clip, i, ranges.length);
+    }
     var texts = defaultCaptionTexts_();
-    var t = texts[i % texts.length] || ['멘트', ''];
+    var t = texts[i % texts.length] || ['이 장면', ''];
     return { line1: t[0], line2: t[1] };
   }
 
@@ -271,15 +298,49 @@
     return next;
   }
 
+  /** 주제·각도·아이디어(키워드) — 장면과 맞을 때만 멘트에 씀 */
   function readFormKeywords_() {
+    var parts = [];
     try {
       if (global.state && global.state.newItem) {
-        var t = String(global.state.newItem.topic || '').trim();
-        if (t) return t;
+        var ni = global.state.newItem;
+        [ni.topic, ni.angle, ni.dailyThought, ni.dailyWhat].forEach(function (v) {
+          v = String(v || '').trim();
+          if (v) parts.push(v);
+        });
       }
     } catch (e) {}
-    var el = document.getElementById('new-item-topic-input');
-    return el ? String(el.value || '').trim() : '';
+    if (!parts.length) {
+      var el = document.getElementById('new-item-topic-input');
+      if (el && String(el.value || '').trim()) parts.push(String(el.value).trim());
+    }
+    return parts.join('\n');
+  }
+
+  function findMatchingPhraseForClip_(clip, phrases) {
+    if (!clip || !phrases || !phrases.length) return null;
+    var hay = String(clip.name || '') + ' ' + String(clip.label || '') + ' ' + String(clip.note || '');
+    var best = null;
+    var bestBoost = 1;
+    for (var i = 0; i < phrases.length; i++) {
+      var p = phrases[i];
+      var b = keywordMatchBoost_(hay, [p]);
+      if (b > bestBoost) {
+        bestBoost = b;
+        best = p;
+      }
+    }
+    return bestBoost > 1.05 ? best : null;
+  }
+
+  function captionFromKeywordPhrase_(phrase, scene) {
+    var lines = splitToTwoLines_(phrase);
+    var out = { line1: lines[0] || '', line2: lines[1] || '' };
+    // 키워드가 한 줄뿐이면 장면 2줄을 보조로 유지하지 않음 — 키워드만 (맞는 클립에만 쓰므로)
+    if (!out.line2 && scene && scene.line2 && /장면|사진|구간/.test(String(scene.line1 || ''))) {
+      out.line2 = '';
+    }
+    return out;
   }
 
   function parseKeywordPhrases_(raw) {
@@ -330,10 +391,23 @@
     return pairs;
   }
 
+  /** 장면 멘트 시드 → 키워드는 파일명·장면과 맞는 클립에만 덮어씀 */
+  function seedSceneCaptions_() {
+    var ranges = clipTimelineRanges_();
+    if (!ranges.length) {
+      reel.captions = [];
+      return;
+    }
+    var textPairs = ranges.map(function (r, i) {
+      return sceneCaptionForClip_(r.clip, i, ranges.length);
+    });
+    reel.captions = bindCaptionsToClips_([], textPairs);
+  }
+
   function applyKeywordsToCaptions_(force) {
     var phrases = parseKeywordPhrases_(readFormKeywords_());
     if (!phrases.length) {
-      if (force) toast_('위에 키워드를 먼저 적어 주세요.', 'err');
+      if (force) toast_('위에 키워드·아이디어를 먼저 적어 주세요.', 'err');
       return false;
     }
     var d = totalDuration();
@@ -341,20 +415,30 @@
       if (force) toast_('영상을 먼저 선택해 주세요.', 'err');
       return false;
     }
-    var pairs = phrasePairsFromKeywords_(phrases).map(function (p) {
-      return { line1: p[0] || '', line2: p[1] || '' };
-    });
-    // 클립 순서에 맞춰 멘트 구간·문구를 다시 붙임
     var ranges = clipTimelineRanges_();
-    var textPairs = ranges.map(function (r, i) {
-      return pairs[i % pairs.length] || captionTextForIndex_(i);
-    });
-    reel.captions = bindCaptionsToClips_([], textPairs);
-    if (reel.top2 === '휴대 가능한 인디바 고주파' || force) {
-      var top = phrases[0];
-      if (top && top.length > 22) top = top.slice(0, 22);
-      if (top) reel.top2 = top;
+    if (!ranges.length) {
+      if (force) toast_('포함할 클립이 없어요.', 'err');
+      return false;
     }
+    var matched = 0;
+    var textPairs = ranges.map(function (r, i) {
+      var scene = sceneCaptionForClip_(r.clip, i, ranges.length);
+      var hit = findMatchingPhraseForClip_(r.clip, phrases);
+      if (hit) {
+        matched++;
+        return captionFromKeywordPhrase_(hit, scene);
+      }
+      // 장면과 안 맞는 키워드는 넣지 않음
+      return scene;
+    });
+    if (!matched) {
+      if (force) {
+        toast_('장면·파일명과 맞는 키워드가 없어 멘트를 바꾸지 않았어요. 영상 내용에 맞는 키워드만 적어 주세요.', 'err');
+      }
+      seedSceneCaptions_();
+      return false;
+    }
+    reel.captions = bindCaptionsToClips_([], textPairs);
     return true;
   }
 
@@ -419,7 +503,10 @@
     return { vw: media.videoWidth || 1920, vh: media.videoHeight || 1080 };
   }
 
-  function layoutVideo(vw, vh) {
+  function layoutVideo(vw, vh, kind) {
+    vw = Math.max(1, Number(vw) || 1);
+    vh = Math.max(1, Number(vh) || 1);
+    // 4:5 프레임 안 레터박스(contain) — 가로·세로 동일 배율로 늘어나지 않게
     var bandW = W;
     var bandH = Math.round(bandW * (vh / vw));
     if (bandH > H) {
@@ -428,8 +515,12 @@
     }
     var bandX = Math.round((W - bandW) / 2);
     var bandY = Math.round((H - bandH) / 2);
-    var zoom = Math.max(1, Number(reel.zoom) || 1.18);
-    var scale = Math.max(bandW / vw, bandH / vh) * zoom;
+    // 사진은 기본 1배(잘림·왜곡 최소화), 영상만 살짝 확대
+    var zoomDefault = (kind === 'image') ? 1 : 1.18;
+    var zoom = Math.max(1, Number(reel.zoom) || zoomDefault);
+    if (kind === 'image' && !(Number(reel.zoom) > 1)) zoom = 1;
+    var fit = Math.min(bandW / vw, bandH / vh);
+    var scale = fit * zoom;
     var drawW = vw * scale;
     var drawH = vh * scale;
     var maxOx = Math.max(0, drawW - bandW);
@@ -438,8 +529,8 @@
     return {
       x: bandX, y: bandY, w: bandW, h: bandH,
       topPad: bandY, botPad: H - bandY - bandH,
-      drawX: bandX - maxOx * fx,
-      drawY: bandY - maxOy * 0.5,
+      drawX: bandX - maxOx * fx + Math.max(0, (bandW - drawW) / 2),
+      drawY: bandY - maxOy * 0.5 + Math.max(0, (bandH - drawH) / 2),
       drawW: drawW, drawH: drawH
     };
   }
@@ -450,15 +541,17 @@
     var contentDur = contentDuration();
     var drawT = Math.min(timelineT, Math.max(0, contentDur - 0.03));
     var hit = clipAtTime(drawT);
-    var lay = layoutVideo(1920, 1080);
+    var lay = layoutVideo(1920, 1080, 'video');
     if (hit && hit.clip && hit.clip.el) {
       var sz = mediaSize(hit.clip.el, hit.clip.kind);
-      lay = layoutVideo(sz.vw, sz.vh);
+      lay = layoutVideo(sz.vw, sz.vh, hit.clip.kind);
       try {
         ctx.save();
         ctx.beginPath();
         ctx.rect(lay.x, lay.y, lay.w, lay.h);
         ctx.clip();
+        ctx.imageSmoothingEnabled = true;
+        if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(hit.clip.el, lay.drawX, lay.drawY, lay.drawW, lay.drawH);
         ctx.restore();
       } catch (e) {}
@@ -765,10 +858,19 @@
   async function decodeReelImageBitmap_(file) {
     if (typeof createImageBitmap !== 'function') return null;
     try {
-      // 긴 변을 줄여 디코드 비용을 크게 낮춤 (릴스 1080 기준으로 충분)
+      // 원본 비율 유지 — width·height를 같게 넣으면 정사각으로 늘어남
+      var full = await createImageBitmap(file);
+      var w = full.width || 1;
+      var h = full.height || 1;
+      var maxEdge = REEL_IMAGE_MAX_EDGE_;
+      if (w <= maxEdge && h <= maxEdge) return full;
+      var scale = maxEdge / Math.max(w, h);
+      var rw = Math.max(1, Math.round(w * scale));
+      var rh = Math.max(1, Math.round(h * scale));
+      try { if (typeof full.close === 'function') full.close(); } catch (eClose) {}
       return await createImageBitmap(file, {
-        resizeWidth: REEL_IMAGE_MAX_EDGE_,
-        resizeHeight: REEL_IMAGE_MAX_EDGE_,
+        resizeWidth: rw,
+        resizeHeight: rh,
         resizeQuality: 'high'
       });
     } catch (e1) {
@@ -1009,7 +1111,7 @@
 
       stopImportCountdown_();
       autoSelectClips_();
-      rebuildCaptionsKeepText();
+      seedSceneCaptions_();
       var kwApplied = applyKeywordsToCaptions_(false);
       reel.focusAuto = true;
       reel.status = '구도 자동 분석 중…';
@@ -1682,7 +1784,7 @@
         '<span style="font-size:10px;color:#9CA3AF;">포함 ' + includedClips().length + '/' + reel.clips.length + ' · ' + fmtTime(totalDuration()) + '</span>' +
         '<button type="button" class="reel-btn-ghost" onclick="ReelMaker.clearClips()" ' + (reel.busy ? 'disabled' : '') + '>목록 비우기</button>' +
       '</div>' +
-      '<p class="reel-focus-hint" style="margin-top:0;">긴 영상·여러 영상에서 움직임이 큰 구간을 자동으로 골랐어요. 위에 키워드가 있으면 멘트·구간 개수에 반영됩니다. <strong>위·아래</strong>로 재생 순서를 바꾸면 멘트도 해당 클립을 따라갑니다. 시작·끝·포함을 고치면 됩니다. 새로 고를 때는 아래로 이어 붙으니, 처음부터면 「목록 비우기」를 누르세요.</p>' +
+      '<p class="reel-focus-hint" style="margin-top:0;">긴 영상·여러 영상에서 움직임이 큰 구간을 자동으로 골랐어요. 멘트는 <strong>장면·파일명</strong>에 맞추고, 키워드·아이디어는 그 장면과 맞는 클립에만 반영합니다. <strong>위·아래</strong>로 재생 순서를 바꾸면 멘트도 해당 클립을 따라갑니다. 새로 고를 때는 아래로 이어 붙으니, 처음부터면 「목록 비우기」를 누르세요.</p>' +
       reel.clips.map(function (c, i) {
         var thumb = c.thumbDataUrl
           ? '<img class="reel-seg-thumb" src="' + c.thumbDataUrl + '" alt="">'
@@ -1736,13 +1838,10 @@
     }).join('');
 
     var onAddForm = !!(global.state && global.state.showAdd);
-    var reelStep = onAddForm && global.state && global.state.newItem && global.state.newItem.mediaStudioMode === 'both';
     return '<div class="form-field reel-maker" id="reel-maker-root">' +
       '<div class="reel-maker-hd' + (onAddForm ? ' add-media-section-hd' : '') + '">' +
-        '<label class="form-label">' + (reelStep ? '1. ' : '') + '릴스 만들기 <span style="font-weight:600;color:#9CA3AF;">· 4:5</span>' +
-          '<span class="reel-maker-pick-hint">' +
-            (reelStep ? '먼저 릴스를 만든 뒤 아래에서 썸네일을 이어 작업합니다.' : '참고할 영상, 사진, 폴더를 선택해주세요.') +
-          '</span></label>' +
+        '<label class="form-label">' + (onAddForm ? '1. ' : '') + '릴스 만들기 <span style="font-weight:600;color:#9CA3AF;">· 4:5</span>' +
+          '<span class="reel-maker-pick-hint">추가할 영상, 사진, 폴더를 선택해주세요.</span></label>' +
         (onAddForm
           ? '<button type="button" class="add-media-fold-btn" onclick="closeAddMediaStudio_()" title="접기" aria-label="릴스 만들기 접기">접기 ▴</button>'
           : '') +
@@ -2003,8 +2102,8 @@
     },
     applyKeywords: function () {
       if (!applyKeywordsToCaptions_(true)) return;
-      reel.status = '키워드로 멘트를 채웠습니다. 미리보기를 확인하세요.';
-      toast_('키워드 → 멘트 반영', 'ok');
+      reel.status = '장면과 맞는 키워드만 멘트에 반영했습니다. 미리보기를 확인하세요.';
+      toast_('맞는 키워드만 멘트 반영', 'ok');
       refreshPreviews();
     },
     refreshPreviews: function () { refreshPreviews(); },

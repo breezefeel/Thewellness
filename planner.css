@@ -942,7 +942,31 @@ margin-left: 4px;
   gap: 0;
   margin-top: 8px;
 }
-.card-move-picker.open { display: flex; }
+.card-move-picker.open,
+.card-move-picker.card-move-picker--inline { display: flex; }
+.card-move-picker--inline .card-move-steps {
+  justify-content: flex-end;
+}
+.card-more-step-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-start;
+}
+.card-more-step-chips .card-step-chip.is-current,
+.card-more-step-chips .card-step-chip:disabled {
+  background: #F1F5F9;
+  color: #94A3B8;
+  cursor: default;
+  border-color: #E5E7EB;
+}
+.card-more-step-chips .card-step-chip:not(:disabled):hover {
+  border-color: var(--cc, #2DD4BF);
+  color: #0F766E;
+}
 .card-move-steps {
   display: flex;
   align-items: flex-start;
@@ -3130,15 +3154,20 @@ cursor: pointer; font-family: inherit; margin-top: 6px;
 .btn-flow-regen:disabled { opacity: .55; cursor: not-allowed; }
 .btn-submit:disabled { opacity: .55; cursor: not-allowed; }
 
-/* Reel maker (add form) */
-.reel-maker {
+/* Reel maker (add form) — 청록 톤으로 썸네일 박스와 구분 */
+.reel-maker,
+#reel-maker-root {
   margin-top: 0;
   margin-bottom: 0;
   padding: 10px 12px 10px;
-  border: 1.5px solid #E5E7EB;
+  border: 1.5px solid #99F6E4;
   border-radius: 14px;
-  background: #FAFAF9;
+  background: linear-gradient(165deg, #F0FDFA 0%, #ECFDF5 42%, #fff 100%);
   box-sizing: border-box;
+}
+.reel-maker .form-label,
+#reel-maker-root .form-label {
+  color: #0F766E;
 }
 .reel-maker-pick-hint {
   display: inline;
@@ -3195,18 +3224,22 @@ cursor: pointer; font-family: inherit; margin-top: 6px;
 }
 .add-media-pick-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  flex-wrap: nowrap;
   gap: 8px;
   align-items: stretch;
 }
 .add-media-pick-actions .add-media-pick-fake {
-  flex: 1 1 140px;
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
   cursor: pointer;
   text-align: center;
 }
 .add-media-pick-actions .add-media-pick-folder {
   flex: 0 0 auto;
-  min-width: 72px;
+  width: 100%;
+  min-width: 0;
 }
 .add-media-pick-card {
   margin: 0;
@@ -3289,6 +3322,15 @@ cursor: pointer; font-family: inherit; margin-top: 6px;
   gap: 8px;
   width: 100%;
 }
+.add-media-pick-sub {
+  display: block;
+  width: 100%;
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #374151;
+}
 .add-media-fold-hint {
   margin-left: auto;
   font-size: 11px;
@@ -3336,14 +3378,29 @@ cursor: pointer; font-family: inherit; margin-top: 6px;
 @media (max-width: 640px) {
   .add-media-pick-row { grid-template-columns: 1fr; }
 }
-.add-photo-field,
-.add-thumb-field {
+.add-photo-field {
   margin-bottom: 0;
   padding: 10px 12px 10px;
   border: 1.5px solid #E5E7EB;
   border-radius: 14px;
   background: #fff;
   box-sizing: border-box;
+}
+/* 썸네일 만들기 — 앰버 톤으로 릴스 박스와 구분 */
+.add-thumb-field,
+#add-thumb-maker-root {
+  margin-bottom: 0;
+  padding: 10px 12px 10px;
+  border: 1.5px solid #FCD34D;
+  border-radius: 14px;
+  background: linear-gradient(165deg, #FFFBEB 0%, #FEF3C7 38%, #fff 100%);
+  box-sizing: border-box;
+}
+.add-thumb-field .form-label,
+.add-thumb-field .img-section-title,
+#add-thumb-maker-root .form-label,
+#add-thumb-maker-root .img-section-title {
+  color: #B45309;
 }
 .add-photo-field .form-input,
 .reel-maker > .form-input[type="file"] {

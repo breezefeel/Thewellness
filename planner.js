@@ -23282,9 +23282,9 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
         for(var uo = ordIdx - 1; uo >= 0; uo--){ if(slotMapOrd[uo]){ canUpCard = true; break; } }
         for(var do_ = ordIdx + 1; do_ < slotMapOrd.length; do_++){ if(slotMapOrd[do_]){ canDownCard = true; break; } }
         orderBtns =
-          '<span class="draft-card-order-btns" title="순서 변경">' +
-            '<button type="button" class="draft-card-order-mini"' + (canUpCard ? '' : ' disabled') + ' title="순서 위로" onclick="event.stopPropagation();moveDraftCardOrder_(' + cat.id + ',\'' + d.id + '\',-1)">▲</button>' +
-            '<button type="button" class="draft-card-order-mini"' + (canDownCard ? '' : ' disabled') + ' title="순서 아래로" onclick="event.stopPropagation();moveDraftCardOrder_(' + cat.id + ',\'' + d.id + '\',1)">▼</button>' +
+          '<span class="draft-card-order-btns" title="같은 카테고리 안에서 위·아래 주제와 순서 바꾸기">' +
+            '<button type="button" class="draft-card-order-mini"' + (canUpCard ? '' : ' disabled') + ' title="같은 카테고리 · 위로" onclick="event.stopPropagation();moveDraftCardOrder_(' + cat.id + ',\'' + d.id + '\',-1)">▲</button>' +
+            '<button type="button" class="draft-card-order-mini"' + (canDownCard ? '' : ' disabled') + ' title="같은 카테고리 · 아래로" onclick="event.stopPropagation();moveDraftCardOrder_(' + cat.id + ',\'' + d.id + '\',1)">▼</button>' +
           '</span>';
       }
     }
@@ -23294,13 +23294,14 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
     '<div class="card-intent-foot">' +
       '<div class="card-intent-dates"><span>' + dateLabel + '</span><span>생성 ' + createdDateLabel + '</span></div>' +
       '<div class="card-more-actions">' +
-        '<button type="button" class="draft-card-tidy-mini" title="다른 단계로 옮기기" aria-expanded="false" onclick="event.stopPropagation();toggleMoveDraftPicker_(this)">순서</button>' +
-        '<button type="button" class="draft-card-refresh-mini" data-regen-draft="' + d.id + '" title="이 주제의 제목·각도만 다시 받기" onclick="event.stopPropagation();refreshTopicsForDraft(' + cat.id + ',\'' + d.id + '\')">주제 변경</button>' +
+        '<div class="card-more-step-chips" title="카테고리(단계) 이동">' +
+          renderMoveDraftStepChipsHTML_(cat.id, d.id) +
+        '</div>' +
         '<button type="button" class="draft-card-delete-mini" title="이 주제 카드 삭제" onclick="event.stopPropagation();deleteDraft(' + cat.id + ',\'' + d.id + '\')">삭제</button>' +
         orderBtns +
       '</div>' +
     '</div>' +
-    renderMoveDraftPickerHTML_(cat.id, d.id);
+    renderMoveDraftProgramBlockHTML_(cat.id, d.id);
   var stepIdAttr = '';
   try {
     var sidAttr = getDraftRoadmapStepId_(d, cat.id, draftIndex);
@@ -25270,17 +25271,17 @@ function renderAddForm(){
           '<span class="form-label add-media-pick-label">릴스·썸네일 만들기' +
             '<span style="font-weight:600;color:#9CA3AF;">' + (reelOnIos ? ' · Quik/썸네일' : ' · 4:5') + '</span>' +
           '</span>' +
+          '<span class="add-media-pick-sub">' +
+            (reelOnIos
+              ? '사진 1장 선택 시 → 썸네일 · 여러 장·영상 → GoPro Quik (PC 권장)'
+              : '사진 1장 선택 시 → 썸네일 · 여러 장·영상 → 릴스 제작 후 썸네일') +
+          '</span>' +
           '<div class="add-media-pick-actions">' +
-            '<label class="add-media-pick-fake" for="add-unified-file-input">파일 선택 · 사진·영상</label>' +
+            '<label class="add-media-pick-fake" for="add-unified-file-input">파일 선택 · 사진 · 영상</label>' +
             '<label class="add-media-pick-fake add-media-pick-folder" for="add-unified-folder-input">폴더</label>' +
           '</div>' +
           '<input type="file" id="add-unified-file-input" accept="image/*,video/*" multiple style="display:none" onchange="onUnifiedMediaStudioFiles_(this)">' +
           '<input type="file" id="add-unified-folder-input" webkitdirectory multiple style="display:none" onchange="onUnifiedMediaStudioFiles_(this)">' +
-          '<span class="add-media-pick-hint">' +
-            (reelOnIos
-              ? '사진 1장 → 썸네일 · 여러 장·영상 → GoPro Quik(Studio). PC 권장'
-              : '사진 1장 → 썸네일만 · 여러 장·영상 → 릴스 후 썸네일') +
-          '</span>' +
         '</div>' +
       '</div>')
     : '';
@@ -25859,7 +25860,8 @@ window.deleteDraft = function(catId, draftId){
   if(typeof setAppToast === 'function') setAppToast('「' + short + '」을(를) 삭제했어요. 서버에도 반영 중…', { duration: 3600, variant: 'ok' });
 };
 
-function renderMoveDraftPickerHTML_(fromCatId, draftId){
+/** 자세히 보기 — 카테고리(단계) 칩. 예전 「순서」 버튼과 같은 크기 */
+function renderMoveDraftStepChipsHTML_(fromCatId, draftId){
   var cat = CATEGORIES[fromCatId];
   var draft = cat && (cat.drafts || []).find(function(d){ return d && d.id === draftId; });
   var draftIndex = draft && cat.drafts ? cat.drafts.indexOf(draft) : -1;
@@ -25874,30 +25876,42 @@ function renderMoveDraftPickerHTML_(fromCatId, draftId){
       ? (displaySubGoalStepTitle_(tip, fromCatId) || ((idx + 1) + ''))
       : ((idx + 1) + '단계');
     var current = sid === currentStepId;
-    return '<button type="button" class="card-move-opt' + (current ? ' is-current' : '') + '"' +
+    return '<button type="button" class="draft-card-tidy-mini card-step-chip' + (current ? ' is-current' : '') + '"' +
       (current ? ' disabled' : '') +
-      (tip ? ' title="' + escapeHtml(tip) + '"' : '') +
+      (tip ? ' title="' + escapeHtml(tip) + '"' : ' title="이 카테고리로 옮기기"') +
       ' onclick="event.stopPropagation();moveDraftToStep_(' + fromCatId + ',\'' + draftId + '\',\'' + sid.replace(/'/g, '') + '\')">' +
       escapeHtml(label) + '</button>';
   }).join('');
   var miscCurrent = currentStepId === SUBGOAL_MISC_ID;
-  stepBtns += '<button type="button" class="card-move-opt' + (miscCurrent ? ' is-current' : '') + '"' +
+  stepBtns += '<button type="button" class="draft-card-tidy-mini card-step-chip' + (miscCurrent ? ' is-current' : '') + '"' +
     (miscCurrent ? ' disabled' : '') +
     ' title="기타 주제" onclick="event.stopPropagation();moveDraftToStep_(' + fromCatId + ',\'' + draftId + '\',\'' + SUBGOAL_MISC_ID + '\')">기타</button>';
   if(!steps.length && !stepBtns) stepBtns = '<span class="card-move-empty">생성된 단계가 없어요</span>';
+  return stepBtns;
+}
+
+function renderMoveDraftProgramBlockHTML_(fromCatId, draftId){
   var programs = ADD_FORM_CAT_ORDER.map(function(id){
     if(id === fromCatId || !CATEGORIES[id] || isOpsManualCategory(id)) return '';
     var name = (id === 7 ? (LIFE_HEALTH_LABEL + ' · 기타') : (id === 6 ? '일상 공유' : (CAT_TAB_SHORT[id] || CATEGORIES[id].name)));
     return '<button type="button" class="card-move-opt" onclick="event.stopPropagation();moveDraftToCategory_(' +
       fromCatId + ',\'' + draftId + '\',' + id + ')">' + escapeHtml(name) + '</button>';
   }).join('');
-  return '<div class="card-move-picker" onclick="event.stopPropagation()">' +
+  return '<div class="card-move-picker card-move-picker--inline" onclick="event.stopPropagation()">' +
     '<div class="card-move-steps">' +
-      '<div class="card-move-step-list">' + stepBtns + '</div>' +
       '<button type="button" class="card-move-program-btn" aria-expanded="false" onclick="event.stopPropagation();toggleMoveProgramList_(this)">프로그램</button>' +
     '</div>' +
     '<div class="card-move-programs">' + programs + '</div>' +
   '</div>';
+}
+
+/** @deprecated 자세히 보기에서 「순서」 토글 제거 — 호환용 유지 */
+function renderMoveDraftPickerHTML_(fromCatId, draftId){
+  return '<div class="card-move-picker" onclick="event.stopPropagation()">' +
+    '<div class="card-move-steps">' +
+      '<div class="card-move-step-list">' + renderMoveDraftStepChipsHTML_(fromCatId, draftId) + '</div>' +
+    '</div>' +
+  '</div>' + renderMoveDraftProgramBlockHTML_(fromCatId, draftId);
 }
 window.toggleMoveDraftPicker_ = function(btn){
   var body = btn && btn.closest ? btn.closest('.card-more-body') : null;
@@ -25910,12 +25924,10 @@ window.toggleMoveDraftPicker_ = function(btn){
     if(programs) programs.classList.remove('open');
     var progBtn = el.querySelector('.card-move-program-btn');
     if(progBtn) progBtn.setAttribute('aria-expanded', 'false');
-    var other = el.parentElement && el.parentElement.querySelector('.draft-card-tidy-mini');
-    if(other) other.setAttribute('aria-expanded', 'false');
   });
   if(open){
     picker.classList.add('open');
-    btn.setAttribute('aria-expanded', 'true');
+    if(btn) btn.setAttribute('aria-expanded', 'true');
   }
 };
 window.toggleMoveProgramList_ = function(btn){

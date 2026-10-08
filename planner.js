@@ -8796,7 +8796,8 @@ function renderPlanLayerMonthHTML_(catId){
       });
     });
     var pspItems = pspParts.join('') || '<p class="plan-layer-empty">카테고리가 아직 없습니다.</p>';
-    return planLayerCardHTML_('3', 'PSP 카테고리', pspItems, 'openExpertCategoryNote_()', 'month');
+    var pspTidyClick = canBulkReassignCategory_(catId) ? 'openBulkReassignModal_(' + catId + ')' : '';
+    return planLayerCardHTML_('3', 'PSP 카테고리', pspItems, pspTidyClick, 'month', { btnLabel: '서랍 정리' });
   }
   if(isFlatProgramRoadmapCategory_(catId)){
     var flatParts = [];

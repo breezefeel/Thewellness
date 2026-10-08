@@ -70,8 +70,8 @@
 })();
 </script>
 <!-- CSS는 비차단 로드 — 렌더 막지 않음 -->
-<link rel="stylesheet" href="planner.css?v=203" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="planner.css?v=203"></noscript>
+<link rel="stylesheet" href="planner.css?v=204" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="planner.css?v=204"></noscript>
 <!-- 서비스워커는 head에서 등록하지 않음 — 문서 이동이 SW 대기(수십 초)에 걸리지 않게 함 -->
 </head>
 <body>
@@ -290,7 +290,7 @@
       <div class="modal-title" id="bulk-reassign-title" style="margin:0;">서랍 정리</div>
       <button type="button" class="prompt-modal-close" onclick="closeBulkReassignModal_()" aria-label="닫기">×</button>
     </div>
-    <div class="modal-desc" style="font-size:12px;margin-bottom:12px;">주제 제목의 키워드로 맞는 서랍을 제안합니다. 확인하고 체크한 것만 옮겨요.</div>
+    <div class="modal-desc" style="font-size:12px;margin-bottom:12px;">제목 키워드로 맞는 서랍을 제안하고, 같은 제목 카드는 하나만 남기도록 고를 수 있어요. 체크한 것만 적용합니다.</div>
     <div id="bulk-reassign-body"></div>
     <button type="button" class="modal-btn" id="bulk-reassign-apply" onclick="applyBulkReassignFromModal_()">옮기기</button>
   </div>
@@ -434,7 +434,7 @@
 <script src="ops-naver-kw-seed.js?v=159"></script>
 <script src="ops-naver-ad-assets.js?v=3"></script>
 <script src="planner-reel.js?v=23"></script>
-<script src="planner.js?v=261" defer></script>
+<script src="planner.js?v=264" defer></script>
 <script>
 function openLinksModal_(){
   var o = document.getElementById('links-modal-overlay');

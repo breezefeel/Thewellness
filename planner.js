@@ -2675,6 +2675,7 @@ function isDraftPinned_(draftId){
 }
 const PENDING_SUBGOAL_SS_KEY = 'ht_pending_subgoal_plan';
 const PENDING_YEAR_SS_KEY = 'ht_pending_year_plan';
+const PENDING_YEAR_LS_KEY = 'ht_pending_year_plan_ls';
 function sameCatId_(a, b){
   if(a == null || b == null) return false;
   var na = Number(a);
@@ -4633,6 +4634,8 @@ function getYearPlan_(){
   return { anchorDate: anchor, goal: '', intent: '', periods: buildRollingPeriodsFromAnchor_(anchor, goals) };
 }
 function periodHasYearGoalText_(per){
+  per = unwrapSyncEntityValue_(per) || per;
+  if(per && per.value && typeof per.value === 'object' && per.goal == null && per.topic == null) per = per.value;
   return !!(per && (String(per.goal || per.topic || '').trim() || String(per.rationale || '').trim()));
 }
 function mapYearPeriodForStore_(per, i){
@@ -6555,8 +6558,14 @@ function groupDraftsBySeries_(drafts, catId){
 }
 function persistPendingYearPlan_(){
   try {
-    if(state.pendingYearPlan) sessionStorage.setItem(PENDING_YEAR_SS_KEY, JSON.stringify(state.pendingYearPlan));
-    else sessionStorage.removeItem(PENDING_YEAR_SS_KEY);
+    if(state.pendingYearPlan){
+      var raw = JSON.stringify(state.pendingYearPlan);
+      sessionStorage.setItem(PENDING_YEAR_SS_KEY, raw);
+      try { localStorage.setItem(PENDING_YEAR_LS_KEY, raw); } catch(eLs){}
+    } else {
+      sessionStorage.removeItem(PENDING_YEAR_SS_KEY);
+      try { localStorage.removeItem(PENDING_YEAR_LS_KEY); } catch(eLs2){}
+    }
   } catch(e){}
   bumpPlanWorkshopApplyBtn_();
 }
@@ -7039,11 +7048,15 @@ function bumpPlanWorkshopApplyBtn_(){
 function restorePendingYearPlan_(){
   try {
     var raw = sessionStorage.getItem(PENDING_YEAR_SS_KEY);
+    if(!raw){
+      try { raw = localStorage.getItem(PENDING_YEAR_LS_KEY) || ''; } catch(eLs){ raw = ''; }
+    }
     if(!raw) return;
     var p = JSON.parse(raw);
     if(p && p.periods && p.periods.length){
       sanitizeYearPlanObj_(p);
       state.pendingYearPlan = p;
+      persistPendingYearPlan_();
     }
   } catch(e){}
 }
@@ -13698,6 +13711,7 @@ function invalidateStalePendingPlans_(opts){
   if(!keepYear){
     state.pendingYearPlan = null;
     try { sessionStorage.removeItem(PENDING_YEAR_SS_KEY); } catch(e2){}
+    try { localStorage.removeItem(PENDING_YEAR_LS_KEY); } catch(e3){}
   } else {
     try { persistPendingYearPlan_(); } catch(eKeepYear){}
   }
@@ -13969,7 +13983,7 @@ function upsertPlanRowByStableKey_(rows, keyPart, wrapped, missing, touchId){
     if(found >= 0) rows.splice(found, 1);
     return;
   }
-  var row = cloneSyncValue_(wrapped && wrapped.value);
+  var row = cloneSyncValue_(unwrapSyncEntityValue_(wrapped));
   if(typeof touchId === 'function') row = touchId(row, key);
   else if(row && typeof row === 'object' && !row.id) row.id = key;
   var order = wrapped && typeof wrapped.order === 'number' ? wrapped.order : -1;
@@ -14251,20 +14265,94 @@ function requestServerAuthorityInsteadOfFlood_(){
     syncAllSourcesIfNewer_('flood-adopt').catch(function(e){ console.warn('[서버 기준 맞춤]', e); });
   } catch(e0){}
 }
-function discardStaleUnpushedBeforeConnect_(){
-  if(state._sessionUserEdit || state._emptyServerSeed) return;
-  state.syncOutbox = [];
-  state.syncDirtyEntityKeys = {};
-  state.syncNeedsSnapshot = false;
-  state.syncDirty = false;
+function isProtectedUserSyncKey_(key){
+  key = String(key || '');
+  if(!key || isDeviceLocalSyncEntityKey_(key)) return false;
+  return /^plan:/.test(key) ||
+    /^deleted:/.test(key) ||
+    /^pinned:/.test(key) ||
+    /^override:/.test(key) ||
+    /^branding:/.test(key) ||
+    /^generated:/.test(key) ||
+    /^published:/.test(key) ||
+    /^prompt:/.test(key);
 }
-/** 서버를 기준본으로 받을지. 접속 시 받고, 이 세션에서 고친 것만 올린다. */
+function outboxHasProtectedMutations_(){
+  return (state.syncOutbox || []).some(function(op){
+    return op && isProtectedUserSyncKey_(op.key);
+  });
+}
+function yearPlanTextScore_(payload){
+  var yp = payload && payload.branding && payload.branding.yearPlan;
+  if(!yp) return 0;
+  var n = 0;
+  if(String(yp.goal || '').trim()) n += 2;
+  if(String(yp.intent || '').trim()) n += 2;
+  (yp.periods || []).forEach(function(p){
+    if(periodHasYearGoalText_(p)) n += 1;
+  });
+  return n;
+}
+function yearPlanRicherThan_(localPayload, remotePayload){
+  return yearPlanTextScore_(localPayload) > yearPlanTextScore_(remotePayload);
+}
+function listLocalYearPlanSyncKeys_(payload){
+  var keys = [];
+  try {
+    Object.keys(collectSyncEntities_(payload || getPersistPayload(), { skipEnsureIds: true }) || {}).forEach(function(k){
+      if(String(k).indexOf('plan:year:') === 0) keys.push(k);
+    });
+  } catch(eKeys){}
+  return keys;
+}
+function requeueLocalYearPlanIfRicher_(remotePayload){
+  var local = getPersistPayload();
+  if(!yearPlanRicherThan_(local, remotePayload)) return false;
+  var keys = listLocalYearPlanSyncKeys_(local);
+  if(!keys.length) keys = ['plan:year:meta'];
+  enqueueSyncOutboxChanges_(keys, local);
+  state._sessionUserEdit = true;
+  state.syncDirty = true;
+  return true;
+}
+function discardStaleUnpushedBeforeConnect_(){
+  if(state._emptyServerSeed) return;
+  var n = countRealUnpushedMutations_();
+  // 소수 실수정(기획·삭제)은 새로고침·모바일 백그라운드 뒤에도 지우지 않음
+  if(n > 0 && n <= REAL_UNPUSHED_PUSH_MAX_){
+    state._sessionUserEdit = true;
+    return;
+  }
+  var kept = (state.syncOutbox || []).filter(function(op){
+    return op && isProtectedUserSyncKey_(op.key);
+  });
+  state.syncOutbox = kept;
+  Object.keys(state.syncDirtyEntityKeys || {}).forEach(function(k){
+    if(!isProtectedUserSyncKey_(k)) delete state.syncDirtyEntityKeys[k];
+  });
+  kept.forEach(function(op){ if(op && op.key) state.syncDirtyEntityKeys[op.key] = true; });
+  rebuildDirtyStateFromOutbox_();
+  if(kept.length){
+    state._sessionUserEdit = true;
+    state.syncDirty = true;
+  } else {
+    state.syncNeedsSnapshot = false;
+    state.syncDirty = false;
+  }
+}
+/** 서버를 기준본으로 받을지. 접속 시 받고, 이 기기 실수정(기획 포함)은 덮지 않는다. */
 function shouldAdoptServerAsTruth_(remotePayload, remoteRevision){
   if(!remotePayload || typeof remotePayload !== 'object') return false;
   remoteRevision = parseInt(remoteRevision, 10) || getPayloadRevision_(remotePayload) || 0;
   if(!remoteRevision) return false;
   if(state._emptyServerSeed && state.syncNeedsSnapshot) return false;
-  if(state._sessionUserEdit && countRealUnpushedMutations_() > 0) return false;
+  var unpushed = countRealUnpushedMutations_();
+  if(unpushed > 0 && unpushed <= REAL_UNPUSHED_PUSH_MAX_) return false;
+  if(outboxHasProtectedMutations_()) return false;
+  if(state.pendingYearPlan && isPendingYearPlanDirty_()) return false;
+  try {
+    if(yearPlanRicherThan_(getPersistPayload(), remotePayload)) return false;
+  } catch(eY){}
   return true;
 }
 function adoptServerAsAuthority_(remotePayload, remoteRevision){
@@ -14396,6 +14484,7 @@ function reconcileLocalWithServerPayload_(localPayload, remotePayload, remoteRev
     adoptServerAsAuthority_(remotePayload, remoteRevision);
     return 'adopted';
   }
+  try { requeueLocalYearPlanIfRicher_(remotePayload); } catch(eRq){}
   return 'push';
 }
 function mergeTrackedSyncEntities_(out, local, remote, preferRemote){
@@ -14983,8 +15072,21 @@ function pruneOutboxAlreadyOnServer_(remote){
       return rVal !== undefined && rVal !== null;
     }
     if(rVal === undefined) return true;
+    if(key.indexOf('plan:year:') === 0){
+      var localRow = unwrapSyncEntityValue_(op.value);
+      var remoteRow = unwrapSyncEntityValue_(rVal);
+      if(key === 'plan:year:meta'){
+        var lg = String((localRow && localRow.goal) || '').trim();
+        var li = String((localRow && localRow.intent) || '').trim();
+        var rg = String((remoteRow && remoteRow.goal) || '').trim();
+        var ri = String((remoteRow && remoteRow.intent) || '').trim();
+        if((lg && lg !== rg) || (li && li !== ri)) return true;
+      } else if(periodHasYearGoalText_(localRow) && !periodHasYearGoalText_(remoteRow)){
+        return true;
+      }
+    }
     try {
-      if(syncValueFingerprint_(op.value) === syncValueFingerprint_(rVal)) return false;
+      if(syncEntitiesEquivalent_(key, op.value, rVal)) return false;
     } catch(eFp){}
     return true;
   });
@@ -15001,6 +15103,11 @@ async function recoverOutboxAfterSlowPush_(){
     var dropped = pruneOutboxAlreadyOnServer_(data.payload);
     var remoteRev = parseInt(data.serverRevision, 10) || getPayloadRevision_(data.payload);
     if(!hasPendingLocalSyncChanges_()){
+      if(requeueLocalYearPlanIfRicher_(data.payload)){
+        save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+        updateSyncStatusUI_();
+        return false;
+      }
       adoptServerAsAuthority_(data.payload, remoteRev);
       save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
       if(typeof setAppToast === 'function'){
@@ -15267,6 +15374,7 @@ async function plannerPullRemoteIntoStateCore_(){
     adoptServerAsAuthority_(remote, remoteRevision);
     return true;
   }
+  try { requeueLocalYearPlanIfRicher_(remote); } catch(eRqPull){}
   // 이 기기 수정분 올리는 중이면 서버 옛 목록과 합치지 않음
   return false;
 }
@@ -16809,9 +16917,15 @@ async function runPlannerBootstrapInBackground_(){
     if(bootstrapData.result === 'success' && bootstrapData.payload){
       var remotePayload = bootstrapData.payload;
       var remoteRevision = parseInt(bootstrapData.serverRevision, 10) || getPayloadRevision_(remotePayload);
-      var sessionOps = (state._sessionUserEdit ? (state.syncOutbox || []) : []).filter(function(op){
+      var sessionOps = (state.syncOutbox || []).filter(function(op){
         return op && op.key && !isDeviceLocalSyncEntityKey_(op.key);
       });
+      if(!sessionOps.length && yearPlanRicherThan_(getPersistPayload(), remotePayload)){
+        requeueLocalYearPlanIfRicher_(remotePayload);
+        sessionOps = (state.syncOutbox || []).filter(function(op){
+          return op && op.key && !isDeviceLocalSyncEntityKey_(op.key);
+        });
+      }
       state._bootstrapChoiceDone = true;
       adoptServerAsAuthority_(remotePayload, remoteRevision);
       if(sessionOps.length){
@@ -20572,7 +20686,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=174').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=175').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){

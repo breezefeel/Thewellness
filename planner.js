@@ -14091,6 +14091,62 @@ function hasPendingLocalSyncChanges_(){
   // syncDirty 단독은 미반영로 치지 않음 — 키·outbox·snapshot 없이 dirty만 남은 고착 방지
   return false;
 }
+/** 실제 미전송 수정만. 기기 로컬 키·비교 잔재 수백 건은 제외 */
+var REAL_UNPUSHED_PUSH_MAX_ = 80;
+var _floodAdoptAt_ = 0;
+function countRealUnpushedMutations_(){
+  var seen = {};
+  var n = 0;
+  (state.syncOutbox || []).forEach(function(op){
+    if(!op || !op.key || isDeviceLocalSyncEntityKey_(op.key)) return;
+    seen[op.key] = true;
+    n++;
+  });
+  Object.keys(state.syncDirtyEntityKeys || {}).forEach(function(k){
+    if(!k || seen[k] || isDeviceLocalSyncEntityKey_(k)) return;
+    n++;
+  });
+  return n;
+}
+/** 이전 세션 잔재(794건 루프)는 올리지 않음. 이 세션에서 고친 것만 푸시. */
+function shouldBlockStaleFloodPush_(){
+  if(state._emptyServerSeed && state.syncNeedsSnapshot) return false;
+  if(state._sessionUserEdit) return false;
+  return countRealUnpushedMutations_() > REAL_UNPUSHED_PUSH_MAX_;
+}
+function requestServerAuthorityInsteadOfFlood_(){
+  var now = Date.now();
+  if(_floodAdoptAt_ && (now - _floodAdoptAt_) < 8000) return;
+  _floodAdoptAt_ = now;
+  try {
+    syncAllSourcesIfNewer_('flood-adopt').catch(function(e){ console.warn('[서버 기준 맞춤]', e); });
+  } catch(e0){}
+}
+function discardStaleUnpushedBeforeConnect_(){
+  if(state._sessionUserEdit || state._emptyServerSeed) return;
+  state.syncOutbox = [];
+  state.syncDirtyEntityKeys = {};
+  state.syncNeedsSnapshot = false;
+  state.syncDirty = false;
+}
+/** 서버를 기준본으로 받을지. 접속 시 받고, 이 세션에서 고친 것만 올린다. */
+function shouldAdoptServerAsTruth_(remotePayload, remoteRevision){
+  if(!remotePayload || typeof remotePayload !== 'object') return false;
+  remoteRevision = parseInt(remoteRevision, 10) || getPayloadRevision_(remotePayload) || 0;
+  if(!remoteRevision) return false;
+  if(state._emptyServerSeed && state.syncNeedsSnapshot) return false;
+  if(state._sessionUserEdit && countRealUnpushedMutations_() > 0) return false;
+  return true;
+}
+function adoptServerAsAuthority_(remotePayload, remoteRevision){
+  adoptServerPayloadAuthoritatively_(remotePayload, remoteRevision);
+  state._postAdoptMigration = false;
+  state.syncDirty = false;
+  state.syncDirtyEntityKeys = {};
+  state.syncNeedsSnapshot = false;
+  state.syncOutbox = [];
+  markLocalInSyncWithServer_(remotePayload || { syncRevision: remoteRevision });
+}
 /** 서버 반영 성공 후 로컬 미반영 플래그를 전부 끔 (미반영 1건 루프 차단) */
 function markLocalInSyncWithServer_(serverPayload, opts){
   opts = opts || {};
@@ -14103,6 +14159,7 @@ function markLocalInSyncWithServer_(serverPayload, opts){
   state.syncDirty = false;
   state._applyMigrated = false;
   state._postAdoptMigration = false;
+  state._emptyServerSeed = false;
   try {
     markGasSyncOk_(rev, (serverPayload && serverPayload.savedAt) || null);
   } catch(eMk){}
@@ -14194,45 +14251,22 @@ function adoptServerPayloadAuthoritatively_(remotePayload, remoteRevision){
       state._postAdoptMigration = true;
     }
   } catch(eAdoptDedupe){}
-  // adopt 중 마이그레이션이 내용을 바꿨으면 이후 patch/snapshot으로 올리도록 dirty 복구
+  // 서버를 받은 뒤 로컬 단계 정리가 있어도 다시 전체 업로드하지 않음 (폰 794건 루프 원인)
   if(state._postAdoptMigration){
-    state.syncDirty = true;
-    state.syncNeedsSnapshot = true;
     state._postAdoptMigration = false;
   }
 }
 /**
- * GAS 기준 + 로컬 dirty 예외.
- * @returns {'adopted'|'merged'|'conflict'|'noop'}
+ * 서버 기준본. 이 세션 수정만 올리는 중이면 'push'.
+ * @returns {'adopted'|'push'}
  */
 function reconcileLocalWithServerPayload_(localPayload, remotePayload, remoteRevision){
   remoteRevision = parseInt(remoteRevision, 10) || getPayloadRevision_(remotePayload);
-  ensureOutboxFromLegacyDirty_(localPayload || getPersistPayload());
-  if(!hasPendingLocalSyncChanges_()){
-    var localNow = localPayload || getPersistPayload();
-    var localMs = getPayloadSavedMs_(localNow);
-    var remoteMs = getPayloadSavedMs_(remotePayload);
-    // dirty 소실 시에도, 이 기기 저장이 더 최신·내용이 다르면 서버 옛 배정으로 덮지 않음
-    if(localMs > remoteMs){
-      var localFp = plannerSyncFingerprint_(localNow);
-      var remoteFp = plannerSyncFingerprint_(remotePayload);
-      if(localFp && remoteFp && localFp !== remoteFp){
-        applyServerPayloadPreservingOutbox_(remotePayload, remoteRevision);
-        state.syncDirty = true;
-        state.syncNeedsSnapshot = true;
-        return 'merged';
-      }
-    }
-    adoptServerPayloadAuthoritatively_(remotePayload, remoteRevision);
+  if(shouldAdoptServerAsTruth_(remotePayload, remoteRevision)){
+    adoptServerAsAuthority_(remotePayload, remoteRevision);
     return 'adopted';
   }
-  // 미업로드 로컬 수정 있음 → 겹친 항목만 충돌 UI, 없으면 outbox 보존 병합
-  if(openPlannerConflict_(localPayload || getPersistPayload(), remotePayload, remoteRevision)){
-    // true지만 pending이 없으면 대량 충돌 자동해결 완료 → 추가 merge 금지
-    return plannerSyncConflictPending_ ? 'conflict' : 'merged';
-  }
-  applyServerPayloadPreservingOutbox_(remotePayload, remoteRevision);
-  return 'merged';
+  return 'push';
 }
 function mergeTrackedSyncEntities_(out, local, remote, preferRemote){
   // skipEnsureIds: 맵 단위 병합이 끝난 뒤 엔티티 LWW만 — id 재마이그레이션·대량 clone 방지
@@ -14792,7 +14826,11 @@ function pruneOrphanSubGoalStepOutbox_(){
   }
 }
 function schedulePlannerGasPush_(immediate){
-  if(!plannerSyncBootstrapReady_ || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return;
+  if(!plannerSyncBootstrapReady_ || !state._bootstrapChoiceDone || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return;
+  if(shouldBlockStaleFloodPush_()){
+    requestServerAuthorityInsteadOfFlood_();
+    return;
+  }
   if(!getPlannerGasUrl_() || location.protocol === 'file:') return;
   try {
     if(clearStuckSyncFlagsIfClean_(null)){
@@ -14905,35 +14943,12 @@ async function plannerPullRemoteIntoStateCore_(){
   }
 
   if(!remote) return false;
-  var localRevNow = parseInt(state.syncRevision, 10) || 0;
-  // 최신 직후 로컬 삭제·수정: 서버 revision이 같으면 옛 목록과 합치지 않음 (삭제 복구·가짜 충돌 방지)
-  if(state.syncDirty && remoteRevision === localRevNow &&
-      ((state.syncOutbox || []).length || Object.keys(state.syncDirtyEntityKeys || {}).length)){
-    return false;
+  if(shouldAdoptServerAsTruth_(remote, remoteRevision)){
+    adoptServerAsAuthority_(remote, remoteRevision);
+    return true;
   }
-  if(state.syncDirty && remoteRevision !== localRevNow){
-    if((state.syncOutbox || []).length){
-      applyServerPayloadPreservingOutbox_(remote, remoteRevision);
-      return true;
-    }
-    return reconcileRemoteBeforeWrite_(body, remote, remoteRevision);
-  }
-  var merged = mergePlannerPayloads_(body, remote);
-  if(plannerSyncFingerprint_(body) === plannerSyncFingerprint_(merged)){
-    state.syncRevision = remoteRevision || getPayloadRevision_(remote);
-    state.syncEntityRevisions = ensureSyncEntityRevisions_(remote);
-    state.syncEntityTombstones = Object.assign({}, remote.syncEntityTombstones || {});
-    state.syncBaseEntityUpdatedAt = Object.assign({}, remote.syncEntityUpdatedAt || {});
-    return false;
-  }
-  var remoteWins = preferRemotePayload_(body, remote);
-  if(remoteWins) invalidateStalePendingPlans_();
-  applyPersistPayload(merged, { skipRestorePending: remoteWins });
-  state.syncRevision = remoteRevision || getPayloadRevision_(merged);
-  state.syncEntityRevisions = ensureSyncEntityRevisions_(remote);
-  state.syncEntityTombstones = Object.assign({}, remote.syncEntityTombstones || {});
-  state.syncBaseEntityUpdatedAt = Object.assign({}, state.syncDirty ? (remote.syncEntityUpdatedAt || {}) : (merged.syncEntityUpdatedAt || {}));
-  return true;
+  // 이 기기 수정분 올리는 중이면 서버 옛 목록과 합치지 않음
+  return false;
 }
 async function plannerPullRemoteIntoState_(){
   return withPlannerSyncMutex_(function(){ return plannerPullRemoteIntoStateCore_(); });
@@ -14959,6 +14974,16 @@ async function plannerGasPushNow_(){
       var storedRev = readStoredSyncRev_(GAS_LAST_SYNC_REV_KEY);
       skipPull = prePatch && locRev > 0 && locRev === storedRev;
     } catch(eSkipPull){}
+    if(shouldBlockStaleFloodPush_()){
+      var adoptedFlood = await plannerPullRemoteIntoStateCore_();
+      if(adoptedFlood){
+        try {
+          save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+        } catch(eFloodSv){}
+      }
+      try { updateSyncStatusUI_(); } catch(eFloodUi){}
+      return { ok: true, adopted: !!adoptedFlood };
+    }
     if(!skipPull) await plannerPullRemoteIntoStateCore_();
     if(plannerSyncConflictPending_) return { ok: false, conflict: true };
     if(!hasPendingLocalSyncChanges_()){
@@ -15666,7 +15691,11 @@ function kickPendingSyncIfIdle_(info){
   if(info.phase !== 'pending' && info.phase !== 'queued') return;
   if(_plannerSyncUiBusy || plannerGasPushTimer || plannerGasRetryTimer_) return;
   if(plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return;
-  if(!plannerSyncBootstrapReady_) return;
+  if(!plannerSyncBootstrapReady_ || !state._bootstrapChoiceDone) return;
+  if(shouldBlockStaleFloodPush_()){
+    requestServerAuthorityInsteadOfFlood_();
+    return;
+  }
   var now = Date.now();
   if(_syncPendingKickAt_ && (now - _syncPendingKickAt_) < 3000) return;
   _syncPendingKickAt_ = now;
@@ -16412,99 +16441,55 @@ async function runPlannerBootstrapInBackground_(){
       );
     }
     await yieldPlannerBootstrapUi_(null);
+    discardStaleUnpushedBeforeConnect_();
     // 비교 전에 integrity를 돌리면 로컬만 바뀌어 F5마다 「선택」창이 뜸 → 비교 후에만 정리
     var bootstrapData = await verifyPlannerServerReachable_();
     await yieldPlannerBootstrapUi_(null);
     if(bootstrapData.result === 'success' && bootstrapData.payload){
       var remotePayload = bootstrapData.payload;
       var remoteRevision = parseInt(bootstrapData.serverRevision, 10) || getPayloadRevision_(remotePayload);
-      var localPayload = getPersistPayload();
-      var localRev = parseInt(state.syncRevision, 10) || 0;
-
-      function finishBootstrapAlreadyInSync_(msg){
-        state._bootstrapChoiceDone = true;
-        markGasSyncOk_(remoteRevision, remotePayload.savedAt || remotePayload.localSavedAt);
+      var sessionOps = (state._sessionUserEdit ? (state.syncOutbox || []) : []).filter(function(op){
+        return op && op.key && !isDeviceLocalSyncEntityKey_(op.key);
+      });
+      state._bootstrapChoiceDone = true;
+      adoptServerAsAuthority_(remotePayload, remoteRevision);
+      if(sessionOps.length){
+        state.syncOutbox = sessionOps;
         try {
-          state._forceStepIntegrityPass = true;
-          // skipGasPush: integrity가 snapshot dirty를 다시 켜도 아래에서 정리·필요 시만 푸시
-          runPlannerStepIntegrityPass_({ toast: false, render: false, skipGasPush: true });
-        } catch(eIntOk){}
-        // 「남은 1건」고착 원인: 이미 맞춘 뒤 integrity가 syncNeedsSnapshot만 다시 켬
-        try {
-          if(clearStuckSyncFlagsIfClean_(remotePayload)){
-            save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
-          }
-        } catch(eClrOk){}
-        if(hasPendingLocalSyncChanges_()){
-          try { schedulePlannerGasPush_(true); } catch(ePushOk){}
-        }
-        try { updateSyncStatusUI_(); } catch(eUiOk){}
-        if(msg && typeof setAppToast === 'function'){
-          setAppToast(msg, { duration: 2800, variant: 'ok' });
-        }
-      }
-
-      // 같은 revision = 이미 같은 세대. 선택창 금지.
-      // F5마다 「남은 N건」·서버/기기 선택이 뜨던 원인: 전송 완료 잔재 dirty/outbox + 메타 노이즈
-      if(localRev > 0 && remoteRevision > 0 && localRev === remoteRevision){
-        try {
-          prunePhantomSyncDirtyKeys_(localPayload, remotePayload);
-          localPayload = getPersistPayload();
-        } catch(ePrSame){}
-
-        var diffReportSame = { counts: {}, items: [] };
-        try { diffReportSame = buildBootstrapDiffReport_(localPayload, remotePayload); } catch(eDiffSame){}
-        var actionableSame = false;
-        try { actionableSame = bootstrapDiffReportHasActionableDiff_(diffReportSame); } catch(eAct){}
-        var fpSame = false;
-        try { fpSame = plannerSyncFingerprint_(localPayload) === plannerSyncFingerprint_(remotePayload); } catch(eFp){}
-
-        // 실질 콘텐츠 차이 없으면 dirty/outbox/snapshot 전부 폐기 (가짜「남은 1건」루프)
-        if(!actionableSame || fpSame){
-          markLocalInSyncWithServer_(remotePayload);
-          try {
-            save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
-          } catch(eSv0){}
-          finishBootstrapAlreadyInSync_('서버와 이미 같은 내용이에요.');
-          return;
-        }
-
-        // 같은 rev인데 로컬에만 남은 실제 수정 → 선택창 없이 조용히 업로드
-        finishBootstrapAlreadyInSync_('');
-        return;
-      }
-
-      if(plannerSyncFingerprint_(localPayload) === plannerSyncFingerprint_(remotePayload)){
-        try { prunePhantomSyncDirtyKeys_(localPayload, remotePayload); } catch(ePrFp){}
-        markLocalInSyncWithServer_(remotePayload);
+          var overlaid = overlayOutboxOnPayload_(getPersistPayload());
+          applyPersistPayload(overlaid, {
+            skipRestorePending: true,
+            replaceDeletedDraftIds: true,
+            deferHeavyRepair: true
+          });
+        } catch(eOv){}
+        state.syncOutbox = sessionOps;
+        try { rebuildDirtyStateFromOutbox_(); } catch(eRep){}
+        state._sessionUserEdit = true;
+        state.syncDirty = true;
         try {
           save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
-        } catch(eSvFp){}
-        finishBootstrapAlreadyInSync_('서버와 이미 같은 내용이에요.');
-        return;
-      }
-
-      var diffReport = { counts: {}, items: [] };
-      try { diffReport = buildBootstrapDiffReport_(localPayload, remotePayload); } catch(eDiff0){}
-      // 실질 콘텐츠 차이 없고 미전송도 없으면(메타·updatedAt 노이즈) 선택 창 생략
-      if(!bootstrapDiffReportHasActionableDiff_(diffReport) && !hasPendingLocalSyncChanges_()){
-        try { prunePhantomSyncDirtyKeys_(localPayload, remotePayload); } catch(ePr2){}
-        markLocalInSyncWithServer_(remotePayload);
+        } catch(eAdSv2){}
+        try { renderTabs(); renderMain(); } catch(eAdR2){}
+        try { schedulePlannerGasPush_(true); } catch(eBootPush){}
+        try { updateSyncStatusUI_(); } catch(eBootU){}
+        if(typeof setAppToast === 'function'){
+          setAppToast('서버를 받은 뒤, 이 기기에서 고친 ' + sessionOps.length + '건을 올립니다…', { duration: 3600, variant: 'ok' });
+        }
+      } else {
         try {
           save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
-        } catch(eSv2){}
-        finishBootstrapAlreadyInSync_('서버와 이미 같은 내용이에요.');
-        return;
-      }
-
-      // revision이 다를 때만 서버/이 기기 선택 (다른 기기에서 바뀐 경우)
-      openPlannerBootstrapSyncChoice_(localPayload, remotePayload, remoteRevision);
-      if(typeof setAppToast === 'function'){
-        setAppToast('서버와 비교했어요. 내려받을 내용을 확인한 뒤 적용해 주세요.', { duration: 5500, variant: 'ok' });
+        } catch(eAdSv){}
+        try { renderTabs(); renderMain(); } catch(eAdR){}
+        try { updateSyncStatusUI_(); } catch(eAdU){}
+        if(typeof setAppToast === 'function'){
+          setAppToast('서버 내용으로 맞췄어요.', { duration: 3200, variant: 'ok' });
+        }
       }
       return;
     } else if(bootstrapData.result === 'empty'){
       state._bootstrapChoiceDone = true;
+      state._emptyServerSeed = true;
       state.syncDirty = true;
       state.syncNeedsSnapshot = true;
       save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
@@ -17273,13 +17258,14 @@ async function runPlannerBootstrapSync_(){
   plannerSyncBootstrapRunning_ = true;
   state._bootstrapDeferHeavy = true;
   state._bootstrapUnlockedEarly = true;
+  discardStaleUnpushedBeforeConnect_();
 
   // 핵심: 서버 pull/JSON 파싱이 끝나기 전에 UI를 연다.
   // (대용량 응답 파싱 중에는 setTimeout 도 밀려 「확인 중」이 1분씩 남음)
     unlockPlannerBootstrapLocal_({
       toast: isPlannerLocalStoreHeavy_()
-        ? '이 기기 데이터로 바로 열었어요. 곧 서버 내용을 받아 미리보기로 확인할 수 있어요.'
-        : '편집을 먼저 열었어요. 서버 내용을 확인한 뒤 내려받을지 선택합니다.',
+        ? '이 기기 데이터로 바로 열었어요. 곧 서버 내용으로 맞춥니다.'
+        : '편집을 먼저 열었어요. 곧 서버 내용을 받습니다.',
       toastMs: 4200,
       skipRender: true
     });
@@ -18294,13 +18280,12 @@ async function syncAllSourcesIfNewerCore_(reason){
 
   if(!remote) return false;
 
-  // 팀 모드·온라인 복귀: GAS 기준. 로컬 dirty가 있을 때만 충돌/부분 병합.
   var mode = reconcileLocalWithServerPayload_(localPayload, remote, remoteRevision || getPayloadRevision_(remote));
-  if(mode === 'conflict'){
-    renderTabs();
-    renderMain();
+  if(mode === 'push'){
+    markSyncReason_(reason || 'auto');
     updateSyncStatusUI_();
-    return false;
+    if(plannerSyncBootstrapReady_) schedulePlannerGasPush_(true);
+    return true;
   }
   save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
   updateApiBadge();
@@ -18315,11 +18300,8 @@ async function syncAllSourcesIfNewerCore_(reason){
   markSyncReason_(reason || 'auto');
   if(remoteSource === '서버') markGasSyncOk_(state.syncRevision, remote.savedAt || remote.localSavedAt);
   updateSyncStatusUI_();
-  if(mode === 'merged' && hasPendingLocalSyncChanges_() && plannerSyncBootstrapReady_){
-    schedulePlannerGasPush_(true);
-  }
-  if(mode === 'adopted' && reason === 'online' && typeof setAppToast === 'function'){
-    setAppToast((remoteSource || '서버') + ' 최신 데이터로 맞췄어요.', { duration: 3200, variant: 'ok' });
+  if(mode === 'adopted' && (reason === 'online' || reason === 'manual' || reason === 'focus') && typeof setAppToast === 'function'){
+    setAppToast((remoteSource || '서버') + ' 내용으로 맞췄어요.', { duration: 3200, variant: 'ok' });
   }
   return true;
 }
@@ -19068,6 +19050,7 @@ function save(opts) {
     if(!o.skipMarkDirty){
       state.syncDirty = true;
       state.syncNeedsSnapshot = true;
+      state._sessionUserEdit = true;
       plannerDirtyGeneration_++;
     }
     var emergencyStr = JSON.stringify(getLocalStoragePayload());
@@ -19111,7 +19094,10 @@ function save(opts) {
     if(untrackedChanged) state.syncNeedsSnapshot = true;
     rebuildDirtyStateFromOutbox_();
     if(untrackedChanged) state.syncDirty = true;
-    if(becameDirty) plannerDirtyGeneration_++;
+    if(becameDirty){
+      state._sessionUserEdit = true;
+      plannerDirtyGeneration_++;
+    }
   }
   var payload = JSON.stringify(getLocalStoragePayload());
   var ok = writeLocalStoragePayloadString_(payload);

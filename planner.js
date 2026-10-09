@@ -10303,6 +10303,8 @@ let plannerGasRetryCount_ = 0;
 let plannerGasRetryDueAt_ = 0;
 let _syncSendingNow_ = 0;
 let _syncSendingSnapshot_ = false;
+let _syncTransferStartedAt_ = 0;
+let _syncFastAckPending_ = true;
 let _syncProgressTickTimer_ = null;
 let plannerDirtyGeneration_ = 0;
 let plannerLastSyncError_ = '';
@@ -14160,6 +14162,7 @@ function markLocalInSyncWithServer_(serverPayload, opts){
   state._applyMigrated = false;
   state._postAdoptMigration = false;
   state._emptyServerSeed = false;
+  _syncFastAckPending_ = true;
   try {
     markGasSyncOk_(rev, (serverPayload && serverPayload.savedAt) || null);
   } catch(eMk){}
@@ -14683,30 +14686,125 @@ function ensureOutboxFromLegacyDirty_(payload){
     state.syncDirty = false;
   }
 }
-var SYNC_OUTBOX_PATCH_BATCH_ = 80;
+var SYNC_OUTBOX_PATCH_MAX_ITEMS_ = 12;
+var SYNC_OUTBOX_PATCH_MAX_BYTES_ = 40000;
+var SYNC_OUTBOX_PATCH_FIRST_ITEMS_ = 8;
+var SYNC_OUTBOX_PATCH_FIRST_BYTES_ = 16000;
 function canPlannerPatchPushFast_(){
-  if(state.syncNeedsSnapshot) return false;
   if((parseInt(state.syncProtocolVersion, 10) || 1) < 2) return false;
   if((state.syncOutbox || []).length) return true;
   return Object.keys(state.syncDirtyEntityKeys || {}).length > 0;
+}
+function syncMutationLightness_(op){
+  var key = String((op && op.key) || '');
+  if(op && op.deleted) return 0;
+  if(key.indexOf('deleted:') === 0) return 0;
+  if(key.indexOf('draft:') === 0 || key.indexOf('override:') === 0 || key.indexOf('pinned:') === 0) return 1;
+  if(key.indexOf('generated:') === 0 || key.indexOf('published:') === 0) return 3;
+  if(key.indexOf('plan:') === 0) return 2;
+  return 2;
+}
+function toPlannerSyncMutation_(op){
+  return {
+    mutationId: op.mutationId,
+    version: parseInt(op.version, 10) || 1,
+    key: op.key,
+    value: op.deleted ? null : cloneSyncValue_(op.value),
+    deleted: !!op.deleted,
+    baseEntityRevision: parseInt(op.baseEntityRevision, 10) || 0,
+    updatedAt: op.updatedAt || new Date().toISOString()
+  };
+}
+function syncMutationBytes_(mut){
+  try { return JSON.stringify(mut).length; } catch(e){ return 4000; }
+}
+function plannerPushTimeoutMs_(bodyBytes, snapshot){
+  var n = parseInt(bodyBytes, 10) || 0;
+  if(snapshot){
+    return Math.max(90000, Math.min(180000, 60000 + Math.ceil(n / 20000) * 15000));
+  }
+  // 삭제 조각(수 KB)은 25~35초, 40KB는 약 70초. 용량이 클수록만 더 기다림
+  return Math.max(25000, Math.min(150000, 22000 + Math.ceil(n / 8000) * 10000));
 }
 function buildPendingSyncMutations_(payload){
   ensureOutboxFromLegacyDirty_(payload);
   migrateIndexedPlanEntityKeysInPayload_(payload || {}, state.syncOutbox);
   var sorted = (state.syncOutbox || []).slice().sort(function(a, b){
+    var light = syncMutationLightness_(a) - syncMutationLightness_(b);
+    if(light) return light;
     return compareSyncEntityKeysForApply_(a && a.key, b && b.key);
   });
-  return sorted.slice(0, SYNC_OUTBOX_PATCH_BATCH_).map(function(op){
-    return {
-      mutationId: op.mutationId,
-      version: parseInt(op.version, 10) || 1,
-      key: op.key,
-      value: op.deleted ? null : cloneSyncValue_(op.value),
-      deleted: !!op.deleted,
-      baseEntityRevision: parseInt(op.baseEntityRevision, 10) || 0,
-      updatedAt: op.updatedAt || new Date().toISOString()
-    };
+  var first = !!_syncFastAckPending_;
+  var maxItems = first ? SYNC_OUTBOX_PATCH_FIRST_ITEMS_ : SYNC_OUTBOX_PATCH_MAX_ITEMS_;
+  var maxBytes = first ? SYNC_OUTBOX_PATCH_FIRST_BYTES_ : SYNC_OUTBOX_PATCH_MAX_BYTES_;
+  var out = [];
+  var bytes = 2;
+  for(var i = 0; i < sorted.length; i++){
+    if(!sorted[i] || !sorted[i].key) continue;
+    var mut = toPlannerSyncMutation_(sorted[i]);
+    var n = syncMutationBytes_(mut);
+    if(out.length && (out.length >= maxItems || bytes + n > maxBytes)) break;
+    out.push(mut);
+    bytes += n + 1;
+  }
+  return out;
+}
+function pruneOutboxAlreadyOnServer_(remote){
+  if(!remote || typeof remote !== 'object') return 0;
+  var remoteEnts = {};
+  try { remoteEnts = collectSyncEntities_(remote, { skipEnsureIds: true }) || {}; } catch(eEnt){}
+  var remoteDeleted = remote.deletedDraftIds || {};
+  var before = (state.syncOutbox || []).length;
+  if(!before) return 0;
+  state.syncOutbox = (state.syncOutbox || []).filter(function(op){
+    if(!op || !op.key) return false;
+    var key = String(op.key);
+    if(key.indexOf('deleted:') === 0){
+      var delId = key.slice('deleted:'.length);
+      if(Object.prototype.hasOwnProperty.call(remoteEnts, key) || remoteDeleted[delId]) return false;
+      return true;
+    }
+    var rVal = remoteEnts[key];
+    if(op.deleted){
+      return rVal !== undefined && rVal !== null;
+    }
+    if(rVal === undefined) return true;
+    try {
+      if(syncValueFingerprint_(op.value) === syncValueFingerprint_(rVal)) return false;
+    } catch(eFp){}
+    return true;
   });
+  if((state.syncOutbox || []).length !== before){
+    try { rebuildDirtyStateFromOutbox_(); } catch(eReb){}
+  }
+  return before - (state.syncOutbox || []).length;
+}
+async function recoverOutboxAfterSlowPush_(){
+  try {
+    var data = await plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_PULL_TIMEOUT_MS);
+    applyPlannerServerCaps_(data, true);
+    if(!(data && data.result === 'success' && data.payload)) return false;
+    var dropped = pruneOutboxAlreadyOnServer_(data.payload);
+    var remoteRev = parseInt(data.serverRevision, 10) || getPayloadRevision_(data.payload);
+    if(!hasPendingLocalSyncChanges_()){
+      adoptServerAsAuthority_(data.payload, remoteRev);
+      save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+      if(typeof setAppToast === 'function'){
+        setAppToast('서버에 이미 반영되어 있어요.', { duration: 3200, variant: 'ok' });
+      }
+      updateSyncStatusUI_();
+      return true;
+    }
+    if(dropped && typeof setAppToast === 'function'){
+      setAppToast('이미 반영된 ' + dropped + '건을 빼고 이어서 올립니다.', { duration: 3600, variant: 'ok' });
+    }
+    if(remoteRev) state.syncRevision = Math.max(parseInt(state.syncRevision, 10) || 0, remoteRev);
+    save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+    updateSyncStatusUI_();
+  } catch(eRec){
+    console.warn('[느린 전송 복구]', eRec);
+  }
+  return false;
 }
 function acknowledgeSyncOutbox_(accepted, sentMutations){
   var ackVer = {};
@@ -14743,6 +14841,7 @@ function acknowledgeSyncOutbox_(accepted, sentMutations){
     return true;
   });
   rebuildDirtyStateFromOutbox_();
+  _syncFastAckPending_ = false;
 }
 function overlayOutboxOnPayload_(payload){
   var ops = state.syncOutbox || [];
@@ -14896,17 +14995,24 @@ function schedulePlannerGasRetry_(error){
   if(plannerGasRetryTimer_) return;
   plannerGasRetryCount_++;
   var slow = isSyncTimeoutOrSlowError_(error);
+  if(slow) _syncFastAckPending_ = true;
   plannerLastSyncError_ = slow
     ? '서버 응답이 지연되어 자동 재시도 중'
     : String((error && error.message) || error || '서버 동기화 지연');
   var delay = slow
-    ? Math.min(20000, 4000 * Math.pow(2, Math.min(plannerGasRetryCount_ - 1, 2)))
+    ? Math.min(45000, 20000 * Math.pow(2, Math.min(plannerGasRetryCount_ - 1, 1)))
     : Math.min(60 * 1000, 3000 * Math.pow(2, Math.min(plannerGasRetryCount_ - 1, 6)));
   plannerGasRetryDueAt_ = Date.now() + delay;
   plannerGasRetryTimer_ = setTimeout(function(){
     plannerGasRetryTimer_ = null;
     plannerGasRetryDueAt_ = 0;
-    plannerGasPushNow_().catch(function(err){ console.warn('[서버 동기화 재시도]', err); });
+    (async function(){
+      if(slow){
+        var already = await recoverOutboxAfterSlowPush_();
+        if(already) return;
+      }
+      await plannerGasPushNow_();
+    })().catch(function(err){ console.warn('[서버 동기화 재시도]', err); });
   }, delay);
   updateSyncStatusUI_();
 }
@@ -14969,10 +15075,11 @@ async function plannerGasPushNow_(){
     try {
       var preBody = getPersistPayload();
       var preMut = buildPendingSyncMutations_(preBody);
-      var prePatch = preMut.length > 0 && !state.syncNeedsSnapshot && (state.syncProtocolVersion || 1) >= 2;
+      var prePatch = preMut.length > 0 && (state.syncProtocolVersion || 1) >= 2;
+      if(prePatch) state.syncNeedsSnapshot = false;
       var locRev = parseInt(state.syncRevision, 10) || 0;
       var storedRev = readStoredSyncRev_(GAS_LAST_SYNC_REV_KEY);
-      skipPull = prePatch && locRev > 0 && locRev === storedRev;
+      skipPull = prePatch;
     } catch(eSkipPull){}
     if(shouldBlockStaleFloodPush_()){
       var adoptedFlood = await plannerPullRemoteIntoStateCore_();
@@ -14998,7 +15105,8 @@ async function plannerGasPushNow_(){
     migrateIndexedPlanEntityKeysInPayload_(body, state.syncOutbox);
     var mutations = buildPendingSyncMutations_(body);
     var requestDirtyGeneration = plannerDirtyGeneration_;
-    var usePatch = mutations.length > 0 && !state.syncNeedsSnapshot && state.syncProtocolVersion >= 2;
+    var usePatch = mutations.length > 0 && state.syncProtocolVersion >= 2;
+    if(usePatch) state.syncNeedsSnapshot = false;
     var maxPatchRounds = usePatch ? 12 : 1;
     var round = 0;
     var lastOkRevision = state.syncRevision;
@@ -15012,9 +15120,9 @@ async function plannerGasPushNow_(){
         migrateIndexedPlanEntityKeysInPayload_(body, state.syncOutbox);
         mutations = buildPendingSyncMutations_(body);
         if(!mutations.length || state.syncNeedsSnapshot || state.syncProtocolVersion < 2) break;
-        if((state.syncOutbox || []).length > SYNC_OUTBOX_PATCH_BATCH_ && typeof setAppToast === 'function'){
+        if((state.syncOutbox || []).length > mutations.length && typeof setAppToast === 'function'){
           setAppToast(
-            '대량 변경을 나눠 저장 중이에요. 남은 ' +
+            '나눠 저장 중이에요. 남은 ' +
               Math.max(0, (state.syncOutbox || []).length - mutations.length) +
               '건…',
             { duration: 2800, variant: 'ok' }
@@ -15035,20 +15143,22 @@ async function plannerGasPushNow_(){
           payload: body,
           baseRevision: parseInt(state.syncRevision, 10) || 0
         };
+    var requestBody = plannerGasRequestBody_(requestPayload);
     var pushController = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    var pushTimeout = pushController ? setTimeout(function(){ pushController.abort(); }, 90000) : null;
+    var pushTimeoutMs = plannerPushTimeoutMs_(requestBody.length, !usePatch);
+    var pushTimeout = pushController ? setTimeout(function(){ pushController.abort(); }, pushTimeoutMs) : null;
     var r;
     try {
       r = await fetch(url, {
       method: 'POST',
       mode: 'cors',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: plannerGasRequestBody_(requestPayload),
+      body: requestBody,
       signal: pushController ? pushController.signal : undefined
       });
     } catch(fetchErr){
       if(fetchErr && fetchErr.name === 'AbortError'){
-        throw new Error('서버 응답이 조금 오래 걸려요. (약 90초) 데이터가 크거나 Apps Script가 느릴 때 나와요. 자동으로 다시 시도합니다.');
+        throw new Error('서버 응답이 오래 걸려요. 같은 묶음을 처음부터 다시 보내지 않고, 반영된 건만 빼고 이어갑니다.');
       }
       throw fetchErr;
     } finally {
@@ -15580,6 +15690,7 @@ let _syncStatusUiTimer = null;
 let _syncStatusModalRemote = null;
 function withPlannerSyncMutex_(fn){
   _plannerSyncUiBusy = true;
+  if(!_syncTransferStartedAt_) _syncTransferStartedAt_ = Date.now();
   updateSyncStatusUI_();
   var run = _plannerSyncMutexTail.then(function(){
     return fn();
@@ -15587,6 +15698,7 @@ function withPlannerSyncMutex_(fn){
     return fn();
   }).finally(function(){
     _plannerSyncUiBusy = false;
+    if(!hasPendingLocalSyncChanges_()) _syncTransferStartedAt_ = 0;
     updateSyncStatusUI_();
     if(_syncPushAgain_){
       _syncPushAgain_ = false;
@@ -15645,10 +15757,21 @@ function countPendingSyncItems_(){
 function noteSyncSending_(n, snapshot){
   _syncSendingNow_ = parseInt(n, 10) || 0;
   _syncSendingSnapshot_ = !!snapshot;
+  if(!_syncTransferStartedAt_) _syncTransferStartedAt_ = Date.now();
 }
 function clearSyncSending_(){
   _syncSendingNow_ = 0;
   _syncSendingSnapshot_ = false;
+}
+function formatSyncElapsed_(fromAt){
+  var started = fromAt || _syncTransferStartedAt_;
+  if(!started) return '';
+  var sec = Math.floor((Date.now() - started) / 1000);
+  if(sec < 3) return '';
+  if(sec < 60) return sec + '초';
+  var m = Math.floor(sec / 60);
+  var s = sec % 60;
+  return s ? (m + '분 ' + s + '초') : (m + '분');
 }
 function syncRetryWaitSec_(){
   if(!plannerGasRetryDueAt_) return 0;
@@ -15662,28 +15785,31 @@ function formatSyncPendingPhrase_(n, snapshot){
 }
 function formatSyncHeaderSub_(info){
   var n = info.pendingCount || 0;
-  var nTxt = formatSyncPendingPhrase_(n, info.sendingSnapshot);
+  var left = n > 0 ? ('남은 ' + n + '건') : '';
   if(info.phase === 'transferring'){
-    if(info.sendingNow > 0 && n > info.sendingNow){
-      return '전송 ' + info.sendingNow + '/' + n + '건';
-    }
-    return nTxt ? ('전송 · ' + nTxt) : '전송 중';
+    var bits = [];
+    if(left) bits.push(left);
+    if(info.sendingNow > 0 && n > info.sendingNow) bits.push('이번 ' + info.sendingNow);
+    if(plannerGasRetryCount_ > 0) bits.push('재시도 ' + plannerGasRetryCount_ + '회');
+    var elapsed = formatSyncElapsed_();
+    if(elapsed) bits.push(elapsed);
+    return bits.join(' · ') || '전송 중';
   }
   if(info.phase === 'retry_wait'){
     var sec = info.retryInSec || 0;
-    var wait = sec > 0 ? (sec + '초 후') : '재시도';
-    return nTxt ? (wait + ' · ' + nTxt) : wait;
+    var wait = sec > 0 ? (sec + '초 후 확인') : '재시도';
+    return left ? (left + ' · ' + wait) : wait;
   }
   if(info.phase === 'queued'){
-    return nTxt ? ('곧 · ' + nTxt) : '곧 전송';
+    return left || '곧 전송';
   }
   if(info.phase === 'checking') return '서버 확인';
   if(info.phase === 'pull') return '받을 내용';
   if(info.phase === 'pending'){
-    return n > 0 ? ('남은 ' + n + '건') : '반영 대기';
+    return left || '반영 대기';
   }
   if(info.overall === 'ok') return '최신 · ' + info.localRev;
-  if(info.overall === 'warn') return nTxt ? ('다시 시도 · ' + nTxt) : '확인 필요';
+  if(info.overall === 'warn') return left ? ('다시 시도 · ' + left) : '확인 필요';
   return String(info.localRev || '');
 }
 let _syncPendingKickAt_ = 0;
@@ -22593,12 +22719,57 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
       <span class="topic-drag-handle" title="끌어서 단계 이동" aria-hidden="true">⠿</span>
       <div class="card-topic">${escapeHtml(lineTitle)}</div>
       <div class="topic-line-meta">${badges}</div>
-      <button type="button" class="topic-line-more" onclick="event.stopPropagation();var card=this.closest('.draft-card');card.classList.toggle('more-open');this.setAttribute('aria-expanded', card.classList.contains('more-open')?'true':'false');">자세히</button>
+      <button type="button" class="topic-line-more" onclick="toggleTopicLineMore_(this,event)">자세히</button>
     </div>
     <div class="card-more-body" onclick="event.stopPropagation()">${moreBody}</div>
   </div>`;
 }
 
+function findTopicLineScrollParent_(el){
+  var node = el && el.parentElement;
+  while(node && node !== document.body && node !== document.documentElement){
+    var st = window.getComputedStyle(node);
+    var oy = st.overflowY || st.overflow;
+    if((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight + 2){
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return document.scrollingElement || document.documentElement;
+}
+function scrollByExpandedTopicHeight_(scroller, delta){
+  if(!(delta > 0)) return;
+  if(scroller === document.scrollingElement || scroller === document.documentElement || scroller === document.body){
+    window.scrollBy(0, delta);
+  } else {
+    scroller.scrollTop += delta;
+  }
+}
+function toggleTopicLineMore_(btn, ev){
+  if(ev){
+    ev.stopPropagation();
+    ev.preventDefault();
+  }
+  if(!btn) return;
+  var card = btn.closest('.draft-card');
+  if(!card) return;
+  var opening = !card.classList.contains('more-open');
+  var before = card.getBoundingClientRect().height;
+  card.classList.toggle('more-open', opening);
+  btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
+  if(!opening) return;
+  var after = card.getBoundingClientRect().height;
+  var delta = after - before;
+  if(delta < 2){
+    requestAnimationFrame(function(){
+      var later = card.getBoundingClientRect().height - before;
+      scrollByExpandedTopicHeight_(findTopicLineScrollParent_(card), later);
+    });
+    return;
+  }
+  scrollByExpandedTopicHeight_(findTopicLineScrollParent_(card), delta);
+}
+window.toggleTopicLineMore_ = toggleTopicLineMore_;
 function resetDraftFilters(){
   state.searchQ = '';
   renderMain();

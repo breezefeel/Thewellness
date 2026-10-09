@@ -109,7 +109,7 @@ flex-wrap: nowrap; gap: 10px;
   .btn-sync-status .sync-btn-main { font-size: 10px; }
   .btn-sync-status .sync-btn-sub {
     font-size: 8px;
-    max-width: 72px;
+    max-width: 96px;
   }
   .btn-prompt-settings { padding: 5px 6px; }
   .btn-add { padding: 5px 8px; }

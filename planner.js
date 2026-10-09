@@ -15677,6 +15677,7 @@ function formatSyncHeaderSub_(info){
   if(info.phase === 'queued'){
     return nTxt ? ('곧 · ' + nTxt) : '곧 전송';
   }
+  if(info.phase === 'checking') return '서버 확인';
   if(info.phase === 'pull') return '받을 내용';
   if(info.phase === 'pending'){
     return n > 0 ? ('남은 ' + n + '건') : '반영 대기';
@@ -15786,6 +15787,10 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(busy){
     phase = 'queued';
     overall = 'syncing';
+  } else if(serverOn && !state._bootstrapChoiceDone && isPlannerEmployeeEmailValid_(getPlannerEmployeeId_())){
+    // 로컬 revision이 같아도, 이번 접속에서 서버를 받기 전에는 「최신」이 아님
+    phase = 'checking';
+    overall = 'syncing';
   }
 
   var actionHint = '';
@@ -15813,6 +15818,9 @@ function getSyncStatusInfo_(remoteMeta){
     summary = '곧 자동으로 올리도록 예약돼 있어요.' +
       (pendingCount ? ' 남은 약 ' + pendingCount + '건.' : ' (보통 수 초 뒤)');
     actionHint = '기다리면 됩니다. 급하면 「동기화」→「지금 동기화」.';
+  } else if(phase === 'checking'){
+    summary = '서버 내용을 확인하는 중이에요. 맞춘 뒤에 최신으로 표시합니다.';
+    actionHint = '잠시만 기다려 주세요. 확인이 끝나면 자동으로 맞춰집니다.';
   } else if(phase === 'pull'){
     summary = '서버에 이 기기보다 최신 데이터(rev ' + remoteRev + ')가 있어요.';
     actionHint = '「동기화」버튼을 누른 뒤 「지금 동기화」로 받아오세요.';
@@ -16028,8 +16036,8 @@ function renderSyncStatusBodyHTML_(info){
   );
 
   // 2. 이 기기
-  var localBadge = info.transferring ? 'syncing' : (info.phase === 'pending' || info.phase === 'queued' || info.phase === 'retry_wait' ? 'pending' : 'ok');
-  var localText = (info.phase === 'transferring' || info.phase === 'retry_wait' || info.phase === 'queued' || info.phase === 'pending')
+  var localBadge = info.transferring || info.phase === 'checking' ? 'syncing' : (info.phase === 'pending' || info.phase === 'queued' || info.phase === 'retry_wait' ? 'pending' : 'ok');
+  var localText = (info.phase === 'transferring' || info.phase === 'retry_wait' || info.phase === 'queued' || info.phase === 'pending' || info.phase === 'checking')
     ? formatSyncHeaderSub_(info)
     : (info.pendingCount > 0 && (info.serverPending || info.drivePending)
       ? ('남은 ' + info.pendingCount + '건')
@@ -16057,8 +16065,8 @@ function renderSyncStatusBodyHTML_(info){
 
   // 3. 서버 (GAS)
   if(info.serverOn){
-    var sBadge = info.transferring ? 'syncing' : (info.serverPending || info.retryScheduled || info.queuedPush ? 'pending' : (info.remoteNewer ? 'pending' : (info.serverRev ? 'ok' : 'off')));
-    var sText = info.transferring
+    var sBadge = (info.transferring || info.phase === 'checking') ? 'syncing' : (info.serverPending || info.retryScheduled || info.queuedPush ? 'pending' : (info.remoteNewer ? 'pending' : (info.serverRev ? 'ok' : 'off')));
+    var sText = (info.transferring || info.phase === 'checking')
       ? formatSyncHeaderSub_(info)
       : (info.retryScheduled
         ? formatSyncHeaderSub_(info)

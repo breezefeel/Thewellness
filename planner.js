@@ -2674,6 +2674,7 @@ function isDraftPinned_(draftId){
   return true;
 }
 const PENDING_SUBGOAL_SS_KEY = 'ht_pending_subgoal_plan';
+const PENDING_SUBGOAL_LS_KEY = 'ht_pending_subgoal_plan_ls';
 const PENDING_YEAR_SS_KEY = 'ht_pending_year_plan';
 const PENDING_YEAR_LS_KEY = 'ht_pending_year_plan_ls';
 function sameCatId_(a, b){
@@ -5391,14 +5392,23 @@ function getVisibleDraftsInMain_(catId){
 }
 function persistPendingSubGoalPlan_(){
   try {
-    if(state.pendingSubGoalPlan) sessionStorage.setItem(PENDING_SUBGOAL_SS_KEY, JSON.stringify(state.pendingSubGoalPlan));
-    else sessionStorage.removeItem(PENDING_SUBGOAL_SS_KEY);
+    if(state.pendingSubGoalPlan){
+      var raw = JSON.stringify(state.pendingSubGoalPlan);
+      sessionStorage.setItem(PENDING_SUBGOAL_SS_KEY, raw);
+      try { localStorage.setItem(PENDING_SUBGOAL_LS_KEY, raw); } catch(eLs){}
+    } else {
+      sessionStorage.removeItem(PENDING_SUBGOAL_SS_KEY);
+      try { localStorage.removeItem(PENDING_SUBGOAL_LS_KEY); } catch(eLs2){}
+    }
   } catch(e){}
   bumpPlanWorkshopApplyBtn_();
 }
 function restorePendingSubGoalPlan_(){
   try {
     var raw = sessionStorage.getItem(PENDING_SUBGOAL_SS_KEY);
+    if(!raw){
+      try { raw = localStorage.getItem(PENDING_SUBGOAL_LS_KEY) || ''; } catch(eLs){ raw = ''; }
+    }
     if(!raw) return;
     var p = JSON.parse(raw);
     if(!p || p.catId == null || !p.plan) return;
@@ -5410,6 +5420,7 @@ function restorePendingSubGoalPlan_(){
     if(!hasSteps && !hasFoundation) return;
     p.catId = normalizePendingCatId_(p.catId);
     state.pendingSubGoalPlan = p;
+    persistPendingSubGoalPlan_();
   } catch(e){}
 }
 /** 단계 id 정규화: "1" / "s1" → "s1" */
@@ -13702,6 +13713,7 @@ function invalidateStalePendingPlans_(opts){
   if(!keepSub){
     state.pendingSubGoalPlan = null;
     try { sessionStorage.removeItem(PENDING_SUBGOAL_SS_KEY); } catch(e){}
+    try { localStorage.removeItem(PENDING_SUBGOAL_LS_KEY); } catch(eLs){}
   } else {
     try {
       state.pendingSubGoalPlan.catId = normalizePendingCatId_(state.pendingSubGoalPlan.catId);
@@ -14265,21 +14277,34 @@ function requestServerAuthorityInsteadOfFlood_(){
     syncAllSourcesIfNewer_('flood-adopt').catch(function(e){ console.warn('[서버 기준 맞춤]', e); });
   } catch(e0){}
 }
-function isProtectedUserSyncKey_(key){
+function draftRowHasUserText_(val){
+  var row = unwrapSyncEntityValue_(val);
+  if(row && row.value && typeof row.value === 'object') row = row.value;
+  if(!row || typeof row !== 'object') return false;
+  return !!(String(row.topic || '').trim() || String(row.angle || '').trim() || String(row.rationale || '').trim() ||
+    String(row.writingBrief || '').trim() || String(row.articleKind || '').trim() ||
+    (row.articleFlow && (row.articleFlow.title || row.articleFlow.angle)));
+}
+function isProtectedUserSyncKey_(key, op){
   key = String(key || '');
   if(!key || isDeviceLocalSyncEntityKey_(key)) return false;
-  return /^plan:/.test(key) ||
+  if(/^plan:/.test(key) ||
     /^deleted:/.test(key) ||
     /^pinned:/.test(key) ||
     /^override:/.test(key) ||
     /^branding:/.test(key) ||
     /^generated:/.test(key) ||
     /^published:/.test(key) ||
-    /^prompt:/.test(key);
+    /^prompt:/.test(key) ||
+    /^milestone:/.test(key) ||
+    /^setting:/.test(key)) return true;
+  if(/^ops:/.test(key)) return key !== 'ops:meta';
+  if(/^draft:/.test(key)) return draftRowHasUserText_(op && op.value);
+  return false;
 }
 function outboxHasProtectedMutations_(){
   return (state.syncOutbox || []).some(function(op){
-    return op && isProtectedUserSyncKey_(op.key);
+    return op && isProtectedUserSyncKey_(op.key, op);
   });
 }
 function yearPlanTextScore_(payload){
@@ -14293,27 +14318,114 @@ function yearPlanTextScore_(payload){
   });
   return n;
 }
+function subGoalPlanTextScore_(payload){
+  var plans = (payload && payload.branding && payload.branding.subGoalPlans) || {};
+  var n = 0;
+  Object.keys(plans).forEach(function(cid){
+    var p = plans[cid] || {};
+    if(String(p.brandProfile || '').trim()) n += 2;
+    if(String(p.strategyGuide || p.criteria || p.intent || '').trim()) n += 2;
+    (p.steps || []).forEach(function(s){
+      var row = unwrapSyncEntityValue_(s) || s;
+      if(row && row.value && typeof row.value === 'object' && !row.title) row = row.value;
+      if(row && (String(row.title || '').trim() || String(row.rationale || '').trim())) n += 1;
+    });
+  });
+  return n;
+}
+function dailyShareTextScore_(payload){
+  var dp = payload && payload.branding && payload.branding.dailySharePlan;
+  if(!dp) return 0;
+  var n = 0;
+  if(String(dp.intent || dp.goal || '').trim()) n += 2;
+  (dp.themes || []).forEach(function(t){
+    var row = unwrapSyncEntityValue_(t) || t;
+    if(row && row.value && typeof row.value === 'object' && !row.title && !row.topic) row = row.value;
+    if(row && (String(row.title || row.topic || row.theme || '').trim() || String(row.rationale || row.intent || '').trim())) n += 1;
+  });
+  return n;
+}
 function yearPlanRicherThan_(localPayload, remotePayload){
   return yearPlanTextScore_(localPayload) > yearPlanTextScore_(remotePayload);
 }
-function listLocalYearPlanSyncKeys_(payload){
+function listDifferingProtectedKeys_(localPayload, remotePayload){
+  var lEnt = {};
+  var rEnt = {};
+  try { lEnt = collectSyncEntities_(localPayload || {}, { skipEnsureIds: true }) || {}; } catch(eL){}
+  try { rEnt = collectSyncEntities_(remotePayload || {}, { skipEnsureIds: true }) || {}; } catch(eR){}
+  var keys = [];
+  Object.keys(lEnt).forEach(function(k){
+    if(isDeviceLocalSyncEntityKey_(k)) return;
+    if(String(k).indexOf('draft:') === 0){
+      if(!draftRowHasUserText_(lEnt[k])) return;
+    } else if(String(k).indexOf('generated:') === 0 || String(k).indexOf('published:') === 0){
+      return;
+    } else if(!/^(plan:|branding:|prompt:|deleted:|override:|pinned:|ops:|milestone:|setting:)/.test(k)){
+      return;
+    } else if(k === 'ops:meta'){
+      return;
+    }
+    if(syncEntitiesEquivalent_(k, lEnt[k], rEnt[k])) return;
+    keys.push(k);
+  });
+  return keys.slice(0, 80);
+}
+function localContentRicherThan_(localPayload, remotePayload){
+  if(yearPlanTextScore_(localPayload) > yearPlanTextScore_(remotePayload)) return true;
+  if(subGoalPlanTextScore_(localPayload) > subGoalPlanTextScore_(remotePayload)) return true;
+  if(dailyShareTextScore_(localPayload) > dailyShareTextScore_(remotePayload)) return true;
+  return listDifferingProtectedKeys_(localPayload, remotePayload).length > 0;
+}
+function listSyncKeysByPrefix_(payload, prefix){
   var keys = [];
   try {
-    Object.keys(collectSyncEntities_(payload || getPersistPayload(), { skipEnsureIds: true }) || {}).forEach(function(k){
-      if(String(k).indexOf('plan:year:') === 0) keys.push(k);
+    Object.keys(collectSyncEntities_(payload || {}, { skipEnsureIds: true }) || {}).forEach(function(k){
+      if(String(k).indexOf(prefix) === 0) keys.push(k);
     });
   } catch(eKeys){}
   return keys;
 }
-function requeueLocalYearPlanIfRicher_(remotePayload){
+function listLocalYearPlanSyncKeys_(payload){
+  return listSyncKeysByPrefix_(payload, 'plan:year:');
+}
+function listRicherDraftKeys_(localPayload, remotePayload){
+  var keys = [];
+  var lEnt = {};
+  var rEnt = {};
+  try { lEnt = collectSyncEntities_(localPayload || {}, { skipEnsureIds: true }) || {}; } catch(eL){}
+  try { rEnt = collectSyncEntities_(remotePayload || {}, { skipEnsureIds: true }) || {}; } catch(eR){}
+  Object.keys(lEnt).forEach(function(k){
+    if(String(k).indexOf('draft:') !== 0) return;
+    if(!draftRowHasUserText_(lEnt[k])) return;
+    if(syncEntitiesEquivalent_(k, lEnt[k], rEnt[k])) return;
+    keys.push(k);
+  });
+  return keys.slice(0, 40);
+}
+function requeueLocalRicherContent_(remotePayload){
   var local = getPersistPayload();
-  if(!yearPlanRicherThan_(local, remotePayload)) return false;
-  var keys = listLocalYearPlanSyncKeys_(local);
-  if(!keys.length) keys = ['plan:year:meta'];
+  var keys = [];
+  var seen = {};
+  function add_(list){
+    (list || []).forEach(function(k){
+      if(!k || seen[k]) return;
+      seen[k] = true;
+      keys.push(k);
+    });
+  }
+  if(yearPlanRicherThan_(local, remotePayload)) add_(listLocalYearPlanSyncKeys_(local));
+  if(subGoalPlanTextScore_(local) > subGoalPlanTextScore_(remotePayload)) add_(listSyncKeysByPrefix_(local, 'plan:subgoal:'));
+  if(dailyShareTextScore_(local) > dailyShareTextScore_(remotePayload)) add_(listSyncKeysByPrefix_(local, 'plan:daily:'));
+  add_(listRicherDraftKeys_(local, remotePayload));
+  add_(listDifferingProtectedKeys_(local, remotePayload));
+  if(!keys.length) return false;
   enqueueSyncOutboxChanges_(keys, local);
   state._sessionUserEdit = true;
   state.syncDirty = true;
   return true;
+}
+function requeueLocalYearPlanIfRicher_(remotePayload){
+  return requeueLocalRicherContent_(remotePayload);
 }
 function discardStaleUnpushedBeforeConnect_(){
   if(state._emptyServerSeed) return;
@@ -14324,7 +14436,7 @@ function discardStaleUnpushedBeforeConnect_(){
     return;
   }
   var kept = (state.syncOutbox || []).filter(function(op){
-    return op && isProtectedUserSyncKey_(op.key);
+    return op && isProtectedUserSyncKey_(op.key, op);
   });
   state.syncOutbox = kept;
   Object.keys(state.syncDirtyEntityKeys || {}).forEach(function(k){
@@ -14350,8 +14462,9 @@ function shouldAdoptServerAsTruth_(remotePayload, remoteRevision){
   if(unpushed > 0 && unpushed <= REAL_UNPUSHED_PUSH_MAX_) return false;
   if(outboxHasProtectedMutations_()) return false;
   if(state.pendingYearPlan && isPendingYearPlanDirty_()) return false;
+  if(state.pendingSubGoalPlan && isPendingSubGoalPlanDirty_(state.pendingSubGoalPlan.catId)) return false;
   try {
-    if(yearPlanRicherThan_(getPersistPayload(), remotePayload)) return false;
+    if(localContentRicherThan_(getPersistPayload(), remotePayload)) return false;
   } catch(eY){}
   return true;
 }
@@ -16920,7 +17033,7 @@ async function runPlannerBootstrapInBackground_(){
       var sessionOps = (state.syncOutbox || []).filter(function(op){
         return op && op.key && !isDeviceLocalSyncEntityKey_(op.key);
       });
-      if(!sessionOps.length && yearPlanRicherThan_(getPersistPayload(), remotePayload)){
+      if(!sessionOps.length && localContentRicherThan_(getPersistPayload(), remotePayload)){
         requeueLocalYearPlanIfRicher_(remotePayload);
         sessionOps = (state.syncOutbox || []).filter(function(op){
           return op && op.key && !isDeviceLocalSyncEntityKey_(op.key);
@@ -20686,7 +20799,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=175').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=177').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){

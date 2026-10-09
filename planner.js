@@ -4632,6 +4632,38 @@ function getYearPlan_(){
   var goals = [b.message, '', '', ''];
   return { anchorDate: anchor, goal: '', intent: '', periods: buildRollingPeriodsFromAnchor_(anchor, goals) };
 }
+function periodHasYearGoalText_(per){
+  return !!(per && (String(per.goal || per.topic || '').trim() || String(per.rationale || '').trim()));
+}
+function mapYearPeriodForStore_(per, i){
+  per = per || {};
+  return {
+    id: per.id || ('yp_mig_' + i + '_' + String(per.start || '').replace(/-/g, '')),
+    index: i,
+    start: per.start || '',
+    end: per.end || '',
+    goal: String(per.goal || per.topic || '').trim(),
+    topic: String(per.topic || per.goal || '').trim(),
+    rationale: String(per.rationale || '').trim(),
+    pinned: !!per.pinned,
+    months: parseInt(per.months, 10) || 3,
+    createdAt: per.createdAt || ''
+  };
+}
+function getYearPlanForView_(){
+  if(state.pendingYearPlan && isPendingYearPlanDirty_()){
+    var p = state.pendingYearPlan;
+    var base = getYearPlan_();
+    var src = (p.periods && p.periods.length) ? p.periods : base.periods;
+    return {
+      anchorDate: p.anchorDate || base.anchorDate,
+      intent: String(p.intent || base.intent || '').trim(),
+      goal: String(p.goal || base.goal || '').trim(),
+      periods: (src || []).map(function(per, i){ return mapYearPeriodForStore_(per, i); })
+    };
+  }
+  return getYearPlan_();
+}
 function getCurrentMainGoal_(){
   var plan = getYearPlan_();
   if(plan.periods[0] && plan.periods[0].goal) return plan.periods[0].goal;
@@ -4664,13 +4696,25 @@ function getYearPlanMeta_(){
   return { intent: intent, goal: goal, currentRationale: currentRationale, currentTopic: currentTopic };
 }
 function buildMainGoalContextBlock_(){
-  var goal = getCurrentMainGoal_();
   var meta = getYearPlanMeta_();
-  var lines = ['[분기별 목표 · 1년 브랜드 기획]', '목표(현재 분기): ' + goal];
-  if(meta.currentTopic && meta.currentTopic !== goal) lines.push('분기 주제: ' + meta.currentTopic);
-  if(meta.intent) lines.push('기획 의도(전체 1년·순서 이유): ' + meta.intent);
-  if(meta.currentRationale) lines.push('현재 분기 의도(이 기간 방향·독자가 얻을 것): ' + meta.currentRationale);
-  if(!meta.intent && !meta.currentRationale) lines.push('(의도 미작성 — 1년 기획에서 기획 의도·분기 의도를 자세히 적어 주세요)');
+  var quarterGoal = meta.currentTopic || getCurrentMainGoal_();
+  var lines = ['[이번 분기 · 주제·초안이 먼저 맞출 것]'];
+  if(quarterGoal) lines.push('이번 분기 목표: ' + quarterGoal);
+  if(meta.currentRationale) lines.push('이번 분기 의도: ' + meta.currentRationale);
+  lines.push('이번 분기 목표·의도를 주제·각도에 우선 반영하세요.');
+  if(meta.goal || meta.intent){
+    lines.push('', '[전체 1년 · 배경만 참고]');
+    if(meta.goal) lines.push('1년 목표: ' + meta.goal);
+    if(meta.intent){
+      var year = String(meta.intent).replace(/\s+/g, ' ').trim();
+      if(year.length > 160) year = year.slice(0, 160) + '…';
+      lines.push('1년 의도(요약): ' + year);
+    }
+    lines.push('1년 문장을 그대로 주제로 쓰지 말고, 이번 분기·이번 서랍에 맞게 구체화하세요.');
+  }
+  if(!quarterGoal && !meta.currentRationale && !meta.intent){
+    lines.push('(의도 미작성 — 1년·분기 기획에서 의도를 적어 주세요)');
+  }
   return lines.join('\n');
 }
 function normalizeProgramStrategyGuideTemplate_(raw){
@@ -4771,8 +4815,9 @@ function buildProgramPlanContextBlock_(catId, stepId){
 }
 function buildTopicPlanPromptPrefix_(catId, stepId){
   return (
-    buildContentStrategyPromptPrefix_({ mainGoal: getCurrentMainGoal_(), program: getCategoryProgramLine_(catId) + (CATEGORIES[catId] ? ' · ' + CATEGORIES[catId].name : '') }) + '\n\n' +
-    buildProgramPlanContextBlock_(catId, stepId)
+    buildContentStrategyPromptPrefix_({ mainGoal: getCurrentMainGoal_(), program: getCategoryProgramLine_(catId) + (CATEGORIES[catId] ? ' · ' + CATEGORIES[catId].name : ''), catId: catId }) + '\n\n' +
+    buildProgramPlanContextBlock_(catId, stepId) + '\n\n' +
+    '우선순위: 1) 이번 서랍(단계) 2) 이번 분기 의도 3) 프로그램 정체성 4) 1년 배경. 1년 문장을 그대로 주제로 쓰지 마세요.'
   );
 }
 function renderIntentRefBlockHTML_(title, body, opts){
@@ -6275,10 +6320,17 @@ function syncDraftFieldsFromWritingBrief_(draft){
 function buildDefaultWritingBrief_(draft, catId, draftIndex){
   if(!draft) return '';
   var meta = getDraftBrandMeta_(draft, catId, draftIndex);
+  var ymeta = getYearPlanMeta_();
   var parts = [];
+  var nowLines = [];
+  var stepTitle = meta.series || '';
+  if(stepTitle) nowLines.push('이번 서랍: ' + stepTitle + (meta.step ? ' (' + meta.step + ')' : ''));
+  if(ymeta.currentTopic) nowLines.push('이번 분기 목표: ' + ymeta.currentTopic);
+  if(ymeta.currentRationale) nowLines.push('이번 분기 의도: ' + ymeta.currentRationale);
+  if(nowLines.length) parts.push('【이번 분기 · 이 서랍을 우선】\n' + nowLines.join('\n'));
   if(meta.pillar) parts.push('【브랜드 기둥】\n' + meta.pillar);
   var stageLines = buildDraftStageContextLines_(draft, catId, draftIndex);
-  if(stageLines.length) parts.push('【' + (isExpertCourseCategory(catId) ? 'PSP · 카테고리' : '분기 → 현재 단계') + '】\n' + stageLines.join('\n'));
+  if(stageLines.length) parts.push('【' + (isExpertCourseCategory(catId) ? 'PSP · 카테고리' : '서랍 · 단계') + '】\n' + stageLines.join('\n'));
   var rationale = stripTopicRationaleStepPrefix_(meta.rationale) || buildDraftRationaleFromRoadmap_(draft, catId, draftIndex);
   if(rationale) parts.push('【왜 지금 이 글인가】\n' + rationale);
   var angle = String(draft.angle || '').trim();
@@ -6316,7 +6368,7 @@ function buildDraftBriefPromptLines_(draft, catId){
   }
   if(flowLines.length) return flowLines.join('\n');
   if(brief){
-    return '글 작성 핵심:\n' + brief + '\n\n위 「글 작성 핵심」의 분기·단계 맥락, 필요성, 풀어가는 순서를 본문 전개에 우선 반영하세요.';
+    return '글 작성 핵심:\n' + brief + '\n\n위 「글 작성 핵심」에서 이번 서랍·이번 분기 의도를 본문에 우선 반영하세요. 1년 문장을 그대로 반복하지 마세요.';
   }
   if(draft && draft.angle) return '각도: ' + draft.angle;
   return '';
@@ -7039,7 +7091,7 @@ function refreshPlanWorkshopModal_(){
   if(!body || !footer) return;
   var mode = state.planWorkshopMode || 'year';
   if(mode === 'year'){
-    if(titleEl) titleEl.textContent = state.planWorkshopFocus === 'quarter' ? '분기별 목표와 의도' : '1년 목표와 의도';
+    if(titleEl) titleEl.textContent = state.planWorkshopFocus === 'quarter' ? '전체 브랜드 · 분기 목표' : '전체 브랜드 · 1년 목표';
     body.innerHTML = renderYearWorkshopBodyHTML_();
     footer.innerHTML = renderYearWorkshopFooterHTML_();
   } else if(mode === 'stepTopics'){
@@ -8126,21 +8178,14 @@ function commitPendingYearPlan_(){
   if(!state.branding || typeof state.branding !== 'object') state.branding = {};
   var prev = (state.branding.yearPlan && typeof state.branding.yearPlan === 'object') ? state.branding.yearPlan : {};
   var focus = state.planWorkshopFocus === 'quarter' ? 'quarter' : 'year';
-  var periods = (focus === 'year' && prev.periods && prev.periods.length)
-    ? prev.periods
-    : p.periods.map(function(per, i){
-      return {
-        index: i,
-        start: per.start,
-        end: per.end,
-        goal: per.goal || per.topic || '',
-        topic: per.topic || per.goal || '',
-        rationale: per.rationale || '',
-        pinned: !!per.pinned,
-        months: parseInt(per.months, 10) || 3,
-        createdAt: per.createdAt || ''
-      };
-    });
+  var pendingPeriods = (p.periods || []).map(function(per, i){ return mapYearPeriodForStore_(per, i); });
+  var prevPeriods = (prev.periods || []).map(function(per, i){ return mapYearPeriodForStore_(per, i); });
+  var periods = [0, 1, 2, 3].map(function(i){
+    var pend = pendingPeriods[i];
+    var old = prevPeriods[i];
+    if(periodHasYearGoalText_(pend)) return pend;
+    return old || pend || mapYearPeriodForStore_({}, i);
+  });
   state.branding.yearPlan = {
     anchorDate: (focus === 'year' && prev.anchorDate) ? prev.anchorDate : (p.anchorDate || prev.anchorDate || new Date().toISOString().slice(0, 10)),
     periods: periods,
@@ -8161,13 +8206,17 @@ function commitPendingYearPlan_(){
   }
   return true;
 }
+window.applyPendingYearPlanFromLayer_ = function(focus){
+  state.planWorkshopFocus = focus === 'quarter' ? 'quarter' : 'year';
+  applyPendingYearPlan_();
+};
 window.applyPendingYearPlan_ = function(){
   var p = state.pendingYearPlan;
   if(!p || !p.periods || !p.periods.length) return;
   var focus = state.planWorkshopFocus === 'quarter' ? 'quarter' : 'year';
   var confirmMsg = focus === 'quarter'
-    ? '분기별 목표와 의도를 적용할까요?'
-    : '1년 목표와 기획 의도를 적용할까요?';
+    ? '전체 브랜드 분기 목표를 적용할까요? 모든 프로그램이 같이 씁니다.'
+    : '전체 브랜드 1년 목표를 적용할까요? 모든 프로그램이 같이 씁니다.';
   if(!confirm(confirmMsg)) return;
   commitPendingYearPlan_();
 };
@@ -8680,15 +8729,31 @@ function planLayerParagraphsHTML_(text){
   if(!parts.length) return '';
   return parts.map(function(line){ return '<p>' + escapeHtml(line) + '</p>'; }).join('');
 }
+function planLayerSharedOpts_(extra){
+  extra = extra || {};
+  var pending = !!(state.pendingYearPlan && isPendingYearPlanDirty_());
+  var applyFocus = extra.applyFocus === 'quarter' ? 'quarter' : 'year';
+  return Object.assign({
+    shared: true,
+    pending: pending,
+    extraBtnHTML: pending
+      ? '<button type="button" class="plan-layer-edit plan-layer-apply" onclick="applyPendingYearPlanFromLayer_(\'' + applyFocus + '\')">적용</button>'
+      : ''
+  }, extra);
+}
 function planLayerCardHTML_(num, title, bodyHtml, onclickJs, tone, opts){
   opts = opts || {};
   var btn = onclickJs
     ? '<button type="button" class="plan-layer-edit" onclick="' + onclickJs + '">' + escapeHtml(opts.btnLabel || '기획 하기') + '</button>'
     : '';
   if(opts.extraBtnHTML) btn = '<span class="plan-layer-actions">' + opts.extraBtnHTML + btn + '</span>';
-  return '<section class="plan-layer-block tone-' + tone + '">' +
+  var kicker = num + ' · ';
+  if(opts.shared) kicker += '<span class="plan-layer-shared">전체 브랜드</span> · ';
+  kicker += escapeHtml(title);
+  if(opts.pending) kicker += ' <span class="plan-layer-pending">적용 전</span>';
+  return '<section class="plan-layer-block tone-' + tone + (opts.pending ? ' is-pending' : '') + '">' +
     '<div class="plan-layer-head">' +
-      '<span class="plan-layer-kicker">' + num + ' · ' + escapeHtml(title) + '</span>' +
+      '<span class="plan-layer-kicker">' + kicker + '</span>' +
       btn +
     '</div>' +
     '<div class="plan-layer-text">' + bodyHtml + '</div>' +
@@ -8698,28 +8763,42 @@ function renderPlanLayerYearHTML_(){
   var meta = getYearPlanMeta_();
   var goal = String(meta.goal || '').trim();
   var text = String(meta.intent || '').trim();
-  var body = '';
+  var body = '<p class="plan-layer-shared-note">모든 프로그램이 같이 쓰는 나침반입니다.</p>';
   if(goal) body += '<div class="plan-layer-item-goal">' + escapeHtml(goal) + '</div>';
   if(text) body += '<div class="plan-layer-item-intent">' + planLayerParagraphsHTML_(text) + '</div>';
-  if(!body) body = '<p class="plan-layer-empty">1년 목표와 의도를 아직 적지 않았습니다.</p>';
-  return planLayerCardHTML_('1', '1년 목표와 의도', body, 'openYearPlanWorkshop_(\'year\')', 'year');
+  if(!goal && !text) body += '<p class="plan-layer-empty">1년 목표와 의도를 아직 적지 않았습니다.</p>';
+  return planLayerCardHTML_('1', '1년 목표', body, 'openYearPlanWorkshop_(\'year\')', 'year', planLayerSharedOpts_({ applyFocus: 'year' }));
 }
 function renderPlanLayerQuarterHTML_(){
-  var plan = getYearPlan_();
+  var plan = getYearPlanForView_();
   var items = (plan.periods || []).map(function(p, i){
     var range = formatPeriodRangeLabel_(p.start, p.end) || ((i + 1) + '분기');
     var goal = String(p.goal || p.topic || '').trim();
     var why = String(p.rationale || '').trim();
-    var html = '<div class="plan-layer-item ' + getQuarterToneClass_(i) + (i === 0 ? ' is-current' : '') + '">' +
-      '<div class="plan-layer-item-title">' + escapeHtml((i === 0 ? '이번 분기 · ' : '') + range) + '</div>';
-    if(goal) html += '<div class="plan-layer-item-goal">' + escapeHtml(goal) + '</div>';
-    if(why) html += '<div class="plan-layer-item-intent">' + planLayerParagraphsHTML_(why) + '</div>';
-    if(!goal && !why) html += '<div class="plan-layer-item-goal plan-layer-empty">목표 없음</div>';
-    html += '</div>';
-    return html;
+    var has = !!(goal || why);
+    if(i === 0){
+      var html = '<div class="plan-layer-item ' + getQuarterToneClass_(i) + ' is-current">' +
+        '<div class="plan-layer-item-title">' + escapeHtml('이번 분기 · ' + range) + '</div>';
+      if(goal) html += '<div class="plan-layer-item-goal">' + escapeHtml(goal) + '</div>';
+      if(why) html += '<div class="plan-layer-item-intent">' + planLayerParagraphsHTML_(why) + '</div>';
+      if(!has) html += '<div class="plan-layer-item-goal plan-layer-empty">아직 없습니다. 기획하기에서 채워 주세요.</div>';
+      html += '</div>';
+      return html;
+    }
+    if(!has){
+      return '<div class="plan-layer-item is-later is-empty ' + getQuarterToneClass_(i) + '">' +
+        '<div class="plan-layer-item-title">' + escapeHtml(range) + ' · 아직</div></div>';
+    }
+    var short = goal.length > 28 ? goal.slice(0, 28) + '…' : goal;
+    return '<details class="plan-layer-item is-later ' + getQuarterToneClass_(i) + '">' +
+      '<summary class="plan-layer-item-title">' + escapeHtml(range + ' · ' + short) + '</summary>' +
+      (goal ? '<div class="plan-layer-item-goal">' + escapeHtml(goal) + '</div>' : '') +
+      (why ? '<div class="plan-layer-item-intent">' + planLayerParagraphsHTML_(why) + '</div>' : '') +
+      '</details>';
   }).join('');
   if(!items) items = '<p class="plan-layer-empty">분기 목표가 아직 없습니다.</p>';
-  return planLayerCardHTML_('2', '분기별 목표와 의도', items, 'openYearPlanWorkshop_(\'quarter\')', 'quarter');
+  var body = '<p class="plan-layer-shared-note">모든 프로그램이 같이 쓰는 이번 분기 방향입니다.</p>' + items;
+  return planLayerCardHTML_('2', '분기 목표', body, 'openYearPlanWorkshop_(\'quarter\')', 'quarter', planLayerSharedOpts_({ applyFocus: 'quarter' }));
 }
 function periodHasQuarterGoal_(p){
   return !!(p && String(p.topic || p.goal || '').trim());
@@ -14406,6 +14485,91 @@ function unwrapSyncEntityValue_(wrapped){
     ? wrapped.value
     : wrapped;
 }
+var _conflictAutoKeepCount_ = {};
+function syncEntitiesEquivalent_(key, localVal, remoteVal){
+  key = String(key || '');
+  var l = unwrapSyncEntityValue_(localVal);
+  var r = unwrapSyncEntityValue_(remoteVal);
+  if(l === undefined && r === undefined) return true;
+  if(key.indexOf('draft:') === 0 || key.indexOf('override:') === 0){
+    return draftEntityFingerprint_(l) === draftEntityFingerprint_(r);
+  }
+  return syncValueFingerprint_(l) === syncValueFingerprint_(r);
+}
+function conflictServerEntityRevision_(conflict){
+  var n = parseInt(conflict && conflict.serverEntityRevision, 10) || 0;
+  if(n) return n;
+  var key = String((conflict && conflict.key) || '');
+  return parseInt((state.syncEntityRevisions || {})[key], 10) || 0;
+}
+function pauseSyncForConflictUi_(){
+  try { clearPlannerGasRetry_(); } catch(eClr){}
+  _syncTransferStartedAt_ = 0;
+  _syncPushAgain_ = false;
+  try { updateSyncStatusUI_(); } catch(eUi){}
+}
+function forceOutboxOverwriteBase_(conflicts){
+  if(!Array.isArray(state.syncOutbox)) state.syncOutbox = [];
+  var now = new Date().toISOString();
+  (conflicts || []).forEach(function(conflict){
+    var key = String((conflict && conflict.key) || '');
+    if(!key) return;
+    var serverRev = conflictServerEntityRevision_(conflict);
+    var op = null;
+    for(var i = 0; i < state.syncOutbox.length; i++){
+      if(state.syncOutbox[i] && state.syncOutbox[i].key === key){ op = state.syncOutbox[i]; break; }
+    }
+    if(op){
+      op.baseEntityRevision = serverRev;
+      op.version = (parseInt(op.version, 10) || 1) + 1;
+      op.updatedAt = now;
+      return;
+    }
+    var localVal = unwrapSyncEntityValue_(conflict.local);
+    state.syncOutbox.push({
+      mutationId: makePlannerMutationId_(),
+      version: 1,
+      key: key,
+      value: localVal === undefined ? null : cloneSyncValue_(localVal),
+      deleted: localVal === undefined,
+      baseEntityRevision: serverRev,
+      updatedAt: now
+    });
+  });
+  rebuildDirtyStateFromOutbox_();
+}
+function dropSkippableOutboxConflicts_(serverConflicts){
+  var localEntities = {};
+  try { localEntities = collectSyncEntities_(getPersistPayload(), { skipEnsureIds: true }) || {}; } catch(eEnt){}
+  var drop = {};
+  (serverConflicts || []).forEach(function(conflict){
+    if(!conflict || !conflict.key) return;
+    var key = String(conflict.key);
+    var op = null;
+    for(var i = 0; i < (state.syncOutbox || []).length; i++){
+      if(state.syncOutbox[i] && state.syncOutbox[i].key === key){ op = state.syncOutbox[i]; break; }
+    }
+    var localVal = op ? (op.deleted ? undefined : op.value) : localEntities[key];
+    var remoteVal = conflict.serverDeleted ? undefined : conflict.serverValue;
+    if(shouldSkipPlannerConflict_(key, localVal, remoteVal) || syncEntitiesEquivalent_(key, localVal, remoteVal)){
+      drop[key] = true;
+    }
+  });
+  var n = Object.keys(drop).length;
+  if(!n) return 0;
+  state.syncOutbox = (state.syncOutbox || []).filter(function(op){ return !(op && drop[op.key]); });
+  Object.keys(drop).forEach(function(key){
+    if(state.syncDirtyEntityKeys) delete state.syncDirtyEntityKeys[key];
+    delete _conflictAutoKeepCount_[key];
+  });
+  rebuildDirtyStateFromOutbox_();
+  if(!hasPendingLocalSyncChanges_()){
+    state.syncNeedsSnapshot = false;
+    state.syncDirty = false;
+    _syncTransferStartedAt_ = 0;
+  }
+  return n;
+}
 /** 한쪽만 추가된 키·로컬 생성 초안(서버에 본문 없음)은 충돌 UI 없이 병합 */
 function shouldSkipPlannerConflict_(key, localVal, remoteVal){
   key = String(key || '');
@@ -14413,6 +14577,8 @@ function shouldSkipPlannerConflict_(key, localVal, remoteVal){
   var r = unwrapSyncEntityValue_(remoteVal);
   // 양쪽 모두 없음 = 충돌 아님 (가짜 충돌 루프 방지)
   if(l === undefined && r === undefined) return true;
+  // 빈 필드만 다른 초안은 충돌 아님
+  if(syncEntitiesEquivalent_(key, l, r)) return true;
   // UI 기억값·기기 로컬 선호 키는 팀 충돌로 올리지 않음
   if(key === 'setting:catGroupLast' || key === 'setting:plannerSetupDismissed') return true;
   // 순수 추가: 한쪽만 있으면 충돌 아님 (합치면 됨)
@@ -14444,7 +14610,7 @@ function detectPlannerEntityConflicts_(local, remote){
     var lEnt = entitiesL_()[key];
     var rEnt = entitiesR_()[key];
     if(shouldSkipPlannerConflict_(key, lEnt, rEnt)) return;
-    if(syncValueFingerprint_(lEnt) === syncValueFingerprint_(rEnt)) return;
+    if(syncEntitiesEquivalent_(key, lEnt, rEnt)) return;
     conflicts.push({
       key: key,
       local: lEnt,
@@ -14466,7 +14632,7 @@ function detectPlannerEntityConflicts_(local, remote){
         var rt = parseIsoMs_(rTimes[key]);
         if(!(lt > bt && rt > bt)){
           // base 이후 양쪽이 안 바뀐 dirty는 내용만 같으면 정리
-          if(syncValueFingerprint_(entitiesL_()[key]) === syncValueFingerprint_(entitiesR_()[key])){
+          if(syncEntitiesEquivalent_(key, entitiesL_()[key], entitiesR_()[key])){
             try { delete state.syncDirtyEntityKeys[key]; } catch(eClr){}
           }
           return;
@@ -14514,7 +14680,7 @@ function prunePhantomSyncDirtyKeys_(local, remote){
       removed++;
       return;
     }
-    if(syncValueFingerprint_(lEntities[key]) === syncValueFingerprint_(rEntities[key])){
+    if(syncEntitiesEquivalent_(key, lEntities[key], rEntities[key])){
       delete state.syncDirtyEntityKeys[key];
       removed++;
     }
@@ -14527,9 +14693,9 @@ function prunePhantomSyncDirtyKeys_(local, remote){
       if(isDeviceLocalSyncEntityKey_(op.key)) return false;
       var localVal = Object.prototype.hasOwnProperty.call(lEntities, op.key) ? lEntities[op.key] : undefined;
       var remoteVal = Object.prototype.hasOwnProperty.call(rEntities, op.key) ? rEntities[op.key] : undefined;
-      if(syncValueFingerprint_(localVal) === syncValueFingerprint_(remoteVal)) return false;
+      if(syncEntitiesEquivalent_(op.key, localVal, remoteVal)) return false;
       // outbox value가 서버와 같아도 전송 불필요
-      if(!op.deleted && syncValueFingerprint_(op.value) === syncValueFingerprint_(remoteVal)) return false;
+      if(!op.deleted && syncEntitiesEquivalent_(op.key, op.value, remoteVal)) return false;
       return true;
     });
     removed += Math.max(0, beforeOut - state.syncOutbox.length);
@@ -15229,16 +15395,21 @@ async function plannerGasPushNow_(){
       if(openPlannerOutboxConflict_(data.conflicts, data.payload, data.serverRevision)){
         // pending 없으면 대량 충돌 자동해결됨
         if(plannerSyncConflictPending_){
+          pauseSyncForConflictUi_();
           return { ok: false, conflict: true, partial: data.result === 'partial' };
         }
         save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
-        schedulePlannerGasPush_(true);
+        if(hasPendingLocalSyncChanges_()) schedulePlannerGasPush_(true);
         return { ok: true, conflict: false, autoResolved: true };
       }
-      // 스킵 가능한 충돌만 있으면: base revision 갱신 + 스냅샷으로 재푸시 (동일 mutation 루프 방지)
-      bumpOutboxBaseForSkippedConflicts_(data.conflicts);
+      // 스킵 가능한 충돌만 있으면 재전송·스냅샷 없이 제거 (1건 루프 방지)
+      dropSkippableOutboxConflicts_(data.conflicts);
       save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
-      schedulePlannerGasPush_(true);
+      if(hasPendingLocalSyncChanges_()) schedulePlannerGasPush_(true);
+      else {
+        _syncTransferStartedAt_ = 0;
+        clearPlannerGasRetry_();
+      }
       return { ok: true, conflict: false, skippedEmptyConflicts: true };
     }
     if(data.result === 'conflict' && data.payload){
@@ -15246,10 +15417,11 @@ async function plannerGasPushNow_(){
       var serverRev = parseInt(data.serverRevision, 10) || getPayloadRevision_(data.payload);
       if(openPlannerConflict_(localBefore, data.payload, serverRev)){
         if(plannerSyncConflictPending_){
+          pauseSyncForConflictUi_();
           return { ok: false, conflict: true };
         }
         // 자동 해결됨
-        schedulePlannerGasPush_(true);
+        if(hasPendingLocalSyncChanges_()) schedulePlannerGasPush_(true);
         return { ok: true, conflict: false, autoResolved: true };
       }
       reconcileRemoteBeforeWrite_(getPersistPayload(), data.payload, serverRev);
@@ -15852,6 +16024,7 @@ function formatSyncHeaderSub_(info){
     return left || '곧 전송';
   }
   if(info.phase === 'checking') return '서버 확인';
+  if(info.phase === 'conflict') return '충돌 선택';
   if(info.phase === 'pull') return '받을 내용';
   if(info.phase === 'pending'){
     return left || '반영 대기';
@@ -15932,7 +16105,10 @@ function getSyncStatusInfo_(remoteMeta){
   var retryInSec = syncRetryWaitSec_();
   var phase = 'ok';
   var overall = 'ok';
-  if(transferring){
+  if(plannerSyncConflictPending_){
+    phase = 'conflict';
+    overall = 'warn';
+  } else if(transferring){
     phase = 'transferring';
     overall = 'syncing';
   } else if(retryScheduled){
@@ -15995,6 +16171,9 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(phase === 'checking'){
     summary = '서버 내용을 확인하는 중이에요. 맞춘 뒤에 최신으로 표시합니다.';
     actionHint = '잠시만 기다려 주세요. 확인이 끝나면 자동으로 맞춰집니다.';
+  } else if(phase === 'conflict'){
+    summary = '같은 항목이 서버와 달라서, 서버 내용과 이 기기 중 골라야 해요.';
+    actionHint = '충돌 창에서 선택하면 동기화가 이어집니다. 자동으로 다시 올리지 않습니다.';
   } else if(phase === 'pull'){
     summary = '서버에 이 기기보다 최신 데이터(rev ' + remoteRev + ')가 있어요.';
     actionHint = '「동기화」버튼을 누른 뒤 「지금 동기화」로 받아오세요.';
@@ -17477,8 +17656,8 @@ window.continuePlannerWithLocalData_ = function(){
 function openPlannerConflict_(local, remote, serverRevision){
   var conflicts = detectPlannerEntityConflicts_(local, remote);
   if(!conflicts.length) return false;
-  // 충돌이 많거나 데이터가 크면 모달·전체 merge 없이 이 기기 유지 (메인 스레드 멈춤 방지)
-  if(conflicts.length > 5 || isPlannerPayloadHeavy_(local) || isPlannerPayloadHeavy_(remote) || isPlannerLocalStoreHeavy_()){
+  // 1~5건은 대용량이어도 선택창. 예전엔 자동 유지→재전송이 같은 1건을 수십 분 반복함
+  if(conflicts.length > 5){
     keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts);
     return true;
   }
@@ -17497,6 +17676,7 @@ function openPlannerConflict_(local, remote, serverRevision){
       };
     })
   };
+  pauseSyncForConflictUi_();
   renderPlannerConflictUi_(plannerSyncConflictPending_);
   return true;
 }
@@ -17504,7 +17684,8 @@ function openPlannerConflict_(local, remote, serverRevision){
  * 대용량 충돌: mergePlannerPayloads_/JSON.clone 없이 로컬 본문 유지.
  * (이전 autoResolve의 전체 merge가 「적용」클릭 후 1분+ 무반응의 원인)
  */
-function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts){
+function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts, opts){
+  opts = opts || {};
   try {
     var rev = parseInt(serverRevision, 10) || getPayloadRevision_(remote) || state.syncRevision || 0;
     if(rev > (parseInt(state.syncRevision, 10) || 0)) state.syncRevision = rev;
@@ -17514,42 +17695,67 @@ function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts){
       state.syncBaseEntityUpdatedAt = Object.assign({}, state.syncEntityUpdatedAt || {});
     }
     try { prunePhantomSyncDirtyKeys_(getPersistPayload(), remote); } catch(ePr){}
-    var kept = 0;
+    var real = [];
     (conflicts || []).forEach(function(conflict){
       var key = String(conflict.key || '');
       if(!key) return;
-      // 실제 내용이 같거나 스킵 대상이면 dirty로 다시 올리지 않음 (반복 루프 방지)
       if(shouldSkipPlannerConflict_(key, conflict.local, conflict.remote)) return;
-      if(syncValueFingerprint_(conflict.local) === syncValueFingerprint_(conflict.remote)) return;
-      state.syncDirtyEntityKeys[key] = true;
-      kept++;
+      if(syncEntitiesEquivalent_(key, conflict.local, conflict.remote)) return;
+      real.push(conflict);
     });
-    if(kept){
-      state.syncDirty = true;
-      var onlyTopicEdits = (conflicts || []).every(function(c){
-        var k = String(c.key || '');
-        return k.indexOf('deleted:') === 0 || k.indexOf('draft:') === 0 ||
-          k.indexOf('override:') === 0 || k.indexOf('pinned:') === 0;
-      });
-      if(!onlyTopicEdits) state.syncNeedsSnapshot = true;
-    } else if(!Object.keys(state.syncDirtyEntityKeys || {}).length && !(state.syncOutbox || []).length){
-      state.syncDirty = false;
-      state.syncNeedsSnapshot = false;
+    if(!real.length){
+      dropSkippableOutboxConflicts_(conflicts);
+      plannerSyncConflictPending_ = null;
+      var ovEmpty = document.getElementById('sync-conflict-overlay');
+      closeScrollLockedOverlayEl_(ovEmpty);
+      if(!plannerSyncBootstrapReady_) plannerSyncBootstrapReady_ = true;
+      save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+      if(typeof setAppToast === 'function'){
+        setAppToast('같은 내용이라 충돌을 정리했어요.', { duration: 3600, variant: 'ok' });
+      }
+      if(hasPendingLocalSyncChanges_()) schedulePlannerGasPush_(true);
+      else {
+        _syncTransferStartedAt_ = 0;
+        clearPlannerGasRetry_();
+      }
+      return;
     }
+    var looping = [];
+    if(!opts.fromUser){
+      real.forEach(function(conflict){
+        var key = String(conflict.key);
+        _conflictAutoKeepCount_[key] = (_conflictAutoKeepCount_[key] || 0) + 1;
+        if(_conflictAutoKeepCount_[key] > 1) looping.push(key);
+      });
+    } else {
+      real.forEach(function(conflict){ delete _conflictAutoKeepCount_[String(conflict.key)]; });
+    }
+    if(looping.length && !opts.fromUser){
+      plannerSyncConflictPending_ = {
+        mode: 'outbox',
+        local: getPersistPayload(),
+        remote: remote || {},
+        serverRevision: rev,
+        conflicts: real
+      };
+      pauseSyncForConflictUi_();
+      renderPlannerConflictUi_(plannerSyncConflictPending_);
+      if(typeof setAppToast === 'function'){
+        setAppToast('같은 항목이 반복해서 충돌해서, 서버/이 기기 중 골라 주세요.', { duration: 5500, variant: 'ok' });
+      }
+      return;
+    }
+    forceOutboxOverwriteBase_(real);
+    state.syncDirty = true;
     plannerSyncConflictPending_ = null;
     var ov = document.getElementById('sync-conflict-overlay');
     closeScrollLockedOverlayEl_(ov);
     if(!plannerSyncBootstrapReady_) plannerSyncBootstrapReady_ = true;
     save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
     if(typeof setAppToast === 'function'){
-      if(kept){
-        setAppToast('충돌 ' + (conflicts || []).length + '건을 이 기기 기준으로 맞췄어요' +
-          ' (로컬 유지 ' + kept + '건).\n서버 반영은 백그라운드에서 이어갑니다.', { duration: 5500, variant: 'ok' });
-      } else {
-        setAppToast('가짜 충돌을 정리했어요. 서버와 같으면 바로 맞춥니다.', { duration: 4200, variant: 'ok' });
-      }
+      setAppToast('충돌 ' + real.length + '건을 이 기기 기준으로 다시 올립니다.', { duration: 4200, variant: 'ok' });
     }
-    if(kept || state.syncDirty) schedulePlannerGasPush_(true);
+    if(hasPendingLocalSyncChanges_()) schedulePlannerGasPush_(true);
   } catch(err){
     console.warn('[충돌 빠른해결]', err);
     if(typeof setAppToast === 'function') setAppToast('충돌 자동 적용에 실패했어요. 「이 기기 데이터로 열기」 후 다시 시도해 주세요.', { duration: 6500, variant: 'err' });
@@ -17642,7 +17848,7 @@ window.applyAllConflictsKeepLocal_ = function(){
   plannerSyncConflictPending_ = null;
   // 즉시 피드백 후 가벼운 경로 (전체 merge 금지)
   setTimeout(function(){
-    keepLocalConflictsWithoutMerge_(snap.remote, snap.serverRevision, snap.conflicts || []);
+    keepLocalConflictsWithoutMerge_(snap.remote, snap.serverRevision, snap.conflicts || [], { fromUser: true });
     if(applyBtn){ applyBtn.disabled = false; applyBtn.textContent = '선택 내용 적용 후 동기화'; }
     if(keepBtn) keepBtn.disabled = false;
   }, 0);
@@ -17696,10 +17902,9 @@ function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
     return !shouldSkipPlannerConflict_(conflict.key, conflict.local, conflict.remote);
   });
   if(!conflicts.length) return false;
-  // true + pending=null → 푸시 경로에서 autoResolved 로 재푸시 (false면 skipped 경로로 잘못 분기)
-  if(conflicts.length > 5 || isPlannerPayloadHeavy_(localPayload) || isPlannerPayloadHeavy_(remote) || isPlannerLocalStoreHeavy_()){
+  // 1~5건은 선택창. 대량만 이 기기 유지 후 서버 리비전으로 한 번 덮어씀
+  if(conflicts.length > 5){
     keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts);
-    bumpOutboxBaseForSkippedConflicts_(serverConflicts);
     return true;
   }
   plannerSyncConflictPending_ = {
@@ -17709,37 +17914,13 @@ function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
     serverRevision: parseInt(serverRevision, 10) || getPayloadRevision_(remote),
     conflicts: conflicts
   };
+  pauseSyncForConflictUi_();
   renderPlannerConflictUi_(plannerSyncConflictPending_);
   return true;
 }
-/** 서버 충돌이지만 로컬 유지로 스킵한 키 — base revision을 올려 동일 patch 루프를 끊고 스냅샷으로 올린다 */
+/** @deprecated dropSkippableOutboxConflicts_ 사용 */
 function bumpOutboxBaseForSkippedConflicts_(serverConflicts){
-  var localPayload = getPersistPayload();
-  var localEntities = collectSyncEntities_(localPayload);
-  var outboxByKey = {};
-  (state.syncOutbox || []).forEach(function(op){ if(op && op.key) outboxByKey[op.key] = op; });
-  var touched = false;
-  (serverConflicts || []).forEach(function(conflict){
-    if(!conflict || !conflict.key) return;
-    var op = outboxByKey[conflict.key];
-    var localVal = op
-      ? (op.deleted ? undefined : op.value)
-      : localEntities[conflict.key];
-    var remoteVal = conflict.serverDeleted ? undefined : conflict.serverValue;
-    if(!shouldSkipPlannerConflict_(conflict.key, localVal, remoteVal)) return;
-    if(op){
-      op.baseEntityRevision = parseInt(conflict.serverEntityRevision, 10) || 0;
-      op.version = (parseInt(op.version, 10) || 1) + 1;
-      op.updatedAt = new Date().toISOString();
-    }
-    touched = true;
-  });
-  if(touched){
-    state.syncNeedsSnapshot = true;
-    state.syncDirty = true;
-    rebuildDirtyStateFromOutbox_();
-  }
-  return touched;
+  return dropSkippableOutboxConflicts_(serverConflicts) > 0;
 }
 window.applyPlannerConflictChoices_ = async function(){
   var pending = plannerSyncConflictPending_;
@@ -17777,7 +17958,7 @@ window.applyPlannerConflictChoices_ = async function(){
     var allLocal = choices.every(function(c){ return c.useLocal; });
     // 대용량·전부 이 기기 → 전체 merge/푸시 대기 없이 즉시 종료
     if(heavy || allLocal || snap._forceAllLocal){
-      keepLocalConflictsWithoutMerge_(snap.remote, snap.serverRevision, snap.conflicts || []);
+      keepLocalConflictsWithoutMerge_(snap.remote, snap.serverRevision, snap.conflicts || [], { fromUser: true });
       return;
     }
     // 소량 + 서버 선택 있음: 키만 반영 (전체 mergePlannerPayloads_ 금지)
@@ -20391,7 +20572,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=172').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=174').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){

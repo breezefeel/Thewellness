@@ -14062,6 +14062,41 @@ function setSyncEntity_(payload, key, wrapped){
     else payload.generatedOnly[id] = cloneSyncValue_(wrapped);
   }
 }
+function normalizeDraftRowForSync_(draft){
+  if(!draft || typeof draft !== 'object') return draft;
+  var row = {};
+  ['id','topic','angle','series','step','pillar','rationale','writingBrief','roadmapStepId',
+    'shareMonth','createdAt','sourceNote','youtubeAnalysis','updatedAt','dailyShareKind',
+    'dailyThought','dailyWho','dailyWhat','dailyBody','articleKind','previousRoadmapStepId',
+    'previousSeries','miscLocked','articleFlow'].forEach(function(k){
+    var v = draft[k];
+    if(v == null || v === '') return;
+    if(Array.isArray(v) && !v.length) return;
+    row[k] = v;
+  });
+  if(draft.youtubeUrls && draft.youtubeUrls.length) row.youtubeUrls = draft.youtubeUrls;
+  return row;
+}
+function draftEntityFingerprint_(val){
+  var row = val;
+  if(val && typeof val === 'object' && val.value) row = val.value;
+  return syncValueFingerprint_(normalizeDraftRowForSync_(row));
+}
+function syncKeyBelongsToDraftIds_(key, ids){
+  key = String(key || '');
+  if(!ids) return false;
+  var prefixes = ['deleted:', 'draft:', 'generated:', 'published:', 'override:', 'pinned:'];
+  for(var i = 0; i < prefixes.length; i++){
+    if(key.indexOf(prefixes[i]) === 0 && ids[key.slice(prefixes[i].length)]) return true;
+  }
+  return false;
+}
+function entityMentionsDraftIds_(val, ids){
+  if(!val || !ids) return false;
+  var s = '';
+  try { s = JSON.stringify(val); } catch(e){ return false; }
+  return Object.keys(ids).some(function(id){ return id && s.indexOf(id) >= 0; });
+}
 function listChangedSyncEntityKeys_(previousPayload, currentPayload){
   // dirty 판별 중 id 마이그레이션을 돌리면 branding이 매번 바뀌어 가짜 1건이 생김
   var prevEntities = collectSyncEntities_(previousPayload || {}, { skipEnsureIds: true });
@@ -14072,10 +14107,23 @@ function listChangedSyncEntityKeys_(previousPayload, currentPayload){
   var changed = [];
   Object.keys(keys).forEach(function(key){
     if(isDeviceLocalSyncEntityKey_(key)) return;
-    if(syncValueFingerprint_(prevEntities[key]) !== syncValueFingerprint_(nextEntities[key])){
-      changed.push(key);
-    }
+    var prev = prevEntities[key];
+    var next = nextEntities[key];
+    var same = key.indexOf('draft:') === 0
+      ? draftEntityFingerprint_(prev) === draftEntityFingerprint_(next)
+      : syncValueFingerprint_(prev) === syncValueFingerprint_(next);
+    if(!same) changed.push(key);
   });
+  var focus = state._syncFocusDraftIds;
+  if(focus && Object.keys(focus).length){
+    changed = changed.filter(function(key){
+      if(syncKeyBelongsToDraftIds_(key, focus)) return true;
+      if(String(key).indexOf('plan:subgoal:') === 0){
+        return entityMentionsDraftIds_(prevEntities[key], focus) || entityMentionsDraftIds_(nextEntities[key], focus);
+      }
+      return false;
+    });
+  }
   return changed;
 }
 function stampChangedSyncEntities_(previousPayload, currentPayload){
@@ -18464,29 +18512,33 @@ function collectExtraDrafts(){
     out[i] = (cat.drafts || []).filter(function(d){
       return d && isUserAddedDraftId_(d.id) && !deleted[d.id];
     }).map(function(d){
-      var row = {
-        id: d.id, topic: d.topic, angle: d.angle || '',
-        series: d.series || '', step: d.step || '', pillar: d.pillar || '', rationale: d.rationale || '',
-        writingBrief: d.writingBrief || '',
-        roadmapStepId: d.roadmapStepId || '',
-        shareMonth: d.shareMonth || '',
-        createdAt: d.createdAt || '',
-        sourceNote: d.sourceNote || '',
-        youtubeAnalysis: d.youtubeAnalysis || '',
-        youtubeUrls: d.youtubeUrls || [],
-        articleFlow: d.articleFlow || null,
-        updatedAt: d.updatedAt || (userAddedDraftTimestamp_(d.id) ? new Date(userAddedDraftTimestamp_(d.id)).toISOString() : '')
-      };
-      if(d.dailyShareKind) row.dailyShareKind = d.dailyShareKind;
-      if(d.dailyThought) row.dailyThought = d.dailyThought;
-      if(d.dailyWho) row.dailyWho = d.dailyWho;
-      if(d.dailyWhat) row.dailyWhat = d.dailyWhat;
-      if(d.dailyBody) row.dailyBody = d.dailyBody;
-      if(d.articleKind) row.articleKind = d.articleKind;
-      if(d.previousRoadmapStepId) row.previousRoadmapStepId = d.previousRoadmapStepId;
-      if(d.previousSeries) row.previousSeries = d.previousSeries;
-      if(d.miscLocked) row.miscLocked = true;
-      return row;
+      return normalizeDraftRowForSync_({
+        id: d.id,
+        topic: d.topic,
+        angle: d.angle,
+        series: d.series,
+        step: d.step,
+        pillar: d.pillar,
+        rationale: d.rationale,
+        writingBrief: d.writingBrief,
+        roadmapStepId: d.roadmapStepId,
+        shareMonth: d.shareMonth,
+        createdAt: d.createdAt,
+        sourceNote: d.sourceNote,
+        youtubeAnalysis: d.youtubeAnalysis,
+        youtubeUrls: d.youtubeUrls,
+        articleFlow: d.articleFlow,
+        updatedAt: d.updatedAt || (userAddedDraftTimestamp_(d.id) ? new Date(userAddedDraftTimestamp_(d.id)).toISOString() : ''),
+        dailyShareKind: d.dailyShareKind,
+        dailyThought: d.dailyThought,
+        dailyWho: d.dailyWho,
+        dailyWhat: d.dailyWhat,
+        dailyBody: d.dailyBody,
+        articleKind: d.articleKind,
+        previousRoadmapStepId: d.previousRoadmapStepId,
+        previousSeries: d.previousSeries,
+        miscLocked: d.miscLocked
+      });
     });
   });
   return out;
@@ -25215,6 +25267,7 @@ window.deleteDraft = function(catId, draftId){
   if(!state.deletedDraftIds) state.deletedDraftIds = {};
   state.deletedDraftIds[draftId] = new Date().toISOString();
   if(state.pinnedDraftIds && state.pinnedDraftIds[draftId]) delete state.pinnedDraftIds[draftId];
+  if(state.draftBrandOverrides) delete state.draftBrandOverrides[draftId];
   delete state.published[draftId];
   delete state.generatedOnly[draftId];
   if(typeof instaBgByDraft !== 'undefined') delete instaBgByDraft[draftId];
@@ -25225,7 +25278,13 @@ window.deleteDraft = function(catId, draftId){
     clearOpenDetailHash_();
   }
 
-  save({ driveImmediate: true, gasImmediate: true });
+  state._syncFocusDraftIds = {};
+  state._syncFocusDraftIds[draftId] = true;
+  try {
+    save({ driveImmediate: false, gasImmediate: true });
+  } finally {
+    state._syncFocusDraftIds = null;
+  }
   renderMain();
   if(state.planWorkshopMode === 'topic') refreshTopicWorkshop_();
   if(typeof setAppToast === 'function') setAppToast('「' + short + '」을(를) 삭제했어요. 서버에도 반영 중…', { duration: 3600, variant: 'ok' });

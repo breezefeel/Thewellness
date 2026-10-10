@@ -14749,7 +14749,28 @@ function listRicherDraftKeys_(localPayload, remotePayload){
   });
   return keys.slice(0, 40);
 }
+var _cleanEntityFp_ = null;
+function rememberCleanSyncEntities_(){
+  _cleanEntityFp_ = {};
+  var ents = {};
+  try { ents = collectSyncEntities_(getPersistPayload(), { skipEnsureIds: true }) || {}; } catch(eFp){}
+  Object.keys(ents).forEach(function(k){
+    try {
+      _cleanEntityFp_[canonicalSyncEntityKey_(k)] = syncValueFingerprint_(stripSyncVolatileForCompare_(ents[k]));
+    } catch(eOne){}
+  });
+}
+function localEntityUnchangedSinceClean_(key, val){
+  if(!_cleanEntityFp_) return false;
+  var ck = canonicalSyncEntityKey_(key);
+  if(!Object.prototype.hasOwnProperty.call(_cleanEntityFp_, ck)) return false;
+  try {
+    return syncValueFingerprint_(stripSyncVolatileForCompare_(val)) === _cleanEntityFp_[ck];
+  } catch(eSame){ return false; }
+}
 function requeueLocalRicherContent_(remotePayload){
+  // 이 화면에서 직접 고치기 전에 돌리면, 방금 최신이 된 33건이 그대로 다시 찬다
+  if(!state._sessionUserEdit) return false;
   var local = getPersistPayload();
   var lEnt = {};
   try { lEnt = collectSyncEntities_(local, { skipEnsureIds: true }) || {}; } catch(eEnt){}
@@ -14758,7 +14779,9 @@ function requeueLocalRicherContent_(remotePayload){
   function add_(list){
     (list || []).forEach(function(k){
       if(!k || seen[k] || isDeviceLocalSyncEntityKey_(k)) return;
-      if(isEmptyDefaultSyncEntity_(k, lookupSyncEntityAliased_(lEnt, k))) return;
+      var localVal = lookupSyncEntityAliased_(lEnt, k);
+      if(isEmptyDefaultSyncEntity_(k, localVal)) return;
+      if(localEntityUnchangedSinceClean_(k, localVal)) return;
       seen[k] = true;
       keys.push(k);
     });
@@ -14768,7 +14791,6 @@ function requeueLocalRicherContent_(remotePayload){
   add_(listRicherDraftKeys_(local, remotePayload));
   if(!keys.length) return false;
   enqueueSyncOutboxChanges_(keys, local);
-  state._sessionUserEdit = true;
   state.syncDirty = true;
   return true;
 }
@@ -14847,6 +14869,7 @@ function markLocalInSyncWithServer_(serverPayload, opts){
   state._applyMigrated = false;
   state._postAdoptMigration = false;
   state._emptyServerSeed = false;
+  try { rememberCleanSyncEntities_(); } catch(eCleanFp){}
   _syncFastAckPending_ = true;
   try {
     markGasSyncOk_(rev, (serverPayload && serverPayload.savedAt) || null);
@@ -17603,7 +17626,7 @@ async function runPlannerBootstrapInBackground_(){
       var sessionOps = (state.syncOutbox || []).filter(function(op){
         return op && op.key && !isDeviceLocalSyncEntityKey_(op.key);
       });
-      if(!sessionOps.length && localContentRicherThan_(getPersistPayload(), remotePayload)){
+      if(state._sessionUserEdit && !sessionOps.length && localContentRicherThan_(getPersistPayload(), remotePayload)){
         requeueLocalYearPlanIfRicher_(remotePayload);
         sessionOps = (state.syncOutbox || []).filter(function(op){
           return op && op.key && !isDeviceLocalSyncEntityKey_(op.key);
@@ -21388,7 +21411,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=179').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=180').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){

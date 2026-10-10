@@ -4005,7 +4005,10 @@ function collapseYearPlanPeriods_(periods){
       var m2 = String(p.id || '').match(/^yp_mig_(\d+)/);
       if(m2) qi = parseInt(m2[1], 10);
     }
-    if(isNaN(qi) || qi < 0 || qi > 3) qi = Math.min(3, Math.max(0, i));
+    if(isNaN(qi) || qi < 0 || qi > 3){
+      var total = (periods || []).length;
+      qi = (total > 4 && total % 4 === 0) ? (i % 4) : Math.min(3, Math.max(0, i));
+    }
     buckets[qi].push(p);
   });
   return buckets.map(function(list, i){
@@ -4056,38 +4059,23 @@ function ensurePlanRowStableIdsInPayload_(payload){
     }
   }
   if(branding.dailySharePlan && Array.isArray(branding.dailySharePlan.themes)){
-    branding.dailySharePlan.themes.forEach(function(theme, i){
-      if(!theme || typeof theme !== 'object') return;
-      var def = DEFAULT_DAILY_SHARE_THEMES[i];
-      var next = takeId_(theme.id, (def && def.id) || ('theme_' + i));
-      if(String(theme.id || '') !== next){ theme.id = next; changed = true; }
-    });
-  }
-  // 카테고리마다 단계 id 네임스페이스를 분리 — '1'이 도수·리얼무브에 겹치면 뒤 카테고리 id가 깨짐
-  Object.keys(branding.subGoalPlans || {}).forEach(function(catId){
-    var steps = (branding.subGoalPlans[catId] && branding.subGoalPlans[catId].steps) || [];
-    var usedInCat = {};
-    var idMap = {};
-    steps.forEach(function(step, i){
-      if(!step || typeof step !== 'object') return;
-      var oldId = String(step.id != null ? step.id : '').trim();
-      var preferred = oldId;
-      // 숫자-only id는 sync remap이 배열 index로 오인 → s1,s2… 로 통일
-      if(!preferred || /^\d+$/.test(preferred)) preferred = 's' + (i + 1);
-      var next = preferred;
-      if(usedInCat[next]) next = 'st_' + catId + '_' + i;
-      var dup = 0;
-      while(usedInCat[next]){
-        dup++;
-        next = 'st_' + catId + '_' + i + '_d' + dup;
-      }
-      usedInCat[next] = true;
-      if(oldId && oldId !== next) idMap[oldId] = next;
-      if(String(step.id || '') !== next){ step.id = next; changed = true; }
-    });
-    if(Object.keys(idMap).length){
-      remapDraftStepIdsForCat_(payload, catId, idMap);
+    var nextThemes = collapseDailyShareThemes_(branding.dailySharePlan.themes);
+    var beforeThemeIds = (branding.dailySharePlan.themes || []).map(function(t){ return t && t.id; }).join('|');
+    var afterThemeIds = nextThemes.map(function(t){ return t && t.id; }).join('|');
+    if(beforeThemeIds !== afterThemeIds || branding.dailySharePlan.themes.length !== nextThemes.length){
+      branding.dailySharePlan.themes = nextThemes;
       changed = true;
+    }
+  }
+  // 카테고리마다 단계 id를 s1…로 접음 — 1/s1 중복이 st_ 로 갈라지며 쌓이던 루프 차단
+  Object.keys(branding.subGoalPlans || {}).forEach(function(catId){
+    var plan = branding.subGoalPlans[catId];
+    var res = dedupeSubGoalPlanStepsInPlace_(plan, { collectIdMap: true });
+    if(res && res.changed){
+      changed = true;
+      if(res.idMap && Object.keys(res.idMap).length){
+        remapDraftStepIdsForCat_(payload, catId, res.idMap);
+      }
     }
   });
   return changed;
@@ -4402,18 +4390,23 @@ function getBranding_(){
     dailySharePlan: normalizeDailySharePlan_(b.dailySharePlan)
   };
 }
-function normalizeDailySharePlan_(raw){
-  var intent = raw && raw.intent != null ? String(raw.intent).trim() : '';
-  var inThemes = raw && Array.isArray(raw.themes) ? raw.themes : [];
-  var themes = DEFAULT_DAILY_SHARE_THEMES.map(function(def){
+function collapseDailyShareThemes_(themes){
+  var inThemes = Array.isArray(themes) ? themes : [];
+  return DEFAULT_DAILY_SHARE_THEMES.map(function(def, i){
     var found = inThemes.find(function(t){ return t && String(t.id) === def.id; });
+    if(!found && inThemes[i] && (!inThemes[i].id || /^theme_\d+$/.test(String(inThemes[i].id)) || /^\d+$/.test(String(inThemes[i].id)))){
+      found = inThemes[i];
+    }
     return {
       id: def.id,
       label: def.label,
       note: found && found.note != null ? String(found.note).trim() : def.note
     };
   });
-  var out = { intent: intent, themes: themes };
+}
+function normalizeDailySharePlan_(raw){
+  var intent = raw && raw.intent != null ? String(raw.intent).trim() : '';
+  var out = { intent: intent, themes: collapseDailyShareThemes_(raw && raw.themes) };
   if(raw && raw.updatedAt) out.updatedAt = raw.updatedAt;
   return out;
 }
@@ -4923,6 +4916,19 @@ function ensureYearPlanMigrated_(){
   var plan = getYearPlan_();
   state.branding.yearPlan = { anchorDate: plan.anchorDate, periods: collapseYearPlanPeriods_(plan.periods) };
   syncBrandingMessageFromYearPlan_();
+  return true;
+}
+function ensureDailySharePlanNormalized_(){
+  if(!state.branding || typeof state.branding !== 'object' || !state.branding.dailySharePlan) return false;
+  var next = normalizeDailySharePlan_(state.branding.dailySharePlan);
+  var beforeIds = (state.branding.dailySharePlan.themes || []).map(function(t){ return t && t.id; }).join('|');
+  var afterIds = (next.themes || []).map(function(t){ return t && t.id; }).join('|');
+  if(beforeIds === afterIds &&
+      String(state.branding.dailySharePlan.intent || '') === String(next.intent || '') &&
+      (state.branding.dailySharePlan.themes || []).length === (next.themes || []).length){
+    return false;
+  }
+  state.branding.dailySharePlan = next;
   return true;
 }
 function usePendingProgramPreview_(catId){
@@ -14246,7 +14252,9 @@ function setSyncEntity_(payload, key, wrapped){
           if(row && typeof row === 'object' && !row.id) row.id = id;
           return row;
         });
-        payload.branding.dailySharePlan.themes = themes.filter(function(x){ return x != null; });
+        payload.branding.dailySharePlan = normalizeDailySharePlan_(
+          Object.assign({}, payload.branding.dailySharePlan, { themes: themes.filter(function(x){ return x != null; }) })
+        );
       }
     } else if(parts[1] === 'subgoal'){
       if(!payload.branding.subGoalPlans) payload.branding.subGoalPlans = {};
@@ -14263,6 +14271,7 @@ function setSyncEntity_(payload, key, wrapped){
           return row;
         });
         payload.branding.subGoalPlans[catId].steps = steps.filter(function(x){ return x != null; });
+        try { dedupeSubGoalPlanStepsInPlace_(payload.branding.subGoalPlans[catId]); } catch(eDed){}
       }
     }
     return;
@@ -14448,6 +14457,25 @@ function lookupSyncEntityAliased_(map, key){
     }
     if(foundYear) return foundYear;
     if(qi >= 0 && yearKeys[qi]) return map[yearKeys[qi]];
+  }
+  var dm = key.match(/^plan:daily:theme:(.+)$/);
+  if(dm){
+    var tid = String(dm[1]);
+    if(map['plan:daily:theme:' + tid]) return map['plan:daily:theme:' + tid];
+    var di = -1;
+    var tm = tid.match(/^theme_(\d+)$/);
+    if(tm) di = parseInt(tm[1], 10);
+    else if(/^\d+$/.test(tid)) di = parseInt(tid, 10);
+    if(di >= 0 && DEFAULT_DAILY_SHARE_THEMES[di]){
+      var wantDaily = 'plan:daily:theme:' + DEFAULT_DAILY_SHARE_THEMES[di].id;
+      if(map[wantDaily]) return map[wantDaily];
+    }
+    for(var ti = 0; ti < DEFAULT_DAILY_SHARE_THEMES.length; ti++){
+      if(DEFAULT_DAILY_SHARE_THEMES[ti].id === tid){
+        var altDaily = 'plan:daily:theme:theme_' + ti;
+        if(map[altDaily]) return map[altDaily];
+      }
+    }
   }
   return undefined;
 }
@@ -15006,6 +15034,41 @@ function syncEntitiesEquivalent_(key, localVal, remoteVal){
       });
     }
     return syncValueFingerprint_(yearPeriodCore_(l)) === syncValueFingerprint_(yearPeriodCore_(r));
+  }
+  if(key === 'plan:daily:meta'){
+    function dailyMetaCore_(row){
+      if(!row || typeof row !== 'object') return row;
+      return omitEmptyForSyncCompare_({ intent: String(row.intent || '').trim() });
+    }
+    return syncValueFingerprint_(dailyMetaCore_(l)) === syncValueFingerprint_(dailyMetaCore_(r));
+  }
+  if(key.indexOf('plan:daily:theme:') === 0){
+    function dailyThemeCore_(row){
+      if(!row || typeof row !== 'object') return row;
+      var id = String(row.id || '').trim();
+      var di = -1;
+      var tm = id.match(/^theme_(\d+)$/);
+      if(tm) di = parseInt(tm[1], 10);
+      else if(/^\d+$/.test(id)) di = parseInt(id, 10);
+      if(di >= 0 && DEFAULT_DAILY_SHARE_THEMES[di]) id = DEFAULT_DAILY_SHARE_THEMES[di].id;
+      return omitEmptyForSyncCompare_({
+        id: id,
+        label: String(row.label || '').trim(),
+        note: String(row.note || '').trim()
+      });
+    }
+    return syncValueFingerprint_(dailyThemeCore_(l)) === syncValueFingerprint_(dailyThemeCore_(r));
+  }
+  if(/^plan:subgoal:\d+:meta$/.test(key)){
+    function subMetaCore_(row){
+      if(!row || typeof row !== 'object') return row;
+      return omitEmptyForSyncCompare_({
+        brandProfile: String(row.brandProfile || '').trim(),
+        strategyGuide: String(row.strategyGuide || row.criteria || row.intent || '').trim(),
+        miscLabel: String(row.miscLabel || '').trim()
+      });
+    }
+    return syncValueFingerprint_(subMetaCore_(l)) === syncValueFingerprint_(subMetaCore_(r));
   }
   if(key.indexOf('plan:subgoal:') === 0 && l && typeof l === 'object' && r && typeof r === 'object'){
     l = Object.assign({}, l);
@@ -19425,6 +19488,7 @@ function applyPersistPayload(s, opts){
   if(migrateExpertPspCurriculum_()) migrated = true;
   if(sanitizeBrandingClinicRefs_()) migrated = true;
   if(ensureYearPlanMigrated_()) migrated = true;
+  if(ensureDailySharePlanNormalized_()) migrated = true;
   var planKeyPayload = {
     branding: state.branding,
     syncEntityUpdatedAt: state.syncEntityUpdatedAt,
@@ -20897,6 +20961,7 @@ function runDeferredBootMigrations_(){
     if(dedupeAllSubGoalPlanSteps_()) migrated = true;
     if(sanitizeBrandingClinicRefs_()) migrated = true;
     if(ensureYearPlanMigrated_()) migrated = true;
+    if(ensureDailySharePlanNormalized_()) migrated = true;
     var planKeyPayload = {
       branding: state.branding,
       syncEntityUpdatedAt: state.syncEntityUpdatedAt,

@@ -14780,6 +14780,15 @@ function discardStaleUnpushedBeforeConnect_(){
   var n = countRealUnpushedMutations_();
   // 소수 실수정(기획·삭제)은 새로고침·모바일 백그라운드 뒤에도 지우지 않음
   if(n > 0 && n <= REAL_UNPUSHED_PUSH_MAX_){
+    // 데스크탑에 남아 있는 전송은 새로고침마다 「전체」로 다시 도는 잔재. 폰이 맞춘 서버를 받는다.
+    if(isPlannerDesktopBrowser_()){
+      state.syncOutbox = [];
+      state.syncDirtyEntityKeys = {};
+      state.syncNeedsSnapshot = false;
+      state.syncDirty = false;
+      state._sessionUserEdit = false;
+      return;
+    }
     state._sessionUserEdit = true;
     return;
   }
@@ -14806,6 +14815,8 @@ function shouldAdoptServerAsTruth_(remotePayload, remoteRevision){
   remoteRevision = parseInt(remoteRevision, 10) || getPayloadRevision_(remotePayload) || 0;
   if(!remoteRevision) return false;
   if(state._emptyServerSeed && state.syncNeedsSnapshot) return false;
+  // 이 화면에서 직접 고친 적이 없는 데스크탑은 서버가 기준. 로컬 잔재로 다시 올리지 않음.
+  if(isPlannerDesktopBrowser_() && !state._sessionUserEdit) return true;
   var unpushed = countRealUnpushedMutations_();
   if(unpushed > 0 && unpushed <= REAL_UNPUSHED_PUSH_MAX_) return false;
   if(outboxHasProtectedMutations_()) return false;
@@ -15800,6 +15811,14 @@ function pruneOrphanSubGoalStepOutbox_(){
 }
 function schedulePlannerGasPush_(immediate){
   if(!plannerSyncBootstrapReady_ || !state._bootstrapChoiceDone || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return;
+  if(isPlannerDesktopBrowser_() && !state._sessionUserEdit && hasPendingLocalSyncChanges_()){
+    state.syncOutbox = [];
+    state.syncDirtyEntityKeys = {};
+    state.syncNeedsSnapshot = false;
+    state.syncDirty = false;
+    requestServerAuthorityInsteadOfFlood_();
+    return;
+  }
   if(shouldBlockStaleFloodPush_()){
     requestServerAuthorityInsteadOfFlood_();
     return;
@@ -19676,8 +19695,14 @@ function applyPersistPayload(s, opts){
   if(migrateAntiAiPainSafetyPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrated){
-    if(opts && opts.authoritativeAdopt) state._postAdoptMigration = true;
-    else {
+    var desktopReceiveOnly = isPlannerDesktopBrowser_() && !state._sessionUserEdit;
+    if((opts && opts.authoritativeAdopt) || desktopReceiveOnly){
+      state._postAdoptMigration = true;
+      state.syncNeedsSnapshot = false;
+      state.syncDirty = false;
+      state.syncDirtyEntityKeys = {};
+      state.syncOutbox = [];
+    } else {
       state.syncDirty = true;
       state.syncNeedsSnapshot = true;
     }
@@ -20240,13 +20265,14 @@ function save(opts) {
   }
   if(!o.skipMarkDirty){
     var becameDirty = changedEntities.length > 0 || contentChanged || untrackedChanged;
-    if(changedEntities.length || contentChanged) state.syncDirty = true;
-    changedEntities.forEach(function(key){ state.syncDirtyEntityKeys[key] = true; });
-    enqueueSyncOutboxChanges_(changedEntities, getPersistPayload());
-    if(untrackedChanged) state.syncNeedsSnapshot = true;
-    rebuildDirtyStateFromOutbox_();
-    if(untrackedChanged) state.syncDirty = true;
-    if(becameDirty){
+    var desktopAuto = isPlannerDesktopBrowser_() && !state._sessionUserEdit && !changedEntities.length;
+    if(!desktopAuto && (changedEntities.length || contentChanged)) state.syncDirty = true;
+    if(!desktopAuto) changedEntities.forEach(function(key){ state.syncDirtyEntityKeys[key] = true; });
+    if(!desktopAuto) enqueueSyncOutboxChanges_(changedEntities, getPersistPayload());
+    if(untrackedChanged && !desktopAuto) state.syncNeedsSnapshot = true;
+    if(!desktopAuto) rebuildDirtyStateFromOutbox_();
+    if(untrackedChanged && !desktopAuto) state.syncDirty = true;
+    if(becameDirty && !desktopAuto){
       state._sessionUserEdit = true;
       plannerDirtyGeneration_++;
     }
@@ -20389,6 +20415,10 @@ function isDrivePreferRedirect_(){
   if(/Android|iPhone|iPad|iPod|Mobile|CriOS|FxiOS/i.test(ua)) return true;
   if(navigator.maxTouchPoints > 0 && window.innerWidth < 960) return true;
   return false;
+}
+/** 폰·태블릿이 아닌 넓은 화면. 여기 남은 전송은 이전 세션 잔재로 보고 서버를 받는다. */
+function isPlannerDesktopBrowser_(){
+  try { return !isDrivePreferRedirect_() && window.innerWidth >= 1024; } catch(eDesk){ return false; }
 }
 function isPlannerGithubDeploy_(){
   return location.hostname === 'breezefeel.github.io' && (location.pathname || '').indexOf('/Thewellness') !== -1;
@@ -21358,7 +21388,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=178').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=179').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){

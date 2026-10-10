@@ -3978,6 +3978,49 @@ function sanitizeYearPeriodFields_(per){
 function makePlanRowStableId_(prefix){
   return String(prefix || 'row') + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
+function yearPeriodStableId_(i){
+  return 'yp_q' + (parseInt(i, 10) || 0);
+}
+function pickRicherYearPeriodRow_(cands){
+  if(!cands || !cands.length) return null;
+  var ranked = cands.slice().sort(function(a, b){
+    var ta = periodHasYearGoalText_(a) ? 1 : 0;
+    var tb = periodHasYearGoalText_(b) ? 1 : 0;
+    if(ta !== tb) return tb - ta;
+    return String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''));
+  });
+  return ranked[0];
+}
+/** 분기 행을 0~3 고정 id(yp_q0…)로 접음 — 재생성·병합 때마다 새 id가 쌓여 동기화 루프가 생김 */
+function collapseYearPlanPeriods_(periods){
+  var buckets = [[], [], [], []];
+  (periods || []).forEach(function(p, i){
+    if(!p || typeof p !== 'object') return;
+    var qi = parseInt(p.index, 10);
+    if(isNaN(qi) || qi < 0 || qi > 3){
+      var m = String(p.id || '').match(/^yp_q(\d+)$/);
+      if(m) qi = parseInt(m[1], 10);
+    }
+    if(isNaN(qi) || qi < 0 || qi > 3){
+      var m2 = String(p.id || '').match(/^yp_mig_(\d+)/);
+      if(m2) qi = parseInt(m2[1], 10);
+    }
+    if(isNaN(qi) || qi < 0 || qi > 3) qi = Math.min(3, Math.max(0, i));
+    buckets[qi].push(p);
+  });
+  return buckets.map(function(list, i){
+    var row = pickRicherYearPeriodRow_(list);
+    if(!row){
+      return { id: yearPeriodStableId_(i), index: i, goal: '', topic: '', rationale: '', months: 3 };
+    }
+    if(typeof row === 'object'){
+      row = Object.assign({}, row);
+      row.id = yearPeriodStableId_(i);
+      row.index = i;
+    }
+    return row;
+  });
+}
 /** 연간/일상/단계 행에 안정 id를 부여 — index 키 동시편집 시 행 밀림 방지 */
 function ensurePlanRowStableIdsInPayload_(payload){
   if(!payload || !payload.branding || typeof payload.branding !== 'object') return false;
@@ -3997,14 +4040,20 @@ function ensurePlanRowStableIdsInPayload_(payload){
     return id;
   }
   if(branding.yearPlan && Array.isArray(branding.yearPlan.periods)){
-    branding.yearPlan.periods.forEach(function(period, i){
-      if(!period || typeof period !== 'object') return;
-      var next = takeId_(
-        period.id,
-        'yp_mig_' + i + '_' + String(period.start || '').replace(/-/g, '')
-      );
-      if(String(period.id || '') !== next){ period.id = next; changed = true; }
-    });
+    var collapsed = collapseYearPlanPeriods_(branding.yearPlan.periods);
+    var beforeIds = (branding.yearPlan.periods || []).map(function(p){ return p && p.id; }).join('|');
+    var afterIds = collapsed.map(function(p){ return p && p.id; }).join('|');
+    if(beforeIds !== afterIds || branding.yearPlan.periods.length !== collapsed.length){
+      branding.yearPlan.periods = collapsed;
+      changed = true;
+    } else {
+      branding.yearPlan.periods.forEach(function(period, i){
+        if(!period || typeof period !== 'object') return;
+        var next = yearPeriodStableId_(i);
+        if(String(period.id || '') !== next){ period.id = next; changed = true; }
+        if(period.index !== i){ period.index = i; changed = true; }
+      });
+    }
   }
   if(branding.dailySharePlan && Array.isArray(branding.dailySharePlan.themes)){
     branding.dailySharePlan.themes.forEach(function(theme, i){
@@ -4198,10 +4247,14 @@ function sanitizeYearPlanObj_(plan){
   if(plan.goal != null) plan.goal = sanitizePersonalBrandText_(plan.goal);
   (plan.periods || []).forEach(function(per, i){
     sanitizeYearPeriodFields_(per);
-    if(per && !per.id){
-      per.id = 'yp_mig_' + i + '_' + String(per.start || '').replace(/-/g, '');
+    if(per){
+      per.id = yearPeriodStableId_(i);
+      per.index = i;
     }
   });
+  if(plan.periods && plan.periods.length !== 4){
+    plan.periods = collapseYearPlanPeriods_(plan.periods);
+  }
   return plan;
 }
 function sanitizeBrandingClinicRefs_(){
@@ -4595,7 +4648,7 @@ function buildRollingPeriodsFromAnchor_(anchorIso, goalList){
     var end = addMonthsToDate_(start, 3);
     end.setDate(end.getDate() - 1);
     periods.push({
-      id: makePlanRowStableId_('yp'),
+      id: yearPeriodStableId_(i),
       index: i,
       start: start.toISOString().slice(0, 10),
       end: end.toISOString().slice(0, 10),
@@ -4608,6 +4661,9 @@ function buildRollingPeriodsFromAnchor_(anchorIso, goalList){
 function getYearPlan_(){
   var brand = state.branding && typeof state.branding === 'object' ? state.branding : {};
   var yp = brand.yearPlan;
+  if(yp && yp.periods && yp.periods.length !== 4){
+    yp.periods = collapseYearPlanPeriods_(yp.periods);
+  }
   if(yp && yp.periods && yp.periods.length === 4){
     return {
       anchorDate: yp.anchorDate || yp.periods[0].start || new Date().toISOString().slice(0, 10),
@@ -4615,7 +4671,7 @@ function getYearPlan_(){
       goal: String(yp.goal || '').trim(),
       periods: yp.periods.map(function(p, i){
         return {
-          id: p.id || ('yp_mig_' + i + '_' + String(p.start || '').replace(/-/g, '')),
+          id: yearPeriodStableId_(i),
           index: i,
           start: p.start,
           end: p.end,
@@ -4642,7 +4698,7 @@ function periodHasYearGoalText_(per){
 function mapYearPeriodForStore_(per, i){
   per = per || {};
   return {
-    id: per.id || ('yp_mig_' + i + '_' + String(per.start || '').replace(/-/g, '')),
+    id: yearPeriodStableId_(i),
     index: i,
     start: per.start || '',
     end: per.end || '',
@@ -4853,9 +4909,19 @@ window.toggleLegacyDrafts_ = function(){
 };
 function ensureYearPlanMigrated_(){
   if(!state.branding || typeof state.branding !== 'object') state.branding = {};
-  if(state.branding.yearPlan && state.branding.yearPlan.periods && state.branding.yearPlan.periods.length === 4) return false;
+  if(state.branding.yearPlan && Array.isArray(state.branding.yearPlan.periods)){
+    var before = (state.branding.yearPlan.periods || []).map(function(p){ return p && p.id; }).join('|');
+    var next = collapseYearPlanPeriods_(state.branding.yearPlan.periods);
+    var after = next.map(function(p){ return p && p.id; }).join('|');
+    if(before !== after || state.branding.yearPlan.periods.length !== next.length){
+      state.branding.yearPlan.periods = next;
+      syncBrandingMessageFromYearPlan_();
+      return true;
+    }
+    return false;
+  }
   var plan = getYearPlan_();
-  state.branding.yearPlan = { anchorDate: plan.anchorDate, periods: plan.periods };
+  state.branding.yearPlan = { anchorDate: plan.anchorDate, periods: collapseYearPlanPeriods_(plan.periods) };
   syncBrandingMessageFromYearPlan_();
   return true;
 }
@@ -7172,6 +7238,7 @@ function buildRollingPeriodsWithMonths_(anchorIso, periodDefs){
     var end = addMonthsToDate_(start, mo);
     end.setDate(end.getDate() - 1);
     var row = {
+      id: yearPeriodStableId_(i),
       index: i,
       start: start.toISOString().slice(0, 10),
       end: end.toISOString().slice(0, 10),
@@ -8224,12 +8291,12 @@ function commitPendingYearPlan_(){
   var focus = state.planWorkshopFocus === 'quarter' ? 'quarter' : 'year';
   var pendingPeriods = (p.periods || []).map(function(per, i){ return mapYearPeriodForStore_(per, i); });
   var prevPeriods = (prev.periods || []).map(function(per, i){ return mapYearPeriodForStore_(per, i); });
-  var periods = [0, 1, 2, 3].map(function(i){
+  var periods = collapseYearPlanPeriods_([0, 1, 2, 3].map(function(i){
     var pend = pendingPeriods[i];
     var old = prevPeriods[i];
     if(periodHasYearGoalText_(pend)) return pend;
     return old || pend || mapYearPeriodForStore_({}, i);
-  });
+  }));
   state.branding.yearPlan = {
     anchorDate: (focus === 'year' && prev.anchorDate) ? prev.anchorDate : (p.anchorDate || prev.anchorDate || new Date().toISOString().slice(0, 10)),
     periods: periods,
@@ -14165,7 +14232,7 @@ function setSyncEntity_(payload, key, wrapped){
           if(row && typeof row === 'object' && !row.id) row.id = id;
           return row;
         });
-        payload.branding.yearPlan.periods = periods.filter(function(x){ return x != null; });
+        payload.branding.yearPlan.periods = collapseYearPlanPeriods_(periods.filter(function(x){ return x != null; }));
       }
     } else if(parts[1] === 'daily'){
       if(!payload.branding.dailySharePlan) payload.branding.dailySharePlan = {};
@@ -14368,6 +14435,20 @@ function lookupSyncEntityAliased_(map, key){
   if(m && Object.prototype.hasOwnProperty.call(map, m[1] + m[2])) return map[m[1] + m[2]];
   var m2 = key.match(/^(plan:subgoal:\d+:step:)(\d+)$/);
   if(m2 && Object.prototype.hasOwnProperty.call(map, m2[1] + 's' + m2[2])) return map[m2[1] + 's' + m2[2]];
+  var ym = key.match(/^plan:year:period:(.+)$/);
+  if(ym){
+    var q = String(ym[1]).match(/^yp_q(\d+)$/) || String(ym[1]).match(/^yp_mig_(\d+)/);
+    var qi = q ? parseInt(q[1], 10) : -1;
+    if(qi >= 0 && map['plan:year:period:yp_q' + qi]) return map['plan:year:period:yp_q' + qi];
+    var yearKeys = Object.keys(map).filter(function(k){ return k.indexOf('plan:year:period:') === 0; });
+    var foundYear = null;
+    for(var yi = 0; yi < yearKeys.length; yi++){
+      var ent = map[yearKeys[yi]];
+      if(ent && (ent.order === qi || ent.index === qi || (ent.value && ent.value.index === qi))) foundYear = ent;
+    }
+    if(foundYear) return foundYear;
+    if(qi >= 0 && yearKeys[qi]) return map[yearKeys[qi]];
+  }
   return undefined;
 }
 function draftEntityFingerprint_(val){
@@ -14653,8 +14734,6 @@ function shouldAdoptServerAsTruth_(remotePayload, remoteRevision){
   var unpushed = countRealUnpushedMutations_();
   if(unpushed > 0 && unpushed <= REAL_UNPUSHED_PUSH_MAX_) return false;
   if(outboxHasProtectedMutations_()) return false;
-  if(state.pendingYearPlan && isPendingYearPlanDirty_()) return false;
-  if(state.pendingSubGoalPlan && isPendingSubGoalPlanDirty_(state.pendingSubGoalPlan.catId)) return false;
   try {
     if(localContentRicherThan_(getPersistPayload(), remotePayload)) return false;
   } catch(eY){}
@@ -14902,6 +14981,31 @@ function syncEntitiesEquivalent_(key, localVal, remoteVal){
   if(l === undefined && r === undefined) return true;
   if(key.indexOf('draft:') === 0){
     return draftEntityFingerprint_(l) === draftEntityFingerprint_(r);
+  }
+  if(key === 'plan:year:meta'){
+    function yearMetaCore_(row){
+      if(!row || typeof row !== 'object') return row;
+      return omitEmptyForSyncCompare_({
+        goal: String(row.goal || '').trim(),
+        intent: String(row.intent || '').trim(),
+        anchorDate: String(row.anchorDate || '').trim()
+      });
+    }
+    return syncValueFingerprint_(yearMetaCore_(l)) === syncValueFingerprint_(yearMetaCore_(r));
+  }
+  if(key.indexOf('plan:year:period:') === 0){
+    function yearPeriodCore_(row){
+      if(!row || typeof row !== 'object') return row;
+      var goal = String(row.goal || row.topic || '').trim();
+      return omitEmptyForSyncCompare_({
+        start: String(row.start || '').trim(),
+        end: String(row.end || '').trim(),
+        goal: goal,
+        rationale: String(row.rationale || '').trim(),
+        months: (parseInt(row.months, 10) || 3) === 3 ? undefined : parseInt(row.months, 10)
+      });
+    }
+    return syncValueFingerprint_(yearPeriodCore_(l)) === syncValueFingerprint_(yearPeriodCore_(r));
   }
   if(key.indexOf('plan:subgoal:') === 0 && l && typeof l === 'object' && r && typeof r === 'object'){
     l = Object.assign({}, l);

@@ -4691,6 +4691,14 @@ function periodHasYearGoalText_(per){
   if(per && per.value && typeof per.value === 'object' && per.goal == null && per.topic == null) per = per.value;
   return !!(per && (String(per.goal || per.topic || '').trim() || String(per.rationale || '').trim()));
 }
+function yearPlanPeriodTextCount_(plan){
+  var n = 0;
+  var periods = (plan && plan.periods) || [];
+  for(var i = 0; i < periods.length; i++){
+    if(periodHasYearGoalText_(periods[i])) n++;
+  }
+  return n;
+}
 function mapYearPeriodForStore_(per, i){
   per = per || {};
   return {
@@ -4708,15 +4716,20 @@ function mapYearPeriodForStore_(per, i){
 }
 function getYearPlanForView_(){
   if(state.pendingYearPlan && isPendingYearPlanDirty_()){
-    var p = state.pendingYearPlan;
-    var base = getYearPlan_();
-    var src = (p.periods && p.periods.length) ? p.periods : base.periods;
-    return {
-      anchorDate: p.anchorDate || base.anchorDate,
-      intent: String(p.intent || base.intent || '').trim(),
-      goal: String(p.goal || base.goal || '').trim(),
-      periods: (src || []).map(function(per, i){ return mapYearPeriodForStore_(per, i); })
-    };
+    var pendingN = yearPlanPeriodTextCount_(state.pendingYearPlan);
+    var appliedN = yearPlanPeriodTextCount_(state.branding && state.branding.yearPlan);
+    // 빈 미적용 초안이 이미 받은 분기 글을 가리지 않음
+    if(!(pendingN === 0 && appliedN > 0)){
+      var p = state.pendingYearPlan;
+      var base = getYearPlan_();
+      var src = (p.periods && p.periods.length) ? p.periods : base.periods;
+      return {
+        anchorDate: p.anchorDate || base.anchorDate,
+        intent: String(p.intent || base.intent || '').trim(),
+        goal: String(p.goal || base.goal || '').trim(),
+        periods: (src || []).map(function(per, i){ return mapYearPeriodForStore_(per, i); })
+      };
+    }
   }
   return getYearPlan_();
 }
@@ -14935,6 +14948,8 @@ function prunePhantomBeforeReconcile_(remotePayload){
 function reconcileLocalWithServerPayload_(localPayload, remotePayload, remoteRevision){
   remoteRevision = parseInt(remoteRevision, 10) || getPayloadRevision_(remotePayload);
   prunePhantomBeforeReconcile_(remotePayload);
+  // 다른 로컬 수정 때문에 전체를 못 받아도, 비어 있는 분기는 서버 글로 채운다
+  try { pullRemoteYearPlanIntoLocalIfRicher_(remotePayload); } catch(eYearPull){}
   if(shouldAdoptServerAsTruth_(remotePayload, remoteRevision)){
     adoptServerAsAuthority_(remotePayload, remoteRevision);
     return 'adopted';
@@ -15933,7 +15948,8 @@ async function plannerGasPushNow_(){
       if(prePatch) state.syncNeedsSnapshot = false;
       var locRev = parseInt(state.syncRevision, 10) || 0;
       var storedRev = readStoredSyncRev_(GAS_LAST_SYNC_REV_KEY);
-      skipPull = prePatch;
+      var localQuartersEmpty = yearPlanPeriodTextCount_(state.branding && state.branding.yearPlan) < 1;
+      skipPull = prePatch && !localQuartersEmpty;
     } catch(eSkipPull){}
     if(shouldBlockStaleFloodPush_()){
       var adoptedFlood = await plannerPullRemoteIntoStateCore_();
@@ -16302,6 +16318,73 @@ function mergeGeneratedMaps_(a, b, preferB){
   });
   return out;
 }
+/** 분기 글이 있는 쪽을 남긴다. 시각만 새로운 빈 분기가 서버 글을 지우지 않게. */
+function mergeYearPlansKeepingText_(localPlan, remotePlan, preferRemote){
+  if(!localPlan || typeof localPlan !== 'object') return remotePlan || null;
+  if(!remotePlan || typeof remotePlan !== 'object') return localPlan || null;
+  var localN = yearPlanPeriodTextCount_(localPlan);
+  var remoteN = yearPlanPeriodTextCount_(remotePlan);
+  var base;
+  var other;
+  if(remoteN > localN){
+    base = remotePlan;
+    other = localPlan;
+  } else if(localN > remoteN){
+    base = localPlan;
+    other = remotePlan;
+  } else {
+    base = pickNewerBrandingPlan_(localPlan, remotePlan, preferRemote);
+    other = (base === remotePlan) ? localPlan : remotePlan;
+  }
+  var merged = Object.assign({}, base);
+  var combined = [];
+  (localPlan.periods || []).forEach(function(p){ if(p) combined.push(p); });
+  (remotePlan.periods || []).forEach(function(p){ if(p) combined.push(p); });
+  merged.periods = collapseYearPlanPeriods_(combined);
+  if(!String(merged.goal || '').trim() && other && other.goal) merged.goal = other.goal;
+  if(!String(merged.intent || '').trim() && other && other.intent) merged.intent = other.intent;
+  if(!merged.anchorDate && other && other.anchorDate) merged.anchorDate = other.anchorDate;
+  return merged;
+}
+/** 서버 분기에 글이 있고 이 기기는 비어 있으면 화면·저장본에 받는다. 다시 올리지는 않음. */
+function pullRemoteYearPlanIntoLocalIfRicher_(remotePayload){
+  var remotePlan = remotePayload && remotePayload.branding && remotePayload.branding.yearPlan;
+  if(!remotePlan || typeof remotePlan !== 'object') return false;
+  if(!state.branding || typeof state.branding !== 'object') state.branding = {};
+  var before = yearPlanPeriodTextCount_(state.branding.yearPlan);
+  var merged = mergeYearPlansKeepingText_(state.branding.yearPlan, remotePlan, true);
+  var after = yearPlanPeriodTextCount_(merged);
+  if(!merged || after <= before) return false;
+  state.branding.yearPlan = merged;
+  try {
+    var ents = collectSyncEntities_({ branding: { yearPlan: merged } }, { skipEnsureIds: true }) || {};
+    var rTimes = (remotePayload && remotePayload.syncEntityUpdatedAt) || {};
+    if(!state.syncEntityUpdatedAt) state.syncEntityUpdatedAt = {};
+    Object.keys(ents).forEach(function(key){
+      if(String(key).indexOf('plan:year:') !== 0) return;
+      if(rTimes[key]) state.syncEntityUpdatedAt[key] = rTimes[key];
+      if(state.syncDirtyEntityKeys) delete state.syncDirtyEntityKeys[key];
+    });
+    if(Array.isArray(state.syncOutbox) && state.syncOutbox.length){
+      state.syncOutbox = state.syncOutbox.filter(function(op){
+        if(!op || String(op.key || '').indexOf('plan:year:period:') !== 0) return true;
+        return periodHasYearGoalText_(op.value);
+      });
+    }
+    try { rebuildDirtyStateFromOutbox_(); } catch(eRb){}
+  } catch(ePullYear){}
+  try {
+    if(state.pendingYearPlan && yearPlanPeriodTextCount_(state.pendingYearPlan) < after){
+      state.pendingYearPlan = null;
+      persistPendingYearPlan_();
+    }
+  } catch(ePend){}
+  try {
+    save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+  } catch(eSv){}
+  try { renderMain(); } catch(eRender){}
+  return true;
+}
 /** 두 기획 객체 중 자체 updatedAt이 더 최신인 것을 고른다. 없으면 전체 payload 우선순위(preferRemote)로 폴백. */
 function pickNewerBrandingPlan_(localPlan, remotePlan, preferRemote){
   if(!localPlan) return remotePlan || null;
@@ -16365,7 +16448,7 @@ function mergePlannerPayloads_(local, remote){
     // 기획(yearPlan/subGoalPlans/dailySharePlan)은 각 plan의 updatedAt 기준으로 최신본을 고른다.
     // 전체 payload 저장 시각과 무관하게, 실제로 나중에 수정된 기획이 살아남도록.
     out.branding.subGoalPlans = mergeSubGoalPlansByTs_(lb.subGoalPlans, rb.subGoalPlans, preferRemote);
-    out.branding.yearPlan = pickNewerBrandingPlan_(lb.yearPlan, rb.yearPlan, preferRemote);
+    out.branding.yearPlan = mergeYearPlansKeepingText_(lb.yearPlan, rb.yearPlan, preferRemote);
     if(out.branding.yearPlan && Array.isArray(out.branding.yearPlan.periods)){
       out.branding.yearPlan.periods = collapseYearPlanPeriods_(out.branding.yearPlan.periods);
     }
@@ -17523,6 +17606,10 @@ async function runPlannerBootstrapInBackground_(){
         try { rebuildDirtyStateFromOutbox_(); } catch(eRep){}
         state._sessionUserEdit = true;
         state.syncDirty = true;
+      }
+      // 이 기기 수정만 얹은 뒤에도, 비어 있는 분기는 서버 글로 다시 채운다
+      try { pullRemoteYearPlanIntoLocalIfRicher_(remotePayload); } catch(eYearBoot){}
+      if(sessionOps.length){
         try {
           save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
         } catch(eAdSv2){}
@@ -21271,7 +21358,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=177').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=178').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){

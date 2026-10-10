@@ -3987,7 +3987,10 @@ function pickRicherYearPeriodRow_(cands){
     var ta = periodHasYearGoalText_(a) ? 1 : 0;
     var tb = periodHasYearGoalText_(b) ? 1 : 0;
     if(ta !== tb) return tb - ta;
-    return String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''));
+    var sa = /^yp_q[0-3]$/.test(String((a && a.id) || '')) ? 1 : 0;
+    var sb = /^yp_q[0-3]$/.test(String((b && b.id) || '')) ? 1 : 0;
+    if(sa !== sb) return sb - sa;
+    return String(b.createdAt || b.updatedAt || '').localeCompare(String(a.createdAt || a.updatedAt || ''));
   });
   return ranked[0];
 }
@@ -4885,11 +4888,15 @@ function syncBrandingMessageFromYearPlan_(){
   var plan = getYearPlan_();
   if(!state.branding || typeof state.branding !== 'object') state.branding = {};
   if(!state.branding.yearPlan) state.branding.yearPlan = plan;
-  if(plan.periods[0]){
-    state.branding.message = plan.periods[0].goal || state.branding.message || '';
-    var label = formatPeriodRangeLabel_(plan.periods[0].start, plan.periods[0].end);
-    if(label) state.branding.quarterLabel = label;
+  if(!plan.periods[0]) return;
+  var nextMsg = plan.periods[0].goal || state.branding.message || '';
+  var nextLabel = formatPeriodRangeLabel_(plan.periods[0].start, plan.periods[0].end);
+  if(String(state.branding.message || '') === String(nextMsg) &&
+      (!nextLabel || String(state.branding.quarterLabel || '') === String(nextLabel))){
+    return;
   }
+  state.branding.message = nextMsg;
+  if(nextLabel) state.branding.quarterLabel = nextLabel;
 }
 function hasSubGoalPlan_(catId){
   var plan = getSubGoalPlan_(catId);
@@ -14027,6 +14034,7 @@ function isEmptyDefaultSyncEntity_(key, val){
   if(key === 'setting:chatgptOpenUrl') return !String(v == null ? '' : v).trim();
   if(key === 'setting:publishRecCurrentTabOnly') return !v;
   if(key === 'setting:syncRationalesOnBrandSave') return v == null || v === '' || v === true;
+  if(key.indexOf('plan:year:period:') === 0) return !periodHasYearGoalText_(v);
   return false;
 }
 function collectSyncEntities_(payload, opts){
@@ -14094,8 +14102,10 @@ function collectSyncEntities_(payload, opts){
     var yearMeta = Object.assign({}, branding.yearPlan);
     delete yearMeta.periods;
     out['plan:year:meta'] = yearMeta;
-    (branding.yearPlan.periods || []).forEach(function(period, i){
-      var periodId = String((period && period.id) || ('yp_mig_' + i));
+    // 비교·전송 키는 항상 yp_q0~3. 옛 id를 그대로 내면 적용 후 34·37건이 다시 채워짐
+    collapseYearPlanPeriods_(branding.yearPlan.periods || []).forEach(function(period, i){
+      if(!periodHasYearGoalText_(period)) return;
+      var periodId = yearPeriodStableId_(i);
       out['plan:year:period:' + periodId] = { id: periodId, order: i, index: i, value: period };
     });
   }
@@ -14506,23 +14516,41 @@ function entityMentionsDraftIds_(val, ids){
   try { s = JSON.stringify(val); } catch(e){ return false; }
   return Object.keys(ids).some(function(id){ return id && s.indexOf(id) >= 0; });
 }
+function canonicalSyncEntityKey_(key){
+  key = String(key || '');
+  var ym = key.match(/^plan:year:period:(.+)$/);
+  if(ym){
+    var q = String(ym[1]).match(/^yp_q(\d+)$/) || String(ym[1]).match(/^yp_mig_(\d+)/);
+    var qi = q ? parseInt(q[1], 10) : -1;
+    if(qi >= 0 && qi <= 3) return 'plan:year:period:yp_q' + qi;
+    return key;
+  }
+  var sm = key.match(/^(plan:subgoal:\d+:step:)s?(\d+)$/i);
+  if(sm) return sm[1] + sm[2];
+  var dm = key.match(/^plan:daily:theme:(.+)$/);
+  if(dm){
+    var tid = String(dm[1]);
+    var tm = tid.match(/^theme_(\d+)$/);
+    var di = tm ? parseInt(tm[1], 10) : (/^\d+$/.test(tid) ? parseInt(tid, 10) : -1);
+    if(di >= 0 && DEFAULT_DAILY_SHARE_THEMES[di]) return 'plan:daily:theme:' + DEFAULT_DAILY_SHARE_THEMES[di].id;
+    return 'plan:daily:theme:' + tid;
+  }
+  return key;
+}
 function listChangedSyncEntityKeys_(previousPayload, currentPayload){
   // dirty 판별 중 id 마이그레이션을 돌리면 branding이 매번 바뀌어 가짜 1건이 생김
-  var prevEntities = collectSyncEntities_(previousPayload || {}, { skipEnsureIds: true });
-  var nextEntities = collectSyncEntities_(currentPayload || {}, { skipEnsureIds: true });
+  var prevEntities = collectSyncEntities_(previousPayload || {}, { skipEnsureIds: true }) || {};
+  var nextEntities = collectSyncEntities_(currentPayload || {}, { skipEnsureIds: true }) || {};
   var keys = {};
-  Object.keys(prevEntities).forEach(function(k){ keys[k] = true; });
-  Object.keys(nextEntities).forEach(function(k){ keys[k] = true; });
+  Object.keys(prevEntities).forEach(function(k){ keys[canonicalSyncEntityKey_(k)] = true; });
+  Object.keys(nextEntities).forEach(function(k){ keys[canonicalSyncEntityKey_(k)] = true; });
   var changed = [];
   Object.keys(keys).forEach(function(key){
     if(isDeviceLocalSyncEntityKey_(key)) return;
-    var prev = prevEntities[key];
-    var next = nextEntities[key];
-    var same = key.indexOf('draft:') === 0
-      ? draftEntityFingerprint_(prev) === draftEntityFingerprint_(next)
-      : syncValueFingerprint_(stripSyncVolatileForCompare_(prev)) ===
-        syncValueFingerprint_(stripSyncVolatileForCompare_(next));
-    if(!same) changed.push(key);
+    var prev = lookupSyncEntityAliased_(prevEntities, key);
+    var next = lookupSyncEntityAliased_(nextEntities, key);
+    if(syncEntitiesEquivalent_(key, prev, next)) return;
+    changed.push(key);
   });
   var focus = state._syncFocusDraftIds;
   if(focus && Object.keys(focus).length){
@@ -14671,7 +14699,10 @@ function listDifferingProtectedKeys_(localPayload, remotePayload){
     } else if(k === 'ops:meta'){
       return;
     }
-    if(syncEntitiesEquivalent_(k, lEnt[k], lookupSyncEntityAliased_(rEnt, k))) return;
+    var remoteVal = lookupSyncEntityAliased_(rEnt, k);
+    if(isEmptyDefaultSyncEntity_(k, lEnt[k]) &&
+        (remoteVal === undefined || isEmptyDefaultSyncEntity_(k, remoteVal))) return;
+    if(syncEntitiesEquivalent_(k, lEnt[k], remoteVal)) return;
     keys.push(k);
   });
   return keys.slice(0, 80);
@@ -14707,11 +14738,14 @@ function listRicherDraftKeys_(localPayload, remotePayload){
 }
 function requeueLocalRicherContent_(remotePayload){
   var local = getPersistPayload();
+  var lEnt = {};
+  try { lEnt = collectSyncEntities_(local, { skipEnsureIds: true }) || {}; } catch(eEnt){}
   var keys = [];
   var seen = {};
   function add_(list){
     (list || []).forEach(function(k){
       if(!k || seen[k] || isDeviceLocalSyncEntityKey_(k)) return;
+      if(isEmptyDefaultSyncEntity_(k, lookupSyncEntityAliased_(lEnt, k))) return;
       seen[k] = true;
       keys.push(k);
     });
@@ -15023,17 +15057,23 @@ function syncEntitiesEquivalent_(key, localVal, remoteVal){
   }
   if(key.indexOf('plan:year:period:') === 0){
     function yearPeriodCore_(row){
+      if(row == null) return undefined;
+      row = unwrapSyncEntityValue_(row) || row;
+      if(row && row.value && typeof row.value === 'object' && row.goal == null && row.topic == null) row = row.value;
       if(!row || typeof row !== 'object') return row;
       var goal = String(row.goal || row.topic || '').trim();
       return omitEmptyForSyncCompare_({
-        start: String(row.start || '').trim(),
-        end: String(row.end || '').trim(),
         goal: goal,
         rationale: String(row.rationale || '').trim(),
         months: (parseInt(row.months, 10) || 3) === 3 ? undefined : parseInt(row.months, 10)
       });
     }
-    return syncValueFingerprint_(yearPeriodCore_(l)) === syncValueFingerprint_(yearPeriodCore_(r));
+    var lp = yearPeriodCore_(l);
+    var rp = yearPeriodCore_(r);
+    var lBlank = lp == null || (typeof lp === 'object' && !Object.keys(lp).length);
+    var rBlank = rp == null || (typeof rp === 'object' && !Object.keys(rp).length);
+    if(lBlank && rBlank) return true;
+    return syncValueFingerprint_(lp) === syncValueFingerprint_(rp);
   }
   if(key === 'plan:daily:meta'){
     function dailyMetaCore_(row){
@@ -15703,6 +15743,7 @@ function applyServerPayloadPreservingOutbox_(serverPayload, serverRevision){
   merged = overlayOutboxOnPayload_(merged);
   applyPersistPayload(merged, {
     skipRestorePending: true,
+    authoritativeAdopt: true,
     deferHeavyRepair: !!state._bootstrapDeferHeavy
   });
   try {
@@ -16325,6 +16366,9 @@ function mergePlannerPayloads_(local, remote){
     // 전체 payload 저장 시각과 무관하게, 실제로 나중에 수정된 기획이 살아남도록.
     out.branding.subGoalPlans = mergeSubGoalPlansByTs_(lb.subGoalPlans, rb.subGoalPlans, preferRemote);
     out.branding.yearPlan = pickNewerBrandingPlan_(lb.yearPlan, rb.yearPlan, preferRemote);
+    if(out.branding.yearPlan && Array.isArray(out.branding.yearPlan.periods)){
+      out.branding.yearPlan.periods = collapseYearPlanPeriods_(out.branding.yearPlan.periods);
+    }
     out.branding.dailySharePlan = pickNewerBrandingPlan_(lb.dailySharePlan, rb.dailySharePlan, preferRemote);
     if(!out.branding.yearPlan) delete out.branding.yearPlan;
     if(!out.branding.dailySharePlan) delete out.branding.dailySharePlan;
@@ -16564,6 +16608,20 @@ function dropEmptyDefaultSyncMutations_(){
       if(isDeviceLocalSyncEntityKey_(op.key) || isEmptyDefaultSyncEntity_(op.key, op.value)){
         removed++;
         return;
+      }
+      if(String(op.key).indexOf('plan:year:period:') === 0){
+        try {
+          var yp = state.branding && state.branding.yearPlan;
+          var collapsed = collapseYearPlanPeriods_((yp && yp.periods) || []);
+          var qm = String(op.key).match(/yp_q(\d+)$/) || String(op.key).match(/yp_mig_(\d+)/);
+          var qi = qm ? parseInt(qm[1], 10) : -1;
+          if(qi >= 0 && qi <= 3){
+            if(!periodHasYearGoalText_(collapsed[qi])){ removed++; return; }
+          } else if(!collapsed.some(periodHasYearGoalText_)){
+            removed++;
+            return;
+          }
+        } catch(eYDrop){}
       }
       next.push(op);
     });

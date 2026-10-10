@@ -5750,14 +5750,32 @@ function applyDraftRoadmapAssignment_(draft, catId, stepId, stepTitle, order, to
   opts = opts || {};
   if(!draft) return;
   var nextId = String(stepId);
+  var nextTitle = String(stepTitle || '');
+  var nextStep = String(order) + '/' + String(totalInStep);
   var prevId = String(draft.roadmapStepId || '');
   var prevSeries = String(draft.series || '').trim();
+  var alreadySame = prevId === nextId &&
+    String(draft.series || '') === nextTitle &&
+    String(draft.step || '') === nextStep;
+  if(alreadySame && nextId !== SUBGOAL_MISC_ID && !opts.dropRescueHints &&
+      (draft.previousRoadmapStepId || draft.previousSeries || draft.miscLocked)){
+    alreadySame = false;
+  }
+  if(alreadySame){
+    // 배정이 같으면 updatedAt을 다시 찍지 않음 — 동기화 적용마다 재전송 루프 차단
+    stampDraftBrandOverride_(draft.id, {
+      series: nextTitle,
+      step: nextStep,
+      roadmapStepId: nextId
+    });
+    return;
+  }
   var plan = peekSubGoalPlan_(catId);
   var miscLabel = getSubGoalMiscLabel_(plan);
   var ov = state.draftBrandOverrides && state.draftBrandOverrides[draft.id];
   var patch = {
-    series: stepTitle,
-    step: order + '/' + totalInStep,
+    series: nextTitle,
+    step: nextStep,
     roadmapStepId: nextId
   };
   if(nextId === SUBGOAL_MISC_ID){
@@ -5793,8 +5811,8 @@ function applyDraftRoadmapAssignment_(draft, catId, stepId, stepTitle, order, to
     delete draft.previousSeries;
     delete draft.miscLocked;
   }
-  draft.series = stepTitle;
-  draft.step = order + '/' + totalInStep;
+  draft.series = nextTitle;
+  draft.step = nextStep;
   draft.roadmapStepId = nextId;
   // 시드·직접추가 모두 override에 단계 배정을 남겨야 함.
   // 예전에 기타로 잠긴(miscLocked) 주제는 draft만 바꾸면 토스트만 뜨고 목록은 기타에 남음.
@@ -5817,7 +5835,7 @@ function applyDraftRoadmapAssignment_(draft, catId, stepId, stepTitle, order, to
 /** 주제 기획안·수동 추가 초안의 단계 배정. 유효한 step이면 유지, 없으면 기타. */
 function resolveUserAddedDraftStepAssignment_(draft, catId){
   if(!draft || !isUserAddedDraftId_(draft.id)) return null;
-  var plan = getSubGoalPlan_(catId);
+  var plan = peekSubGoalPlan_(catId);
   if(!plan) return null;
   var sid = normalizeStepIdAgainstPlan_(plan, draft.roadmapStepId) ||
     findPlanStepIdByTitle_(plan, draft.series) ||
@@ -5847,7 +5865,7 @@ function resolveUserAddedDraftStepAssignment_(draft, catId){
 function applyResolvedUserAddedStepOrMisc_(draft, catId){
   if(!draft || !isUserAddedDraftId_(draft.id)) return false;
   if(draft.miscLocked) return false;
-  var plan = getSubGoalPlan_(catId);
+  var plan = peekSubGoalPlan_(catId);
   if(!plan) return false;
   // 고정 모드: 이미 유효한 단계/기타 배정이 있으면 로드·동기화 시 건드리지 않음
   if(!canReassignDraftSteps_()){
@@ -5864,10 +5882,12 @@ function applyResolvedUserAddedStepOrMisc_(draft, catId){
   }
   var resolved = resolveUserAddedDraftStepAssignment_(draft, catId);
   if(resolved){
+    var title = getSubGoalStepTitle_(plan, resolved.stepId);
+    if(draftStepAssignEquals_(draft, resolved.stepId, title, resolved.order, resolved.total)){
+      return false;
+    }
     applyDraftRoadmapAssignment_(
-      draft, catId, resolved.stepId,
-      getSubGoalStepTitle_(plan, resolved.stepId),
-      resolved.order, resolved.total
+      draft, catId, resolved.stepId, title, resolved.order, resolved.total
     );
     return true;
   }
@@ -5875,7 +5895,7 @@ function applyResolvedUserAddedStepOrMisc_(draft, catId){
 }
 function assignUserAddedDraftToMisc_(draft, catId){
   if(!draft || !isUserAddedDraftId_(draft.id)) return false;
-  var plan = getSubGoalPlan_(catId);
+  var plan = peekSubGoalPlan_(catId);
   if(!plan) return false;
   var miscLabel = getSubGoalMiscLabel_(plan);
   var existing = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true })
@@ -5888,7 +5908,7 @@ function assignUserAddedDraftToMisc_(draft, catId){
   return true;
 }
 function normalizeMiscUserAddedOrder_(catId){
-  var plan = getSubGoalPlan_(catId);
+  var plan = peekSubGoalPlan_(catId);
   if(!plan) return false;
   var miscLabel = getSubGoalMiscLabel_(plan);
   var list = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true });
@@ -5909,7 +5929,7 @@ function normalizeMiscUserAddedOrder_(catId){
 }
 function ensureUserAddedDraftsInMisc_(catId){
   var cat = CATEGORIES[catId];
-  var plan = getSubGoalPlan_(catId);
+  var plan = peekSubGoalPlan_(catId);
   if(!cat || !plan) return;
   // 주제 기획안이 단계에 붙인 초안은 기타로 끌어내리지 않음. 미배정·깨진 step만 misc.
   var toMigrate = [];
@@ -11238,41 +11258,133 @@ const REAL_MOVEMENT_PLACE_YAKSU_URL = 'https://naver.me/x2YstInq';
 const REAL_MOVEMENT_PLACE_INCHEON_URL = 'https://naver.me/xYNbHrY9';
 const REAL_MOVEMENT_IG_PARK_URL = 'https://www.instagram.com/dr.park_dc.pt/';
 const REAL_MOVEMENT_IG_CENTER_URL = 'https://www.instagram.com/re.al_movement_official/';
-/** 소식 탭 — 지점별 발행 바로가기 (당근은 앱 실행만) */
+/** 소식 탭 — 지점별 발행 바로가기 (당근·카카오채널은 앱, 네이버는 새 창) */
 const DAANGN_APP_OPEN_URL_ = 'https://www.daangn.com/';
+const DAANGN_PLAY_STORE_ = 'https://play.google.com/store/apps/details?id=com.towneers.www';
+const DAANGN_IOS_STORE_ = 'https://apps.apple.com/kr/app/id1018769995';
+const KAKAO_CHANNEL_ADMIN_WEB_ = 'https://center-pf.kakao.com/';
+const KAKAO_CHANNEL_ADMIN_PLAY_ = 'https://play.google.com/store/apps/details?id=com.kakao.yellowid';
+const KAKAO_CHANNEL_ADMIN_IOS_ = 'https://apps.apple.com/kr/app/id990571676';
 const NEWS_POST_LINKS_BY_BRANCH_ = {
   yaksu: {
     label: '약수',
     naver: 'https://new.smartplace.naver.com/',
     naverPlace: REAL_MOVEMENT_PLACE_YAKSU_URL,
-    kakao: 'https://business.kakao.com/_nVSxdn/chats',
+    kakao: KAKAO_CHANNEL_ADMIN_WEB_,
     kakaoChat: 'https://pf.kakao.com/_nVSxdn/chat',
+    kakaoProfile: '_nVSxdn',
     karrot: DAANGN_APP_OPEN_URL_
   },
   incheon: {
     label: '인천',
     naver: 'https://new.smartplace.naver.com/',
     naverPlace: REAL_MOVEMENT_PLACE_INCHEON_URL,
-    kakao: 'https://pf.kakao.com/_unqbX/chat',
+    kakao: KAKAO_CHANNEL_ADMIN_WEB_,
     kakaoChat: 'https://pf.kakao.com/_unqbX/chat',
+    kakaoProfile: '_unqbX',
     karrot: DAANGN_APP_OPEN_URL_
   }
 };
-function renderNewsPostLinksBarHTML_(){
-  function linkOrMissing_(url, label, title){
-    if(url){
-      return '<a class="sheet-news-post-link" href="' + escapeHtml(url) + '" target="_blank" rel="noopener noreferrer" title="' +
-        escapeHtml(title || label) + '">' + escapeHtml(label) + '</a>';
+function openNewsExternalWindow_(url){
+  if(!url) return null;
+  var w = null;
+  try { w = window.open(url, '_blank', 'noopener,noreferrer'); } catch(e){}
+  if(w) return w;
+  try {
+    var a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.style.display = 'none';
+    (document.body || document.documentElement).appendChild(a);
+    a.click();
+    setTimeout(function(){ try { a.remove(); } catch(e2){} }, 0);
+  } catch(e3){}
+  return null;
+}
+function openNewsAndroidPackage_(pkg, webUrl, storeUrl){
+  try {
+    window.location.href = 'intent:#Intent;package=' + pkg +
+      ';action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end';
+  } catch(e0){}
+  setTimeout(function(){
+    if(document.hidden) return;
+    try {
+      var u = new URL(webUrl);
+      window.location.href = 'intent://' + u.host + u.pathname +
+        '#Intent;scheme=https;package=' + pkg +
+        ';S.browser_fallback_url=' + encodeURIComponent(storeUrl || webUrl) + ';end';
+    } catch(e1){}
+  }, 450);
+  setTimeout(function(){
+    if(document.hidden) return;
+    openNewsExternalWindow_(storeUrl || webUrl);
+  }, 1100);
+}
+function openNewsIosApp_(schemes, webUrl, storeUrl){
+  (schemes || []).forEach(function(scheme){
+    try { openIOSAppScheme_(scheme); } catch(e1){}
+  });
+  setTimeout(function(){
+    if(document.hidden) return;
+    openNewsExternalWindow_(webUrl);
+  }, 700);
+  setTimeout(function(){
+    if(document.hidden) return;
+    if(storeUrl && storeUrl !== webUrl) openNewsExternalWindow_(storeUrl);
+  }, 1400);
+}
+window.openNewsPostTarget_ = function(kind, branchKey, ev){
+  if(ev){
+    ev.preventDefault();
+    ev.stopPropagation();
+  }
+  var b = NEWS_POST_LINKS_BY_BRANCH_[branchKey] || NEWS_POST_LINKS_BY_BRANCH_.yaksu;
+  kind = String(kind || '');
+  if(kind === 'naver'){
+    openNewsExternalWindow_(b.naver);
+    return false;
+  }
+  if(kind === 'karrot'){
+    if(isAndroidDevice()){
+      openNewsAndroidPackage_('com.towneers.www', DAANGN_APP_OPEN_URL_, DAANGN_PLAY_STORE_);
+      return false;
     }
-    return '<span class="sheet-news-post-missing" title="등록된 링크가 없어요">' + escapeHtml(label) + '</span>';
+    if(isIOSLikeDevice()){
+      openNewsIosApp_(['karrot://', 'daangn://'], DAANGN_APP_OPEN_URL_, DAANGN_IOS_STORE_);
+      return false;
+    }
+    openNewsExternalWindow_(DAANGN_APP_OPEN_URL_);
+    return false;
+  }
+  if(kind === 'kakao'){
+    if(isAndroidDevice()){
+      openNewsAndroidPackage_('com.kakao.yellowid', KAKAO_CHANNEL_ADMIN_WEB_, KAKAO_CHANNEL_ADMIN_PLAY_);
+      return false;
+    }
+    if(isIOSLikeDevice()){
+      openNewsIosApp_(['kakaobiz://', 'yellowid://'], KAKAO_CHANNEL_ADMIN_WEB_, KAKAO_CHANNEL_ADMIN_IOS_);
+      return false;
+    }
+    openNewsExternalWindow_(b.kakao || KAKAO_CHANNEL_ADMIN_WEB_);
+    return false;
+  }
+  return false;
+};
+function renderNewsPostLinksBarHTML_(){
+  function newsLink_(kind, branchKey, label, title, href){
+    return '<a class="sheet-news-post-link" href="' + escapeHtml(href) +
+      '" target="_blank" rel="noopener noreferrer" title="' + escapeHtml(title || label) +
+      '" onclick="return openNewsPostTarget_(\'' + kind + '\',\'' + branchKey + '\',event)">' +
+      escapeHtml(label) + '</a>';
   }
   var rows = ['yaksu', 'incheon'].map(function(key){
     var b = NEWS_POST_LINKS_BY_BRANCH_[key];
     return '<div class="sheet-news-post-row">' +
       '<span class="sheet-news-post-branch">' + escapeHtml(b.label) + '</span>' +
-      linkOrMissing_(b.naver, '네이버 소식', '스마트플레이스 관리 · 소식 작성') +
-      linkOrMissing_(b.kakao, '카카오채널 소식', '카카오채널 관리·소식') +
-      linkOrMissing_(b.karrot, '당근 소식', '아이폰·아이패드·안드로이드에서 당근 앱 열기') +
+      newsLink_('naver', key, '네이버 소식', '새 창에서 스마트플레이스 소식 작성', b.naver) +
+      newsLink_('kakao', key, '카카오채널 소식', '카카오채널 관리자 앱 열기', b.kakao) +
+      newsLink_('karrot', key, '당근 소식', '당근 앱 열기', b.karrot) +
     '</div>';
   }).join('');
   return '<div class="sheet-news-post-links" aria-label="지점별 소식 발행 링크">' + rows + '</div>';
@@ -13832,6 +13944,18 @@ function isDeviceLocalSyncEntityKey_(key){
     key === 'setting:dailyAutoLast' ||
     key === 'ops:meta';
 }
+/** 비어 있는 기본 설정 — 서버에 키가 없어도 「남은 1건」으로 치지 않음 */
+function isEmptyDefaultSyncEntity_(key, val){
+  key = String(key || '');
+  var v = val;
+  if(v && typeof v === 'object' && Object.prototype.hasOwnProperty.call(v, 'value') && v.value !== undefined){
+    v = v.value;
+  }
+  if(key === 'setting:chatgptOpenUrl') return !String(v == null ? '' : v).trim();
+  if(key === 'setting:publishRecCurrentTabOnly') return !v;
+  if(key === 'setting:syncRationalesOnBrandSave') return v == null || v === '' || v === true;
+  return false;
+}
 function collectSyncEntities_(payload, opts){
   payload = payload || {};
   // 병합·충돌 비교 중 반복 호출 시 id 마이그레이션까지 돌리면 대용량에서 메인 스레드가 멈춤
@@ -13856,7 +13980,10 @@ function collectSyncEntities_(payload, opts){
     out['branding:seriesGoal:' + key] = branding.seriesGoals[key];
   });
   ['chatgptOpenUrl','publishRecCurrentTabOnly','syncRationalesOnBrandSave'].forEach(function(field){
-    if(Object.prototype.hasOwnProperty.call(payload, field)) out['setting:' + field] = payload[field];
+    if(!Object.prototype.hasOwnProperty.call(payload, field)) return;
+    var settingKey = 'setting:' + field;
+    if(isEmptyDefaultSyncEntity_(settingKey, payload[field])) return;
+    out[settingKey] = payload[field];
   });
   Object.keys(payload.promptRefineMilestones || {}).forEach(function(key){
     out['milestone:' + key] = payload.promptRefineMilestones[key];
@@ -14182,10 +14309,27 @@ function normalizeDraftRowForSync_(draft){
   if(draft.youtubeUrls && draft.youtubeUrls.length) row.youtubeUrls = draft.youtubeUrls;
   return row;
 }
+function stripSyncVolatileForCompare_(value){
+  if(!value || typeof value !== 'object') return value;
+  var copy = Array.isArray(value) ? value.slice() : Object.assign({}, value);
+  delete copy.updatedAt;
+  delete copy.savedAt;
+  if(copy.value && typeof copy.value === 'object' && !Array.isArray(copy.value)){
+    copy.value = Object.assign({}, copy.value);
+    delete copy.value.updatedAt;
+    delete copy.value.savedAt;
+  }
+  return copy;
+}
 function draftEntityFingerprint_(val){
   var row = val;
   if(val && typeof val === 'object' && val.value) row = val.value;
-  return syncValueFingerprint_(normalizeDraftRowForSync_(row));
+  var norm = normalizeDraftRowForSync_(row);
+  if(norm && typeof norm === 'object'){
+    norm = Object.assign({}, norm);
+    delete norm.updatedAt;
+  }
+  return syncValueFingerprint_(norm);
 }
 function syncKeyBelongsToDraftIds_(key, ids){
   key = String(key || '');
@@ -14216,7 +14360,8 @@ function listChangedSyncEntityKeys_(previousPayload, currentPayload){
     var next = nextEntities[key];
     var same = key.indexOf('draft:') === 0
       ? draftEntityFingerprint_(prev) === draftEntityFingerprint_(next)
-      : syncValueFingerprint_(prev) === syncValueFingerprint_(next);
+      : syncValueFingerprint_(stripSyncVolatileForCompare_(prev)) ===
+        syncValueFingerprint_(stripSyncVolatileForCompare_(next));
     if(!same) changed.push(key);
   });
   var focus = state._syncFocusDraftIds;
@@ -14288,6 +14433,7 @@ function draftRowHasUserText_(val){
 function isProtectedUserSyncKey_(key, op){
   key = String(key || '');
   if(!key || isDeviceLocalSyncEntityKey_(key)) return false;
+  if(isEmptyDefaultSyncEntity_(key, op && op.value)) return false;
   if(/^plan:/.test(key) ||
     /^deleted:/.test(key) ||
     /^pinned:/.test(key) ||
@@ -14692,11 +14838,13 @@ function syncEntitiesEquivalent_(key, localVal, remoteVal){
   key = String(key || '');
   var l = unwrapSyncEntityValue_(localVal);
   var r = unwrapSyncEntityValue_(remoteVal);
+  if(isEmptyDefaultSyncEntity_(key, l) && isEmptyDefaultSyncEntity_(key, r)) return true;
   if(l === undefined && r === undefined) return true;
-  if(key.indexOf('draft:') === 0 || key.indexOf('override:') === 0){
+  if(key.indexOf('draft:') === 0){
     return draftEntityFingerprint_(l) === draftEntityFingerprint_(r);
   }
-  return syncValueFingerprint_(l) === syncValueFingerprint_(r);
+  return syncValueFingerprint_(stripSyncVolatileForCompare_(l)) ===
+    syncValueFingerprint_(stripSyncVolatileForCompare_(r));
 }
 function conflictServerEntityRevision_(conflict){
   var n = parseInt(conflict && conflict.serverEntityRevision, 10) || 0;
@@ -15072,6 +15220,7 @@ function enqueueSyncOutboxChanges_(changedKeys, payload){
   changedKeys.forEach(function(key){
     if(isDeviceLocalSyncEntityKey_(key)) return;
     var hasValue = Object.prototype.hasOwnProperty.call(entities, key);
+    if(isEmptyDefaultSyncEntity_(key, hasValue ? entities[key] : null)) return;
     var existing = state.syncOutbox.find(function(op){ return op && op.key === key; });
     if(existing){
       existing.value = hasValue ? cloneSyncValue_(entities[key]) : null;
@@ -16177,10 +16326,41 @@ function isPlannerSyncBusy_(){
 function isPlannerSyncTransferring_(){
   return !!_plannerSyncUiBusy;
 }
+function dropEmptyDefaultSyncMutations_(){
+  var removed = 0;
+  if(Array.isArray(state.syncOutbox) && state.syncOutbox.length){
+    var next = [];
+    state.syncOutbox.forEach(function(op){
+      if(!op || !op.key) return;
+      if(isDeviceLocalSyncEntityKey_(op.key) || isEmptyDefaultSyncEntity_(op.key, op.value)){
+        removed++;
+        return;
+      }
+      next.push(op);
+    });
+    if(removed) state.syncOutbox = next;
+  }
+  Object.keys(state.syncDirtyEntityKeys || {}).forEach(function(k){
+    var op = (state.syncOutbox || []).find(function(item){ return item && item.key === k; });
+    var val = op ? op.value : (
+      k === 'setting:chatgptOpenUrl' ? state.chatgptOpenUrl :
+      k === 'setting:publishRecCurrentTabOnly' ? state.publishRecCurrentTabOnly :
+      k === 'setting:syncRationalesOnBrandSave' ? state.syncRationalesOnBrandSave :
+      undefined
+    );
+    if(isDeviceLocalSyncEntityKey_(k) || isEmptyDefaultSyncEntity_(k, val)){
+      delete state.syncDirtyEntityKeys[k];
+      removed++;
+    }
+  });
+  if(removed){
+    try { rebuildDirtyStateFromOutbox_(); } catch(eDrop){}
+  }
+  return removed;
+}
 function countPendingSyncItems_(){
-  var outbox = (state.syncOutbox || []).length;
-  var dirtyKeys = Object.keys(state.syncDirtyEntityKeys || {}).length;
-  var n = Math.max(outbox, dirtyKeys);
+  try { dropEmptyDefaultSyncMutations_(); } catch(eDropCnt){}
+  var n = countRealUnpushedMutations_();
   // 키·outbox 없이 snapshot만 남은 경우: 서버 rev와 이미 같으면 0건으로 치유
   if(n < 1 && state.syncNeedsSnapshot){
     var localRevCnt = parseInt(state.syncRevision, 10) || 0;
@@ -16532,6 +16712,7 @@ function refreshSyncStatusBodyHtml_(info){
   bindSyncSettingsEmployeeDraftOnce_();
 }
 function updateSyncStatusUI_(){
+  try { dropEmptyDefaultSyncMutations_(); } catch(eDropUi){}
   // 헤더「남은 1건」고착: outbox·dirty키 없이 snapshot/dirty만 남은 경우 즉시 치유
   try {
     if((state.syncNeedsSnapshot || state.syncDirty) &&
@@ -18985,8 +19166,10 @@ function mergeExtraDrafts(byCat){
       if(d.miscLocked) merged.miscLocked = true;
       if(merged && !merged.previousRoadmapStepId) delete merged.previousRoadmapStepId;
       if(merged && !merged.previousSeries) delete merged.previousSeries;
-      // 저장돼 있던 roadmapStepId(주제 기획안 단계)를 존중. 없을 때만 기타로.
-      if(merged) applyResolvedUserAddedStepOrMisc_(merged, i);
+      // 이미 단계가 있으면 재배정하지 않음 — 매 동기화 apply마다 updatedAt이 바뀌어 재전송 루프가 생김
+      if(merged && !String(merged.roadmapStepId || '').trim() && !merged.miscLocked){
+        applyResolvedUserAddedStepOrMisc_(merged, i);
+      }
     });
   });
   purgeDeletedDraftsFromCatalog_();

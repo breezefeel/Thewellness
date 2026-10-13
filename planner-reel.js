@@ -10,9 +10,12 @@
 
   var W = 1080;
   var H = 1350;
-  var TOP_FS = 78;
-  var BOT_FS = 68;
-  var FONT = '"Noto Sans KR", "Malgun Gothic", sans-serif';
+  var HOOK1_FS = 68;
+  var HOOK2_FS = 96;
+  var CAP_FS = 68;
+  var AMBER = '#b06d1a';
+  var TEXT_MAX_W = 1000;
+  var FONT = '"Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif';
   var PHOTO_DEFAULT_SEC = 3;
   var END_HOLD_SEC = 0.9;
   var END_FADE_SEC = 1.0;
@@ -24,8 +27,9 @@
 
   var reel = {
     clips: [],
-    top1: 'IFC x INDIBA',
-    top2: '휴대 가능한 인디바 고주파',
+    top1: '',
+    top2: '',
+    accent: '',
     captions: [],
     previews: [],
     busy: false,
@@ -68,6 +72,23 @@
     var m = Math.floor(sec / 60);
     var s = Math.floor(sec % 60);
     return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function fmtTimeFine(sec) {
+    sec = Math.max(0, Number(sec) || 0);
+    if (Math.abs(sec - Math.round(sec)) < 0.05) return fmtTime(sec);
+    var m = Math.floor(sec / 60);
+    var s = sec - m * 60;
+    var ss = (s < 10 ? '0' : '') + s.toFixed(1);
+    return m + ':' + ss;
+  }
+
+  function accentHintText_() {
+    var word = String(reel.accent || '').trim();
+    if (word && String(reel.top2 || '').indexOf(word) < 0) {
+      return '앰버로 칠할 단어가 2줄에 없습니다. 2줄에 그대로 있는 단어만 색이 바뀝니다.';
+    }
+    return '1줄은 작게, 2줄은 더 크게. 앰버는 2줄 안의 그 단어만. 저장하면 훅만 있는 썸네일 jpg가 같이 받아집니다. 하단 멘트는 재생이 시작된 뒤에 나옵니다.';
   }
 
   function parseTime(str) {
@@ -162,24 +183,15 @@
       var lines = splitToTwoLines_(human);
       return { line1: lines[0] || human, line2: lines[1] || '' };
     }
-    var n = Math.max(1, total || 1);
-    var i = Math.max(0, index || 0);
-    if (clip && clip.kind === 'image') {
-      if (n <= 1) return { line1: '이 사진의 장면', line2: '그대로 보여 줍니다' };
-      return { line1: '사진 ' + (i + 1), line2: '장면으로 보여 줍니다' };
-    }
-    if (n <= 1) return { line1: '이 구간의 장면', line2: '그대로 보여 줍니다' };
-    if (i === 0) return { line1: '첫 장면', line2: '여기서부터 보여 줍니다' };
-    if (i >= n - 1) return { line1: '마지막 장면', line2: '핵심만 짧게' };
-    return { line1: '이어지는 장면', line2: (i + 1) + '/' + n };
+    return { line1: '', line2: '' };
   }
 
   function defaultCaptionTexts_() {
     return [
-      ['이 구간의 장면', '그대로 보여 줍니다'],
-      ['이어지는 장면', '핵심만 짧게'],
-      ['이 장면의 포인트', '먼저 보여 줍니다'],
-      ['마지막 장면', '짧게 마무리합니다']
+      ['', ''],
+      ['', ''],
+      ['', ''],
+      ['', '']
     ];
   }
 
@@ -227,14 +239,14 @@
       return sceneCaptionForClip_(ranges[i].clip, i, ranges.length);
     }
     var texts = defaultCaptionTexts_();
-    var t = texts[i % texts.length] || ['이 장면', ''];
+    var t = texts[i % texts.length] || ['', ''];
     return { line1: t[0], line2: t[1] };
   }
 
   function captionRangeForClip_(range) {
     var dur = Math.max(0.2, range.end - range.start);
     var pad = Math.min(0.2, dur * 0.08);
-    var start = range.start + (range.start === 0 ? Math.min(0.15, pad) : pad * 0.5);
+    var start = range.start + (range.start === 0 ? Math.min(0.4, Math.max(0.12, dur * 0.15)) : pad * 0.5);
     var end = Math.max(start + 0.35, range.end - pad);
     return {
       start: Math.round(start * 10) / 10,
@@ -535,7 +547,87 @@
     };
   }
 
-  function drawReelFrame(ctx, timelineT, outT) {
+  function ensureReelFont_() {
+    try {
+      if (document.fonts && document.fonts.load) {
+        return Promise.all([
+          document.fonts.load('800 96px Pretendard'),
+          document.fonts.load('800 68px "Noto Sans KR"')
+        ]).catch(function () {});
+      }
+    } catch (e) {}
+    return Promise.resolve();
+  }
+
+  function fitFontPx_(ctx, text, px) {
+    var size = px;
+    ctx.font = '800 ' + size + 'px ' + FONT;
+    var w = ctx.measureText(String(text || '')).width;
+    if (w > TEXT_MAX_W && w > 0) size = Math.max(48, Math.floor(px * TEXT_MAX_W / w));
+    ctx.font = '800 ' + size + 'px ' + FONT;
+    return size;
+  }
+
+  function strokeFill_(ctx, text, x, y, color, px) {
+    if (!text) return;
+    ctx.lineWidth = Math.max(6, Math.round((px || CAP_FS) / 12));
+    ctx.strokeStyle = '#000';
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+  }
+
+  function drawSizedLine_(ctx, text, y, px, accent) {
+    text = String(text || '');
+    if (!text.trim()) return;
+    var size = fitFontPx_(ctx, text, px);
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    var width = ctx.measureText(text).width;
+    var x0 = (W - width) / 2;
+    strokeFill_(ctx, text, x0, y, '#fff', size);
+    var word = String(accent || '').trim();
+    var idx = word ? text.indexOf(word) : -1;
+    if (idx >= 0) {
+      var before = text.slice(0, idx);
+      var mid = text.slice(idx, idx + word.length);
+      var wb = before ? ctx.measureText(before).width : 0;
+      ctx.fillStyle = AMBER;
+      ctx.fillText(mid, x0 + wb, y);
+    }
+    ctx.textAlign = 'center';
+  }
+
+  function capPositions_(lay) {
+    var y1 = 1008;
+    var y2 = 1096;
+    var pictureBottom = (lay && lay.y != null) ? (lay.y + lay.h) : H;
+    var half = CAP_FS / 2 + 8;
+    if (H - pictureBottom > half * 2 + 48) {
+      var shift = Math.max(0, Math.ceil(pictureBottom + half) - y1);
+      if (y2 + shift <= 1112) {
+        y1 += shift;
+        y2 += shift;
+      }
+    }
+    return { y1: y1, y2: y2 };
+  }
+
+  function hookPositions_(lay) {
+    var gap = 36;
+    var block = HOOK1_FS + gap + HOOK2_FS;
+    if (lay.topPad >= block + 40) {
+      var y1 = Math.round((lay.topPad - block) / 2 + HOOK1_FS / 2);
+      var y2 = y1 + Math.round(HOOK1_FS / 2 + gap + HOOK2_FS / 2);
+      return { y1: y1, y2: y2 };
+    }
+    return { y1: 78, y2: 176 };
+  }
+
+  function drawReelFrame(ctx, timelineT, outT, opts) {
+    opts = opts || {};
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
     var contentDur = contentDuration();
@@ -557,23 +649,20 @@
       } catch (e) {}
     }
 
-    var topMid = lay.topPad / 2;
-    ctx.fillStyle = '#fff';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = '800 ' + TOP_FS + 'px ' + FONT;
-    ctx.fillText(reel.top1 || '', W / 2, topMid - TOP_FS * 0.55);
-    ctx.fillText(reel.top2 || '', W / 2, topMid + TOP_FS * 0.55);
+    var hookAt = hookPositions_(lay);
+    drawSizedLine_(ctx, reel.top1, hookAt.y1, HOOK1_FS, '');
+    drawSizedLine_(ctx, reel.top2, hookAt.y2, HOOK2_FS, reel.accent);
 
-    var cap = captionAt(drawT);
-    if (!cap && timelineT >= contentDur - 0.05 && reel.captions && reel.captions.length) {
-      cap = reel.captions[reel.captions.length - 1];
-    }
-    if (cap) {
-      var botMid = lay.y + lay.h + lay.botPad / 2;
-      ctx.font = '800 ' + BOT_FS + 'px ' + FONT;
-      ctx.fillText(cap.line1 || '', W / 2, botMid - BOT_FS * 0.55);
-      ctx.fillText(cap.line2 || '', W / 2, botMid + BOT_FS * 0.55);
+    if (!opts.hookOnly) {
+      var cap = captionAt(drawT);
+      if (!cap && timelineT >= contentDur - 0.05 && reel.captions && reel.captions.length) {
+        cap = reel.captions[reel.captions.length - 1];
+      }
+      if (cap) {
+        var capAt = capPositions_(lay);
+        drawSizedLine_(ctx, cap.line1, capAt.y1, CAP_FS, '');
+        drawSizedLine_(ctx, cap.line2, capAt.y2, CAP_FS, '');
+      }
     }
 
     var exportDur = renderDuration();
@@ -1185,6 +1274,7 @@
     }
     reel.busy = true;
     reel.status = '컷 미리보기 생성 중…';
+    await ensureReelFont_();
     // 전체 페이지 재렌더 대신 릴스 블록만 1회 갱신 — 스크롤 튀김 방지
     rerenderSoft_();
     try {
@@ -1361,6 +1451,21 @@
     }
   }
 
+  function syncAccentHint_() {
+    var hint = document.getElementById('reel-accent-hint');
+    if (hint) hint.textContent = accentHintText_();
+  }
+
+  function repaintCurrentFrame_() {
+    var canvas = document.getElementById('reel-live-preview-canvas');
+    if (!canvas || !includedClips().length || livePreview.painting) return;
+    try {
+      var ctx = canvas.getContext('2d');
+      var tOut = livePreview.tOut || 0;
+      drawReelFrame(ctx, outputToSourceTime_(tOut), tOut);
+    } catch (e) {}
+  }
+
   function livePreviewTick_(wallNow) {
     if (!livePreview.playing) return;
     if (!livePreview.lastWall) livePreview.lastWall = wallNow;
@@ -1469,7 +1574,8 @@
   function buildReelMemoText_() {
     var lines = [];
     lines.push('[릴스 메이커 저장]');
-    lines.push('상단: ' + (reel.top1 || '') + ' / ' + (reel.top2 || ''));
+    lines.push('훅: ' + (reel.top1 || '') + ' / ' + (reel.top2 || '') +
+      (reel.accent ? ' · 앰버 ' + reel.accent : ''));
     lines.push('구도: ' + (FOCUS_LABEL[reel.focus] || reel.focus) + (reel.focusAuto ? ' (자동)' : ' (수동)'));
     lines.push('볼륨: ' + Math.round(clampVolume(reel.volume) * 100) + '% · 속도: ' + clampSpeed(reel.speed).toFixed(2) + 'x' +
       (reel.preservePitch ? ' · 피치 유지' : ''));
@@ -1625,6 +1731,31 @@
     return await offline.startRendering();
   }
 
+  function clickDownload_(href, name) {
+    var a = document.createElement('a');
+    a.href = href;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      try { if (String(href).indexOf('blob:') === 0) URL.revokeObjectURL(href); } catch (e) {}
+      a.remove();
+    }, 2500);
+  }
+
+  async function downloadHookThumb_(baseName) {
+    var canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    var ctx = canvas.getContext('2d');
+    var dur = contentDuration();
+    var t = Math.min(0.2, Math.max(0.02, (dur > 0 ? dur : 1) * 0.08));
+    await prepareMediaAt(t);
+    drawReelFrame(ctx, t, 0, { hookOnly: true });
+    clickDownload_(canvas.toDataURL('image/jpeg', 0.92), baseName + '_썸네일.jpg');
+    return true;
+  }
+
   async function exportReel() {
     if (!includedClips().length || !reel.captions.length) {
       toast_('포함할 영상·사진을 먼저 선택해 주세요.', 'err');
@@ -1680,6 +1811,7 @@
     rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };
     var stopped = new Promise(function (resolve) { rec.onstop = function () { resolve(); }; });
 
+    await ensureReelFont_();
     var duration = renderDuration();
     var step = 1 / fps;
     rec.start(200);
@@ -1717,12 +1849,9 @@
       return;
     }
     var baseName = (includedClips()[0] && includedClips()[0].name || 'reel').replace(/\.[^.]+$/, '');
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = baseName + '_4x5_IFC.' + ext;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function () { try { URL.revokeObjectURL(a.href); } catch (e) {} a.remove(); }, 2500);
+    clickDownload_(URL.createObjectURL(blob), baseName + '_4x5.' + ext);
+    var thumbOk = false;
+    try { thumbOk = await downloadHookThumb_(baseName); } catch (eThumb) {}
 
     try {
       var memo = buildReelMemoText_();
@@ -1734,7 +1863,9 @@
 
     reel.busy = false;
     reel.exportPct = 100;
-    reel.status = '다운로드 완료 (' + ext.toUpperCase() + '). 참고 메모에 반영했습니다.';
+    reel.status = thumbOk
+      ? ('다운로드 완료 (' + ext.toUpperCase() + ' + 훅 썸네일). 참고 메모에 반영했습니다.')
+      : '영상은 저장했습니다. 훅 썸네일은 만들지 못했습니다.';
     toast_('릴스 저장 · 참고 메모에 반영', 'ok');
     rerender_();
   }
@@ -1825,14 +1956,14 @@
       return '<div class="reel-cap-row">' +
         '<div class="reel-cap-meta">' +
           '<span class="reel-cap-idx">컷 ' + (i + 1) + '</span>' +
-          '<label>시작 <input class="form-input reel-time" value="' + esc(fmtTime(c.start)) + '" onchange="ReelMaker.setCapTime(' + i + ',\'start\',this.value)" ' + (reel.busy ? 'disabled' : '') + '></label>' +
-          '<label>끝 <input class="form-input reel-time" value="' + esc(fmtTime(c.end)) + '" onchange="ReelMaker.setCapTime(' + i + ',\'end\',this.value)" ' + (reel.busy ? 'disabled' : '') + '></label>' +
+          '<label>시작 <input class="form-input reel-time" value="' + esc(fmtTimeFine(c.start)) + '" onchange="ReelMaker.setCapTime(' + i + ',\'start\',this.value)" ' + (reel.busy ? 'disabled' : '') + '></label>' +
+          '<label>끝 <input class="form-input reel-time" value="' + esc(fmtTimeFine(c.end)) + '" onchange="ReelMaker.setCapTime(' + i + ',\'end\',this.value)" ' + (reel.busy ? 'disabled' : '') + '></label>' +
         '</div>' +
         '<div class="reel-cap-body">' +
           (thumb ? '<img class="reel-cap-thumb" src="' + thumb + '" alt="">' : '<div class="reel-cap-thumb reel-cap-thumb-empty">미리보기</div>') +
           '<div class="reel-cap-texts">' +
-            '<input class="form-input" value="' + esc(c.line1) + '" placeholder="멘트 1줄" oninput="ReelMaker.setCapText(' + i + ',\'line1\',this.value)" ' + (reel.busy ? 'disabled' : '') + '>' +
-            '<input class="form-input" value="' + esc(c.line2) + '" placeholder="멘트 2줄" oninput="ReelMaker.setCapText(' + i + ',\'line2\',this.value)" ' + (reel.busy ? 'disabled' : '') + '>' +
+            '<input class="form-input" value="' + esc(c.line1) + '" placeholder="하단 1줄" oninput="ReelMaker.setCapText(' + i + ',\'line1\',this.value)" ' + (reel.busy ? 'disabled' : '') + '>' +
+            '<input class="form-input" value="' + esc(c.line2) + '" placeholder="하단 2줄 (세워 주세요)" oninput="ReelMaker.setCapText(' + i + ',\'line2\',this.value)" ' + (reel.busy ? 'disabled' : '') + '>' +
           '</div>' +
         '</div></div>';
     }).join('');
@@ -1882,9 +2013,11 @@
             '</div>' +
           '</div>' +
           '<div class="reel-top-fields">' +
-            '<label class="form-label">상단 문구</label>' +
-            '<input class="form-input" value="' + esc(reel.top1) + '" oninput="ReelMaker.setTop(1,this.value)" ' + (reel.busy ? 'disabled' : '') + '>' +
-            '<input class="form-input" value="' + esc(reel.top2) + '" oninput="ReelMaker.setTop(2,this.value)" style="margin-top:6px;" ' + (reel.busy ? 'disabled' : '') + '>' +
+            '<label class="form-label">훅</label>' +
+            '<input class="form-input" value="' + esc(reel.top1) + '" placeholder="1줄 · 작게, 불편 (어깨가 뻣뻣할 때)" oninput="ReelMaker.setTop(1,this.value)" ' + (reel.busy ? 'disabled' : '') + '>' +
+            '<input class="form-input" value="' + esc(reel.top2) + '" placeholder="2줄 · 크게, 소품·자세 (도스틱을 어깨에)" oninput="ReelMaker.setTop(2,this.value)" style="margin-top:6px;" ' + (reel.busy ? 'disabled' : '') + '>' +
+            '<input class="form-input" value="' + esc(reel.accent || '') + '" placeholder="앰버 한 단어 (도스틱)" oninput="ReelMaker.setAccent(this.value)" style="margin-top:6px;" ' + (reel.busy ? 'disabled' : '') + '>' +
+            '<p class="reel-focus-hint" id="reel-accent-hint" style="margin:6px 0 0;">' + esc(accentHintText_()) + '</p>' +
           '</div>' +
           '<div class="reel-cap-list">' +
             '<div class="reel-cap-list-head"><span class="form-label" style="margin:0;">멘트 컷 · 클립별</span>' +
@@ -2021,6 +2154,13 @@
     },
     setTop: function (n, v) {
       if (n === 1) reel.top1 = v; else reel.top2 = v;
+      repaintCurrentFrame_();
+      syncAccentHint_();
+    },
+    setAccent: function (v) {
+      reel.accent = v || '';
+      repaintCurrentFrame_();
+      syncAccentHint_();
     },
     setVolume: function (v) {
       reel.volume = clampVolume((Number(v) || 0) / 100);
@@ -2085,6 +2225,7 @@
         if (!reel._captionTextByClipId[id]) reel._captionTextByClipId[id] = { line1: '', line2: '' };
         reel._captionTextByClipId[id][field] = v;
       }
+      repaintCurrentFrame_();
     },
     setCapTime: function (i, field, v) {
       if (!reel.captions[i]) return;
@@ -2095,7 +2236,7 @@
       var last = reel.captions[reel.captions.length - 1];
       var start = last ? last.end : 0;
       var end = Math.min(totalDuration(), start + 4);
-      var cap = { start: start, end: end, line1: '새 멘트 1줄', line2: '새 멘트 2줄', clipId: null };
+      var cap = { start: start, end: end, line1: '', line2: '', clipId: null };
       reassignCaptionClipId_(cap);
       reel.captions.push(cap);
       refreshPreviews();
@@ -2136,8 +2277,9 @@
       reel.status = '';
       reel.exportPct = 0;
       livePreview.tOut = 0;
-      reel.top1 = 'IFC x INDIBA';
-      reel.top2 = '휴대 가능한 인디바 고주파';
+      reel.top1 = '';
+      reel.top2 = '';
+      reel.accent = '';
       reel.focus = 'center';
       reel.focusAuto = true;
       reel.zoom = 1.18;

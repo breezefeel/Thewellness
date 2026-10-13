@@ -4601,12 +4601,75 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 .ops-check-item { border-top: 1px solid #f1f5f9; padding-top: 10px; }
 .ops-check-item:first-child { border-top: none; padding-top: 0; }
 .ops-check-item.done .ops-check-text { color: #94a3b8; text-decoration: line-through; }
+.ops-check-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ops-check-head .ops-check-row { flex: 1; min-width: 0; }
+.ops-check-head .ops-review-btn { flex-shrink: 0; }
 .ops-check-row { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
 .ops-check-row input { margin-top: 3px; flex-shrink: 0; }
 .ops-check-text { font-size: 12px; line-height: 1.5; color: #334155; font-weight: 600; }
 .ops-check-purpose { font-size: 11px; color: #64748b; line-height: 1.55; margin: 4px 0 0 22px; white-space: pre-line; }
 .ops-check-hint { font-size: 10px; color: #94a3b8; margin: 4px 0 0 22px; }
-.ops-review-wrap { margin: 6px 0 0 22px; }
+.ops-review-wrap { margin: 8px 0 0; }
+.ops-review-panel-visit {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.ops-visit-stack { display: grid; gap: 10px; }
+.ops-visit-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.ops-visit-card-draft { background: #f8fafc; }
+.ops-visit-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+.ops-visit-note {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
+}
+.ops-visit-url {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #1d4ed8;
+  word-break: break-all;
+}
+.ops-visit-url-row { margin-top: 6px; }
+.ops-visit-url-sub { font-weight: 600; font-size: 12px; }
+.ops-visit-url-empty {
+  margin: 0;
+  font-size: 13px;
+  color: #94a3b8;
+}
+.ops-visit-input {
+  width: 100%;
+  min-height: 140px;
+  box-sizing: border-box;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  color: #1e293b;
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: inherit;
+  resize: vertical;
+}
+.ops-visit-card-draft .ops-visit-input { background: #fff; }
 .ops-item-toolbar {
   display: flex;
   align-items: flex-start;

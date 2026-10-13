@@ -187,8 +187,8 @@ const OPS_BRANCH_LABELS = {
 };
 const OPS_BRANCH_HINTS = {
   global: '콘텐츠 플래너가 담지 못하는 브랜딩·GEO·법적 문구',
-  yaksu: '새 지점 오픈 시 1→8 순서로 채널을 셋팅하세요. 각 항목의 「함께 검토」에서 등록 가이드·기본값을 확인합니다.',
-  jakjeon: '새 지점 오픈 시 1→8 순서로 채널을 셋팅하세요. 각 항목의 「함께 검토」에서 등록 가이드·기본값을 확인합니다.',
+  yaksu: '새 지점 오픈 시 1→8 순서로 채널을 셋팅하세요. 각 항목 오른쪽 「자세히」에서 등록 가이드·기본값을 확인합니다.',
+  jakjeon: '새 지점 오픈 시 1→8 순서로 채널을 셋팅하세요. 각 항목 오른쪽 「자세히」에서 등록 가이드·기본값을 확인합니다.',
   new: '3호점 — 약수·인천과 같은 스마트플레이스 순서로 셋팅한 뒤, 지점 오픈 1→8 채널을 이어 갑니다.'
 };
 /** 리얼무브먼트 — 공통 브랜딩 확정 문구 (플레이스·채널 동기화) */
@@ -219,7 +219,7 @@ const OPS_BRAND_COPY = {
       storeName: '리얼무브먼트 약수점',
       phone: '0507-1359-4596',
       tagline90: 'Real Movement | Real Alignment 1:1 Program',
-      naverKeywords: ['패시브스트레칭', '재활운동', '자세교정', '기능운동', '맞춤운동'],
+      naverKeywords: ['패시브스트레칭', '재활운동', '자세교정', '기능운동', '스포츠재활'],
       address: '서울특별시 중구 동호로7길 32, 4층',
       addressShort: '중구 동호로7길 32, 4층',
       addressJibun: '서울 중구 신당동 366-2',
@@ -232,6 +232,10 @@ const OPS_BRAND_COPY = {
       placeId: '2018185163',
       placeUrl: 'https://naver.me/x2YstInq',
       placeMapUrl: 'https://map.naver.com/p/entry/place/2018185163',
+      kakaoMapUrl: 'https://place.map.kakao.com/897942207',
+      kakaoChannelUrl: 'https://pf.kakao.com/_nVSxdn',
+      googleBusinessUrl: 'https://www.google.com/maps?cid=13602961398846205532',
+      karrotUrl: 'https://www.daangn.com/kr/local-profile/%EB%A6%AC%EC%96%BC%EB%AC%B4%EB%B8%8C%EB%A8%BC%ED%8A%B8-%EC%95%BD%EC%88%98%EC%A0%90-mun1jrp9hjt4/',
       talktalkUrl: 'http://talk.naver.com/w3iw2d3',
       talktalkProfile: 'https://talk.naver.com/profile/c/real_movement_y',
       instagramUrl: 'https://www.instagram.com/re.al_movement_official/',
@@ -239,15 +243,15 @@ const OPS_BRAND_COPY = {
       conveniences: ['예약', '무선 인터넷', '남/녀 화장실 구분', '대기공간', '간편결제', '주차'],
       hours: '평일 09:00–21:00 / 토요일 09:00–18:00 / 일·공휴일 휴무',
       prices: ['50분 1회 8만 5천원', '주 2회 8회 66만원', '시그니처 1회 12만 5천원'],
-      liveSynced: '2026-08-27',
-      liveDetailNote: '현재 플레이스 소개는 메디컬 PT·카이로 톤. 아래 리:얼 문구로 교체.'
+      liveSynced: '2026-10-13',
+      liveDetailNote: '2026-10-13 공개 플레이스 기준. 상세설명은 메디컬 PT 톤으로 등록되어 있습니다.'
     },
     jakjeon: {
       shortLabel: '인천',
       storeName: '리얼무브먼트 인천점',
       phone: '0507-1312-4596',
       tagline90: 'Real Movement | Real Alignment 1:1 Program',
-      naverKeywords: ['재활운동', '기능성트레이닝', '자세교정', '운동처방', '패시브스트레칭'],
+      naverKeywords: ['재활운동', '기능성트레이닝', '자세교정', '패시브스트레칭', '스포츠재활'],
       address: '인천광역시 계양구 봉오대로651번길 9',
       addressShort: '계양구 봉오대로651번길 9, 1층 (커뮤니티 · 도서관 옆)',
       addressJibun: '인천 계양구 작전동 769-79',
@@ -260,14 +264,18 @@ const OPS_BRAND_COPY = {
       placeId: '2044467520',
       placeUrl: 'https://naver.me/xYNbHrY9',
       placeMapUrl: 'https://map.naver.com/p/entry/place/2044467520',
-      talktalkUrl: '',
+      kakaoMapUrl: 'https://place.map.kakao.com/715179953',
+      kakaoChannelUrl: 'https://pf.kakao.com/_unqbX',
+      googleBusinessUrl: 'https://www.google.com/maps?cid=8000026025709137602',
+      karrotUrl: 'https://www.daangn.com/kr/local-profile/%EB%A6%AC%EC%96%BC-%EB%AC%B4%EB%B8%8C%EB%A8%BC%ED%8A%B8-9v37eoudnjkh/',
+      talktalkUrl: 'http://talk.naver.com/w46xopt',
       talktalkProfile: 'https://talk.naver.com/profile/c/real_movement_i',
       categoryLive: '스포츠시설',
       conveniences: ['예약', '무선 인터넷', '남/녀 화장실 구분', '간편결제', '주차'],
       hours: '평일 09:00–21:00 / 토요일 09:00–18:00 / 일·공휴일 휴무',
       prices: ['50분 1회 4만 5천원', '주 2회 8회 32만원', '80분 주 2회 8회 62만원'],
-      liveSynced: '2026-08-27',
-      liveDetailNote: '현재 플레이스 소개는 메디컬 PT·카이로 톤. 아래 리:얼 문구로 교체. 톡톡은 프로필만 있고 플레이스 URL은 비어 있음.'
+      liveSynced: '2026-10-13',
+      liveDetailNote: '2026-10-13 공개 플레이스 기준. 상세설명은 메디컬 PT 톤. 영업시간은 수 18시·토 16시·일 휴무. 톡톡이 연결되어 있습니다.'
     }
   }
 };
@@ -1655,6 +1663,1018 @@ function ensureOpsBrandStyles_(){
   el.textContent = css;
   document.head.appendChild(el);
 }
+function isOpsVisitGuideItem_(itemId){
+  var id = String(itemId || '');
+  return id === 'ops-y-7' || id === 'ops-j-7';
+}
+function parseOpsVisitFacts_(facts){
+  var must = [];
+  var cta = [];
+  var bucket = must;
+  String(facts || '').split('\n').forEach(function(line){
+    var t = line.trim();
+    if(/^■\s*꼭/.test(t)){ bucket = must; return; }
+    if(/^■\s*CTA/i.test(t)){ bucket = cta; return; }
+    if(/^■\s*주의/.test(t)){ bucket = []; return; }
+    bucket.push(line);
+  });
+  return { must: must.join('\n').trim(), cta: cta.join('\n').trim() };
+}
+function buildOpsVisitFactsText_(branchKey){
+  var meta = opsBranchMeta_(branchKey);
+  var sn = opsStoreName_(branchKey);
+  var mapLine = [meta.placeUrl, meta.placeMapUrl].filter(Boolean).join('\n');
+  return [
+    '■ 꼭 넣을 내용',
+    '1) 상호: ' + sn,
+    '2) 주소: ' + (meta.address || ''),
+    '3) 지하철·출구·도보: ' + (meta.directionsPlace || meta.directionsShort || ''),
+    '4) 주차: ' + (meta.parking || ''),
+    '5) 전화: ' + (opsBranchPhone_(branchKey) || '') + ' (사전 예약)',
+    '6) 지도·플레이스: ' + (mapLine || '(플레이스 URL)'),
+    '7) 프로필: ' + OPS_BRAND_COPY.profileUrl,
+    '',
+    '■ CTA',
+    OPS_BRAND_COPY.cta,
+    OPS_BRAND_COPY.disclaimer,
+    '',
+    '■ 주의',
+    '· 층수·출구·주차 정보를 플레이스 찾아오는 길과 같게 적습니다.',
+    '· 치료·완치·시술 표현은 빼세요.',
+    '· 등록 URL을 플레이스·프로필·확장소재에 같이 연결합니다.'
+  ].join('\n');
+}
+function buildOpsVisitDraftFromFacts_(facts){
+  var parts = parseOpsVisitFacts_(facts);
+  var title = '';
+  var bodyLines = [];
+  parts.must.split('\n').forEach(function(line){
+    var t = line.trim();
+    if(!t){
+      bodyLines.push('');
+      return;
+    }
+    var m = t.match(/^\d+\)\s*([^:：]+)[:：]\s*([\s\S]*)$/);
+    if(m){
+      var label = m[1].trim();
+      var value = m[2].trim();
+      if(label.indexOf('상호') >= 0){
+        title = value;
+        return;
+      }
+      bodyLines.push(label + ': ' + value);
+      return;
+    }
+    bodyLines.push(t);
+  });
+  var out = [];
+  if(title) out.push(title + ' 오시는 길');
+  var body = bodyLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  if(body) out.push(body);
+  if(parts.cta) out.push(parts.cta);
+  return out.join('\n\n').trim();
+}
+function ensureOpsVisitFields_(review, itemId){
+  if(!review) return { facts: '', draft: '' };
+  var seeded = review.visit && typeof review.visit === 'object' && typeof review.visit.facts === 'string';
+  if(!seeded){
+    var facts = buildOpsVisitFactsText_(opsPlaceBranchKey_(itemId));
+    review.visit = { facts: facts, draft: buildOpsVisitDraftFromFacts_(facts) };
+  } else if(typeof review.visit.draft !== 'string'){
+    review.visit.draft = buildOpsVisitDraftFromFacts_(review.visit.facts);
+  }
+  return review.visit;
+}
+function renderOpsVisitGuidePanelHTML_(itemId, visit){
+  var meta = opsBranchMeta_(opsPlaceBranchKey_(itemId));
+  var url = String((meta && meta.blogDirections) || '').trim();
+  var urlHtml = url
+    ? '<a class="ops-visit-url" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(url) + '</a>'
+    : '<p class="ops-visit-url-empty">등록된 URL이 없습니다.</p>';
+  return '<div class="ops-visit-stack">' +
+    '<section class="ops-visit-card">' +
+      '<div class="ops-visit-label">등록된 URL</div>' +
+      urlHtml +
+      '<p class="ops-visit-note">플레이스·프로필·확장소재에 같은 주소를 연결합니다.</p>' +
+    '</section>' +
+    '<section class="ops-visit-card">' +
+      '<div class="ops-visit-label">꼭 넣을 내용 · CTA · 주의</div>' +
+      '<p class="ops-visit-note">꼭 넣을 내용과 CTA를 고치면 본문 초안에 반영됩니다.</p>' +
+      '<textarea class="ops-visit-input ops-grow-textarea" rows="14" data-ops-visit-facts="' + itemId + '" oninput="onOpsVisitFactsInput_(\'' + itemId + '\', this)">' + escapeHtml(visit.facts || '') + '</textarea>' +
+    '</section>' +
+    '<section class="ops-visit-card ops-visit-card-draft">' +
+      '<div class="ops-visit-label">본문 초안</div>' +
+      '<textarea class="ops-visit-input ops-grow-textarea" rows="12" data-ops-visit-draft="' + itemId + '" oninput="onOpsVisitDraftInput_(\'' + itemId + '\', this)">' + escapeHtml(visit.draft || '') + '</textarea>' +
+    '</section>' +
+  '</div>';
+}
+var opsVisitSaveTimer_ = null;
+function scheduleOpsVisitSave_(){
+  if(opsVisitSaveTimer_) clearTimeout(opsVisitSaveTimer_);
+  opsVisitSaveTimer_ = setTimeout(function(){
+    opsVisitSaveTimer_ = null;
+    save({ skipDriveUpload: true, skipGasPush: true });
+  }, 400);
+}
+function onOpsVisitFactsInput_(itemId, el){
+  if(!el) return;
+  if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(el);
+  var om = getOpsManualState_();
+  var rv = om.review && om.review[itemId];
+  if(!rv) return;
+  if(!rv.visit || typeof rv.visit !== 'object') rv.visit = {};
+  rv.visit.facts = String(el.value || '');
+  rv.visit.draft = buildOpsVisitDraftFromFacts_(rv.visit.facts);
+  var draftEl = document.querySelector('textarea[data-ops-visit-draft="' + itemId + '"]');
+  if(draftEl){
+    draftEl.value = rv.visit.draft;
+    if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(draftEl);
+  }
+  scheduleOpsVisitSave_();
+}
+function onOpsVisitDraftInput_(itemId, el){
+  if(!el) return;
+  if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(el);
+  var om = getOpsManualState_();
+  var rv = om.review && om.review[itemId];
+  if(!rv) return;
+  if(!rv.visit || typeof rv.visit !== 'object') rv.visit = {};
+  rv.visit.draft = String(el.value || '');
+  scheduleOpsVisitSave_();
+}
+window.onOpsVisitFactsInput_ = onOpsVisitFactsInput_;
+window.onOpsVisitDraftInput_ = onOpsVisitDraftInput_;
+function isOpsSmartPlaceItem_(itemId){
+  var id = String(itemId || '');
+  return id === 'ops-y-6' || id === 'ops-j-6' || id === 'ops-n-6';
+}
+function opsPlaceLiveIntro_(locationLine){
+  return [
+    '안녕하세요 :)',
+    '',
+    '메디컬 기능성 운동 전문센터,',
+    locationLine,
+    '',
+    '저희 메디컬 피지오 트레이닝(PT)은',
+    "'올바른 움직임 패턴과 기능 회복이 우선되어야 한다'는",
+    '철학에서 출발한 프로그램입니다.',
+    '',
+    '미국 카이로프랙틱 닥터, 물리치료사, 관련 석, 박사 등',
+    '각 분야의 최고 전문가들의 임상적 접근과',
+    '기능 회복 개념을 바탕으로 구성되어 있으며',
+    '',
+    '단순히 운동 동작을 따라하는 것이 아니라,',
+    '통증이 생기는 원인과 불편함이 반복되는 이유를 분석하여',
+    '개인의 몸 상태에 맞춰',
+    '기능을 회복하는 방향으로 수업을 진행합니다.',
+    '',
+    '※ 이런 분들이라면 상담을 꼭 받아보세요',
+    '- 목, 허리 통증이 몇 달째 반복되고 있다',
+    '- 자세 교정, 여러 번 시도했지만 오래 못 갔다',
+    '- 임신/출산 전후 몸 상태 관리가 필요하다',
+    '- 수술 후 재활, 정확한 가이드가 필요하다',
+    '- 평소 움직임이 불편하고 뻣뻣한 느낌이 계속된다',
+    '',
+    '기존 체형교정센터와는 차별화되는,',
+    '나만을 위한 1:1 맞춤 솔루션을 지금 상담으로 경험해보세요.'
+  ].join('\n');
+}
+function opsPlaceLiveRecord_(branchKey){
+  if(branchKey === 'yaksu'){
+    return {
+      name: '리얼무브먼트 약수점',
+      nameEn: '공개 페이지에 표시되지 않음',
+      category: '스포츠시설',
+      address: '서울 중구 동호로7길 32 4층',
+      jibun: '서울 중구 신당동 366-2',
+      phone: '0507-1359-4596',
+      directions: '약수역 5,6,7번 출구로 나와 3분 거리 입니다\n\n오시는 길 안내 링크\nhttps://blog.naver.com/allenjoy/224307689748',
+      description: opsPlaceLiveIntro_('약수, 신당 피티(PT) 리얼무브먼트를 찾아주셔서 감사합니다.'),
+      keywords: '패시브스트레칭\n재활운동\n자세교정\n기능운동\n스포츠재활',
+      photos: '사진 탭에 업체 사진이 등록되어 있습니다.',
+      extra: '편의: 예약 · 무선 인터넷 · 남/녀 화장실 구분 · 대기공간 · 간편결제 · 주차\n결제: 지역화폐(지류·카드·모바일) · 제로페이 · 간편결제\n주차: 무료\n주차 안내: 오시는길 / 주차위치 안내\nhttps://blog.naver.com/allenjoy/224307689748',
+      hours: '월–금 09:00–21:00\n토 09:00–18:00\n일 정기휴무 (매주 일요일)',
+      prices: '👍미국 등 해외 임상경력 多보유 · 무료\n👍대학교 겸임교수 경력의 대표진 · 무료\n🎓기능재활 석/박사 전문가의 레슨 · 무료\n🎓재활전문 임상경력 강사진 구성 · 무료\n🎓재활트레이너를 가르치는 교육기관 · 무료\n🔴약수 체형/재활운동 PT · 무료\n🔴약수 운동 목적별 맞춤PT · 무료\n🏃🏻약수역 도보 3분거리 · 무료',
+      booking: '예약 버튼: 방문\nhttps://booking.naver.com/booking/13/bizes/1704376',
+      talk: 'http://talk.naver.com/w3iw2d3',
+      links: '블로그: https://blog.naver.com/allenjoy/224307689748\n홈페이지: https://realmovement.imweb.me/'
+    };
+  }
+  if(branchKey === 'jakjeon'){
+    return {
+      name: '리얼무브먼트 인천점',
+      nameEn: '공개 페이지에 표시되지 않음',
+      category: '스포츠시설',
+      address: '인천 계양구 봉오대로651번길 9',
+      jibun: '인천 계양구 작전동 769-79',
+      phone: '0507-1312-4596',
+      directions: '힐스테이트자이(계양)에 1층 커뮤니티 센터(도서관 옆)에 위치해 있습니다.',
+      description: opsPlaceLiveIntro_('인천 계양 피티(PT) 리얼무브먼트를 찾아주셔서 감사합니다.'),
+      keywords: '재활운동\n기능성트레이닝\n자세교정\n패시브스트레칭\n스포츠재활',
+      photos: '사진 탭에 업체 사진이 등록되어 있습니다.',
+      extra: '편의: 예약 · 무선 인터넷 · 남/녀 화장실 구분 · 간편결제 · 주차\n결제: 지역화폐(카드·모바일·지류) · 제로페이 · 간편결제\n주차: 무료\n주차 안내: 공개 페이지에 문구 없음',
+      hours: '월·화·목·금 09:00–21:00\n수 09:00–18:00\n토 09:00–16:00\n일 정기휴무 (매주 일요일)',
+      prices: '👍 미국 등 해외 임상경력 多보유 · 변동\n👍 대학교 겸임교수 경력의 대표진 · 변동\n🎓 재활트레이너를 가르치는 교육기관 · 변동\n🎓 재활전문 임상경력 강사진 구성 · 변동\n🎓 기능재활 석/박사 전문가의 레슨 · 변동\n🔴 인천 기능성운동목적별 맞춤 PT · 변동\n🔴 인천체형/재활운동 PT · 변동\n작전역 7번 출구 도보 2분거리 · 변동',
+      booking: '예약 버튼: 예약\nhttps://booking.naver.com/booking/6/bizes/1668922/search',
+      talk: 'http://talk.naver.com/w46xopt',
+      links: '홈페이지: https://realmovement.imweb.me/\n블로그: https://blog.naver.com/allenjoy/224122998739'
+    };
+  }
+  var meta = opsBranchMeta_(branchKey);
+  return {
+    name: opsStoreName_(branchKey) || '리얼무브먼트 ○○점',
+    nameEn: meta.tagline90 || '',
+    category: meta.categoryLive || '스포츠시설',
+    address: meta.address || '',
+    jibun: meta.addressJibun || '',
+    phone: opsBranchPhone_(branchKey) || '',
+    directions: meta.directionsPlace || meta.directionsShort || '',
+    description: '',
+    keywords: (meta.naverKeywords || []).join('\n'),
+    photos: '업체 사진',
+    extra: (meta.conveniences || []).join(' · '),
+    hours: opsBranchHours_(branchKey) || '',
+    prices: (meta.prices || []).join('\n'),
+    booking: '',
+    talk: opsTalkLine_(branchKey),
+    links: OPS_BRAND_COPY.profileUrl
+  };
+}
+function buildOpsPlaceGuideText_(branchKey){
+  var p = opsPlaceLiveRecord_(branchKey);
+  return [
+    '1) 업체명 (30자)',
+    p.name,
+    '',
+    '2) 영문 업체명 (90자, 영문만)',
+    p.nameEn,
+    '',
+    '3) 업종',
+    p.category,
+    '',
+    '4) 주소·지도핀',
+    p.address + (p.jibun ? '\n지번: ' + p.jibun : ''),
+    '',
+    '5) 전화',
+    p.phone,
+    '',
+    '6) 찾아오는 길 (400자)',
+    p.directions,
+    '',
+    '7) 상세설명 (2000자)',
+    p.description,
+    '',
+    '8) 대표키워드 5개 (각 15자)',
+    p.keywords,
+    '',
+    '9) 업체 사진',
+    p.photos,
+    '',
+    '10) 부가정보',
+    p.extra,
+    '',
+    '11) 영업시간',
+    p.hours,
+    '',
+    '12) 가격',
+    p.prices,
+    '',
+    '13) 예약',
+    p.booking,
+    '',
+    '14) 톡톡',
+    p.talk,
+    '',
+    '15) 홈페이지·블로그',
+    p.links
+  ].join('\n');
+}
+function parseOpsPlaceGuide_(text){
+  var sections = [];
+  var cur = null;
+  String(text || '').split('\n').forEach(function(line){
+    var m = line.match(/^(\d{1,2})\)\s+(.+)$/);
+    if(m){
+      if(cur) sections.push(cur);
+      cur = { label: m[2].replace(/\s*\([^)]*\)\s*$/, '').trim(), body: [] };
+      return;
+    }
+    if(!cur) cur = { label: '', body: [] };
+    cur.body.push(line);
+  });
+  if(cur) sections.push(cur);
+  return sections;
+}
+function buildOpsPlaceSummaryFromGuide_(guide){
+  return parseOpsPlaceGuide_(guide).map(function(sec){
+    var body = sec.body.join('\n').replace(/^\n+|\n+$/g, '').trim();
+    if(!sec.label) return body;
+    if(!body) return sec.label;
+    return sec.label + '\n' + body;
+  }).filter(Boolean).join('\n\n');
+}
+function ensureOpsPlaceFields_(review, itemId){
+  if(!review) return { guide: '', summary: '' };
+  var seeded = review.place && typeof review.place === 'object' && typeof review.place.guide === 'string';
+  if(!seeded){
+    var guide = buildOpsPlaceGuideText_(opsPlaceBranchKey_(itemId));
+    review.place = { guide: guide, summary: buildOpsPlaceSummaryFromGuide_(guide) };
+  } else if(typeof review.place.summary !== 'string'){
+    review.place.summary = buildOpsPlaceSummaryFromGuide_(review.place.guide);
+  }
+  return review.place;
+}
+function renderOpsSmartPlacePanelHTML_(itemId, place){
+  var meta = opsBranchMeta_(opsPlaceBranchKey_(itemId));
+  var url = String((meta && meta.placeUrl) || '').trim();
+  var mapUrl = String((meta && meta.placeMapUrl) || '').trim();
+  var urlHtml = url
+    ? '<a class="ops-visit-url" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(url) + '</a>'
+    : '<p class="ops-visit-url-empty">등록된 URL이 없습니다.</p>';
+  var mapHtml = mapUrl
+    ? '<a class="ops-visit-url ops-visit-url-sub" href="' + escapeHtml(mapUrl) + '" target="_blank" rel="noopener">지도 ' + escapeHtml(mapUrl) + '</a>'
+    : '';
+  return '<div class="ops-visit-stack">' +
+    '<section class="ops-visit-card">' +
+      '<div class="ops-visit-label">등록된 URL</div>' +
+      urlHtml +
+      (mapHtml ? '<div class="ops-visit-url-row">' + mapHtml + '</div>' : '') +
+    '</section>' +
+    '<section class="ops-visit-card">' +
+      '<div class="ops-visit-label">등록 가이드 · 적어야 할 항목</div>' +
+      '<p class="ops-visit-note">항목을 고치면 아래 등록된 항목 박스가 같이 바뀝니다. 2026-10-13 공개 플레이스 내용입니다.</p>' +
+      '<textarea class="ops-visit-input ops-grow-textarea" rows="16" data-ops-place-guide="' + itemId + '" oninput="onOpsPlaceGuideInput_(\'' + itemId + '\', this)">' + escapeHtml(place.guide || '') + '</textarea>' +
+    '</section>' +
+    '<section class="ops-visit-card ops-visit-card-draft">' +
+      '<div class="ops-visit-label">등록된 항목</div>' +
+      '<textarea class="ops-visit-input ops-grow-textarea" rows="14" data-ops-place-summary="' + itemId + '" oninput="onOpsPlaceSummaryInput_(\'' + itemId + '\', this)">' + escapeHtml(place.summary || '') + '</textarea>' +
+    '</section>' +
+  '</div>';
+}
+function onOpsPlaceGuideInput_(itemId, el){
+  if(!el) return;
+  if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(el);
+  var om = getOpsManualState_();
+  var rv = om.review && om.review[itemId];
+  if(!rv) return;
+  if(!rv.place || typeof rv.place !== 'object') rv.place = {};
+  rv.place.guide = String(el.value || '');
+  rv.place.summary = buildOpsPlaceSummaryFromGuide_(rv.place.guide);
+  var summaryEl = document.querySelector('textarea[data-ops-place-summary="' + itemId + '"]');
+  if(summaryEl){
+    summaryEl.value = rv.place.summary;
+    if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(summaryEl);
+  }
+  scheduleOpsVisitSave_();
+}
+function onOpsPlaceSummaryInput_(itemId, el){
+  if(!el) return;
+  if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(el);
+  var om = getOpsManualState_();
+  var rv = om.review && om.review[itemId];
+  if(!rv) return;
+  if(!rv.place || typeof rv.place !== 'object') rv.place = {};
+  rv.place.summary = String(el.value || '');
+  scheduleOpsVisitSave_();
+}
+window.onOpsPlaceGuideInput_ = onOpsPlaceGuideInput_;
+window.onOpsPlaceSummaryInput_ = onOpsPlaceSummaryInput_;
+function isOpsKakaoMapItem_(itemId){
+  var id = String(itemId || '');
+  return id === 'ops-y-21' || id === 'ops-j-21' || id === 'ops-n-21';
+}
+function opsKakaoLiveRecord_(branchKey){
+  if(branchKey === 'yaksu'){
+    return {
+      url: 'https://place.map.kakao.com/897942207',
+      name: '리얼무브먼트 약수점',
+      category: '요가,필라테스',
+      address: '서울 중구 동호로7길 32 4층\n우편번호 04597\n지번: 신당동 366-2',
+      phone: '0503-7154-6736',
+      hours: '월–금 09:00–21:00\n토 09:00–18:00\n일 휴무',
+      intro: '자세교정과 재활운동으로 편안한 움직임을 찾아드립니다.',
+      parking: '무료 주차',
+      way: '약수역 8번 출구에서 167m · 도보 4분',
+      links: 'https://naver.me/x2YstInq\nhttps://blog.naver.com/allenjoy/224307689748',
+      tags: '공개 페이지에 없음',
+      photos: '21장'
+    };
+  }
+  if(branchKey === 'jakjeon'){
+    return {
+      url: 'https://place.map.kakao.com/715179953',
+      name: '리얼무브먼트 인천점',
+      category: '체육관',
+      address: '인천 계양구 봉오대로651번길 9 힐스테이트자이계양 커뮤니티 센터 내부\n우편번호 21046\n지번: 작전동 953',
+      phone: '0503-7154-8402',
+      hours: '월·화·목·금 09:00–21:00\n수 09:00–18:00\n토 09:00–16:00\n일 휴무',
+      intro: '자세교정과 재활운동으로 편안한 움직임을 찾아드립니다.',
+      parking: '무료 주차',
+      way: '작전역 7번 출구에서 498m · 도보 9분',
+      links: 'https://naver.me/xYNbHrY9\nhttps://blog.naver.com/allenjoy/224122998739',
+      tags: '#재활운동 #중년안전운동 #직장인자세교정 #척추측만증운동 #패시브스트레칭',
+      photos: '등록되어 있음'
+    };
+  }
+  var meta = opsBranchMeta_(branchKey);
+  return {
+    url: (meta && meta.kakaoMapUrl) || '',
+    name: opsStoreName_(branchKey) || '',
+    category: '헬스·PT',
+    address: (meta && meta.address) || '',
+    phone: opsBranchPhone_(branchKey) || '',
+    hours: opsBranchHours_(branchKey) || '',
+    intro: '',
+    parking: (meta && meta.parking) || '',
+    way: (meta && meta.directionsShort) || '',
+    links: (meta && meta.placeUrl) || '',
+    tags: '',
+    photos: ''
+  };
+}
+function buildOpsKakaoGuideText_(branchKey){
+  var p = opsKakaoLiveRecord_(branchKey);
+  return [
+    '■ 등록 순서',
+    '1. 카카오맵 매장관리에서 「' + p.name + '」을 찾고 소유를 확인합니다.',
+    '2. 아래 항목을 공개 페이지와 같게 맞춥니다.',
+    '3. 사진은 있는 것을 유지합니다.',
+    '4. 완성된 URL을 다른 채널에 연결합니다.',
+    '',
+    '■ 적어야 할 항목',
+    '1) 상호',
+    p.name,
+    '',
+    '2) 카테고리',
+    p.category,
+    '',
+    '3) 주소',
+    p.address,
+    '',
+    '4) 전화',
+    p.phone,
+    '',
+    '5) 영업시간',
+    p.hours,
+    '',
+    '6) 소개',
+    p.intro,
+    '',
+    '7) 주차',
+    p.parking,
+    '',
+    '8) 찾아오는 길',
+    p.way,
+    '',
+    '9) 홈페이지·블로그',
+    p.links,
+    '',
+    '10) 태그',
+    p.tags,
+    '',
+    '11) 사진',
+    p.photos
+  ].join('\n');
+}
+function buildOpsKakaoSummaryFromGuide_(guide){
+  var text = String(guide || '');
+  var mark = '■ 적어야 할 항목';
+  var idx = text.indexOf(mark);
+  var fields = idx >= 0 ? text.slice(idx + mark.length) : text;
+  return buildOpsPlaceSummaryFromGuide_(fields.replace(/^\s+/, ''));
+}
+function ensureOpsKakaoFields_(review, itemId){
+  if(!review) return { guide: '', summary: '' };
+  var seeded = review.kakao && typeof review.kakao === 'object' && typeof review.kakao.guide === 'string';
+  if(!seeded){
+    var guide = buildOpsKakaoGuideText_(opsPlaceBranchKey_(itemId));
+    review.kakao = { guide: guide, summary: buildOpsKakaoSummaryFromGuide_(guide) };
+  } else if(typeof review.kakao.summary !== 'string'){
+    review.kakao.summary = buildOpsKakaoSummaryFromGuide_(review.kakao.guide);
+  }
+  return review.kakao;
+}
+function renderOpsKakaoMapPanelHTML_(itemId, kakao){
+  var live = opsKakaoLiveRecord_(opsPlaceBranchKey_(itemId));
+  var url = String(live.url || '').trim();
+  var urlHtml = url
+    ? '<a class="ops-visit-url" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(url) + '</a>'
+    : '<p class="ops-visit-url-empty">등록된 URL이 없습니다.</p>';
+  return '<div class="ops-visit-stack">' +
+    '<section class="ops-visit-card">' +
+      '<div class="ops-visit-label">완성된 URL</div>' +
+      urlHtml +
+    '</section>' +
+    '<section class="ops-visit-card">' +
+      '<div class="ops-visit-label">등록 가이드 · 적어야 할 항목</div>' +
+      '<p class="ops-visit-note">항목을 고치면 아래 초안이 같이 바뀝니다. 2026-10-13 공개 카카오맵 내용입니다.</p>' +
+      '<textarea class="ops-visit-input ops-grow-textarea" rows="16" data-ops-kakao-guide="' + itemId + '" oninput="onOpsKakaoGuideInput_(\'' + itemId + '\', this)">' + escapeHtml(kakao.guide || '') + '</textarea>' +
+    '</section>' +
+    '<section class="ops-visit-card ops-visit-card-draft">' +
+      '<div class="ops-visit-label">완성된 초안</div>' +
+      '<textarea class="ops-visit-input ops-grow-textarea" rows="14" data-ops-kakao-summary="' + itemId + '" oninput="onOpsKakaoSummaryInput_(\'' + itemId + '\', this)">' + escapeHtml(kakao.summary || '') + '</textarea>' +
+    '</section>' +
+  '</div>';
+}
+function onOpsKakaoGuideInput_(itemId, el){
+  if(!el) return;
+  if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(el);
+  var om = getOpsManualState_();
+  var rv = om.review && om.review[itemId];
+  if(!rv) return;
+  if(!rv.kakao || typeof rv.kakao !== 'object') rv.kakao = {};
+  rv.kakao.guide = String(el.value || '');
+  rv.kakao.summary = buildOpsKakaoSummaryFromGuide_(rv.kakao.guide);
+  var summaryEl = document.querySelector('textarea[data-ops-kakao-summary="' + itemId + '"]');
+  if(summaryEl){
+    summaryEl.value = rv.kakao.summary;
+    if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(summaryEl);
+  }
+  scheduleOpsVisitSave_();
+}
+function onOpsKakaoSummaryInput_(itemId, el){
+  if(!el) return;
+  if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(el);
+  var om = getOpsManualState_();
+  var rv = om.review && om.review[itemId];
+  if(!rv) return;
+  if(!rv.kakao || typeof rv.kakao !== 'object') rv.kakao = {};
+  rv.kakao.summary = String(el.value || '');
+  scheduleOpsVisitSave_();
+}
+window.onOpsKakaoGuideInput_ = onOpsKakaoGuideInput_;
+window.onOpsKakaoSummaryInput_ = onOpsKakaoSummaryInput_;
+function isOpsKakaoChannelItem_(itemId){
+  var id = String(itemId || '');
+  return id === 'ops-y-24' || id === 'ops-j-24' || id === 'ops-n-24';
+}
+function opsKakaoChannelLiveRecord_(branchKey){
+  if(branchKey === 'yaksu'){
+    return {
+      url: 'https://pf.kakao.com/_nVSxdn',
+      chat: 'https://pf.kakao.com/_nVSxdn/chat',
+      name: '힐링트리',
+      intro: '리:얼 무브먼트/ 리:얼 페이스/ 전문가 교육\n재정렬하다 - Re: Alignment (주)힐링트리',
+      category: '건강정보',
+      phone: '0503-7154-6736 (카카오맵)\n0507-1359-4596 (고객센터)',
+      address: '서울 중구 동호로7길 32 4층',
+      store: '리얼무브먼트 약수점\n요가,필라테스\nhttps://place.map.kakao.com/897942207',
+      hours: '월–금 09:00–21:00\n토 09:00–18:00\n일 휴무',
+      extra: '주차',
+      site: 'https://m.blog.naver.com/PostView.naver?blogId=allenjoy&logNo=223768872305\n인스타그램 https://www.instagram.com/re.al_movement_official',
+      chatInfo: '월–토 09:00–18:00\n시작 문구: 지금 바로 \'대화\' 해보세요!\'',
+      coupon: 'http://pf.kakao.com/_nVSxdn/coupons'
+    };
+  }
+  if(branchKey === 'jakjeon'){
+    return {
+      url: 'https://pf.kakao.com/_unqbX',
+      chat: 'https://pf.kakao.com/_unqbX/chat',
+      name: '리얼무브먼트 인천점',
+      intro: '▶ 움직임이 편해지는 시간\n▶ P스트레칭 / 자세교정 / 기능운동 / 페이스 전문',
+      category: '운동시설',
+      phone: '0507-1312-4596 (전화 버튼·고객센터)\n0503-7154-8402 (카카오맵)',
+      address: '인천 계양구 봉오대로651번길 9 힐스테이트자이계양 커뮤니티 센터 내부',
+      store: '리얼무브먼트 인천점\n체육관\nhttps://place.map.kakao.com/715179953',
+      hours: '월·화·목·금 09:00–21:00\n수 09:00–18:00\n토 09:00–16:00\n일 휴무',
+      extra: '주차\n제로페이',
+      site: 'https://realmovement.imweb.me/120',
+      chatInfo: '월–토 09:00–18:00\n시작 문구: 지금 바로 \'대화\' 해보세요!\'',
+      coupon: 'http://pf.kakao.com/_unqbX/coupons'
+    };
+  }
+  var meta = opsBranchMeta_(branchKey);
+  return {
+    url: (meta && meta.kakaoChannelUrl) || '',
+    chat: '',
+    name: opsStoreName_(branchKey) || '',
+    intro: '',
+    category: '',
+    phone: opsBranchPhone_(branchKey) || '',
+    address: (meta && meta.address) || '',
+    store: (meta && meta.kakaoMapUrl) || '',
+    hours: opsBranchHours_(branchKey) || '',
+    extra: (meta && meta.parking) || '',
+    site: '',
+    chatInfo: '',
+    coupon: ''
+  };
+}
+function buildOpsKakaoChannelGuideText_(branchKey){
+  var p = opsKakaoChannelLiveRecord_(branchKey);
+  return [
+    '■ 등록 순서',
+    '1. 카카오비즈니스 채널 관리에서 「' + p.name + '」 채널을 엽니다.',
+    '2. 아래 항목을 공개 채널과 같게 맞춥니다.',
+    '3. 연결된 카카오맵 매장이 이 지점인지 확인합니다.',
+    '4. 채팅 시간과 쿠폰이 켜져 있는지 확인합니다.',
+    '5. 완성된 URL을 홈·프로필·명함에 연결합니다.',
+    '',
+    '■ 적어야 할 항목',
+    '1) 채널명',
+    p.name,
+    '',
+    '2) 소개',
+    p.intro,
+    '',
+    '3) 채널 카테고리',
+    p.category,
+    '',
+    '4) 전화',
+    p.phone,
+    '',
+    '5) 주소',
+    p.address,
+    '',
+    '6) 연결된 카카오맵',
+    p.store,
+    '',
+    '7) 영업시간',
+    p.hours,
+    '',
+    '8) 주차·결제',
+    p.extra,
+    '',
+    '9) 웹사이트',
+    p.site,
+    '',
+    '10) 채팅',
+    p.chatInfo,
+    '',
+    '11) 쿠폰',
+    p.coupon
+  ].join('\n');
+}
+function ensureOpsKakaoChannelFields_(review, itemId){
+  if(!review) return { guide: '', summary: '' };
+  var seeded = review.kakaoChannel && typeof review.kakaoChannel === 'object' && typeof review.kakaoChannel.guide === 'string';
+  if(!seeded){
+    var guide = buildOpsKakaoChannelGuideText_(opsPlaceBranchKey_(itemId));
+    review.kakaoChannel = { guide: guide, summary: buildOpsKakaoSummaryFromGuide_(guide) };
+  } else if(typeof review.kakaoChannel.summary !== 'string'){
+    review.kakaoChannel.summary = buildOpsKakaoSummaryFromGuide_(review.kakaoChannel.guide);
+  }
+  return review.kakaoChannel;
+}
+function renderOpsKakaoChannelPanelHTML_(itemId, channel){
+  var live = opsKakaoChannelLiveRecord_(opsPlaceBranchKey_(itemId));
+  var url = String(live.url || '').trim();
+  var chat = String(live.chat || '').trim();
+  var urlHtml = url
+    ? '<a class="ops-visit-url" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(url) + '</a>'
+    : '<p class="ops-visit-url-empty">등록된 URL이 없습니다.</p>';
+  var chatHtml = chat
+    ? '<div class="ops-visit-url-row"><a class="ops-visit-url ops-visit-url-sub" href="' + escapeHtml(chat) + '" target="_blank" rel="noopener">채팅 ' + escapeHtml(chat) + '</a></div>'
+    : '';
+  return '<div class="ops-visit-stack">' +
+    '<section class="ops-visit-card">' +
+      '<div class="ops-visit-label">완성된 URL</div>' +
+      urlHtml +
+      chatHtml +
+    '</section>' +
+    '<section class="ops-visit-card">' +
+      '<div class="ops-visit-label">등록 가이드 · 적어야 할 항목</div>' +
+      '<p class="ops-visit-note">항목을 고치면 아래 초안이 같이 바뀝니다. 2026-10-13 공개 카카오채널입니다. 매장 정보는 연결된 카카오맵과 같습니다.</p>' +
+      '<textarea class="ops-visit-input ops-grow-textarea" rows="16" data-ops-kakaoch-guide="' + itemId + '" oninput="onOpsKakaoChannelGuideInput_(\'' + itemId + '\', this)">' + escapeHtml(channel.guide || '') + '</textarea>' +
+    '</section>' +
+    '<section class="ops-visit-card ops-visit-card-draft">' +
+      '<div class="ops-visit-label">완성된 초안</div>' +
+      '<textarea class="ops-visit-input ops-grow-textarea" rows="14" data-ops-kakaoch-summary="' + itemId + '" oninput="onOpsKakaoChannelSummaryInput_(\'' + itemId + '\', this)">' + escapeHtml(channel.summary || '') + '</textarea>' +
+    '</section>' +
+  '</div>';
+}
+function onOpsKakaoChannelGuideInput_(itemId, el){
+  if(!el) return;
+  if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(el);
+  var om = getOpsManualState_();
+  var rv = om.review && om.review[itemId];
+  if(!rv) return;
+  if(!rv.kakaoChannel || typeof rv.kakaoChannel !== 'object') rv.kakaoChannel = {};
+  rv.kakaoChannel.guide = String(el.value || '');
+  rv.kakaoChannel.summary = buildOpsKakaoSummaryFromGuide_(rv.kakaoChannel.guide);
+  var summaryEl = document.querySelector('textarea[data-ops-kakaoch-summary="' + itemId + '"]');
+  if(summaryEl){
+    summaryEl.value = rv.kakaoChannel.summary;
+    if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(summaryEl);
+  }
+  scheduleOpsVisitSave_();
+}
+function onOpsKakaoChannelSummaryInput_(itemId, el){
+  if(!el) return;
+  if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(el);
+  var om = getOpsManualState_();
+  var rv = om.review && om.review[itemId];
+  if(!rv) return;
+  if(!rv.kakaoChannel || typeof rv.kakaoChannel !== 'object') rv.kakaoChannel = {};
+  rv.kakaoChannel.summary = String(el.value || '');
+  scheduleOpsVisitSave_();
+}
+window.onOpsKakaoChannelGuideInput_ = onOpsKakaoChannelGuideInput_;
+window.onOpsKakaoChannelSummaryInput_ = onOpsKakaoChannelSummaryInput_;
+function isOpsGoogleBizItem_(itemId){
+  var id = String(itemId || '');
+  return id === 'ops-y-17' || id === 'ops-j-17' || id === 'ops-n-17';
+}
+function isOpsKarrotItem_(itemId){
+  var id = String(itemId || '');
+  return id === 'ops-y-20' || id === 'ops-j-20' || id === 'ops-n-20';
+}
+function opsGoogleLiveRecord_(branchKey){
+  if(branchKey === 'yaksu'){
+    return {
+      url: 'https://www.google.com/maps?cid=13602961398846205532',
+      name: '리얼무브먼트 기능성트레이닝 약수 피티(PT)점',
+      category: '건강 센터',
+      address: '서울특별시 중구 동호로7길 32 4층',
+      phone: '0507-1359-4596',
+      hours: '월–금 09:00–21:00\n토 09:00–18:00\n일 휴무',
+      site: 'https://realmovement.imweb.me/',
+      booking: 'https://pcmap.place.naver.com/place/2018185163',
+      photos: '35장'
+    };
+  }
+  if(branchKey === 'jakjeon'){
+    return {
+      url: 'https://www.google.com/maps?cid=8000026025709137602',
+      name: '리얼무브먼트 기능성트레이닝 인천 계양 피티(PT)점',
+      category: '건강 센터',
+      address: '인천광역시 계양구 봉오대로651번길 9 102동 2505호',
+      phone: '0507-1312-4596',
+      hours: '월–금 09:00–21:00\n토 09:00–16:00\n일 휴무',
+      site: 'https://realmovement.imweb.me/',
+      booking: 'https://pcmap.place.naver.com/place/2018185163',
+      photos: '35장'
+    };
+  }
+  var meta = opsBranchMeta_(branchKey);
+  return {
+    url: (meta && meta.googleBusinessUrl) || '',
+    name: opsStoreName_(branchKey) || '',
+    category: '건강 센터',
+    address: (meta && meta.address) || '',
+    phone: opsBranchPhone_(branchKey) || '',
+    hours: opsBranchHours_(branchKey) || '',
+    site: '',
+    booking: (meta && meta.placeUrl) || '',
+    photos: ''
+  };
+}
+function opsKarrotLiveRecord_(branchKey){
+  if(branchKey === 'yaksu'){
+    return {
+      url: 'https://www.daangn.com/kr/local-profile/%EB%A6%AC%EC%96%BC%EB%AC%B4%EB%B8%8C%EB%A8%BC%ED%8A%B8-%EC%95%BD%EC%88%98%EC%A0%90-mun1jrp9hjt4/',
+      name: '리얼무브먼트 약수점',
+      category: '기타 스포츠',
+      area: '서울시 중구 신당동',
+      address: '서울특별시 중구 동호로7길 32 (신당동)',
+      phone: '0507-1359-4596',
+      hours: '월–금 09:00–21:00\n토 09:00–17:00\n일 휴무',
+      conveniences: '주차, 남/녀 화장실 구분, 일일권, 1:1 수업, 무료 주차, 간편결제, 사물함',
+      site: 'https://naver.me/xgXopslt',
+      intro: '리얼무브먼트 약수점\nBetter Movement, Better Life\n몸이 굳고 뻐근할 때, 무작정 운동부터 하기보다\n제대로 움직이게 만드는 1:1 메디컬트레이닝 센터입니다.\n-패시브 스트레칭\n-자세 및 생활습관 교정\n-1:1 맞춤 기능재활운동\n물리치료사 · 미국 Doctor of Chiropractic 면허를 보유한 원장이 회원님의 움직임 패턴과 불편한 동작을 살펴보고 맞춤 운동으로 진행합니다.\n자세가 무너진 청소년,\n목/어깨가 무거운 분 주부,\n골프로 허리가 뻐근한 분,\n오래 앉아있는 직장인,\n운동을 해도 몸이 개운치 못한 분\n리얼무브먼트에서 진짜 움직임을 찾아보세요!\n* 체험이나 상담이 궁금하시다면\n언제든 편하게 채팅주세요 :)',
+      price: '1:1 메디컬 트레이닝 40,000원~\n각자의 몸과 그날 컨디션에 맞는 재활/자세교정 운동을 하게됩니다.',
+      coupon: '10% 할인 · 2026년 10월 31일까지',
+      photos: '9장'
+    };
+  }
+  if(branchKey === 'jakjeon'){
+    return {
+      url: 'https://www.daangn.com/kr/local-profile/%EB%A6%AC%EC%96%BC-%EB%AC%B4%EB%B8%8C%EB%A8%BC%ED%8A%B8-9v37eoudnjkh/',
+      name: '리얼 무브먼트',
+      category: '기타 스포츠',
+      area: '인천 계양구 작전동',
+      address: '인천광역시 계양구 봉오대로651번길 9 (작전동, 힐스테이트자이계양)',
+      phone: '0507-1312-4596',
+      hours: '월·화·목·금 09:00–21:00\n수 09:00–18:00\n토 09:00–16:00\n일 휴무',
+      conveniences: '지역화폐, 주차, 남/녀 화장실 구분, 1회 체험, 1:1 수업, 간편결제',
+      site: 'https://naver.me/Gnt5vugn',
+      intro: '리얼무브먼트 약수점\nBetter Movement, Better Life\n몸이 굳고 뻐근할 때, 무작정 운동부터 하기보다\n제대로 움직이게 만드는 1:1 메디컬트레이닝 센터입니다.\n-패시브 스트레칭\n-자세 및 생활습관 교정\n-1:1 맞춤 기능재활운동\n물리치료사 · 미국 Doctor of Chiropractic 면허를 보유한 원장이 회원님의 움직임 패턴과 불편한 동작을 살펴보고 맞춤으로 진행합니다.\n자세가 무너진 청소년,\n목/어깨가 무거운 분 주부,\n골프로 허리가 뻐근한 분,\n오래 앉아있는 직장인,\n운동을 해도 몸이 개운치 못한 분께 잘 맞습니다.\n리얼무브먼트에서 진짜 움직임을 찾아보세요.\n* 체험·상담 문의는 채팅으로 편하게 남겨 주세요*',
+      price: '1:1 메디컬 패시브스트레칭 45,000원~\n1:1 메디컬 트레이닝 45,000원~\n각자의 몸과 그날 컨디션에 맞는 재활/자세교정 운동을 하게됩니다.\n1:1 바른자세 / 습관교정 45,000원~',
+      coupon: '10% 할인 · 2026년 10월 31일까지',
+      photos: '10장'
+    };
+  }
+  var meta = opsBranchMeta_(branchKey);
+  return {
+    url: (meta && meta.karrotUrl) || '',
+    name: opsStoreName_(branchKey) || '',
+    category: '기타 스포츠',
+    area: '',
+    address: (meta && meta.address) || '',
+    phone: opsBranchPhone_(branchKey) || '',
+    hours: opsBranchHours_(branchKey) || '',
+    conveniences: '',
+    site: '',
+    intro: '',
+    price: '',
+    coupon: '',
+    photos: ''
+  };
+}
+function buildOpsGoogleGuideText_(branchKey){
+  var p = opsGoogleLiveRecord_(branchKey);
+  return [
+    '■ 등록 순서',
+    '1. Google 비즈니스에서 「' + p.name + '」 프로필을 엽니다.',
+    '2. 아래 항목을 공개 페이지와 같게 맞춥니다.',
+    '3. 사진이 유지되는지 확인합니다.',
+    '4. 완성된 URL을 홈·프로필에 연결합니다.',
+    '',
+    '■ 적어야 할 항목',
+    '1) 업체명',
+    p.name,
+    '',
+    '2) 카테고리',
+    p.category,
+    '',
+    '3) 주소',
+    p.address,
+    '',
+    '4) 전화',
+    p.phone,
+    '',
+    '5) 영업시간',
+    p.hours,
+    '',
+    '6) 웹사이트',
+    p.site,
+    '',
+    '7) 예약 링크',
+    p.booking,
+    '',
+    '8) 사진',
+    p.photos
+  ].join('\n');
+}
+function buildOpsKarrotGuideText_(branchKey){
+  var p = opsKarrotLiveRecord_(branchKey);
+  return [
+    '■ 등록 순서',
+    '1. 당근 비즈프로필에서 「' + p.name + '」 프로필을 엽니다.',
+    '2. 아래 항목을 공개 페이지와 같게 맞춥니다.',
+    '3. 사진과 쿠폰이 유지되는지 확인합니다.',
+    '4. 완성된 URL을 홈·프로필에 연결합니다.',
+    '',
+    '■ 적어야 할 항목',
+    '1) 상호',
+    p.name,
+    '',
+    '2) 업종',
+    p.category,
+    '',
+    '3) 동네',
+    p.area,
+    '',
+    '4) 주소',
+    p.address,
+    '',
+    '5) 전화',
+    p.phone,
+    '',
+    '6) 영업시간',
+    p.hours,
+    '',
+    '7) 편의',
+    p.conveniences,
+    '',
+    '8) 웹사이트',
+    p.site,
+    '',
+    '9) 소개',
+    p.intro,
+    '',
+    '10) 가격',
+    p.price,
+    '',
+    '11) 쿠폰',
+    p.coupon,
+    '',
+    '12) 사진',
+    p.photos
+  ].join('\n');
+}
+function ensureOpsGoogleFields_(review, itemId){
+  if(!review) return { guide: '', summary: '' };
+  var seeded = review.gbp && typeof review.gbp === 'object' && typeof review.gbp.guide === 'string';
+  if(!seeded){
+    var guide = buildOpsGoogleGuideText_(opsPlaceBranchKey_(itemId));
+    review.gbp = { guide: guide, summary: buildOpsKakaoSummaryFromGuide_(guide) };
+  } else if(typeof review.gbp.summary !== 'string'){
+    review.gbp.summary = buildOpsKakaoSummaryFromGuide_(review.gbp.guide);
+  }
+  return review.gbp;
+}
+function ensureOpsKarrotFields_(review, itemId){
+  if(!review) return { guide: '', summary: '' };
+  var seeded = review.karrot && typeof review.karrot === 'object' && typeof review.karrot.guide === 'string';
+  if(!seeded){
+    var guide = buildOpsKarrotGuideText_(opsPlaceBranchKey_(itemId));
+    review.karrot = { guide: guide, summary: buildOpsKakaoSummaryFromGuide_(guide) };
+  } else if(typeof review.karrot.summary !== 'string'){
+    review.karrot.summary = buildOpsKakaoSummaryFromGuide_(review.karrot.guide);
+  }
+  return review.karrot;
+}
+function renderOpsGoogleBizPanelHTML_(itemId, rec){
+  var live = opsGoogleLiveRecord_(opsPlaceBranchKey_(itemId));
+  var url = String(live.url || '').trim();
+  var urlHtml = url
+    ? '<a class="ops-visit-url" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(url) + '</a>'
+    : '<p class="ops-visit-url-empty">등록된 URL이 없습니다.</p>';
+  return '<div class="ops-visit-stack">' +
+    '<section class="ops-visit-card">' +
+      '<div class="ops-visit-label">완성된 URL</div>' +
+      urlHtml +
+    '</section>' +
+    '<section class="ops-visit-card">' +
+      '<div class="ops-visit-label">등록 가이드 · 적어야 할 항목</div>' +
+      '<p class="ops-visit-note">항목을 고치면 아래 초안이 같이 바뀝니다. 2026-10-13 공개 구글 비즈니스 내용입니다.</p>' +
+      '<textarea class="ops-visit-input ops-grow-textarea" rows="16" data-ops-gbp-guide="' + itemId + '" oninput="onOpsGoogleGuideInput_(\'' + itemId + '\', this)">' + escapeHtml(rec.guide || '') + '</textarea>' +
+    '</section>' +
+    '<section class="ops-visit-card ops-visit-card-draft">' +
+      '<div class="ops-visit-label">완성된 초안</div>' +
+      '<textarea class="ops-visit-input ops-grow-textarea" rows="14" data-ops-gbp-summary="' + itemId + '" oninput="onOpsGoogleSummaryInput_(\'' + itemId + '\', this)">' + escapeHtml(rec.summary || '') + '</textarea>' +
+    '</section>' +
+  '</div>';
+}
+function renderOpsKarrotPanelHTML_(itemId, rec){
+  var live = opsKarrotLiveRecord_(opsPlaceBranchKey_(itemId));
+  var url = String(live.url || '').trim();
+  var urlHtml = url
+    ? '<a class="ops-visit-url" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(url) + '</a>'
+    : '<p class="ops-visit-url-empty">등록된 URL이 없습니다.</p>';
+  return '<div class="ops-visit-stack">' +
+    '<section class="ops-visit-card">' +
+      '<div class="ops-visit-label">완성된 URL</div>' +
+      urlHtml +
+    '</section>' +
+    '<section class="ops-visit-card">' +
+      '<div class="ops-visit-label">등록 가이드 · 적어야 할 항목</div>' +
+      '<p class="ops-visit-note">항목을 고치면 아래 초안이 같이 바뀝니다. 2026-10-13 공개 당근 비즈프로필 내용입니다.</p>' +
+      '<textarea class="ops-visit-input ops-grow-textarea" rows="16" data-ops-karrot-guide="' + itemId + '" oninput="onOpsKarrotGuideInput_(\'' + itemId + '\', this)">' + escapeHtml(rec.guide || '') + '</textarea>' +
+    '</section>' +
+    '<section class="ops-visit-card ops-visit-card-draft">' +
+      '<div class="ops-visit-label">완성된 초안</div>' +
+      '<textarea class="ops-visit-input ops-grow-textarea" rows="14" data-ops-karrot-summary="' + itemId + '" oninput="onOpsKarrotSummaryInput_(\'' + itemId + '\', this)">' + escapeHtml(rec.summary || '') + '</textarea>' +
+    '</section>' +
+  '</div>';
+}
+function onOpsGoogleGuideInput_(itemId, el){
+  if(!el) return;
+  if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(el);
+  var om = getOpsManualState_();
+  var rv = om.review && om.review[itemId];
+  if(!rv) return;
+  if(!rv.gbp || typeof rv.gbp !== 'object') rv.gbp = {};
+  rv.gbp.guide = String(el.value || '');
+  rv.gbp.summary = buildOpsKakaoSummaryFromGuide_(rv.gbp.guide);
+  var summaryEl = document.querySelector('textarea[data-ops-gbp-summary="' + itemId + '"]');
+  if(summaryEl){
+    summaryEl.value = rv.gbp.summary;
+    if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(summaryEl);
+  }
+  scheduleOpsVisitSave_();
+}
+function onOpsGoogleSummaryInput_(itemId, el){
+  if(!el) return;
+  if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(el);
+  var om = getOpsManualState_();
+  var rv = om.review && om.review[itemId];
+  if(!rv) return;
+  if(!rv.gbp || typeof rv.gbp !== 'object') rv.gbp = {};
+  rv.gbp.summary = String(el.value || '');
+  scheduleOpsVisitSave_();
+}
+function onOpsKarrotGuideInput_(itemId, el){
+  if(!el) return;
+  if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(el);
+  var om = getOpsManualState_();
+  var rv = om.review && om.review[itemId];
+  if(!rv) return;
+  if(!rv.karrot || typeof rv.karrot !== 'object') rv.karrot = {};
+  rv.karrot.guide = String(el.value || '');
+  rv.karrot.summary = buildOpsKakaoSummaryFromGuide_(rv.karrot.guide);
+  var summaryEl = document.querySelector('textarea[data-ops-karrot-summary="' + itemId + '"]');
+  if(summaryEl){
+    summaryEl.value = rv.karrot.summary;
+    if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(summaryEl);
+  }
+  scheduleOpsVisitSave_();
+}
+function onOpsKarrotSummaryInput_(itemId, el){
+  if(!el) return;
+  if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(el);
+  var om = getOpsManualState_();
+  var rv = om.review && om.review[itemId];
+  if(!rv) return;
+  if(!rv.karrot || typeof rv.karrot !== 'object') rv.karrot = {};
+  rv.karrot.summary = String(el.value || '');
+  scheduleOpsVisitSave_();
+}
+window.onOpsGoogleGuideInput_ = onOpsGoogleGuideInput_;
+window.onOpsGoogleSummaryInput_ = onOpsGoogleSummaryInput_;
+window.onOpsKarrotGuideInput_ = onOpsKarrotGuideInput_;
+window.onOpsKarrotSummaryInput_ = onOpsKarrotSummaryInput_;
 function buildOpsBlogVisitTemplateText_(branchKey){
   var meta = opsBranchMeta_(branchKey);
   var sn = opsStoreName_(branchKey);
@@ -2416,8 +3436,7 @@ function syncOpsReviewItemComplete_(itemId){
   if(!om.checkedAt) om.checkedAt = {};
   var rv = om.review[itemId];
   var proposalsDone = !(rv.proposalItems || []).length || (rv.proposalItems || []).every(function(p){ return !!p.done; });
-  var placementsDone = !(rv.placementChecks || []).length || (rv.placementChecks || []).every(function(c){ return !!c.done; });
-  if(proposalsDone && placementsDone){
+  if(proposalsDone){
     om.checked[itemId] = true;
     om.checkedAt[itemId] = new Date().toISOString();
   } else {
@@ -22676,8 +23695,7 @@ function buildOpsNaverKwCreativePanelHTML_(itemId){
   var titleChips = c.titles.map(function(t){ return buildOpsKwCopyChipHTML_(t, { showLen: true }); }).join('');
   var descChips = c.descriptions.map(function(d){ return buildOpsKwCopyChipHTML_(d, { showLen: true, wide: true }); }).join('');
   return '<div class="ops-review-group ops-kw-group ops-kw-creative" style="border:1px solid rgba(30,58,110,.16);background:rgba(30,58,110,.03);padding:12px 14px;border-radius:10px">' +
-    '<div class="ops-review-group-title"><strong>파트 2 · 소재 · 애셋</strong> <span class="ops-review-group-hint">화면 칩 = 등록팩 = 대량등록 CSV (동일 소스)</span></div>' +
-    '<p style="margin:8px 0 0;font-size:12.5px;line-height:1.5;opacity:.85">아래 제목·설명이 곧 대량등록에 들어가는 <strong>등록팩</strong>입니다. 다운로드 CSV는 네이버 공식 <code>ko_add_rsa_ad_template</code> 형식입니다.</p>' +
+    '<div class="ops-review-group-title"><strong>7. 소재</strong> <span class="ops-review-group-hint">클릭하면 복사 · CSV는 같은 문구</span></div>' +
     '<div style="font-size:13px;line-height:1.55;margin-top:10px">' +
       '<div><strong>유형</strong> 반응형 소재 <span style="opacity:.75">(의료 업종 제한 시 → 단일형)</span></div>' +
       '<div style="margin-top:6px"><strong>사이트 이름</strong></div>' +
@@ -22694,30 +23712,48 @@ function buildOpsNaverKwCreativePanelHTML_(itemId){
     '<div class="ops-kw-chip-row">' + descChips + '</div>' +
     '<div class="ops-kw-actions ops-kw-dl-actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">' +
       '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="downloadOpsNaverAdAssetCsv_(\'' + itemId + '\', \'unified\')">반응형 소재 대량등록 CSV</button>' +
-      '<button type="button" class="ops-kw-btn ops-kw-btn-dl" onclick="downloadOpsNaverAdAssetCsv_(\'' + itemId + '\', \'inventory\')">등록팩·여분 참고용</button>' +
     '</div>' +
-    '<p class="ops-kw-chip-hint">체크한 광고그룹마다 등록팩(제목' + c.titles.length + '+설명' + c.descriptions.length + ') 1행 · 그룹당 반응형 최대 3개. 도구 → 대량관리 → 「반응형 소재 등록」에 바로 업로드. 엑셀 재저장 금지.</p>' +
+    '<p class="ops-kw-chip-hint">체크한 광고그룹마다 제목 ' + c.titles.length + '개 · 설명 ' + c.descriptions.length + '개 한 줄. 「반응형 소재 등록」에 올립니다.</p>' +
   '</div>';
 }
-function buildOpsNaverKwRegisterManualHTML_(){
+function buildOpsNaverKwRegisterManualHTML_(itemId){
+  var store = opsStoreName_(opsPlaceBranchKey_(itemId)) || '리얼무브먼트';
   return '<div class="ops-review-group ops-kw-group ops-kw-manual" style="border:1px solid rgba(15,118,110,.18);background:rgba(15,118,110,.04);padding:12px 14px;border-radius:10px">' +
-    '<div class="ops-review-group-title"><strong>광고 등록 방법</strong> <span class="ops-review-group-hint">네이버 검색광고(파워링크)</span></div>' +
-    '<div style="margin-top:10px;font-size:12px;font-weight:800;letter-spacing:.02em;color:#0F766E">파트 1 · 키워드 등록</div>' +
-    '<ol class="ops-kw-manual-steps" style="margin:6px 0 0;padding-left:1.25em;line-height:1.55;font-size:13px">' +
-      '<li><strong>파워링크</strong>에서 <strong>+ 새 캠페인</strong> 생성 (예: 리얼무브먼트 약수점)</li>' +
-      '<li><strong>+ 새 광고그룹</strong> — 예: 일반, 금호, 금호역, 약수, 약수역… (플래너와 같은 순서)</li>' +
-      '<li>광고그룹 <strong>일괄 체크 → 다운로드</strong> → 광고그룹 ID(grp-…) 복사</li>' +
-      '<li>아래 플래너 <strong>광고그룹ID</strong>·입찰가·채널 URL 확인/수정</li>' +
-      '<li>플래너 <strong>다운로드</strong> (일반+동네 합본 · 1만 개 초과 시 자동 분할)</li>' +
-      '<li><strong>도구 → 대량 관리</strong> · 파워링크 · 작업 「키워드 등록」 · CSV 업로드</li>' +
+    '<div class="ops-review-group-title"><strong>등록 순서</strong> <span class="ops-review-group-hint">파워링크 · 아래 작업과 같은 번호</span></div>' +
+    '<ol class="ops-kw-manual-steps" style="margin:8px 0 0;padding-left:1.25em;line-height:1.55;font-size:13px">' +
+      '<li><strong>+ 새 캠페인</strong> (예: ' + escapeHtml(store) + ')</li>' +
+      '<li><strong>+ 새 광고그룹</strong>. 이름은 아래 동네 목록과 같은 순서 (일반, 동네, 역)</li>' +
+      '<li>광고그룹을 다운로드하고 ID(grp-…)를 아래 칸에 붙입니다</li>' +
+      '<li>일반 키워드, 동네, 입찰가, 채널 URL을 확인합니다</li>' +
+      '<li><strong>선택 항목 다운로드</strong>. 1만 개를 넘으면 파일이 나뉩니다</li>' +
+      '<li>도구 → 대량 관리 → 「키워드 등록」에 CSV를 올립니다. 1~6행은 그대로 두고, 엑셀로 다시 저장하지 않습니다</li>' +
+      '<li>소재는 반응형. 아래 등록팩을 쓰거나 소재 CSV를 「반응형 소재 등록」에 올립니다. 의료 업종으로 막히면 단일형(제목 1번 + 설명 1번)</li>' +
+      '<li>캠페인 <strong>확장 소재</strong>에 아래 전화·플레이스·링크를 한 번 등록합니다</li>' +
     '</ol>' +
-    '<div style="margin-top:14px;font-size:12px;font-weight:800;letter-spacing:.02em;color:#1e3a6e">파트 2 · 소재 · 확장소재</div>' +
-    '<ol class="ops-kw-manual-steps" start="1" style="margin:6px 0 0;padding-left:1.25em;line-height:1.55;font-size:13px">' +
-      '<li>광고그룹(또는 캠페인)에서 <strong>소재 만들기</strong> — 반응형 권장 · 아래 애셋 칩 복사 또는 CSV</li>' +
-      '<li>플래너 <strong>반응형 소재 대량등록 CSV</strong> → 도구 · 대량관리 · 「반응형 소재 등록」에 바로 업로드 (엑셀 재저장 금지)</li>' +
-      '<li>캠페인 <strong>확장 소재</strong> — 전화걸기 · 위치/플레이스 · 추가링크 · (선택) 이미지</li>' +
-    '</ol>' +
-    '<p style="margin:10px 0 0;font-size:12px;opacity:.8;line-height:1.45">CSV 1~6행은 삭제하지 마세요. 그룹당 ≤1,000 · 파일당 ≤10,000. 비즈채널 검토 중이면 키워드·소재 노출이 막힐 수 있습니다.</p>' +
+    '<p style="margin:10px 0 0;font-size:12px;line-height:1.45;color:#475569">비즈채널이 승인된 뒤에 노출됩니다. 그룹당 1,000개, 파일당 10,000개. 치료·완치·시술 표현은 넣지 않습니다.</p>' +
+  '</div>';
+}
+function buildOpsNaverKwExtensionPanelHTML_(itemId){
+  ensureOpsKwChipStyles_();
+  var branchKey = opsPlaceBranchKey_(itemId);
+  var meta = opsBranchMeta_(branchKey);
+  var phone = opsBranchPhone_(branchKey);
+  var store = opsStoreName_(branchKey);
+  var placeUrl = (meta && (meta.placeUrl || meta.placeMapUrl)) || '';
+  var blog = (meta && meta.blogDirections) || '';
+  var creative = buildOpsNaverKwCreativeSeed_(branchKey);
+  return '<div class="ops-review-group ops-kw-group" style="border:1px solid rgba(30,58,110,.16);background:rgba(30,58,110,.03);padding:12px 14px;border-radius:10px">' +
+    '<div class="ops-review-group-title"><strong>8. 확장소재</strong> <span class="ops-review-group-hint">캠페인에 한 번 · 클릭하면 복사</span></div>' +
+    '<div style="margin-top:8px;font-size:13px;line-height:1.5"><strong>전화</strong></div>' +
+    '<div class="ops-kw-chip-row">' + buildOpsKwCopyChipHTML_(phone, { meta: true }) + '</div>' +
+    '<div style="margin-top:8px;font-size:13px;line-height:1.5"><strong>위치 · 플레이스</strong></div>' +
+    '<div class="ops-kw-chip-row">' + buildOpsKwCopyChipHTML_(store, { meta: true }) + (placeUrl ? buildOpsKwCopyChipHTML_(placeUrl, { meta: true, wide: true }) : '') + '</div>' +
+    '<div style="margin-top:8px;font-size:13px;line-height:1.5"><strong>추가 링크</strong></div>' +
+    '<div class="ops-kw-chip-row">' +
+      buildOpsKwCopyChipHTML_(creative.displayUrlPc, { meta: true, wide: true }) +
+      buildOpsKwCopyChipHTML_(creative.finalUrlPc, { meta: true, wide: true }) +
+      (blog ? buildOpsKwCopyChipHTML_(blog, { meta: true, wide: true }) : '') +
+    '</div>' +
   '</div>';
 }
 function buildOpsNaverKwExtensionGuideText_(branchKey){
@@ -22808,8 +23844,6 @@ function renderOpsNaverKwPanelHTML_(itemId){
           '<input type="checkbox" data-ops-kw-hood-select-all' + (allSel ? ' checked' : '') +
             ' onchange="setOpsNaverKwHoodCsvSelectedAll_(\'' + itemId + '\', this.checked)" />' +
           '전체 선택</label>' +
-        '<button type="button" class="ops-kw-btn" style="padding:4px 10px;font-size:11px" onclick="setOpsNaverKwHoodCsvSelectedAll_(\'' + itemId + '\', true)">일괄 체크</button>' +
-        '<button type="button" class="ops-kw-btn" style="padding:4px 10px;font-size:11px" onclick="setOpsNaverKwHoodCsvSelectedAll_(\'' + itemId + '\', false)">일괄 해제</button>' +
         '<span style="font-size:11px;opacity:.7">선택 ' + hoodSelCount + '/' + hoodCount + '</span>' +
       '</div>')
     : '';
@@ -22831,24 +23865,22 @@ function renderOpsNaverKwPanelHTML_(itemId){
     hoodMapRows = '<div class="ops-kw-hood-ad-empty" style="font-size:12px;opacity:.7">일반·동네를 위에 입력하면 여기에 광고그룹ID 입력칸이 생깁니다.</div>';
   }
   return '<div class="ops-kw-panel" data-ops-kw="' + escapeHtml(itemId) + '">' +
-    buildOpsNaverKwRegisterManualHTML_() +
+    buildOpsNaverKwRegisterManualHTML_(itemId) +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>일반 키워드 설정하기</strong> <span class="ops-review-group-hint">한 줄에 하나 · 시드 ' + seedCount + '개 · 「일반」 광고그룹에 등록</span>' +
+      '<div class="ops-review-group-title"><strong>4. 일반 키워드</strong> <span class="ops-review-group-hint">한 줄에 하나 · 시드 ' + seedCount + '개 · 「일반」 그룹</span>' +
         '<span class="ops-review-group-progress">' + baseCount + '개</span></div>' +
       '<textarea class="ops-review-input ops-kw-textarea" rows="8" data-ops-kw-field="keywords" placeholder="예: 허리통증&#10;거북목교정" onchange="setOpsNaverKwList_(\'' + itemId + '\', \'keywords\', this.value)">' + escapeHtml(kwText) + '</textarea>' +
       '<div class="ops-kw-actions">' +
         '<button type="button" class="ops-kw-btn" onclick="addOpsNaverKwLine_(\'' + itemId + '\', \'keywords\')">추가</button>' +
-        '<button type="button" class="ops-kw-btn" onclick="focusOpsNaverKwField_(\'' + itemId + '\', \'keywords\')">수정</button>' +
         '<button type="button" class="ops-kw-btn ops-kw-btn-regen" onclick="regenOpsNaverKwList_(\'' + itemId + '\', \'keywords\')">재생성</button>' +
       '</div>' +
     '</div>' +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>일반 · 동네 항목</strong> <span class="ops-review-group-hint">한 줄에 하나 · 첫 줄 「일반」권장(조합 제외)</span>' +
+      '<div class="ops-review-group-title"><strong>4. 동네</strong> <span class="ops-review-group-hint">한 줄에 하나 · 첫 줄 「일반」은 조합하지 않음</span>' +
         '<span class="ops-review-group-progress">' + hoodCount + '개</span></div>' +
       '<textarea class="ops-review-input ops-kw-textarea ops-kw-hood-textarea" rows="8" data-ops-kw-field="neighborhoods" placeholder="예: 일반&#10;약수&#10;약수역" onchange="setOpsNaverKwList_(\'' + itemId + '\', \'neighborhoods\', this.value)">' + escapeHtml(hoodText) + '</textarea>' +
       '<div class="ops-kw-actions">' +
         '<button type="button" class="ops-kw-btn" onclick="addOpsNaverKwLine_(\'' + itemId + '\', \'neighborhoods\')">추가</button>' +
-        '<button type="button" class="ops-kw-btn" onclick="focusOpsNaverKwField_(\'' + itemId + '\', \'neighborhoods\')">수정</button>' +
         '<button type="button" class="ops-kw-btn ops-kw-btn-regen" onclick="regenOpsNaverKwList_(\'' + itemId + '\', \'neighborhoods\')">재생성</button>' +
         '<label class="ops-kw-join"><span>연결</span>' +
           '<select data-ops-kw-meta="joinMode" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'joinMode\', this.value)">' +
@@ -22860,7 +23892,7 @@ function renderOpsNaverKwPanelHTML_(itemId){
       '<pre class="ops-kw-preview">' + escapeHtml(comboPreview || '(동네·키워드를 입력하면 여기에 표시됩니다. 「일반」은 조합하지 않습니다.)') + '</pre>' +
     '</div>' +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>대량등록 CSV</strong> <span class="ops-review-group-hint">일반+동네 합본 · 파일당 최대 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() + '개 · 그룹당 ' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개</span></div>' +
+      '<div class="ops-review-group-title"><strong>5–6. 대량등록 CSV</strong> <span class="ops-review-group-hint">일반+동네 · 파일당 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() + '개 · 그룹당 ' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개</span></div>' +
       '<div class="ops-kw-meta-grid">' +
         '<div class="ops-kw-meta ops-kw-meta-wide">' +
           '<span>광고그룹ID (기본값 · 수정 가능) <em class="ops-kw-id-note" style="font-style:normal;font-weight:500;opacity:.75">일반 포함 ' + hoodCount + '칸 · 체크한 항목만 다운로드</em></span>' +
@@ -22874,12 +23906,13 @@ function renderOpsNaverKwPanelHTML_(itemId){
       '<div class="ops-kw-dl-counts">일반 ' + baseCount.toLocaleString() + ' · 동네조합 ' + comboCount.toLocaleString() + ' · 합산(중복·' + OPS_NAVER_KW_MAX_CHARS + '자 초과 제외) ' + bothCount.toLocaleString() +
         (bothCount > OPS_NAVER_KW_MAX_ROWS ? ' → <strong>' + Math.ceil(bothCount / OPS_NAVER_KW_MAX_ROWS) + '개 파일</strong>로 분할' : ' / 파일 최대 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString()) +
         (skippedLong ? ' · <span class="ops-kw-warn">' + skippedLong + '개 길이초과 제외</span>' : '') +
-        '<br><span class="ops-kw-adgroup-hint">' + escapeHtml(adGroupHint) + '</span></div>' +
+        '</div>' +
       '<div class="ops-kw-actions ops-kw-dl-actions">' +
         '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="downloadOpsNaverKwCsv_(\'' + itemId + '\', \'both\')">선택 항목 다운로드</button>' +
       '</div>' +
     '</div>' +
     buildOpsNaverKwCreativePanelHTML_(itemId) +
+    buildOpsNaverKwExtensionPanelHTML_(itemId) +
   '</div>';
 }
 function setOpsNaverKwList_(itemId, field, text){
@@ -23278,66 +24311,74 @@ function renderOpsManualMainHTML_(){
     var collapsed = !!om.collapsed[sec.id];
     var itemsHtml = (sec.items || []).map(function(it){
       var checked = isOpsItemChecked_(om, it.id);
-      var note = om.notes[it.id] || '';
       var review = ensureOpsReviewState_(it, branch) || { open: false, fields: {}, pinned: {} };
       var reviewOpen = !!review.open;
-      var field = review.fields || {};
-      var proposalItems = review.proposalItems || [];
-      var checks = review.placementChecks || [];
-      var proposalHtml = proposalItems.map(function(p){
-        var body = '<div class="ops-review-proposal' + (p.done ? ' done' : '') + '" data-proposal-id="' + escapeHtml(p.id) + '">' +
-          '<div class="ops-review-proposal-head">' +
-            '<label class="ops-review-proposal-check">' +
-              '<input type="checkbox"' + (p.done ? ' checked' : '') + ' onchange="toggleOpsReviewProposalDone_(\'' + it.id + '\', \'' + p.id + '\', this.checked)" />' +
-              '<span class="ops-review-label">' + escapeHtml(p.title || '등록 가이드') + '</span>' +
-            '</label>' +
-            '<div class="ops-review-proposal-actions">' +
-              '<button type="button" class="ops-review-pin' + (p.pinned ? ' active' : '') + '" onclick="toggleOpsReviewProposalPin_(\'' + it.id + '\', \'' + p.id + '\')">' + (p.pinned ? '고정됨' : '고정') + '</button>' +
-              '<button type="button" class="ops-review-rewrite" data-rewrite-btn="' + it.id + '-' + p.id + '" onclick="rewriteOpsReviewProposal_(\'' + it.id + '\', \'' + p.id + '\', \'' + branch + '\')">재작성</button>' +
+      var visitItem = isOpsVisitGuideItem_(it.id);
+      var placeItem = isOpsSmartPlaceItem_(it.id);
+      var kakaoItem = isOpsKakaoMapItem_(it.id);
+      var kakaoChannelItem = isOpsKakaoChannelItem_(it.id);
+      var googleItem = isOpsGoogleBizItem_(it.id);
+      var karrotItem = isOpsKarrotItem_(it.id);
+      var panelInner = '';
+      if(visitItem){
+        panelInner = renderOpsVisitGuidePanelHTML_(it.id, ensureOpsVisitFields_(review, it.id));
+      } else if(placeItem){
+        panelInner = renderOpsSmartPlacePanelHTML_(it.id, ensureOpsPlaceFields_(review, it.id));
+      } else if(kakaoItem){
+        panelInner = renderOpsKakaoMapPanelHTML_(it.id, ensureOpsKakaoFields_(review, it.id));
+      } else if(kakaoChannelItem){
+        panelInner = renderOpsKakaoChannelPanelHTML_(it.id, ensureOpsKakaoChannelFields_(review, it.id));
+      } else if(googleItem){
+        panelInner = renderOpsGoogleBizPanelHTML_(it.id, ensureOpsGoogleFields_(review, it.id));
+      } else if(karrotItem){
+        panelInner = renderOpsKarrotPanelHTML_(it.id, ensureOpsKarrotFields_(review, it.id));
+      } else if(isOpsNaverKwItemId_(it.id)){
+        panelInner = renderOpsNaverKwPanelHTML_(it.id);
+      } else {
+        var proposalItems = review.proposalItems || [];
+        var proposalHtml = proposalItems.map(function(p){
+          return '<div class="ops-review-proposal' + (p.done ? ' done' : '') + '" data-proposal-id="' + escapeHtml(p.id) + '">' +
+            '<div class="ops-review-proposal-head">' +
+              '<label class="ops-review-proposal-check">' +
+                '<input type="checkbox"' + (p.done ? ' checked' : '') + ' onchange="toggleOpsReviewProposalDone_(\'' + it.id + '\', \'' + p.id + '\', this.checked)" />' +
+                '<span class="ops-review-label">' + escapeHtml(p.title || '등록 가이드') + '</span>' +
+              '</label>' +
+              '<div class="ops-review-proposal-actions">' +
+                '<button type="button" class="ops-review-pin' + (p.pinned ? ' active' : '') + '" onclick="toggleOpsReviewProposalPin_(\'' + it.id + '\', \'' + p.id + '\')">' + (p.pinned ? '고정됨' : '고정') + '</button>' +
+                '<button type="button" class="ops-review-rewrite" data-rewrite-btn="' + it.id + '-' + p.id + '" onclick="rewriteOpsReviewProposal_(\'' + it.id + '\', \'' + p.id + '\', \'' + branch + '\')">재작성</button>' +
+              '</div>' +
             '</div>' +
-          '</div>' +
-          '<div class="ops-review-field ops-review-brief-field">' +
-            '<span class="ops-review-sublabel">목적 의도 알려주기</span>' +
-            '<textarea class="ops-review-input ops-grow-textarea" rows="1" data-ops-brief="' + it.id + '-' + p.id + '" oninput="autoGrowTextarea_(this)" onchange="setOpsReviewProposalBrief_(\'' + it.id + '\', \'' + p.id + '\', this.value)">' + escapeHtml(p.brief || '') + '</textarea>' +
-          '</div>' +
-          '<div class="ops-review-field ops-proposal-field">' +
-            '<span class="ops-review-sublabel"><strong>등록 가이드 · 기본값</strong> <span class="ops-proposal-edit-hint">· 탭하여 수정</span></span>' +
-            '<div class="ops-proposal-preview" tabindex="0" role="button" aria-label="제안 문장 수정" onclick="focusOpsProposalTextarea_(this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();focusOpsProposalTextarea_(this);}">' + formatOpsProposalPreviewInnerHTML_(p.text || '') + '</div>' +
-            '<textarea class="ops-review-input ops-grow-textarea ops-proposal-textarea" rows="1" data-ops-text="' + it.id + '-' + p.id + '" oninput="autoGrowTextarea_(this);syncOpsProposalPreview_(this)" onblur="blurOpsProposalTextarea_(this)" onchange="setOpsReviewProposalText_(\'' + it.id + '\', \'' + p.id + '\', this.value)">' + escapeHtml(p.text || '') + '</textarea>' +
-          '</div>' +
-        '</div>';
-        if(p.id === 'template'){
-          return '<details class="ops-guide-fold"><summary>작성 템플릿 · 필수·주의 (탭하여 펼치기)</summary>' + body + '</details>';
-        }
-        return body;
-      }).join('');
-      var proposalProgress = proposalItems.length ? ('<span class="ops-review-group-progress">' + proposalItems.filter(function(x){ return !!x.done; }).length + '/' + proposalItems.length + ' 완료</span>') : '';
-      var checklistHtml = checks.map(function(c, idx){
-        return '<label class="ops-review-check-row">' +
-          '<input type="checkbox"' + (c.done ? ' checked' : '') + ' onchange="toggleOpsReviewPlacementCheck_(\'' + it.id + '\',' + idx + ',this.checked)" />' +
-          '<span>' + escapeHtml(c.label || '') + '</span>' +
-        '</label>';
-      }).join('');
-      var kwPanelHtml = isOpsNaverKwItemId_(it.id) ? renderOpsNaverKwPanelHTML_(it.id) : '';
-      var reviewHtml = '<div class="ops-review-wrap">' +
-        '<div class="ops-item-toolbar">' +
-          '<button type="button" class="ops-review-btn" data-item-id="' + it.id + '" aria-expanded="' + (reviewOpen ? 'true' : 'false') + '" onclick="toggleOpsReview_(\'' + it.id + '\', event)">함께 검토</button>' +
-          '<textarea class="ops-check-note ops-grow-textarea" rows="1" placeholder="메모·링크·담당·완료일" oninput="autoGrowTextarea_(this)" onchange="setOpsNote_(\'' + it.id + '\', this.value)">' + escapeHtml(note) + '</textarea>' +
-        '</div>' +
-        '<div class="ops-review-panel' + (reviewOpen ? ' open' : '') + '" data-item-id="' + it.id + '">' +
-          kwPanelHtml +
+            '<div class="ops-review-field ops-review-brief-field">' +
+              '<span class="ops-review-sublabel">목적 의도 알려주기</span>' +
+              '<textarea class="ops-review-input ops-grow-textarea" rows="1" data-ops-brief="' + it.id + '-' + p.id + '" oninput="autoGrowTextarea_(this)" onchange="setOpsReviewProposalBrief_(\'' + it.id + '\', \'' + p.id + '\', this.value)">' + escapeHtml(p.brief || '') + '</textarea>' +
+            '</div>' +
+            '<div class="ops-review-field ops-proposal-field">' +
+              '<span class="ops-review-sublabel"><strong>등록 가이드 · 기본값</strong> <span class="ops-proposal-edit-hint">· 탭하여 수정</span></span>' +
+              '<div class="ops-proposal-preview" tabindex="0" role="button" aria-label="제안 문장 수정" onclick="focusOpsProposalTextarea_(this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();focusOpsProposalTextarea_(this);}">' + formatOpsProposalPreviewInnerHTML_(p.text || '') + '</div>' +
+              '<textarea class="ops-review-input ops-grow-textarea ops-proposal-textarea" rows="1" data-ops-text="' + it.id + '-' + p.id + '" oninput="autoGrowTextarea_(this);syncOpsProposalPreview_(this)" onblur="blurOpsProposalTextarea_(this)" onchange="setOpsReviewProposalText_(\'' + it.id + '\', \'' + p.id + '\', this.value)">' + escapeHtml(p.text || '') + '</textarea>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+        var proposalProgress = proposalItems.length ? ('<span class="ops-review-group-progress">' + proposalItems.filter(function(x){ return !!x.done; }).length + '/' + proposalItems.length + ' 완료</span>') : '';
+        panelInner =
           '<div class="ops-review-group"><div class="ops-review-group-title"><strong>등록 가이드</strong> <span class="ops-review-group-hint">순서대로 확인·완료</span>' + proposalProgress + '</div>' + proposalHtml + '</div>' +
-          '<div class="ops-review-group"><div class="ops-review-group-title">생성된 내용을 어디에 반영할지(체크)</div><div class="ops-review-checklist">' + checklistHtml + '</div></div>' +
           '<div class="ops-review-actions">' +
             '<button type="button" class="ops-review-regen" onclick="regenOpsReview_(\'' + it.id + '\', \'' + branch + '\')">재생성</button>' +
-          '</div>' +
+          '</div>';
+      }
+      var reviewHtml = '<div class="ops-review-wrap">' +
+        '<div class="ops-review-panel' + (reviewOpen ? ' open' : '') + ((visitItem || placeItem || kakaoItem || kakaoChannelItem || googleItem || karrotItem) ? ' ops-review-panel-visit' : '') + '" data-item-id="' + it.id + '">' +
+          panelInner +
         '</div>' +
       '</div>';
       return '<li class="ops-check-item' + (checked ? ' done' : '') + (it.brand ? (' ops-ch-' + it.brand) : '') + '">' +
-        '<label class="ops-check-row">' +
-          '<input type="checkbox"' + (checked ? ' checked' : '') + ' onchange="toggleOpsCheck_(\'' + it.id + '\', this.checked)" />' +
-          '<span class="ops-check-text">' + buildOpsItemTitleHTML_(it) + '</span>' +
-        '</label>' +
+        '<div class="ops-check-head">' +
+          '<label class="ops-check-row">' +
+            '<input type="checkbox"' + (checked ? ' checked' : '') + ' onchange="toggleOpsCheck_(\'' + it.id + '\', this.checked)" />' +
+            '<span class="ops-check-text">' + buildOpsItemTitleHTML_(it) + '</span>' +
+          '</label>' +
+          '<button type="button" class="ops-review-btn" data-item-id="' + it.id + '" aria-expanded="' + (reviewOpen ? 'true' : 'false') + '" onclick="toggleOpsReview_(\'' + it.id + '\', event)">자세히</button>' +
+        '</div>' +
         reviewHtml +
       '</li>';
     }).join('');
@@ -23351,7 +24392,7 @@ function renderOpsManualMainHTML_(){
   }).join('');
   return '<div class="ops-manual-wrap">' + intro + newMeta +
     '<div class="ops-sections">' + sections + '</div>' +
-    '<p class="ops-manual-foot">체크·메모는 이 기기·Drive·서버 동기화에 저장됩니다. 지점은 상단 「지점브랜딩」에서 바꿀 수 있어요.</p>' +
+    '<p class="ops-manual-foot">체크와 작성 내용은 이 기기·Drive·서버 동기화에 저장됩니다. 지점은 상단 「지점브랜딩」에서 바꿀 수 있어요.</p>' +
   '</div>';
 }
 function selectOpsBranch_(branchId){

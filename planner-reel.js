@@ -4,6 +4,10 @@
  * 2) 구도 프레이밍(자동 → 좌/중/우)
  * 3) 영상·사진 여러 개 · 릴스 적합 구간 자동 제안 · 이어붙이기
  * 4) 긴 영상/복수 영상에서 후보 구간만 잘라 하나로 합치기
+ *
+ * 얼굴 가림은 여기서 하지 않는다. 기준은 마케팅_전략.md 6절.
+ * 2026-10-13부터 새로 굽는 영상만, 다른 얼굴은 네모 픽셀이 아니라 얼굴 크기의 부드러운 흐림.
+ * 이미 만든 영상은 다시 굽지 않는다.
  */
 (function (global) {
   'use strict';
@@ -1983,7 +1987,7 @@
           '<input type="file" webkitdirectory multiple accept="video/*,image/*" onchange="ReelMaker.onFile(this)" ' + (reel.busy ? 'disabled' : '') + ' style="display:none">' +
           '폴더 선택</label>' +
       '</div>' +
-      '<div class="reel-maker-hint">데스크톱(PC)에서 쓰는 것을 권장합니다. 파일 여러 개·폴더 선택 가능. 큰 폴더는 사진 최대 ' + REEL_MAX_IMAGES_ + '장·영상 ' + REEL_MAX_VIDEOS_ + '개만 빠르게 불러옵니다.<br>아이폰·아이패드에서는 영상 분석이 느려 GoPro Quik(Studio) 사용을 권장합니다.</div>' +
+      '<div class="reel-maker-hint">데스크톱(PC)에서 쓰는 것을 권장합니다. 파일 여러 개·폴더 선택 가능. 큰 폴더는 사진 최대 ' + REEL_MAX_IMAGES_ + '장·영상 ' + REEL_MAX_VIDEOS_ + '개만 빠르게 불러옵니다.<br>아이폰·아이패드에서는 영상 분석이 느려 GoPro Quik(Studio) 사용을 권장합니다.<br>얼굴 가림은 이 화면에서 하지 않습니다. 새로 굽는 영상만 다른 얼굴을 부드럽게 흐리고, 이미 만든 영상은 다시 굽지 않습니다.</div>' +
       (hasMedia
         ? (renderClipList_() +
           '<div class="reel-maker-meta" id="reel-maker-meta">본편 ' + fmtTime(contentDuration()) +

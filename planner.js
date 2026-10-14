@@ -7503,13 +7503,13 @@ function buildDraftBriefPromptLines_(draft, catId){
     if(af.title) flowLines.push('제목 방향: ' + af.title);
     if(af.angle) flowLines.push('각도: ' + af.angle);
     if(steps.length) flowLines.push('전개 순서:\n' + steps.map(function(s, i){ return (i + 1) + '. ' + s; }).join('\n'));
-    flowLines.push('위 흐름·순서를 벗어나지 말고 작성하세요.');
+    flowLines.push('이 제목·각도·전개가 초안의 뼈대입니다. 제목은 「제목 방향」의 말과 주장을 최대한 그대로 쓰고, 각 단계의 뜻이 본문 칸에 들어가야 합니다. 다른 후킹·다른 소재로 바꾸지 마세요.');
   }
   var diary = isDailyShareCategory(catId) ? buildDailyDiaryFactsBlock_(draft) : '';
   if(diary) flowLines.unshift(diary);
   var brief = getDraftWritingBrief_(draft, catId);
   if(flowLines.length && brief){
-    return flowLines.join('\n') + '\n\n글 작성 핵심:\n' + brief + '\n\n위 「선택한 글 흐름」과 「글 작성 핵심」을 본문 전개에 우선 반영하세요.';
+    return flowLines.join('\n') + '\n\n글 작성 핵심:\n' + brief + '\n\n「선택한 글 흐름」의 제목·각도·전개가 「글 작성 핵심」보다 우선입니다. 핵심은 그 흐름을 돕는 범위에서만 쓰세요.';
   }
   if(flowLines.length) return flowLines.join('\n');
   if(brief){
@@ -13008,7 +13008,8 @@ function buildExpertCourseThreadsPrompt_(opts){
     '- 변환 대상: **인스타 최종본(강의·시연 캡션)** → Threads 본문+댓글\n' +
     '- 독자: ' + roleReaders + '\n' +
     '- 본문: 현장에서 흔히 틀리는 테크닉·전제 하나를 **한 줄**로 뒤집기\n' +
-    '- 댓글: 인스타·영상 범위의 테크닉 원리·손 느낌·주의를 풀어 설명. 수강·등록 유도 금지\n' +
+    '- 댓글: 인스타·영상 범위의 테크닉 원리·손 느낌·주의를 완전한 문장으로 풀어 설명. 수강·등록 유도 금지\n' +
+    PLAIN_DRAFT_SENTENCE_RULE + '\n' +
     '- 인스타에 없는 내용 추가 금지' +
     (programBlock ? '\n' + programBlock : '');
 }
@@ -14012,8 +14013,9 @@ const DEFAULT_EXPERT_COURSE_SCOPE_RULE = `[범위·집중 — 최우선]
 - 정보가 부족하면 억지로 채우지 말고, 참고·영상·사진에 있는 것만 **더 명확하게** 풀어라. 강의 본 동료와 대화하는 톤.
 
 [전문가 영상 공유 — 시청 유도]
-- **직접 시청 유도 금지**: 「영상 보세요」「영상 보시면서」「댓글로 남겨주세요」「다음 컷에서 이어갈게요」처럼 시청·댓글을 **명시적으로 시키는** 문장 금지.
-- **허용**: 장면에 있는 손·자세·자막·순서를 구체적으로 서술해, 읽다 보면 자연히 영상을 떠올리게 하기. 「영상에서 반복해서 보이는 포인트는…」 정도는 OK.
+- **직접 시청 유도 금지**: 「영상을 보면」「영상을 보시면」「영상에서 하려는 말은」「영상에서 말하고자」「이 영상의 핵심은」「영상 보세요」「영상 보시면서」「댓글로 남겨주세요」「다음 컷에서 이어갈게요」.
+- **쓸 것**: 분석에 「영상에서」가 있어도, 손·자세·순서·확인할 방향을 누가 무엇을 하는지로 바로 쓰기. 핵심은 글에 다 쓰고, 그 장면이 구체적이라 독자가 영상을 확인하고 싶어지게.
+- **금지**: 「영상에서 반복된 자막 그대로입니다」「이 영상을 꺼냈어요」「그 멈춤을 짚으려고」처럼 편집·제작 과정을 설명하는 문장. 자막이 있으면 그 뜻을 완전한 문장으로 다시 쓸 것.
 - hook는 「영상 여러 컷에서 공통으로…」식 **분석 보고**보다, 현장에서 자주 보는 **자세·실수·질문**으로 시작하세요.`;
 
 /** 미카닥 말투 카드 v1 — 기준 원문: mikadoc-voice-card.md */
@@ -14057,6 +14059,21 @@ const FUNCTIONAL_REHAB_CENTER_POSITIONING_RULE = `[기능재활운동센터 컬�
 - 배경으로만 허용: 「치료를 받아도 반복되면 자세·움직임」처럼 **짧게**. 도수/카이로를 이 채널의 차별점으로 내세우지 말 것.
 - 신뢰 연결: DC·PT·20년 임상은 「인체를 아는 지도자」로. Doctor/닥터·치료원·병원 근무 톤 금지.`;
 
+/** 초안 문장 — 영상을 안 본 일반인·초보자도 문장만으로 따라가게 */
+const PLAIN_DRAFT_SENTENCE_MARKER = '[초안 문장 — 처음 읽는 사람도]';
+const PLAIN_DRAFT_SENTENCE_RULE = `${PLAIN_DRAFT_SENTENCE_MARKER}
+- 독자는 그 영상을 안 본 일반인·초보자입니다. 문장만 읽어도 **누가, 어디를, 어디까지** 보는지가 끝나 있어야 합니다.
+- 이 규칙이 "말하듯", "자막 그대로", "한 줄 정도 풀어서"보다 우선입니다. 강의 중 말을 조각으로 붙이지 말고, 그 뜻을 완전한 문장으로 다시 쓰세요.
+- 전문어·약어는 남겨도 됩니다. 그 글에서 **처음 한 번**은 괄호로 풀어 쓰세요. 예: EOP(뒤통수 아래 뼈 돌출), 컨택(손으로 닿는 것), 촉진(손으로 살피는 것).
+- 한 문장에 주장 하나. 글 전체의 모양은 이 순서입니다. ① 무엇이 끝이 아닌지 ② 누가 어디서 멈추는지 ③ 위·아래·왼쪽·오른쪽·모양·이어지는 방향처럼 **읽을 것을 문장 안에** ④ 거기서 멈추면 어떤 정보가 빠지는지.
+- 확인 항목이 여러 개면 "주변", "한 세트"로 묶지 마세요. 방향과 모양을 문장에 적으세요.
+- 금지: 목적어가 안 열리는 말("주변이 남아 있어요"), 끝나지 않은 인용("'이렇게 하는 게 아니라'"), 제작 과정("자막 그대로입니다", "영상을 꺼냈어요", "멈춤을 짚으려고").
+- 같은 부위를 다른 이름으로 바꾸지 마세요. 출처가 EOP면 흉추·경추로 옮기지 마세요.
+- 문장 모양의 기준(소재가 다르면 이 모양만 따르고, 예시에 있는 EOP·돌출·촉진을 다른 주제에 넣지 마세요. 채널 호칭이 강사·회원이면 '치료사' 대신 그 호칭을 쓰세요):
+  "돌출부를 컨택했다고 촉진이 끝난 게 아닙니다. 많은 치료사가 EOP 돌출 부분에서 멈춥니다. 하지만 돌출부 위·아래·왼쪽·오른쪽과 모양, 그리고 이어지는 방향까지 읽어야 제대로 된 촉진법입니다. 한 부분 터치하고 끝나면 얻어야 할 정보를 충분히 얻기 힘듭니다."
+- 제목은 ①이 한 줄에 보이게. hook은 ①②. outline은 ③을 한 줄에 하나씩, 각 줄은 완전한 문장. draft·본문은 ④와 이유. 같은 문장을 칸마다 반복하지 마세요.
+- 쓰레드 본문 훅만 짧게 둬도 됩니다. 블로그·인스타·쓰레드 댓글은 이 규칙을 따릅니다.`;
+
 const GEO_CONTENT_STRUCTURE_RULE = `[GEO · 인용 가능한 짧은 구조 — explanation에만, 필요한 것만]
 **explanation 맨 앞 1~2문장은 TL;DR** (핵심만, 뒤에서 같은 문장을 되풀이하지 말 것).
 아래는 **체크리스트가 아니라 선택지**입니다. 새 정보가 생기는 항목만 고르고, 칸을 채우려고 분량을 늘리지 마세요.
@@ -14088,7 +14105,9 @@ ${GEO_CONTENT_STRUCTURE_RULE}
 - title: 호기심·질문형 한 줄 (35자 내외, 네이버 SEO 고려, 과장 금지)
 - problem / selfCare / explanation: 위 순서대로 각각 별도 필드. "N단계 —" 같은 순서 표기 금지
 - cta: 리얼무브먼트·프로그램·프로필 안내 (과장·즉시 예약 압박 금지). **병원 상담 문구는 넣지 마세요.** 주제와 맞는 증상 허브 URL 1개 포함 권장 — 허리 ?hub=back · 목 ?hub=neck · 어깨 ?hub=shoulder · 무릎 ?hub=knee · 골반 ?hub=pelvis (기본 ${PROFILE_BRAND_URL})
-- hashtags: 6~8개 (# 없이)`;
+- hashtags: 6~8개 (# 없이)
+
+${PLAIN_DRAFT_SENTENCE_RULE}`;
 
 function buildExpertCourseBlogPrompt_(opts){
   opts = opts || {};
@@ -14111,16 +14130,17 @@ function buildExpertCourseBlogPrompt_(opts){
     PAIN_FUNCTION_LOAD_SAFETY_RULE + '\n\n' +
     '[톤 & 스타일]\n' +
     '- 과장·낚시·"꼭 해야 한다" 압박 금지. **내용으로 말하는** 느낌\n' +
-    '- 전문 용어는 쓰되, **한 줄 정도 풀어서** 설명\n' +
-    '- 강의 중 실제로 하는 **말하듯** 자연스럽게(존댓말 유지)\n' +
+    '- 전문 용어는 남기되, 처음 한 번은 괄호로 풀고 문장은 끝까지 쓰세요\n' +
+    '- 존댓말을 유지하되, 강의 중 말을 조각으로 붙이지 마세요\n' +
     '- 해시태그 **최소화**(3~5개). 영문 브랜드 표기는 정확히 (예: Re:Al)\n\n' +
     '[형식 — JSON 필드]\n' +
-    '- title: 현장에서 궁금해할 테크닉·질문 한 줄 (35자 내외)\n' +
-    '- hook: **현장 공감 장면**으로 시작 (분석 보고체·직접 시청 유도 금지). 자막·손·자세가 있으면 자연스럽게 녹이기\n' +
-    '- outline: 시연·핵심 포인트 배열 (위 2번)\n' +
-    '- draft: 선택한 유형의 본문 (**650~1,000자**, 참고·영상·사진 범위 안만). **존댓말**. 말미에 「영상 보세요/댓글」 금지\n' +
+    '- title: 무엇이 끝이 아닌지 한 줄 (35자 내외). 목적어가 안 열리는 표현 금지\n' +
+    '- hook: 끝이 아니라는 점과, 누가 어디서 멈추는지 2~3문장. 자막 조각·제작 과정 금지\n' +
+    '- outline: 읽을 항목을 한 줄에 하나씩. 각 줄은 완전한 문장. 위·아래·왼쪽·오른쪽·모양·방향을 "주변""한 세트"로 묶지 말 것\n' +
+    '- draft: 선택한 유형의 본문 (**650~1,000자**, 참고·영상·사진 범위 안만). 거기서 멈추면 어떤 정보가 빠지는지. **존댓말**. 말미에 「영상 보세요/댓글」 금지. hook·outline과 같은 문장 반복 금지\n' +
     '- cta: 수강·등록·시청·댓글 유도 금지. 원리·과정 핵심으로 **가볍게 닫기**만\n' +
-    '- hashtags: 3~5개' +
+    '- hashtags: 3~5개\n\n' +
+    PLAIN_DRAFT_SENTENCE_RULE +
     (programBlock ? '\n\n' + programBlock : '');
 }
 
@@ -14139,8 +14159,9 @@ function buildExpertCourseInstaPrompt_(opts){
     '- 영상·사진 맥락 한 줄 → 시연·핵심 포인트 2~3개 → **원리 설명** 한두 문장\n' +
     '- 참고 메모·영상 분석·블로그 원문 **범위 안**에서만\n\n' +
     '[톤]\n' +
-    '- 과장 없이, 내용으로 말하기. 전문 용어는 한 줄 풀어쓰기\n' +
-    '- 강의 말투처럼 자연스럽게(**존댓말**)\n\n' +
+    '- 과장 없이, 내용으로 말하기. 전문 용어는 처음 한 번 괄호로 풀기\n' +
+    '- 존댓말. 문장은 끝까지. 말하다 만 인용 금지\n\n' +
+    PLAIN_DRAFT_SENTENCE_RULE + '\n\n' +
     '[형식]\n' +
     '- hook: **흔한 방법 vs 같은 자리 비교** 한 줄 (25자 내외). 「좋아요/중요합니다」 금지\n' +
     '- caption: 비교 조건 → 손 느낌·타이밍 차이 1개 → 원리 한 줄. hook 제외 **200~400자**. 수강·등록 유도 금지. **존댓말**\n' +
@@ -14458,6 +14479,26 @@ function migrateAntiAiPainSafetyPrompts_(){
       if(n2.changed){ cat.blog = n2.text; changed = true; }
     });
   }
+  return changed;
+}
+
+/** 저장 프롬프트에 초안 문장 규칙(일반인·초보자도 문장만으로 따라가게) 붙이기 */
+function migratePlainDraftSentencePrompts_(){
+  if(!state.prompts || !state.prompts.categories) return false;
+  var changed = false;
+  Object.keys(state.prompts.categories).forEach(function(catId){
+    var cat = state.prompts.categories[catId];
+    if(!cat || typeof cat !== 'object') return;
+    var id = parseInt(catId, 10);
+    ['blog', 'insta', 'threads'].forEach(function(type){
+      if(!cat[type]) return;
+      if(type !== 'blog' && !(id >= 3 && id <= 5)) return;
+      var text = String(cat[type]);
+      if(text.indexOf(PLAIN_DRAFT_SENTENCE_MARKER) >= 0) return;
+      cat[type] = text.trim() + '\n\n' + PLAIN_DRAFT_SENTENCE_RULE;
+      changed = true;
+    });
+  });
   return changed;
 }
 
@@ -20735,6 +20776,7 @@ function applyPersistPayload(s, opts){
   if(migrateSpeechStylePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrateHospitalGuidanceOnceInSelfCare_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrateAntiAiPainSafetyPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migratePlainDraftSentencePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrated){
     var desktopReceiveOnly = isPlannerDesktopBrowser_() && !state._sessionUserEdit;
@@ -22201,6 +22243,7 @@ function runDeferredBootMigrations_(){
     if(migrateSpeechStylePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrateHospitalGuidanceOnceInSelfCare_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrateAntiAiPainSafetyPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migratePlainDraftSentencePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrated){
       state.syncDirty = true;
@@ -22290,6 +22333,43 @@ function applyBootPlannerRaw_(raw){
     }, 2000);
   }
 }
+/** 완성 릴스의 키워드를 추가 칸에 넣는다. 글의 흐름은 그 칸에서 고른다. */
+function loadReelPlannerInbox_(){
+  var url = 'reel-planner-inbox.json';
+  fetch(url, { cache: 'no-store' }).then(function(res){
+    if(!res.ok) return null;
+    return res.json();
+  }).then(function(data){
+    var items = data && data.items;
+    if(!items || !items.length || !state || !state.newItem) return;
+    var note = String(state.newItem.refNote || '');
+    var topic = String(state.newItem.topic || '').trim();
+    var seen = [];
+    try { seen = JSON.parse(localStorage.getItem('reel_inbox_seen') || '[]'); } catch(eSeen){ seen = []; }
+    if(!Array.isArray(seen)) seen = [];
+    item = null;
+    for(var j = 0; j < items.length; j++){
+      var cand = items[j];
+      if(!cand || cand.status !== 'ready' || !cand.id) continue;
+      if(seen.indexOf(cand.id) >= 0) continue;
+      if(note.indexOf(cand.id) >= 0) continue;
+      item = cand;
+      break;
+    }
+    if(!item) return;
+    if(topic || note.trim()) return;
+    if(typeof isAddFormOpen_ === 'function' && isAddFormOpen_() && plannerAddFormTypedAt_ && (Date.now() - plannerAddFormTypedAt_ < 12000)) return;
+    state.showAdd = true;
+    state.newItem.topic = String(item.keywords || '').trim();
+    state.newItem.refNote = String(item.memo || '').trim();
+    if(seen.indexOf(item.id) < 0) seen.push(item.id);
+    try { localStorage.setItem('reel_inbox_seen', JSON.stringify(seen)); } catch(eSeenWrite){}
+    var btn = document.getElementById('add-toggle-btn');
+    if(btn) btn.textContent = '닫기';
+    if(typeof renderMain === 'function') renderMain({ force: true });
+  }).catch(function(){});
+}
+
 function bootPlannerLocalState_(){
   if(state._bootLocalDone) return Promise.resolve();
   if(state._bootLocalPromise) return state._bootLocalPromise;
@@ -22363,10 +22443,12 @@ function bootPlannerLocalState_(){
       try { removeQuotaRecoveryFab_(); } catch(eFabBoot){}
     }
     state._bootLocalDone = true;
+    try { loadReelPlannerInbox_(); } catch(eInbox){}
   }).catch(function(err){
     console.warn('[boot idb]', err);
     try { applyBootPlannerRaw_(lsStub ? '' : lsRaw); } catch(eBoot){}
     state._bootLocalDone = true;
+    try { loadReelPlannerInbox_(); } catch(eInbox2){}
   });
   return state._bootLocalPromise;
 }
@@ -24982,7 +25064,7 @@ var ARTICLE_KIND_CATALOG_ = {
     stepHint: '① 맥락 ② 시연 ③ 원리',
     minSteps: 3, maxSteps: 3,
     flowGuide: '각 제안은 **전문가 동료 공유 · 시연 복기**용입니다.\nsteps는 반드시 3단계:\n  ① 영상·사진 맥락  ② 시연·핵심 포인트  ③ 원리 설명 방향\n참고·영상·사진 **범위 안**에서만. 없는 내용으로 확장 금지. 아직 안 한 일을 한 것처럼 쓰지 말 것(입력에 내일이면 안내형을 쓰세요).',
-    topicGuide: '전문가 과정 **강연·교육 영상·실습 공유**용 주제 1개.\n- topic: 다룰 테크닉이 드러나는 한 줄 (15~40자)\n- angle: 테크닉/개념 + 핵심 포인트 1~3개',
+    topicGuide: '전문가 과정 **강연·교육 영상·실습 공유**용 주제 1개.\n- topic: 무엇이 끝이 아닌지, 또는 어디를 어디까지 보는지가 한 줄에 끝나게 (15~40자). "주변이 남았다"처럼 목적어가 안 열리는 표현 금지\n- angle: 테크닉/개념 + 확인할 방향·모양 1~3개',
     genRule: '이 글은 **이미 진행한 강의·시연을 복기**합니다. 과거·현장 장면 톤. 모집·예고·신청 문구 금지.'
   },
   review: {
@@ -25034,7 +25116,7 @@ var ARTICLE_KIND_CATALOG_ = {
     stepHint: '① 문제 제기 ② 셀프 케어 ③ 원리 설명',
     minSteps: 3, maxSteps: 3,
     flowGuide: '각 제안은 **일반인 블로그 가이드**용입니다. steps는 반드시 3단계:\n  ① 문제 제기(공감 장면)  ② 셀프 케어 동작  ③ 원리 설명 방향',
-    topicGuide: '입력한 키워드를 중심으로 블로그 주제 1개.\n- topic: 호기심을 자극하는 한 줄 (15~36자)\n- angle: 입력의 관점·테크닉을 한 줄로',
+    topicGuide: '입력한 키워드를 중심으로 블로그 주제 1개.\n- topic: 무엇이 문제인지, 또는 무엇을 하면 되는지가 한 줄에 끝나게 (15~36자). 목적어가 안 열리는 표현 금지\n- angle: 입력의 관점·테크닉을 한 줄로. 초보자도 따라갈 수 있게',
     genRule: '이 글은 **따라하기 가이드**입니다. 독자 장면 → 구체 도움 → 짧은 원리.'
   },
   free: {
@@ -25495,6 +25577,52 @@ function buildTopicGenFidelityBlock_(keywords, sourceNote, isDaily, isThought){
       : '- 원장 재료(누구와·무엇을·몸 느낌)와 사진 장면을 topic·angle에 반영. 없는 일상·가르침을 만들지 말 것');
   } else if(hasNote) lines.push('- 참고 메모의 테크닉·관점·용어를 topic·angle에 반영');
   return '\n' + lines.join('\n');
+}
+
+function buildSelectedFlowLockBlock_(draft){
+  if(!draft || !draft.articleFlow) return '';
+  var af = draft.articleFlow;
+  var title = String(af.title || '').trim();
+  var angle = String(af.angle || '').trim();
+  var steps = Array.isArray(af.steps) ? af.steps.map(function(s){ return String(s || '').trim(); }).filter(Boolean) : [];
+  if(!title && !angle && !steps.length) return '';
+  var lines = [
+    '[선택한 글 흐름 — 제목과 내용을 초안에 유지]',
+    '추가 화면에서 고른 제목·각도·전개가 초안의 뼈대입니다. 작성 지침의 제목 공식·문장 예시보다 이 블록이 우선합니다.',
+    '글의 성격(복기·안내·모집의 시제)은 유지하고, 각 칸에 넣을 내용은 아래 전개를 따릅니다.'
+  ];
+  if(title) lines.push('- 제목은 「' + title + '」의 말과 주장을 최대한 그대로 씁니다. 40자 안이면 그대로 두고, 더 길면 같은 주장만 줄이세요. 다른 후킹·다른 주장으로 바꾸지 마세요.');
+  if(angle) lines.push('- 각도 「' + angle + '」가 본문의 핵심 주장입니다. 빼거나 다른 결론으로 바꾸지 마세요.');
+  if(steps.length){
+    lines.push('- 전개 순서. 3단계면 앞에서부터 맥락(hook·problem) → 핵심 포인트(outline·selfCare) → 원리(draft·explanation)에 그 뜻을 넣습니다. 단계 수가 달라도 순서는 유지하고, 빼거나 다른 소재로 바꾸지 마세요.');
+    steps.forEach(function(s, i){ lines.push('  ' + (i + 1) + '. ' + s); });
+  }
+  lines.push('- 쉬운 문장으로 푸는 것은 이 제목·단계의 뜻을 독자가 알아듣게 다듬는 일입니다. 주장을 교체하지 마세요.');
+  return lines.join('\n');
+}
+function buildVideoSceneNotWatchCtaBlock_(draft){
+  if(!draft) return '';
+  var src = String(draft.sourceNote || '') + '\n' + String(draft.youtubeAnalysis || '');
+  var catId = draft.id ? getCatIdFromDraftId_(draft.id) : null;
+  var hasVideo = !!String(draft.youtubeAnalysis || '').trim() || /youtube\.com|youtu\.be|영상/.test(src);
+  if(!hasVideo && !isExpertCourseCategory(catId)) return '';
+  return [
+    '[영상 분석이 있을 때 — 시청을 시키지 말고 장면으로]',
+    '분석문에 「영상에서」가 있어도, 초안은 그 내용을 글의 설명으로 바로 씁니다.',
+    '금지: 「영상을 보면」「영상을 보시면」「영상에서 하려는 말은」「영상에서 말하고자 하는」「이 영상의 핵심은」「영상 보세요」「영상 보시면서」「다음 컷에서」.',
+    '쓸 것: 손·자세·순서·확인할 방향·그 장면에서 나온 말을, 누가 무엇을 하는지로 적습니다.',
+    '정보를 영상 뒤로 미루지 마세요. 핵심은 글에 다 쓰고, 구체적인 손·순서를 읽어 「영상에 그 장면이 있구나」 싶어 확인하게 합니다.'
+  ].join('\n');
+}
+function appendDraftVoiceLocks_(prompt, draft){
+  var extra = [buildSelectedFlowLockBlock_(draft), buildVideoSceneNotWatchCtaBlock_(draft)].filter(Boolean).join('\n\n');
+  if(!extra) return prompt;
+  return String(prompt || '') + '\n\n' + extra;
+}
+function flowJsonTitleHint_(draft, fallback){
+  var title = draft && draft.articleFlow && String(draft.articleFlow.title || '').trim();
+  if(!title) return fallback;
+  return '선택한 글 흐름 제목을 최대한 그대로: 「' + title.replace(/"/g, "'") + '」. 다른 후킹으로 바꾸지 말 것';
 }
 
 function appendDraftReferenceToPrompt_(prompt, draft, catId){
@@ -34014,14 +34142,14 @@ window.copyWholeTab_ = function(btn){
 
 var SHEET_FIELD_META_ = {
   'blog.title':       { block: 'blog', label: '제목', instr: '증상명과 지역/브랜드 키워드가 자연스럽게 들어간, 검색·AI 인용에 강한 제목 한 줄. 존댓말·질문형 권장.' },
-  'blog.problem':     { block: 'blog', label: '문제 제기', instr: '공감 질문으로 시작해 "일상에서 바로 풀 수 있다"는 한 줄까지. 독자의 상황을 구체적으로. **존댓말(해요체)**. 한다체·반말 금지.' },
+  'blog.problem':     { block: 'blog', label: '문제 제기', instr: '공감 질문으로 시작해 "일상에서 바로 풀 수 있다"는 한 줄까지. 독자의 상황을 구체적으로. 문장은 끝까지 쓰고, 무엇이 문제인지 목적어가 보이게. **존댓말(해요체)**. 한다체·반말 금지.' },
   'blog.selfCare':    { block: 'blog', label: '셀프 케어', step: true, instr: '집에서 따라 할 수 있는 셀프 케어를 단계별로. 각 단계는 새 줄에서 "👉"로 시작하고 동작·초/회/세트를 앞쪽에. 단계 사이 빈 줄. **존댓말(해요체)**.' },
-  'blog.explanation': { block: 'blog', label: '원리 설명', instr: '왜 그런지 해부학적·기능적 원리를 쉬운 말로. **존댓말(해요체)**. 한다체(~한다/~이다) 금지.' },
+  'blog.explanation': { block: 'blog', label: '원리 설명', instr: '왜 그런지 해부학적·기능적 원리를 쉬운 말로. 전문어는 처음 한 번 괄호로 풀고, 확인할 방향·순서가 있으면 위·아래·왼쪽·오른쪽처럼 문장 안에 적기. **존댓말(해요체)**. 한다체(~한다/~이다) 금지.' },
   'blog.cta':         { block: 'blog', label: '마무리 CTA', instr: '전문가 상담·프로필 페이지로 부드럽게 안내하는 마무리 2~3문장. **존댓말**.' },
   'blog.hashtags':    { block: 'blog', label: '해시태그', array: true, instr: '증상·지역·브랜드와 관련된 해시태그 5~8개.' },
-  'blog.hook':        { block: 'blog', label: '영상·사진 맥락', instr: '이번 영상·사진에서 다룬 장면·상황을 짧게. **존댓말**.' },
-  'blog.outline':     { block: 'blog', label: '시연·핵심 포인트', arrayLines: true, instr: '손 위치·동작·주의사항 등 핵심 포인트를 한 줄에 하나씩. **존댓말**.' },
-  'blog.draft':       { block: 'blog', label: '원리 설명(본문)', instr: '본문의 중심. 왜 이렇게 하는지 짧은 메커니즘을 포함. **존댓말(해요체)**.' },
+  'blog.hook':        { block: 'blog', label: '영상·사진 맥락', instr: '끝이 아니라는 점과, 누가 어디서 멈추는지 2~3문장. 문장은 끝까지. 자막 조각·「영상을 꺼냈어요」 같은 제작 과정 금지. 전문어는 처음 한 번 괄호로 풀기. **존댓말**.' },
+  'blog.outline':     { block: 'blog', label: '시연·핵심 포인트', arrayLines: true, instr: '읽을 항목을 한 줄에 하나씩. 각 줄은 완전한 문장. 위·아래·왼쪽·오른쪽·모양·이어지는 방향을 "주변"이나 "한 세트"로 묶지 말 것. **존댓말**.' },
+  'blog.draft':       { block: 'blog', label: '원리 설명(본문)', instr: '본문의 중심. 거기서 멈추면 어떤 정보가 빠지는지, 왜 다음 손 방향이 정해지는지. 문장은 끝까지. hook과 같은 문장 반복 금지. **존댓말(해요체)**.' },
   'community.title':       { block: 'community', label: '제목', instr: '입주민이 클릭하고 싶은, 증상·상황이 드러나는 제목 한 줄.' },
   'community.problem':     { block: 'community', label: '문제 제기', instr: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지, 자연스러운 문장으로.' },
   'community.selfCare':    { block: 'community', label: '셀프 케어', step: true, instr: '집에서 따라 할 수 있는 셀프 케어를 단계별로. 각 단계는 새 줄에서 "👉"로 시작하고 동작·초/회/세트를 앞쪽에 명시하세요. 단계 사이에는 빈 줄을 넣으세요.' },
@@ -34189,6 +34317,8 @@ window.regenSheetField_ = async function(key, btn){
     '사용자가 방금 수정한 현재 「' + meta.label + '」 내용:',
     (currentValue || '(비어 있음)'), '',
     rewriteHint,
+    draft ? buildSelectedFlowLockBlock_(draft) : '',
+    draft ? buildVideoSceneNotWatchCtaBlock_(draft) : '',
     outputGuide
   ].filter(function(l){ return l != null; }).join('\n');
 
@@ -36928,7 +37058,7 @@ ${hjImgGuide}
 2026년 5~6월 봄·초여름 — 주제·각도에 맞을 때만 계절감(산책·냉방·꽃가루·붓기 등)을 자연스럽게. JSON만 출력:
 {
 "community": {
-"title": "🌿 질문형·공감형 한 줄",
+"title": "${flowJsonTitleHint_(draft, '🌿 질문형·공감형 한 줄')}",
 "problem": "문제 제기 2~4문장. 불릿·번호 없이 자연스럽게. 문장(문단) 사이 빈 줄. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스",
 "selfCare": "👉 로 시작. 동작·자세·초·회·분을 앞쪽에. '시원한 지점에서 멈추기' 뉘앙스",
 "explanation": "원리 설명 2~5문장. 문단 사이 빈 줄. 왜 도움이 되는지+비유+복잡하지 않다는 마무리. 옆집 이웃 톤"
@@ -36961,7 +37091,7 @@ ${imagePromptGuide}
 2026년 봄/초여름 — 주제·각도에 맞을 때만 계절감을 자연스럽게. JSON만 응답:
 {
 "blog": {
-"title": "호기심·질문형 한 줄. 증상형이면 증상+지역·프로그램 키워드를 자연스럽게 (35자 내외, 과장 금지)",
+"title": "${flowJsonTitleHint_(draft, '호기심·질문형 한 줄. 증상형이면 증상+지역·프로그램 키워드를 자연스럽게 (35자 내외, 과장 금지)')}",
 "problem": "문제 제기 2~4문장. 불릿·번호 없이. 문장(문단) 사이 빈 줄. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스",
 "selfCare": "👉 로 시작. 동작·자세·초·회·분을 앞쪽에. '시원한 지점에서 멈추기' 뉘앙스",
 "explanation": "맨 앞 2~3문장 TL;DR(핵심 결론) → 원리 설명+GEO 구조. 문단 사이 빈 줄. 왜 도움이 되는지+비유+복잡하지 않다는 마무리",
@@ -37006,10 +37136,10 @@ ${imagePromptGuide}
 JSON만 응답:
 {
 "blog": {
-"title": "현장에서 궁금해할 테크닉·질문 한 줄 (35자 내외, 과장·낚시 금지)",
-"hook": "이번 영상·사진에서 다룬 장면·맥락 2~3문장",
-"outline": ["시연·테크닉 포인트1","포인트2","주의사항"],
-"draft": "650~1,000자. 테크닉형은 원리·메커니즘·현장 적용, 연수 후기형은 실제 질문·역할의 경계·달라진 관점. 참고·영상·사진 범위 안만",
+"title": "${flowJsonTitleHint_(draft, '무엇이 끝이 아닌지 한 줄 (35자 내외). 목적어가 안 열리는 표현 금지')}",
+"hook": "끝이 아니라는 점과, 누가 어디서 멈추는지 2~3문장. 자막 조각·제작 과정 금지",
+"outline": ["읽을 항목을 한 줄에 하나. 각 줄은 완전한 문장","위·아래·왼쪽·오른쪽·모양·방향을 묶지 말 것"],
+"draft": "650~1,000자. 거기서 멈추면 어떤 정보가 빠지는지. 테크닉형은 원리·현장 적용, 연수 후기형은 실제 질문·역할의 경계. 참고·영상·사진 범위 안만. hook과 같은 문장 반복 금지",
 "cta": "수강·등록 유도 금지. 가벼운 마무리",
 "hashtags": ["태그1","태그2","태그3"]
 },
@@ -37044,6 +37174,8 @@ if(draftRefImages.length){
     prompt += '\n\n[첨부 참고 사진' + (draftRefImages.length > 1 ? ' ' + draftRefImages.length + '장' : '') + '] 사진에 보이는 자세·부위·상황을 topic·본문에 반영하세요. 과장·단정적 진단 표현은 피하세요.';
   }
 }
+
+prompt = appendDraftVoiceLocks_(prompt, draft);
 
 prompt += '\n\n[출력 형식 — 필수]\n응답 전체는 JSON 객체 하나만. 서문·설명·「네」「알겠습니다」금지. 첫 문자 { 마지막 문자 }.';
 

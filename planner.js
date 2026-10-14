@@ -32764,8 +32764,7 @@ function openDetail(draftId, catId, tab, opts) {
     state.activeTab = normalizeSheetTabForCategory_(tab, catId) || state.activeTab;
   }
   document.getElementById('sheet-title').textContent = draft.topic;
-  const pub = state.published[draftId];
-  const content = pub?.content || state.generatedOnly[draftId];
+  const content = getDraftContent_(draftId);
   if(content){
     var beforeLen = (content.images && content.images.gptVisuals) ? content.images.gptVisuals.length : 0;
     normalizeContentImages_(content, catId);
@@ -34106,15 +34105,24 @@ window.copySheetField_ = function(id, btn, isHashtags){
 
 window.copyWholeTab_ = function(btn){
   var draftId = state.selectedId;
-  var content = getDraftContent_(draftId);
-  if(!content){ setAppToast('복사할 내용이 없어요.', { duration: 3000, variant: 'err' }); return; }
-  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
   var tab = state.activeTab;
-  var clone = JSON.parse(JSON.stringify(content));
-  applySheetEditsForTab_(clone, tab);
+  var content = tab === 'blog' ? ensureSheetBlogOnContent_(draftId) : getDraftContent_(draftId);
+  if(!content && tab !== 'blog'){ setAppToast('복사할 내용이 없어요.', { duration: 3000, variant: 'err' }); return; }
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  var clone = content ? JSON.parse(JSON.stringify(content)) : {};
+  if(content) applySheetEditsForTab_(clone, tab);
   var text = '';
   var html = '';
-  if(tab === 'blog') text = buildBlogPasteTextForPublish_(clone.blog, catId);
+  if(tab === 'blog'){
+    text = buildBlogPasteTextForPublish_(clone.blog, catId);
+    if(!String(text || '').trim()){
+      var sheetBlog = readSheetBlogEdits_();
+      if(sheetBlog){
+        clone.blog = sheetBlog;
+        text = buildBlogPasteTextForPublish_(sheetBlog, catId);
+      }
+    }
+  }
   else if(tab === 'community') text = formatCommunityPostText(clone.community);
   else if(tab === 'insta') text = getInstaFullPasteText_(clone.insta, catId);
   else if(tab === 'threads') text = getThreadsFullPasteText_(clone.threads);
@@ -34583,11 +34591,49 @@ function renderAllSelfCareStepPreviews_(){
   });
 }
 
+function blogTextOfContent_(c){
+  var b = c && c.blog;
+  if(!b || typeof b !== 'object' || b._prunedForBoot) return '';
+  return [b.title, b.problem, b.selfCare, b.explanation, b.hook, b.draft, b.cta, (b.outline || []).join('')].map(function(x){
+    return String(x || '').trim();
+  }).join('');
+}
+function usableDraftContent_(c){
+  if(!c || typeof c !== 'object' || c._prunedForBoot) return null;
+  return c;
+}
 function getDraftContent_(draftId){
   if(!draftId) return null;
-  if(state.published[draftId] && state.published[draftId].content) return state.published[draftId].content;
-  if(state.generatedOnly[draftId]) return state.generatedOnly[draftId];
-  return null;
+  var pubWrap = state.published[draftId];
+  var pub = usableDraftContent_(pubWrap && pubWrap.content);
+  var gen = usableDraftContent_(state.generatedOnly[draftId]);
+  if(pub && gen && pub !== gen && !blogTextOfContent_(pub) && blogTextOfContent_(gen)){
+    pub.blog = gen.blog;
+  }
+  if(pub && (blogTextOfContent_(pub) || pub.thread || pub.community || pub.insta || pub.threads || pub.images || pub.news)) return pub;
+  if(gen) return gen;
+  return pub || null;
+}
+function sheetBlogEditsHaveText_(edits){
+  if(!edits) return false;
+  if(edits.title || edits.problem || edits.selfCare || edits.explanation || edits.hook || edits.draft || edits.cta) return true;
+  return !!(edits.outline && edits.outline.length);
+}
+function ensureSheetBlogOnContent_(draftId){
+  var content = getDraftContent_(draftId);
+  var edits = readSheetBlogEdits_();
+  var hasDom = sheetBlogEditsHaveText_(edits);
+  if(!content && hasDom){
+    content = { blog: {} };
+    if(!state.published[draftId]) state.published[draftId] = {};
+    state.published[draftId].content = content;
+    state.generatedOnly[draftId] = content;
+  }
+  if(content && hasDom){
+    if(!content.blog || typeof content.blog !== 'object') content.blog = {};
+    applySheetBlogEdits_(content);
+  }
+  return content;
 }
 
 function persistDraftContent_(draftId, content){
@@ -35288,12 +35334,12 @@ window.onSheetDraftSave_ = function(){
     setAppToast('먼저 초안 카드를 선택해 주세요.', { duration: 3500, variant: 'err' });
     return;
   }
-  var content = getDraftContent_(draftId);
+  var tab = state.activeTab;
+  var content = tab === 'blog' ? ensureSheetBlogOnContent_(draftId) : getDraftContent_(draftId);
   if(!content){
     setAppToast('저장할 초안이 없어요. 먼저 초안을 생성해 주세요.', { duration: 4000, variant: 'err' });
     return;
   }
-  var tab = state.activeTab;
   applySheetEditsForTab_(content, tab);
   if(isDailyShareCategory(state.selectedCatId)) persistSheetDailyFactsToDraft_();
   persistDraftContent_(draftId, content);
@@ -35358,12 +35404,11 @@ window.onSheetPublishComplete = async function(){
       openApiModal();
       return;
     }
-    var content = getDraftContent_(draftId);
-    if(!content || !content.blog){
+    var content = ensureSheetBlogOnContent_(draftId);
+    if(!content || !content.blog || !blogTextOfContent_(content)){
       setAppToast('블로그 초안이 없어요. 먼저 초안을 생성해 주세요.', { duration: 4000, variant: 'err' });
       return;
     }
-    applySheetBlogEdits_(content);
     if(!blogHasMinimumContent_(catId, content.blog)){
       setAppToast('제목과 문제 제기·셀프 케어(또는 본문)를 입력해 주세요.', { duration: 4000, variant: 'err' });
       return;

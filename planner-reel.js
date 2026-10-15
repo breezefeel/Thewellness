@@ -5,7 +5,7 @@
  * 3) 영상·사진 여러 개 · 릴스 적합 구간 자동 제안 · 이어붙이기
  * 4) 긴 영상/복수 영상에서 후보 구간만 잘라 하나로 합치기
  *
- * 얼굴 가림은 여기서 하지 않는다. 기준은 마케팅_전략.md 6절.
+ * 얼굴 가림은 여기서 하지 않는다. 문장·훅·썸네일 기준은 콘텐츠_기준.md.
  * 2026-10-13부터 새로 굽는 영상만, 다른 얼굴은 네모 픽셀이 아니라 얼굴 크기의 부드러운 흐림.
  * 이미 만든 영상은 다시 굽지 않는다.
  */
@@ -92,7 +92,7 @@
     if (word && String(reel.top2 || '').indexOf(word) < 0) {
       return '앰버로 칠할 단어가 2줄에 없습니다. 2줄에 그대로 있는 단어만 색이 바뀝니다.';
     }
-    return '1줄은 작게, 2줄은 더 크게. 앰버는 2줄 안의 그 단어만. 저장하면 훅만 있는 썸네일 jpg가 같이 받아집니다. 하단 멘트는 재생이 시작된 뒤에 나옵니다.';
+    return '1줄은 작게, 2줄은 더 크게. 앰버는 2줄 안의 그 단어만. 저장하면 훅만 있는 썸네일 jpg가 같이 받아집니다. 하단 멘트는 재생이 시작된 뒤에 나옵니다. 문장 기준은 콘텐츠_기준.md.';
   }
 
   function parseTime(str) {
@@ -622,12 +622,23 @@
   function hookPositions_(lay) {
     var gap = 36;
     var block = HOOK1_FS + gap + HOOK2_FS;
+    var y1;
+    var y2;
     if (lay.topPad >= block + 40) {
-      var y1 = Math.round((lay.topPad - block) / 2 + HOOK1_FS / 2);
-      var y2 = y1 + Math.round(HOOK1_FS / 2 + gap + HOOK2_FS / 2);
-      return { y1: y1, y2: y2 };
+      y1 = Math.round((lay.topPad - block) / 2 + HOOK1_FS / 2);
+      y2 = y1 + Math.round(HOOK1_FS / 2 + gap + HOOK2_FS / 2);
+    } else {
+      y1 = 78;
+      y2 = 176;
     }
-    return { y1: 78, y2: 176 };
+    // Profile grid cuts about the top 240px. Keep the first line's ink under y=330.
+    var minY1 = 330 + Math.round(HOOK1_FS / 2);
+    if (y1 < minY1) {
+      var shift = minY1 - y1;
+      y1 += shift;
+      y2 += shift;
+    }
+    return { y1: y1, y2: y2 };
   }
 
   function drawReelFrame(ctx, timelineT, outT, opts) {

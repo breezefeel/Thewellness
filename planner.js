@@ -25451,8 +25451,39 @@ const PLANNER_SYNC_PULL_TIMEOUT_MS = 60000;
 const PLANNER_SYNC_META_TIMEOUT_MS = 45000;
 const CLAUDE_PLANNER_MODEL = 'claude-sonnet-4-6';
 
+var CONTENT_GUIDE_TEXT_ = '';
+var CONTENT_GUIDE_PROMISE_ = null;
+function loadContentGuide_(){
+  if(CONTENT_GUIDE_PROMISE_) return CONTENT_GUIDE_PROMISE_;
+  if(location.protocol === 'file:'){
+    CONTENT_GUIDE_PROMISE_ = Promise.resolve('');
+    return CONTENT_GUIDE_PROMISE_;
+  }
+  CONTENT_GUIDE_PROMISE_ = fetch('콘텐츠_기준.md', { cache: 'no-cache' }).then(function(res){
+    if(!res.ok) return '';
+    return res.text();
+  }).then(function(text){
+    CONTENT_GUIDE_TEXT_ = String(text || '').trim();
+    return CONTENT_GUIDE_TEXT_;
+  }).catch(function(){
+    CONTENT_GUIDE_TEXT_ = '';
+    return '';
+  });
+  return CONTENT_GUIDE_PROMISE_;
+}
+function withContentGuide_(prompt){
+  var guide = String(CONTENT_GUIDE_TEXT_ || '').trim();
+  var body = String(prompt || '');
+  if(!guide || body.indexOf('[콘텐츠 기준]') === 0) return body;
+  return '[콘텐츠 기준 — 콘텐츠_기준.md]\n' + guide + '\n\n---\n\n' + body;
+}
+
 async function callClaudePlanner_(prompt, options){
   options = options || {};
+  if(!options.skipContentGuide){
+    await loadContentGuide_();
+    prompt = withContentGuide_(prompt);
+  }
   if(state.plannerClaudeEnabled){
     var gasUrl = getPlannerGasUrl_();
     if(!gasUrl || location.protocol === 'file:') throw new Error('서버 AI는 웹 배포 페이지에서 사용할 수 있어요.');

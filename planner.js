@@ -24735,6 +24735,91 @@ function regenOpsReview_(itemId, branchId){
 }
 window.regenOpsReview_ = regenOpsReview_;
 
+function getCatProgramSearchLabel_(catId){
+  catId = parseInt(catId, 10);
+  var cat = CATEGORIES[catId];
+  if(!cat) return '';
+  var name = (catId === LIFE_HEALTH_HOST_CAT) ? LIFE_HEALTH_LABEL : (CAT_TAB_SHORT[catId] || cat.name);
+  if(getCatGroupKeyForCat_(catId) === 'expert') return '전문가용 · ' + name;
+  if(getCatGroupKeyForCat_(catId) === 'ops') return '지점브랜딩 · ' + name;
+  return '일반인용 · ' + name;
+}
+function draftSearchPlaceLabel_(d, catId){
+  if(!d || !d.id) return '';
+  if(draftShowsOnPublishedList_(d.id, catId)) return '완료 글';
+  if(draftIsShelfEmpty_(d, catId)) return '기획';
+  return '준비 글';
+}
+function pushDraftSearchBit_(parts, value){
+  if(value == null) return;
+  if(typeof value !== 'string' && typeof value !== 'number') return;
+  var s = String(value).trim();
+  if(!s || s.length > 20000) return;
+  parts.push(s);
+}
+function draftSearchText_(d){
+  var parts = [];
+  if(!d) return '';
+  pushDraftSearchBit_(parts, d.topic);
+  pushDraftSearchBit_(parts, d.angle);
+  pushDraftSearchBit_(parts, d.series);
+  pushDraftSearchBit_(parts, d.rationale);
+  pushDraftSearchBit_(parts, d.pillar);
+  pushDraftSearchBit_(parts, d.dailyThought);
+  pushDraftSearchBit_(parts, d.dailyWho);
+  pushDraftSearchBit_(parts, d.dailyWhat);
+  var pub = d.id && state.published ? state.published[d.id] : null;
+  if(pub) pushDraftSearchBit_(parts, pub.topic);
+  var content = null;
+  if(pub && pub.content && !pub.content._prunedForBoot) content = pub.content;
+  else if(d.id && state.generatedOnly && state.generatedOnly[d.id] && !state.generatedOnly[d.id]._prunedForBoot){
+    var generated = state.generatedOnly[d.id];
+    content = (generated.content && !generated.content._prunedForBoot) ? generated.content : generated;
+  }
+  if(content && content.blog){
+    pushDraftSearchBit_(parts, content.blog.title);
+    pushDraftSearchBit_(parts, content.blog.hook);
+    pushDraftSearchBit_(parts, content.blog.draft);
+    pushDraftSearchBit_(parts, content.blog.problem);
+    pushDraftSearchBit_(parts, content.blog.selfCare);
+    pushDraftSearchBit_(parts, content.blog.explanation);
+  }
+  if(content && content.insta){
+    pushDraftSearchBit_(parts, content.insta.hook);
+    pushDraftSearchBit_(parts, content.insta.caption);
+  }
+  if(pub && pub.finalTexts){
+    Object.keys(pub.finalTexts).forEach(function(key){
+      pushDraftSearchBit_(parts, pub.finalTexts[key]);
+    });
+  }
+  return parts.join('\n');
+}
+function collectTopicSearchHits_(q){
+  q = String(q || '').trim();
+  if(!q) return [];
+  var hits = [];
+  var seen = {};
+  CATEGORIES.forEach(function(cat){
+    if(!cat || !cat.drafts) return;
+    cat.drafts.forEach(function(d, index){
+      if(!d || !d.id || seen[d.id]) return;
+      if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
+      if(draftSearchText_(d).indexOf(q) < 0) return;
+      seen[d.id] = true;
+      hits.push({ d: d, cat: cat, index: index });
+    });
+  });
+  var current = state.currentCat;
+  hits.sort(function(a, b){
+    var aCurrent = a.cat.id === current ? 0 : 1;
+    var bCurrent = b.cat.id === current ? 0 : 1;
+    if(aCurrent !== bCurrent) return aCurrent - bCurrent;
+    return a.cat.id - b.cat.id;
+  });
+  return hits;
+}
+
 function renderMain(opts) {
   opts = opts || {};
   if(!opts.force && isImeComposing_()){
@@ -24770,49 +24855,26 @@ function renderMain(opts) {
 
   const searchHTML = `
     <div class="search-wrap">
-      <input class="search-input" value="${escapeHtml(state.searchQ)}" oninput="setSearch(this.value)" placeholder="주제 검색..." />
+      <input class="search-input" value="${escapeHtml(state.searchQ)}" oninput="setSearch(this.value)" placeholder="모든 프로그램에서 주제 검색..." />
     </div>`;
 
   var bodyHTML = '';
-  var listHead = renderTopicListModeBarHTML_(state.currentCat);
   if(state.searchQ && String(state.searchQ).trim()){
-    var q = state.searchQ;
-    function draftMatchesSearch_(d){
-      if(!d) return false;
-      return (d.topic || '').includes(q) || (d.angle || '').includes(q) ||
-        (d.series && d.series.includes(q)) || (d.rationale && d.rationale.includes(q)) ||
-        (d.pillar && d.pillar.includes(q)) ||
-        (d.dailyThought && String(d.dailyThought).includes(q)) ||
-        (d.dailyWho && String(d.dailyWho).includes(q)) ||
-        (d.dailyWhat && String(d.dailyWhat).includes(q));
-    }
-    var hitPairs = [];
-    (cat.drafts || []).forEach(function(d){
-      if(!draftMatchesSearch_(d)) return;
-      hitPairs.push({ d: d, cat: cat });
-    });
-    if(isHeiljagyaeCategory(state.currentCat)){
-      var dailyCatObj = CATEGORIES[LIFE_HEALTH_DAILY_CAT];
-      ((dailyCatObj && dailyCatObj.drafts) || []).forEach(function(d){
-        if(!draftMatchesSearch_(d)) return;
-        hitPairs.push({ d: d, cat: dailyCatObj });
-      });
-    }
-    hitPairs = hitPairs.filter(function(pair){
-      var cid = pair.cat.id;
-      if(getTopicListMode_() === 'plan'){
-        return draftShowsOnPublishedList_(pair.d.id, cid) || !draftIsShelfEmpty_(pair.d, cid);
-      }
-      return draftMatchesTopicListMode_(pair.d, cid);
-    });
-    bodyHTML = listHead +
+    var q = String(state.searchQ).trim();
+    var hitPairs = collectTopicSearchHits_(q);
+    bodyHTML =
+      '<p class="search-scope-note">전체 프로그램 ' + hitPairs.length + '건</p>' +
       '<div class="cards-wrap search-results topic-lines">' +
       (hitPairs.length ? hitPairs.map(function(pair){
-        return draftCardHTML(pair.d, pair.cat, false, pair.cat.drafts.indexOf(pair.d), false);
+        return draftCardHTML(pair.d, pair.cat, false, pair.index, false, {
+          programLabel: getCatProgramSearchLabel_(pair.cat.id),
+          placeLabel: draftSearchPlaceLabel_(pair.d, pair.cat.id)
+        });
       }).join('') :
-        '<div class="empty-note">검색 결과가 없어요</div>') +
+        '<div class="empty-note">모든 프로그램에서 「' + escapeHtml(q) + '」에 맞는 주제가 없어요</div>') +
     '</div>';
   } else {
+    var listHead = renderTopicListModeBarHTML_(state.currentCat);
     var planPanel = getTopicListMode_() === 'plan'
       ? renderPlanLayersHTML_(state.currentCat)
       : (isDailyShareCategory(state.currentCat)
@@ -24830,7 +24892,7 @@ function renderMain(opts) {
   }
 }
 
-function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
+function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
   const pub = state.published[d.id];
   const hasDraft = draftIsPendingPublish_(d);
   const isPub = draftIsPublished_(d.id);
@@ -24904,12 +24966,19 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries) {
         orderBtns +
       '</div>' +
     '</div>';
+  var searchWhereHtml = '';
+  if(cardOpts && cardOpts.programLabel){
+    searchWhereHtml = '<div class="search-hit-where">' + escapeHtml(cardOpts.programLabel) +
+      (cardOpts.placeLabel ? '<span class="search-hit-place">' + escapeHtml(cardOpts.placeLabel) + '</span>' : '') +
+      '</div>';
+  }
   var stepIdAttr = '';
   try {
     var sidAttr = getDraftRoadmapStepId_(d, cat.id, draftIndex);
     if(sidAttr) stepIdAttr = ' data-step-id="' + escapeHtml(String(sidAttr)) + '"';
   } catch(eSid){}
   return `<div class="draft-card topic-line plan-tier-topic${isPub?' published':''}${isPartialPub?' partial-published':''}${isRec?' recommended':''}" data-plan-tier="4" data-draft-id="${escapeHtml(d.id)}" data-cat-id="${cat.id}"${stepIdAttr} draggable="true" style="--cc:${color}" tabindex="0" role="button" aria-label="${escapeHtml(lineTitle)}" onclick="onTopicCardClick_(event,'${d.id}',${cat.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openDetail('${d.id}',${cat.id});}">
+    ${searchWhereHtml}
     <div class="topic-line-row">
       <span class="topic-drag-handle" title="끌어서 단계 이동" aria-hidden="true">⠿</span>
       <div class="card-topic">${escapeHtml(lineTitle)}</div>

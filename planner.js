@@ -15291,6 +15291,37 @@ function isEmptyDefaultSyncEntity_(key, val){
   if(key.indexOf('plan:year:period:') === 0) return !periodHasYearGoalText_(v);
   return false;
 }
+/** 팀으로 오가는 작업. 화면 너비와 관계없이 이 함수만 보고 남긴다. */
+function plannerTeamContentKey_(key){
+  key = String(key || '');
+  return key.indexOf('draft:') === 0 ||
+    key.indexOf('generated:') === 0 ||
+    key.indexOf('published:') === 0 ||
+    key.indexOf('plan:') === 0;
+}
+function plannerTeamContentOp_(op){
+  if(!op || !op.key || op.deleted || isDeviceLocalSyncEntityKey_(op.key)) return false;
+  var key = String(op.key);
+  if(!plannerTeamContentKey_(key)) return false;
+  if(isEmptyDefaultSyncEntity_(key, op.value)) return false;
+  if(key.indexOf('draft:') === 0) return draftRowHasUserText_(op.value);
+  if(key.indexOf('generated:') === 0 || key.indexOf('published:') === 0) return !syncValueIsPruned_(op.value);
+  return true;
+}
+function plannerOutboxHasTeamContent_(){
+  return (state.syncOutbox || []).some(plannerTeamContentOp_);
+}
+function keepPlannerTeamOutbox_(){
+  var kept = (state.syncOutbox || []).filter(plannerTeamContentOp_);
+  state.syncOutbox = kept;
+  state.syncDirtyEntityKeys = {};
+  kept.forEach(function(op){ if(op && op.key) state.syncDirtyEntityKeys[op.key] = true; });
+  state.syncNeedsSnapshot = false;
+  state.syncDirty = kept.length > 0;
+  state._sessionUserEdit = kept.length > 0;
+  if(kept.length) rebuildDirtyStateFromOutbox_();
+  return kept.length;
+}
 function collectSyncEntities_(payload, opts){
   payload = payload || {};
   // 병합·충돌 비교 중 반복 호출 시 id 마이그레이션까지 돌리면 대용량에서 메인 스레드가 멈춤
@@ -15852,7 +15883,7 @@ function countRealUnpushedMutations_(){
 }
 /** 이전 세션 잔재(794건 루프)는 올리지 않음. 이 세션에서 고친 것만 푸시. */
 function shouldBlockStaleFloodPush_(){
-  if(outboxHasUserDraftUpload_()) return false;
+  if(plannerOutboxHasTeamContent_()) return false;
   if(state._emptyServerSeed && state.syncNeedsSnapshot) return false;
   if(state._sessionUserEdit) return false;
   return countRealUnpushedMutations_() > REAL_UNPUSHED_PUSH_MAX_;
@@ -16046,14 +16077,7 @@ function discardStaleUnpushedBeforeConnect_(){
   if(n > 0 && n <= REAL_UNPUSHED_PUSH_MAX_){
     // 데스크탑에 남아 있는 전송은 새로고침마다 「전체」로 다시 도는 잔재. 폰이 맞춘 서버를 받는다.
     if(isPlannerDesktopBrowser_()){
-      var keptDrafts = (state.syncOutbox || []).filter(isUserContentSyncOp_);
-      state.syncOutbox = keptDrafts;
-      state.syncDirtyEntityKeys = {};
-      keptDrafts.forEach(function(op){ state.syncDirtyEntityKeys[op.key] = true; });
-      state.syncNeedsSnapshot = false;
-      state.syncDirty = keptDrafts.length > 0;
-      state._sessionUserEdit = keptDrafts.length > 0;
-      if(keptDrafts.length) rebuildDirtyStateFromOutbox_();
+      keepPlannerTeamOutbox_();
       return;
     }
     state._sessionUserEdit = true;
@@ -17099,11 +17123,7 @@ function syncValueIsPruned_(val){
   return false;
 }
 function isUserContentSyncOp_(op){
-  if(!op || op.deleted || !op.key) return false;
-  var key = String(op.key);
-  if(key.indexOf('draft:') === 0) return draftRowHasUserText_(op.value);
-  if(key.indexOf('generated:') === 0 || key.indexOf('published:') === 0) return !syncValueIsPruned_(op.value);
-  return false;
+  return plannerTeamContentOp_(op);
 }
 function localHasSyncedContentKey_(key){
   key = String(key || '');
@@ -17119,11 +17139,11 @@ function localHasSyncedContentKey_(key){
   return false;
 }
 function outboxHasUserDraftUpload_(){
-  return (state.syncOutbox || []).some(isUserContentSyncOp_);
+  return plannerOutboxHasTeamContent_();
 }
 function schedulePlannerGasPush_(immediate){
   if(!plannerSyncBootstrapReady_ || !state._bootstrapChoiceDone || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return;
-  if(isPlannerDesktopBrowser_() && !state._sessionUserEdit && hasPendingLocalSyncChanges_() && !outboxHasUserDraftUpload_()){
+  if(isPlannerDesktopBrowser_() && !state._sessionUserEdit && hasPendingLocalSyncChanges_() && !plannerOutboxHasTeamContent_()){
     state.syncOutbox = [];
     state.syncDirtyEntityKeys = {};
     state.syncNeedsSnapshot = false;
@@ -18323,8 +18343,8 @@ function getSyncStatusInfo_(remoteMeta){
       (state._topicListGapCount ? ' (' + state._topicListGapCount + '건).' : '.');
     actionHint = '이 기기에 없는 주제는 서버에서 받고, 이 기기에만 있는 주제는 서버로 올립니다.';
   } else if(phase === 'pending'){
-    summary = outboxHasUserDraftUpload_()
-      ? '이 기기에만 있는 주제를 서버로 올리는 중이에요. 올린 뒤 다른 기기가 받습니다.'
+    summary = plannerOutboxHasTeamContent_()
+      ? '이 기기에만 있는 주제·초안·기획을 서버로 올리는 중이에요. 올린 뒤 다른 기기가 받습니다.'
       : ('이 기기 변경이 아직 Supabase에 반영되지 않았어요' +
       (pendingCount ? ' (남은 약 ' + pendingCount + '건)' : '') + '.');
     actionHint = '자동으로 올라갑니다. 오래 멈추면 「동기화」→「지금 동기화」를 누르세요.';
@@ -21208,12 +21228,15 @@ function applyPersistPayload(s, opts){
   if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrated){
     var desktopReceiveOnly = isPlannerDesktopBrowser_() && !state._sessionUserEdit;
-    if((opts && opts.authoritativeAdopt) || desktopReceiveOnly){
+    if(opts && opts.authoritativeAdopt){
       state._postAdoptMigration = true;
       state.syncNeedsSnapshot = false;
       state.syncDirty = false;
       state.syncDirtyEntityKeys = {};
       state.syncOutbox = [];
+    } else if(desktopReceiveOnly){
+      state._postAdoptMigration = true;
+      keepPlannerTeamOutbox_();
     } else {
       state.syncDirty = true;
       state.syncNeedsSnapshot = true;

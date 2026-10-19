@@ -101,14 +101,80 @@ var PlannerSyncSupabase = (function(){
           return next();
         });
     }
+    function loadDraftIndex(){
+      var index = [];
+      var indexFrom = 0;
+      function nextIndex(){
+        return client.from('planner_entities')
+          .select('key,revision,deleted,updated_at,change_seq')
+          .like('key', 'draft:%')
+          .order('key', { ascending: true })
+          .range(indexFrom, indexFrom + page - 1)
+          .then(function(res){
+            if(res.error) throw new Error(res.error.message || '주제 목록을 읽지 못했습니다.');
+            var chunk = res.data || [];
+            index = index.concat(chunk);
+            if(chunk.length < page) return index;
+            indexFrom += page;
+            return nextIndex();
+          });
+      }
+      return nextIndex();
+    }
+    function loadDraftRows(keys){
+      var extra = [];
+      var i = 0;
+      function nextKeys(){
+        if(i >= keys.length) return Promise.resolve(extra);
+        var batch = keys.slice(i, i + 40);
+        i += 40;
+        return client.from('planner_entities')
+          .select('key,value,revision,deleted,updated_at,change_seq')
+          .in('key', batch)
+          .then(function(res){
+            if(res.error) throw new Error(res.error.message || '빠진 주제를 읽지 못했습니다.');
+            extra = extra.concat(res.data || []);
+            return nextKeys();
+          });
+      }
+      return nextKeys();
+    }
     return next().then(function(){
-      var emptyTable = since === 0 && !rows.length;
+      return loadDraftIndex();
+    }).then(function(index){
+      var localIds = (typeof listLocalUserDraftIds_ === 'function') ? listLocalUserDraftIds_() : {};
+      var have = {};
+      rows.forEach(function(row){ if(row && row.key) have[row.key] = true; });
+      var need = [];
+      (index || []).forEach(function(row){
+        if(!row || !row.key || have[row.key]) return;
+        var id = String(row.key).slice('draft:'.length);
+        if(row.deleted){
+          if(localIds[id]) need.push(row.key);
+          return;
+        }
+        if(!localIds[id]) need.push(row.key);
+      });
+      return loadDraftRows(need).then(function(extra){
+        rows = rows.concat(extra || []);
+        return index;
+      });
+    }).then(function(index){
+      var emptyTable = since === 0 && !rows.length && !(index && index.length);
       var applied = { conflicts: [] };
       if(typeof applySupabaseEntityRows_ === 'function'){
         applied = applySupabaseEntityRows_(rows) || applied;
       }
+      var topicGap = false;
+      if(typeof finishTopicListCheck_ === 'function'){
+        topicGap = !!finishTopicListCheck_(index);
+      }
       var maxSeq = since;
       rows.forEach(function(row){
+        var seq = parseInt(row.change_seq, 10) || 0;
+        if(seq > maxSeq) maxSeq = seq;
+      });
+      (index || []).forEach(function(row){
         var seq = parseInt(row.change_seq, 10) || 0;
         if(seq > maxSeq) maxSeq = seq;
       });
@@ -120,6 +186,7 @@ var PlannerSyncSupabase = (function(){
         result: 'success',
         supabaseApplied: true,
         emptyTable: emptyTable,
+        topicGap: topicGap,
         serverRevision: maxSeq,
         savedAt: new Date().toISOString(),
         payload: null,

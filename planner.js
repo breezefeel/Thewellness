@@ -11505,6 +11505,43 @@ function noteSupabaseAcceptedRevisions_(accepted){
     if(rev) state.syncEntityRevisions[item.key] = rev;
   });
 }
+function listLocalUserDraftIds_(){
+  var ids = {};
+  var deleted = state.deletedDraftIds || {};
+  CATEGORIES.forEach(function(cat){
+    (cat.drafts || []).forEach(function(d){
+      if(d && isUserAddedDraftId_(d.id) && !deleted[d.id]) ids[d.id] = true;
+    });
+  });
+  return ids;
+}
+function finishTopicListCheck_(index){
+  var local = listLocalUserDraftIds_();
+  var serverLive = {};
+  var serverDeleted = {};
+  (index || []).forEach(function(row){
+    if(!row || !row.key || String(row.key).indexOf('draft:') !== 0) return;
+    var id = String(row.key).slice('draft:'.length);
+    if(row.deleted) serverDeleted[id] = true;
+    else serverLive[id] = true;
+  });
+  var missingHere = [];
+  Object.keys(serverLive).forEach(function(id){
+    if(!local[id]) missingHere.push(id);
+  });
+  var onlyHere = [];
+  Object.keys(local).forEach(function(id){
+    if(serverDeleted[id] || serverLive[id]) return;
+    onlyHere.push(id);
+  });
+  var stillDeleted = Object.keys(local).filter(function(id){ return !!serverDeleted[id]; });
+  if(onlyHere.length){
+    enqueueSyncOutboxChanges_(onlyHere.map(function(id){ return 'draft:' + id; }), getPersistPayload());
+  }
+  state._topicListGap = !!(missingHere.length || onlyHere.length || stillDeleted.length);
+  state._topicListGapCount = missingHere.length + onlyHere.length + stillDeleted.length;
+  return state._topicListGap;
+}
 function applySupabaseEntityRows_(rows){
   rows = rows || [];
   var payload = getPersistPayload();
@@ -18041,6 +18078,7 @@ function formatSyncHeaderSub_(info){
   if(info.phase === 'pending'){
     return left || '반영 대기';
   }
+  if(info.phase === 'topic_gap') return '주제 다름';
   if(info.overall === 'ok') return '최신 · ' + info.localRev;
   if(info.overall === 'warn') return left ? ('다시 시도 · ' + left) : '확인 필요';
   return String(info.localRev || '');
@@ -18152,6 +18190,9 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(serverOn && !state._bootstrapChoiceDone && isPlannerEmployeeEmailValid_(getPlannerEmployeeId_())){
     phase = 'checking';
     overall = 'syncing';
+  } else if(state._topicListGap){
+    phase = 'topic_gap';
+    overall = 'pending';
   }
 
   var loginRequired = !!state._teamLoginRequired;
@@ -18193,6 +18234,10 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(phase === 'pull'){
     summary = 'Supabase에 이 기기보다 최신 내용(rev ' + remoteRev + ')이 있어요.';
     actionHint = '「동기화」버튼을 누른 뒤 「지금 동기화」로 받아오세요.';
+  } else if(phase === 'topic_gap'){
+    summary = '주제 목록이 서버와 다릅니다. 번호가 같아도 최신으로 두지 않고, 빠진 주제를 맞추는 중이에요' +
+      (state._topicListGapCount ? ' (' + state._topicListGapCount + '건).' : '.');
+    actionHint = '이 기기에 없는 주제는 서버에서 받고, 이 기기에만 있는 주제는 서버로 올립니다.';
   } else if(phase === 'pending'){
     summary = '이 기기 변경이 아직 Supabase에 반영되지 않았어요' +
       (pendingCount ? ' (남은 약 ' + pendingCount + '건)' : '') + '.';
@@ -18208,7 +18253,7 @@ function getSyncStatusInfo_(remoteMeta){
       actionHint = '「동기화」창에서 상태를 확인한 뒤 「지금 동기화」를 시도해 주세요.';
     }
   } else {
-    summary = '이 기기와 Supabase가 같은 revision으로 맞춰져 있어요.';
+    summary = '주제 목록과 변경 내용이 Supabase와 같습니다.';
     actionHint = '할 일 없음. 변경이 생기면 자동으로 반영됩니다.';
   }
 
@@ -18882,7 +18927,9 @@ async function runPlannerBootstrapInBackground_(){
       if(typeof setAppToast === 'function'){
         setAppToast(bootstrapData.emptyTable
           ? 'Supabase에 아직 팀 내용이 없습니다. 이 브라우저의 내용은 올리지 않았습니다.'
-          : 'Supabase 내용을 이 기기에 맞췄어요.', { duration: 5200, variant: 'ok' });
+          : (bootstrapData.topicGap
+            ? '주제 목록이 서버와 달라 최신으로 두지 않았습니다. 빠진 주제를 맞추는 중이에요.'
+            : '주제 목록을 Supabase와 맞췄어요.'), { duration: 5200, variant: 'ok' });
       }
       return;
     }

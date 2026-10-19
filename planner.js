@@ -11519,9 +11519,15 @@ function finishTopicListCheck_(index){
   var local = listLocalUserDraftIds_();
   var serverLive = {};
   var serverDeleted = {};
+  var serverLiveContent = {};
+  var serverDeletedContent = {};
   (index || []).forEach(function(row){
-    if(!row || !row.key || String(row.key).indexOf('draft:') !== 0) return;
-    var id = String(row.key).slice('draft:'.length);
+    if(!row || !row.key) return;
+    var key = String(row.key);
+    if(row.deleted) serverDeletedContent[key] = true;
+    else serverLiveContent[key] = true;
+    if(key.indexOf('draft:') !== 0) return;
+    var id = key.slice('draft:'.length);
     if(row.deleted) serverDeleted[id] = true;
     else serverLive[id] = true;
   });
@@ -11535,18 +11541,32 @@ function finishTopicListCheck_(index){
     onlyHere.push(id);
   });
   var stillDeleted = Object.keys(local).filter(function(id){ return !!serverDeleted[id]; });
-  if(onlyHere.length){
+  var uploadKeys = onlyHere.map(function(id){ return 'draft:' + id; });
+  function queueLocalContent_(prefix, ids){
+    Object.keys(ids || {}).forEach(function(id){
+      var key = prefix + id;
+      if(serverDeletedContent[key] || serverLiveContent[key]) return;
+      if(!localHasSyncedContentKey_(key)) return;
+      uploadKeys.push(key);
+    });
+  }
+  queueLocalContent_('generated:', state.generatedOnly);
+  queueLocalContent_('published:', state.published);
+  if(uploadKeys.length){
     state._sessionUserEdit = true;
-    enqueueSyncOutboxChanges_(onlyHere.map(function(id){ return 'draft:' + id; }), getPersistPayload());
-    onlyHere.forEach(function(id){
-      var key = 'draft:' + id;
+    enqueueSyncOutboxChanges_(uploadKeys, getPersistPayload());
+    uploadKeys.forEach(function(key){
       (state.syncOutbox || []).forEach(function(op){
         if(op && op.key === key) op.baseEntityRevision = 0;
       });
     });
   }
-  state._topicListGap = !!(missingHere.length || stillDeleted.length);
-  state._topicListGapCount = missingHere.length + stillDeleted.length;
+  var missingContent = Object.keys(serverLiveContent).filter(function(key){
+    if(key.indexOf('generated:') !== 0 && key.indexOf('published:') !== 0) return false;
+    return !localHasSyncedContentKey_(key);
+  });
+  state._topicListGap = !!(missingHere.length || stillDeleted.length || missingContent.length);
+  state._topicListGapCount = missingHere.length + stillDeleted.length + missingContent.length;
   return state._topicListGap;
 }
 function applySupabaseEntityRows_(rows){
@@ -16026,9 +16046,7 @@ function discardStaleUnpushedBeforeConnect_(){
   if(n > 0 && n <= REAL_UNPUSHED_PUSH_MAX_){
     // 데스크탑에 남아 있는 전송은 새로고침마다 「전체」로 다시 도는 잔재. 폰이 맞춘 서버를 받는다.
     if(isPlannerDesktopBrowser_()){
-      var keptDrafts = (state.syncOutbox || []).filter(function(op){
-        return op && !op.deleted && /^draft:/.test(String(op.key || '')) && draftRowHasUserText_(op.value);
-      });
+      var keptDrafts = (state.syncOutbox || []).filter(isUserContentSyncOp_);
       state.syncOutbox = keptDrafts;
       state.syncDirtyEntityKeys = {};
       keptDrafts.forEach(function(op){ state.syncDirtyEntityKeys[op.key] = true; });
@@ -17072,10 +17090,36 @@ function pruneOrphanSubGoalStepOutbox_(){
     }
   }
 }
+function syncValueIsPruned_(val){
+  var row = unwrapSyncEntityValue_(val);
+  if(row && row.value && typeof row.value === 'object') row = row.value;
+  if(!row || typeof row !== 'object') return false;
+  if(row._prunedForBoot) return true;
+  if(row.content && row.content._prunedForBoot) return true;
+  return false;
+}
+function isUserContentSyncOp_(op){
+  if(!op || op.deleted || !op.key) return false;
+  var key = String(op.key);
+  if(key.indexOf('draft:') === 0) return draftRowHasUserText_(op.value);
+  if(key.indexOf('generated:') === 0 || key.indexOf('published:') === 0) return !syncValueIsPruned_(op.value);
+  return false;
+}
+function localHasSyncedContentKey_(key){
+  key = String(key || '');
+  if(key.indexOf('draft:') === 0) return !!listLocalUserDraftIds_()[key.slice('draft:'.length)];
+  if(key.indexOf('generated:') === 0){
+    var generated = (state.generatedOnly || {})[key.slice('generated:'.length)];
+    return !!(generated && !syncValueIsPruned_(generated));
+  }
+  if(key.indexOf('published:') === 0){
+    var published = (state.published || {})[key.slice('published:'.length)];
+    return !!(published && !syncValueIsPruned_(published));
+  }
+  return false;
+}
 function outboxHasUserDraftUpload_(){
-  return (state.syncOutbox || []).some(function(op){
-    return op && !op.deleted && /^draft:/.test(String(op.key || '')) && draftRowHasUserText_(op.value);
-  });
+  return (state.syncOutbox || []).some(isUserContentSyncOp_);
 }
 function schedulePlannerGasPush_(immediate){
   if(!plannerSyncBootstrapReady_ || !state._bootstrapChoiceDone || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return;
@@ -17341,7 +17385,8 @@ async function plannerGasPushNow_(){
       data.conflicts.forEach(function(conflict){
         var conflictRev = parseInt(conflict && conflict.serverEntityRevision, 10) || 0;
         if(!conflict || conflict.serverDeleted || conflictRev !== 0) return;
-        if(String(conflict.key || '').indexOf('draft:') !== 0) return;
+        var conflictKey = String(conflict.key || '');
+        if(conflictKey.indexOf('draft:') !== 0 && conflictKey.indexOf('generated:') !== 0 && conflictKey.indexOf('published:') !== 0) return;
         (state.syncOutbox || []).forEach(function(op){
           if(!op || op.key !== conflict.key) return;
           if((parseInt(op.baseEntityRevision, 10) || 0) !== 0){

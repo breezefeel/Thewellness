@@ -101,17 +101,17 @@ var PlannerSyncSupabase = (function(){
           return next();
         });
     }
-    function loadDraftIndex(){
+    function loadPrefixIndex(prefix){
       var index = [];
       var indexFrom = 0;
       function nextIndex(){
         return client.from('planner_entities')
           .select('key,revision,deleted,updated_at,change_seq')
-          .like('key', 'draft:%')
+          .like('key', prefix + '%')
           .order('key', { ascending: true })
           .range(indexFrom, indexFrom + page - 1)
           .then(function(res){
-            if(res.error) throw new Error(res.error.message || '주제 목록을 읽지 못했습니다.');
+            if(res.error) throw new Error(res.error.message || '주제와 초안 목록을 읽지 못했습니다.');
             var chunk = res.data || [];
             index = index.concat(chunk);
             if(chunk.length < page) return index;
@@ -121,13 +121,22 @@ var PlannerSyncSupabase = (function(){
       }
       return nextIndex();
     }
+    function loadDraftIndex(){
+      return loadPrefixIndex('draft:').then(function(drafts){
+        return loadPrefixIndex('generated:').then(function(generated){
+          return loadPrefixIndex('published:').then(function(published){
+            return drafts.concat(generated).concat(published);
+          });
+        });
+      });
+    }
     function loadDraftRows(keys){
       var extra = [];
       var i = 0;
       function nextKeys(){
         if(i >= keys.length) return Promise.resolve(extra);
-        var batch = keys.slice(i, i + 40);
-        i += 40;
+        var batch = keys.slice(i, i + 8);
+        i += 8;
         return client.from('planner_entities')
           .select('key,value,revision,deleted,updated_at,change_seq')
           .in('key', batch)
@@ -142,18 +151,18 @@ var PlannerSyncSupabase = (function(){
     return next().then(function(){
       return loadDraftIndex();
     }).then(function(index){
-      var localIds = (typeof listLocalUserDraftIds_ === 'function') ? listLocalUserDraftIds_() : {};
       var have = {};
       rows.forEach(function(row){ if(row && row.key) have[row.key] = true; });
       var need = [];
       (index || []).forEach(function(row){
         if(!row || !row.key || have[row.key]) return;
-        var id = String(row.key).slice('draft:'.length);
+        var key = String(row.key);
+        var localHas = (typeof localHasSyncedContentKey_ === 'function') ? localHasSyncedContentKey_(key) : false;
         if(row.deleted){
-          if(localIds[id]) need.push(row.key);
+          if(localHas) need.push(key);
           return;
         }
-        if(!localIds[id]) need.push(row.key);
+        if(!localHas) need.push(key);
       });
       return loadDraftRows(need).then(function(extra){
         rows = rows.concat(extra || []);

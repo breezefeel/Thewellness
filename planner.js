@@ -11299,7 +11299,7 @@ function renderSyncHistoryListHtml_(metaList){
       '<div class="sync-status-row-head"><span class="sync-status-row-title">동기화 기록 (이 기기)</span>' +
       '<span class="sync-status-badge off">없음</span></div>' +
       '<div class="sync-status-row-meta">수동·자동 동기화 시 최근 ' + PLANNER_SYNC_HISTORY_MAX +
-      '개를 이 기기에 남깁니다. GAS 서버 버전 목록은 아닙니다.</div></div>';
+      '개를 이 기기에 남깁니다. 서버 기록은 아닙니다.</div></div>';
   }
   var items = metaList.slice(0, PLANNER_SYNC_HISTORY_MAX).map(function(m, i){
     var when = formatDriveTimeShort(m.savedAt) || m.savedAt || '';
@@ -11575,12 +11575,7 @@ function applySupabaseEntityRows_(rows){
 }
 async function plannerGasJsonRequest_(requestPayload, timeoutMs){
   var syncAction = requestPayload && requestPayload.action;
-  var gasDirect = !!(requestPayload && requestPayload.gasDirect);
-  if(gasDirect){
-    requestPayload = Object.assign({}, requestPayload);
-    delete requestPayload.gasDirect;
-  }
-  if(!gasDirect && (syncAction === 'plannerSyncPull' || syncAction === 'plannerSyncPatch' || syncAction === 'plannerSyncPush')){
+  if(syncAction === 'plannerSyncPull' || syncAction === 'plannerSyncPatch' || syncAction === 'plannerSyncPush'){
     if(typeof PlannerSyncSupabase === 'undefined' || !PlannerSyncSupabase.handle){
       return { result: 'error', retry: false, message: 'Supabase 동기화 파일이 없습니다.' };
     }
@@ -18148,8 +18143,8 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(busy){
     phase = 'queued';
     overall = 'syncing';
-  } else if(serverOn && !state._bootstrapChoiceDone && isPlannerEmployeeEmailValid_(getPlannerEmployeeId_())){
-    // 로컬 revision이 같아도, 이번 접속에서 서버를 받기 전에는 「최신」이 아님
+  } else if(serverOn && !state._bootstrapChoiceDone && isPlannerEmployeeEmailValid_(getPlannerEmployeeId_()) &&
+      !(localRev && serverRev && localRev === serverRev && !localPending && !remoteNewer)){
     phase = 'checking';
     overall = 'syncing';
   }
@@ -18366,34 +18361,8 @@ function teamSyncLoginHtml_(){
     '</div>' +
     '<div class="sync-status-row-actions">' +
       '<button type="button" class="modal-btn sync-settings-mini-btn" onclick="plannerSupabaseSignInFromSync_()">팀 로그인</button>' +
-      '<button type="button" class="modal-btn sync-settings-mini-btn" onclick="plannerPullLegacyGasOnce_()">예전 서버에서 받기</button>' +
-      '<button type="button" class="modal-btn sync-settings-mini-btn" onclick="plannerSupabaseImportOnce_()">이 기기 내용 넣기</button>' +
-    '</div>' +
-    '<div style="font-size:12px;line-height:1.45;margin-top:6px;">화면이 비어 있으면 넣기 전에 예전 서버에서 받으세요. 글이 보인 뒤에만 넣기를 한 번 누릅니다.</div>';
+    '</div>';
 }
-window.plannerPullLegacyGasOnce_ = async function(){
-  if(!confirm('예전 Google 서버에 있는 플래너를 이 브라우저로 받아 옵니다.\n지금 화면의 빈 내용은 그 내용으로 바뀝니다.\n받은 글이 맞으면 그다음에 「이 기기 내용 넣기」를 한 번만 누르세요.')) return;
-  if(typeof setAppToast === 'function') setAppToast('예전 서버에서 받는 중이에요. 1분 안쪽일 수 있어요.', { duration: 8000, variant: 'ok' });
-  try {
-    var data = await plannerGasJsonRequest_({ action: 'plannerSyncPull', gasDirect: true }, 120000);
-    if(data && data.result === 'moved'){
-      if(typeof setAppToast === 'function') setAppToast('예전 서버가 이미 옮겨졌다고 답해서 파일을 받지 못했습니다.', { duration: 7000, variant: 'err' });
-      return;
-    }
-    if(!data || data.result !== 'success' || !data.payload){
-      if(typeof setAppToast === 'function') setAppToast((data && data.message) || '예전 서버에 받을 내용이 없습니다.', { duration: 7000, variant: 'err' });
-      return;
-    }
-    var remoteRevision = parseInt(data.serverRevision, 10) || getPayloadRevision_(data.payload);
-    adoptServerAsAuthority_(data.payload, remoteRevision);
-    save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
-    try { renderTabs(); renderMain(); } catch(eRender){}
-    try { updateSyncStatusUI_(); } catch(eUi){}
-    if(typeof setAppToast === 'function') setAppToast('예전 서버 내용을 불러왔습니다. 글이 맞으면 팀 로그인 후 「이 기기 내용 넣기」를 한 번만 누르세요.', { duration: 8000, variant: 'ok' });
-  } catch(err){
-    if(typeof setAppToast === 'function') setAppToast((err && err.message) || '예전 서버에서 받지 못했습니다.', { duration: 7000, variant: 'err' });
-  }
-};
 window.plannerSupabaseSignInFromSync_ = async function(){
   var emailEl = document.getElementById('supabase-team-email');
   var passEl = document.getElementById('supabase-team-password');
@@ -18406,41 +18375,12 @@ window.plannerSupabaseSignInFromSync_ = async function(){
   try {
     await PlannerSyncSupabase.signIn(email, password);
     if(passEl) passEl.value = '';
-    if(typeof setAppToast === 'function') setAppToast('팀 로그인되었습니다.', { duration: 2800, variant: 'ok' });
+    if(typeof setAppToast === 'function') setAppToast('팀 로그인되었습니다. 서버 내용을 확인합니다.', { duration: 2800, variant: 'ok' });
+    state._bootstrapChoiceDone = false;
     updateSyncStatusUI_();
+    try { runPlannerBootstrapInBackground_(); } catch(eBoot){}
   } catch(err){
     if(typeof setAppToast === 'function') setAppToast((err && err.message) || '로그인에 실패했습니다.', { duration: 5000, variant: 'err' });
-  }
-};
-window.plannerSupabaseImportOnce_ = async function(){
-  if(typeof PlannerSyncSupabase === 'undefined' || !PlannerSyncSupabase.configured()){
-    if(typeof setAppToast === 'function') setAppToast('planner-sync-config.js에 Supabase 주소와 공개 키를 넣어 주세요.', { duration: 5000, variant: 'err' });
-    return;
-  }
-  if(!confirm('이 기기의 플래너 항목을 빈 서버 표에 한 번 넣습니다.\n표에 이미 내용이 있으면 거절됩니다.')) return;
-  var entities = collectSyncEntities_(getPersistPayload());
-  var rows = [];
-  Object.keys(entities || {}).forEach(function(key){
-    if(!key || isDeviceLocalSyncEntityKey_(key)) return;
-    rows.push({ key: key, value: entities[key], deleted: false });
-  });
-  try {
-    if(typeof setAppToast === 'function') setAppToast('항목 ' + rows.length + '개를 넣는 중이에요.', { duration: 4000, variant: 'ok' });
-    var out = await PlannerSyncSupabase.importRows(rows);
-    if(!state.syncEntityRevisions) state.syncEntityRevisions = {};
-    rows.forEach(function(row){ state.syncEntityRevisions[row.key] = 1; });
-    state.syncOutbox = [];
-    state.syncDirtyEntityKeys = {};
-    state.syncNeedsSnapshot = false;
-    state.syncDirty = false;
-    state._emptyServerSeed = false;
-    if(out && out.changeSeq) state.syncRevision = parseInt(out.changeSeq, 10) || state.syncRevision;
-    markLocalInSyncWithServer_({ syncRevision: state.syncRevision, savedAt: new Date().toISOString() });
-    save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
-    updateSyncStatusUI_();
-    if(typeof setAppToast === 'function') setAppToast('이 기기 내용을 서버에 넣었습니다. 다른 기기는 새로고침해 주세요.', { duration: 5200, variant: 'ok' });
-  } catch(err){
-    if(typeof setAppToast === 'function') setAppToast((err && err.message) || '넣기에 실패했습니다.', { duration: 6000, variant: 'err' });
   }
 };
 function renderSyncStatusBodyHTML_(info){
@@ -18538,7 +18478,7 @@ function renderSyncStatusBodyHTML_(info){
       if(info.remoteAt) sMeta += ' · <strong>' + escapeHtml(formatDriveTimeShort(info.remoteAt)) + '</strong>';
       if(info.remoteBy) sMeta += '<br>마지막 수정자 <strong>' + escapeHtml(info.remoteBy) + '</strong>';
     }
-    sMeta += '<br>팀 기준본입니다. 급하면 하단 「지금 동기화」로 바로 맞출 수 있어요.';
+    sMeta += '<br>Supabase에 있는 팀 기준본입니다. 급하면 하단 「지금 동기화」로 맞출 수 있어요.';
     sMeta += teamSyncLoginHtml_();
     html += row('3. 서버', sBadge, sText, sMeta);
   } else {
@@ -18590,10 +18530,9 @@ function renderSyncStatusBodyHTML_(info){
     aiBadge,
     aiText,
     aiMeta + (info.lastReason ? '<br>최근 자동 동기화: <strong>' + escapeHtml(info.lastReason) + '</strong>' : ''),
-    '<button type="button" class="modal-btn sync-settings-mini-btn" onclick="openApiModalFromSync_()">AI·토큰·자동초안 설정</button>' +
+    '<button type="button" class="modal-btn sync-settings-mini-btn" onclick="openApiModalFromSync_()">AI·토큰 설정</button>' +
       '<button type="button" class="modal-btn-ghost sync-settings-mini-btn" onclick="copyPlannerTeamInviteLink_()">직원 초대 링크 복사</button>'
   );
-  html += '<div class="sync-status-row-meta" style="padding:0 2px;color:#9CA3AF;">헤더 문구 안내: <strong>전송 · N건</strong>=지금 올리는 중 · <strong>N초 후 · N건</strong>=재시도 대기 · <strong>곧 · N건</strong>=잠시 후 전송 · <strong>남은 N건</strong>=아직 안 올라간 변경. revision은 성공 시 서버가 발급합니다.</div>';
   html += '<div data-sync-history-slot>' + renderSyncHistoryListHtml_(_syncHistoryMetaCache_) + '</div>';
   var backupMeta = readPreSyncBackupMeta_();
   if(backupMeta){
@@ -18919,7 +18858,7 @@ async function runPlannerBootstrapInBackground_(){
       try { updateSyncStatusUI_(); } catch(eSupaU){}
       if(typeof setAppToast === 'function'){
         setAppToast(bootstrapData.emptyTable
-          ? '서버 표가 비어 있습니다. 최신 기기에서 「이 기기 내용 넣기」를 한 번만 눌러 주세요.'
+          ? '서버 표가 비어 있습니다. 이 브라우저의 내용은 올리지 않았습니다.'
           : '서버 항목을 이 기기에 맞춰 두었어요.', { duration: 5200, variant: 'ok' });
       }
       return;
@@ -26090,7 +26029,7 @@ function appendDraftReferenceToPrompt_(prompt, draft, catId){
 async function analyzeYoutubeWithGemini_(url, catId){
   var gasUrl = getPlannerGasUrl_();
   if(!gasUrl || location.protocol === 'file:'){
-    throw new Error('유튜브 분석은 웹 배포 페이지에서 서버(GAS) 연결이 필요해요.');
+    throw new Error('유튜브 분석은 웹 배포 페이지에서 Apps Script 연결이 필요해요.');
   }
   var cat = CATEGORIES[catId];
   var res = await fetch(gasUrl, {
@@ -32120,7 +32059,7 @@ window.toggleThumbAiUpscale_ = async function(btn){
 
   // 첫 적용: 서버 업스케일 1회 실행 후 캐시
   if(!getPlannerGasUrl_() || location.protocol === 'file:'){
-    setAppToast('AI 화질은 웹 배포 페이지에서 서버(GAS) 연결이 필요해요.', { duration: 4200, variant: 'err' });
+    setAppToast('AI 화질은 웹 배포 페이지에서 Apps Script 연결이 필요해요.', { duration: 4200, variant: 'err' });
     return;
   }
   if(!isThumbAiUpscaleAvailable_()){

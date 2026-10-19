@@ -11575,7 +11575,12 @@ function applySupabaseEntityRows_(rows){
 }
 async function plannerGasJsonRequest_(requestPayload, timeoutMs){
   var syncAction = requestPayload && requestPayload.action;
-  if(syncAction === 'plannerSyncPull' || syncAction === 'plannerSyncPatch' || syncAction === 'plannerSyncPush'){
+  var gasDirect = !!(requestPayload && requestPayload.gasDirect);
+  if(gasDirect){
+    requestPayload = Object.assign({}, requestPayload);
+    delete requestPayload.gasDirect;
+  }
+  if(!gasDirect && (syncAction === 'plannerSyncPull' || syncAction === 'plannerSyncPatch' || syncAction === 'plannerSyncPush')){
     if(typeof PlannerSyncSupabase === 'undefined' || !PlannerSyncSupabase.handle){
       return { result: 'error', retry: false, message: 'Supabase 동기화 파일이 없습니다.' };
     }
@@ -18361,9 +18366,34 @@ function teamSyncLoginHtml_(){
     '</div>' +
     '<div class="sync-status-row-actions">' +
       '<button type="button" class="modal-btn sync-settings-mini-btn" onclick="plannerSupabaseSignInFromSync_()">팀 로그인</button>' +
+      '<button type="button" class="modal-btn sync-settings-mini-btn" onclick="plannerPullLegacyGasOnce_()">예전 서버에서 받기</button>' +
       '<button type="button" class="modal-btn sync-settings-mini-btn" onclick="plannerSupabaseImportOnce_()">이 기기 내용 넣기</button>' +
-    '</div>';
+    '</div>' +
+    '<div style="font-size:12px;line-height:1.45;margin-top:6px;">화면이 비어 있으면 넣기 전에 예전 서버에서 받으세요. 글이 보인 뒤에만 넣기를 한 번 누릅니다.</div>';
 }
+window.plannerPullLegacyGasOnce_ = async function(){
+  if(!confirm('예전 Google 서버에 있는 플래너를 이 브라우저로 받아 옵니다.\n지금 화면의 빈 내용은 그 내용으로 바뀝니다.\n받은 글이 맞으면 그다음에 「이 기기 내용 넣기」를 한 번만 누르세요.')) return;
+  if(typeof setAppToast === 'function') setAppToast('예전 서버에서 받는 중이에요. 1분 안쪽일 수 있어요.', { duration: 8000, variant: 'ok' });
+  try {
+    var data = await plannerGasJsonRequest_({ action: 'plannerSyncPull', gasDirect: true }, 120000);
+    if(data && data.result === 'moved'){
+      if(typeof setAppToast === 'function') setAppToast('예전 서버가 이미 옮겨졌다고 답해서 파일을 받지 못했습니다.', { duration: 7000, variant: 'err' });
+      return;
+    }
+    if(!data || data.result !== 'success' || !data.payload){
+      if(typeof setAppToast === 'function') setAppToast((data && data.message) || '예전 서버에 받을 내용이 없습니다.', { duration: 7000, variant: 'err' });
+      return;
+    }
+    var remoteRevision = parseInt(data.serverRevision, 10) || getPayloadRevision_(data.payload);
+    adoptServerAsAuthority_(data.payload, remoteRevision);
+    save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+    try { renderTabs(); renderMain(); } catch(eRender){}
+    try { updateSyncStatusUI_(); } catch(eUi){}
+    if(typeof setAppToast === 'function') setAppToast('예전 서버 내용을 불러왔습니다. 글이 맞으면 팀 로그인 후 「이 기기 내용 넣기」를 한 번만 누르세요.', { duration: 8000, variant: 'ok' });
+  } catch(err){
+    if(typeof setAppToast === 'function') setAppToast((err && err.message) || '예전 서버에서 받지 못했습니다.', { duration: 7000, variant: 'err' });
+  }
+};
 window.plannerSupabaseSignInFromSync_ = async function(){
   var emailEl = document.getElementById('supabase-team-email');
   var passEl = document.getElementById('supabase-team-password');

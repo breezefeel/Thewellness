@@ -11489,33 +11489,152 @@ function plannerGasRequestBody_(obj){
   obj.deviceId = getPlannerDeviceId_();
   return JSON.stringify(obj);
 }
+function plannerGasCanUseGet_(body){
+  try { return encodeURIComponent(body).length <= 1800; } catch(e){ return false; }
+}
+function plannerGasPackUnusable_(pack){
+  if(!pack || !pack.data || typeof pack.data !== 'object') return true;
+  if(!pack.ok) return true;
+  return pack.data.result === 'error' && /unknown action/i.test(String(pack.data.message || ''));
+}
+function noteSupabaseAcceptedRevisions_(accepted){
+  if(!state.syncEntityRevisions) state.syncEntityRevisions = {};
+  (accepted || []).forEach(function(item){
+    if(!item || !item.key) return;
+    var rev = parseInt(item.entityRevision, 10) || 0;
+    if(rev) state.syncEntityRevisions[item.key] = rev;
+  });
+}
+function applySupabaseEntityRows_(rows){
+  rows = rows || [];
+  var payload = getPersistPayload();
+  if(!payload.syncEntityRevisions) payload.syncEntityRevisions = state.syncEntityRevisions || {};
+  if(!payload.syncEntityTombstones) payload.syncEntityTombstones = state.syncEntityTombstones || {};
+  var outboxByKey = {};
+  (state.syncOutbox || []).forEach(function(op){
+    if(op && op.key) outboxByKey[op.key] = op;
+  });
+  var conflicts = [];
+  var changed = false;
+  rows.forEach(function(row){
+    if(!row || !row.key || isDeviceLocalSyncEntityKey_(row.key)) return;
+    var key = String(row.key);
+    var serverRev = parseInt(row.revision, 10) || 0;
+    var op = outboxByKey[key];
+    var serverVal = row.deleted ? undefined : row.value;
+    if(op){
+      var base = parseInt(op.baseEntityRevision, 10) || 0;
+      var localVal = op.deleted ? undefined : op.value;
+      var same = false;
+      try { same = syncEntitiesEquivalent_(key, localVal, serverVal); } catch(eSame){}
+      if(same){
+        payload.syncEntityRevisions[key] = serverRev;
+        return;
+      }
+      if(base !== serverRev){
+        conflicts.push({
+          key: key,
+          mutationId: op.mutationId || '',
+          version: parseInt(op.version, 10) || 1,
+          serverValue: row.value,
+          serverDeleted: !!row.deleted,
+          serverEntityRevision: serverRev,
+          serverUpdatedAt: row.updated_at || ''
+        });
+        return;
+      }
+      return;
+    }
+    var localRev = parseInt(payload.syncEntityRevisions[key], 10) || 0;
+    if(serverRev < localRev) return;
+    setSyncEntity_(payload, key, serverVal);
+    payload.syncEntityRevisions[key] = serverRev;
+    if(row.deleted){
+      payload.syncEntityTombstones[key] = { revision: serverRev, deletedAt: row.updated_at || new Date().toISOString() };
+    } else if(payload.syncEntityTombstones[key]){
+      delete payload.syncEntityTombstones[key];
+    }
+    changed = true;
+  });
+  if(changed){
+    state.syncEntityRevisions = payload.syncEntityRevisions;
+    state.syncEntityTombstones = payload.syncEntityTombstones;
+    applyPersistPayload(payload, { skipRestorePending: true });
+    try {
+      save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+    } catch(eSave){}
+    try { renderTabs(); renderMain(); } catch(eRender){}
+  } else {
+    state.syncEntityRevisions = payload.syncEntityRevisions;
+    state.syncEntityTombstones = payload.syncEntityTombstones;
+  }
+  if(conflicts.length && typeof openPlannerOutboxConflict_ === 'function'){
+    openPlannerOutboxConflict_(conflicts, payload, parseInt(payload.syncRevision, 10) || 0);
+  }
+  return { conflicts: conflicts, changed: changed };
+}
 async function plannerGasJsonRequest_(requestPayload, timeoutMs){
+  var syncAction = requestPayload && requestPayload.action;
+  if(syncAction === 'plannerSyncPull' || syncAction === 'plannerSyncPatch' || syncAction === 'plannerSyncPush'){
+    if(typeof PlannerSyncSupabase === 'undefined' || !PlannerSyncSupabase.handle){
+      return { result: 'error', retry: false, message: 'Supabase 동기화 파일이 없습니다.' };
+    }
+    return PlannerSyncSupabase.handle(requestPayload);
+  }
   var url = getPlannerGasUrl_();
   if(!url || location.protocol === 'file:') throw new Error('서버 URL을 사용할 수 없습니다.');
-  var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  var body = plannerGasRequestBody_(requestPayload);
   var waitMs = timeoutMs || 20000;
-  var timeout = controller ? setTimeout(function(){ controller.abort(); }, waitMs) : null;
-  try {
-    var response = await fetch(url, {
-      method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: plannerGasRequestBody_(requestPayload),
-      signal: controller ? controller.signal : undefined
-    });
-    if(!response.ok) throw new Error('서버 연결 실패 (HTTP ' + response.status + ')');
+  async function once(method){
+    var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timeout = controller ? setTimeout(function(){ controller.abort(); }, waitMs) : null;
     try {
-      return await response.json();
-    } catch(parseErr){
-      throw new Error('서버 응답 형식 오류');
+      var response;
+      if(method === 'GET'){
+        var getUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'data=' + encodeURIComponent(body);
+        response = await fetch(getUrl, {
+          method: 'GET',
+          mode: 'cors',
+          signal: controller ? controller.signal : undefined
+        });
+      } else {
+        response = await fetch(url, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: body,
+          signal: controller ? controller.signal : undefined
+        });
+      }
+      var text = '';
+      try { text = await response.text(); } catch(readErr){ text = ''; }
+      var data = null;
+      try { data = JSON.parse(text); } catch(parseErr){}
+      return { ok: !!response.ok, status: response.status, data: data };
+    } finally {
+      if(timeout) clearTimeout(timeout);
     }
+  }
+  try {
+    var pack = await once('POST');
+    // POST가 리다이렉트에서 본문을 잃으면 unknown action, 응답이 크면 Google이 HTML 404를 준다.
+    if(plannerGasPackUnusable_(pack) && plannerGasCanUseGet_(body)){
+      var viaGet = await once('GET');
+      if(!plannerGasPackUnusable_(viaGet)) pack = viaGet;
+    }
+    if(!pack || !pack.data){
+      if(pack && pack.status === 404){
+        throw new Error('서버 연결 실패 (HTTP 404). 동기화 파일이 너무 크면 Google이 이렇게 응답해요. Apps Script를 다시 배포해야 합니다.');
+      }
+      throw new Error(pack && pack.ok ? '서버 응답 형식 오류' : ('서버 연결 실패 (HTTP ' + ((pack && pack.status) || '?') + ')'));
+    }
+    if(!pack.ok) throw new Error(pack.data.message || ('서버 연결 실패 (HTTP ' + pack.status + ')'));
+    return pack.data;
   } catch(err){
     if(err && err.name === 'AbortError'){
       throw new Error('서버 응답이 조금 오래 걸려요. (약 ' + Math.round(waitMs / 1000) + '초) 데이터가 크거나 Apps Script가 느릴 때 나와요. 자동으로 다시 시도합니다.');
     }
     throw err;
-  } finally {
-    if(timeout) clearTimeout(timeout);
   }
 }
 
@@ -16745,6 +16864,16 @@ async function recoverOutboxAfterSlowPush_(){
   try {
     var data = await plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_PULL_TIMEOUT_MS);
     applyPlannerServerCaps_(data, true);
+    if(data && data.supabaseApplied){
+      if(!hasPendingLocalSyncChanges_()){
+        if(typeof setAppToast === 'function'){
+          setAppToast('서버에 이미 반영되어 있어요.', { duration: 3200, variant: 'ok' });
+        }
+        updateSyncStatusUI_();
+        return true;
+      }
+      return false;
+    }
     if(!(data && data.result === 'success' && data.payload)) return false;
     var dropped = pruneOutboxAlreadyOnServer_(data.payload);
     var remoteRev = parseInt(data.serverRevision, 10) || getPayloadRevision_(data.payload);
@@ -17003,6 +17132,7 @@ async function plannerPullRemoteIntoStateCore_(){
     try {
       var pullData = await plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_PULL_TIMEOUT_MS);
       applyPlannerServerCaps_(pullData, true);
+      if(pullData && pullData.supabaseApplied) return false;
       if(pullData.result === 'success' && pullData.payload){
         remote = pullData.payload;
         remoteRevision = parseInt(pullData.serverRevision, 10) || getPayloadRevision_(remote);
@@ -17033,6 +17163,9 @@ async function plannerPullRemoteIntoState_(){
 async function plannerGasPushNow_(){
   var url = getPlannerGasUrl_();
   if(!url || !plannerSyncBootstrapReady_ || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return { ok: false, skipped: true };
+  if(typeof PlannerSyncSupabase !== 'undefined' && PlannerSyncSupabase.configured()){
+    state.syncProtocolVersion = 2;
+  }
   return withPlannerSyncMutex_(async function(){
   try {
     try {
@@ -18164,7 +18297,7 @@ function refreshSyncStatusBodyHtml_(info){
   if(!body || !overlay || !overlay.classList.contains('open')) return;
   var draft = captureSyncSettingsDrafts_();
   // 모바일: 이메일 입력 중 innerHTML 교체 → 키보드 내려감 + 입력 초기화
-  if(draft.activeId === 'sync-settings-employee'){
+  if(draft.activeId === 'sync-settings-employee' || draft.activeId === 'supabase-team-email' || draft.activeId === 'supabase-team-password'){
     rememberSyncEmployeeDraft_(draft.employee);
     var sum = body.querySelector('.sync-status-summary');
     if(sum && info && info.summary) sum.textContent = info.summary;
@@ -18214,6 +18347,72 @@ function updateSyncStatusUI_(){
   try { armSyncProgressTicker_(info); } catch(eTickArm){}
   try { kickPendingSyncIfIdle_(info); } catch(eKickUi){}
 }
+function teamSyncLoginHtml_(){
+  var ready = typeof PlannerSyncSupabase !== 'undefined' && PlannerSyncSupabase.configured();
+  var email = ready && PlannerSyncSupabase.cachedEmail ? PlannerSyncSupabase.cachedEmail() : '';
+  var note = ready
+    ? (email ? ('로그인됨 · ' + escapeHtml(email)) : '팀 계정으로 로그인한 뒤에만 항목이 오갑니다.')
+    : 'planner-sync-config.js에 Supabase 주소와 공개 키를 넣어 주세요.';
+  return '<div class="sync-settings-label" style="margin-top:8px;">Supabase 팀 로그인</div>' +
+    '<div style="font-size:12px;line-height:1.45;margin-bottom:6px;">' + note + '</div>' +
+    '<div class="sync-settings-inline">' +
+      '<input class="modal-input sync-settings-input" type="email" id="supabase-team-email" placeholder="팀 이메일" autocomplete="username">' +
+      '<input class="modal-input sync-settings-input" type="password" id="supabase-team-password" placeholder="비밀번호" autocomplete="current-password">' +
+    '</div>' +
+    '<div class="sync-status-row-actions">' +
+      '<button type="button" class="modal-btn sync-settings-mini-btn" onclick="plannerSupabaseSignInFromSync_()">팀 로그인</button>' +
+      '<button type="button" class="modal-btn sync-settings-mini-btn" onclick="plannerSupabaseImportOnce_()">이 기기 내용 넣기</button>' +
+    '</div>';
+}
+window.plannerSupabaseSignInFromSync_ = async function(){
+  var emailEl = document.getElementById('supabase-team-email');
+  var passEl = document.getElementById('supabase-team-password');
+  var email = emailEl ? String(emailEl.value || '').trim() : '';
+  var password = passEl ? String(passEl.value || '') : '';
+  if(!email || !password){
+    if(typeof setAppToast === 'function') setAppToast('팀 이메일과 비밀번호를 입력해 주세요.', { duration: 3200, variant: 'err' });
+    return;
+  }
+  try {
+    await PlannerSyncSupabase.signIn(email, password);
+    if(passEl) passEl.value = '';
+    if(typeof setAppToast === 'function') setAppToast('팀 로그인되었습니다.', { duration: 2800, variant: 'ok' });
+    updateSyncStatusUI_();
+  } catch(err){
+    if(typeof setAppToast === 'function') setAppToast((err && err.message) || '로그인에 실패했습니다.', { duration: 5000, variant: 'err' });
+  }
+};
+window.plannerSupabaseImportOnce_ = async function(){
+  if(typeof PlannerSyncSupabase === 'undefined' || !PlannerSyncSupabase.configured()){
+    if(typeof setAppToast === 'function') setAppToast('planner-sync-config.js에 Supabase 주소와 공개 키를 넣어 주세요.', { duration: 5000, variant: 'err' });
+    return;
+  }
+  if(!confirm('이 기기의 플래너 항목을 빈 서버 표에 한 번 넣습니다.\n표에 이미 내용이 있으면 거절됩니다.')) return;
+  var entities = collectSyncEntities_(getPersistPayload());
+  var rows = [];
+  Object.keys(entities || {}).forEach(function(key){
+    if(!key || isDeviceLocalSyncEntityKey_(key)) return;
+    rows.push({ key: key, value: entities[key], deleted: false });
+  });
+  try {
+    if(typeof setAppToast === 'function') setAppToast('항목 ' + rows.length + '개를 넣는 중이에요.', { duration: 4000, variant: 'ok' });
+    var out = await PlannerSyncSupabase.importRows(rows);
+    if(!state.syncEntityRevisions) state.syncEntityRevisions = {};
+    rows.forEach(function(row){ state.syncEntityRevisions[row.key] = 1; });
+    state.syncOutbox = [];
+    state.syncDirtyEntityKeys = {};
+    state.syncNeedsSnapshot = false;
+    state.syncDirty = false;
+    state._emptyServerSeed = false;
+    if(out && out.changeSeq) state.syncRevision = parseInt(out.changeSeq, 10) || state.syncRevision;
+    markLocalInSyncWithServer_({ syncRevision: state.syncRevision, savedAt: new Date().toISOString() });
+    save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+    updateSyncStatusUI_();
+    if(typeof setAppToast === 'function') setAppToast('이 기기 내용을 서버에 넣었습니다. 다른 기기는 새로고침해 주세요.', { duration: 5200, variant: 'ok' });
+  } catch(err){
+    if(typeof setAppToast === 'function') setAppToast((err && err.message) || '넣기에 실패했습니다.', { duration: 6000, variant: 'err' });
+  }
+};
 function renderSyncStatusBodyHTML_(info){
   function row(title, badgeClass, badgeText, metaHtml, actionsHtml){
     return '<div class="sync-status-row">' +
@@ -18310,13 +18509,14 @@ function renderSyncStatusBodyHTML_(info){
       if(info.remoteBy) sMeta += '<br>마지막 수정자 <strong>' + escapeHtml(info.remoteBy) + '</strong>';
     }
     sMeta += '<br>팀 기준본입니다. 급하면 하단 「지금 동기화」로 바로 맞출 수 있어요.';
-    html += row('3. 서버 (GAS)', sBadge, sText, sMeta);
+    sMeta += teamSyncLoginHtml_();
+    html += row('3. 서버', sBadge, sText, sMeta);
   } else {
     html += row(
-      '3. 서버 (GAS)',
+      '3. 서버',
       'off',
       '미설정',
-      'https 배포 URL이 필요해요.',
+      'https 배포 URL이 필요해요.' + teamSyncLoginHtml_(),
       '<button type="button" class="modal-btn sync-settings-mini-btn" onclick="openApiModalFromSync_()">서버·토큰 설정</button>'
     );
   }
@@ -18415,6 +18615,13 @@ async function fetchServerSyncMeta_(){
   try {
     var data = await plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_META_TIMEOUT_MS);
     applyPlannerServerCaps_(data, true);
+    if(data && data.supabaseApplied){
+      return {
+        rev: parseInt(data.serverRevision, 10) || 0,
+        savedAt: data.savedAt || '',
+        lastModifiedBy: ''
+      };
+    }
     if(data.result === 'success' && data.payload){
       return {
         rev: parseInt(data.serverRevision, 10) || getPayloadRevision_(data.payload),
@@ -18637,24 +18844,10 @@ async function verifyPlannerServerReachable_(){
   if(!isPlannerEmployeeEmailValid_(getPlannerEmployeeId_())) throw new Error('직원 이메일을 입력해야 팀 데이터를 사용할 수 있어요.');
   var url = getPlannerGasUrl_();
   if(!url || location.protocol === 'file:') throw new Error('웹 배포 주소(https)에서 접속해야 서버 데이터를 확인할 수 있어요.');
-  var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  var timeout = controller ? setTimeout(function(){ controller.abort(); }, PLANNER_SYNC_META_TIMEOUT_MS) : null;
-  var r;
-  try {
-    r = await fetch(url, {
-      method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: plannerGasRequestBody_({ action: 'plannerSyncPull' }),
-      signal: controller ? controller.signal : undefined
-    });
-  } finally {
-    if(timeout) clearTimeout(timeout);
-  }
-  if(!r.ok) throw new Error('서버 연결 실패 (HTTP ' + r.status + ')');
-  var data = await r.json();
+  var data = await plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_META_TIMEOUT_MS);
   applyPlannerServerCaps_(data, true);
-  if(isPlannerAuthError_(data)) throw new Error(data.message || '동기화 토큰이 필요합니다.');
+  if(isPlannerAuthError_(data)) throw new Error(data.message || '팀 로그인이 필요합니다.');
+  if(data && data.supabaseApplied) return data;
   if(data.result !== 'success' && data.result !== 'empty') throw new Error(data.message || '서버 데이터를 확인하지 못했습니다.');
   return data;
 }
@@ -18680,6 +18873,27 @@ async function runPlannerBootstrapInBackground_(){
     // 비교 전에 integrity를 돌리면 로컬만 바뀌어 F5마다 「선택」창이 뜸 → 비교 후에만 정리
     var bootstrapData = await verifyPlannerServerReachable_();
     await yieldPlannerBootstrapUi_(null);
+    if(bootstrapData && bootstrapData.supabaseApplied){
+      state._bootstrapChoiceDone = true;
+      if(bootstrapData.emptyTable){
+        state._emptyServerSeed = false;
+        state.syncNeedsSnapshot = false;
+      }
+      try {
+        save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+      } catch(eSupaSv){}
+      try { renderTabs(); renderMain(); } catch(eSupaR){}
+      if(!bootstrapData.emptyTable && hasPendingLocalSyncChanges_()){
+        try { schedulePlannerGasPush_(true); } catch(eSupaPush){}
+      }
+      try { updateSyncStatusUI_(); } catch(eSupaU){}
+      if(typeof setAppToast === 'function'){
+        setAppToast(bootstrapData.emptyTable
+          ? '서버 표가 비어 있습니다. 최신 기기에서 「이 기기 내용 넣기」를 한 번만 눌러 주세요.'
+          : '서버 항목을 이 기기에 맞춰 두었어요.', { duration: 5200, variant: 'ok' });
+      }
+      return;
+    }
     if(bootstrapData.result === 'success' && bootstrapData.payload){
       var remotePayload = bootstrapData.payload;
       var remoteRevision = parseInt(bootstrapData.serverRevision, 10) || getPayloadRevision_(remotePayload);
@@ -20155,6 +20369,13 @@ async function fetchRemotePayloadForSyncPreview_(){
   if(!url || location.protocol === 'file:') return null;
   var data = await plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_PULL_TIMEOUT_MS);
   applyPlannerServerCaps_(data, true);
+  if(data && data.supabaseApplied){
+    var localNow = getPersistPayload();
+    return {
+      payload: localNow,
+      serverRevision: parseInt(data.serverRevision, 10) || getPayloadRevision_(localNow)
+    };
+  }
   if(data.result === 'success' && data.payload){
     return {
       payload: data.payload,
@@ -20513,6 +20734,18 @@ async function syncAllSourcesIfNewerCore_(reason){
     try {
       var data = await plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_PULL_TIMEOUT_MS);
       applyPlannerServerCaps_(data, true);
+      if(data && data.supabaseApplied){
+        try {
+          save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+        } catch(eSupaAll){}
+        updateApiBadge();
+        if(!shouldProtectComposeUi_()){
+          renderTabs();
+          renderMain();
+        }
+        updateSyncStatusUI_();
+        return true;
+      }
       if(data.result === 'success' && data.payload){
         remoteRevision = parseInt(data.serverRevision, 10) || getPayloadRevision_(data.payload);
         var ms2 = getPayloadSavedMs_(data.payload);
@@ -20650,8 +20883,68 @@ function mergeExtraDrafts(byCat){
   });
   purgeDeletedDraftsFromCatalog_();
 }
+var OMITTED_BINARY_MARK_ = '__OMITTED_BINARY__:';
+function restoreOmittedBinaries_(remote, local){
+  if(typeof remote === 'string' && remote.indexOf(OMITTED_BINARY_MARK_) === 0){
+    if(typeof local === 'string' && local && local.indexOf(OMITTED_BINARY_MARK_) !== 0) return local;
+    return remote;
+  }
+  if(Array.isArray(remote)){
+    var locArr = Array.isArray(local) ? local : [];
+    return remote.map(function(item, i){ return restoreOmittedBinaries_(item, locArr[i]); });
+  }
+  if(remote && typeof remote === 'object'){
+    var locObj = (local && typeof local === 'object' && !Array.isArray(local)) ? local : {};
+    var out = {};
+    Object.keys(remote).forEach(function(k){
+      out[k] = restoreOmittedBinaries_(remote[k], locObj[k]);
+    });
+    return out;
+  }
+  return remote;
+}
+function publishedDraftCardExists_(draftId){
+  for(var i = 0; i < CATEGORIES.length; i++){
+    var drafts = CATEGORIES[i] && CATEGORIES[i].drafts;
+    if(!drafts) continue;
+    for(var j = 0; j < drafts.length; j++){
+      if(drafts[j] && drafts[j].id === draftId) return true;
+    }
+  }
+  return false;
+}
+/** 발행 기록은 있는데 카드가 없으면 완료 목록에 안 보인다. 기타 주제로 카드를 되살린다. */
+function ensurePublishedDraftCards_(){
+  var pubs = state.published || {};
+  var deleted = state.deletedDraftIds || {};
+  var added = 0;
+  Object.keys(pubs).forEach(function(id){
+    if(!id || deleted[id]) return;
+    var pub = pubs[id];
+    if(!pub || !draftShowsOnPublishedList_(id, pub.catId)) return;
+    if(publishedDraftCardExists_(id)) return;
+    var catId = pub.catId != null ? pub.catId : getCatIdFromDraftId_(id);
+    var cat = CATEGORIES[catId];
+    if(!cat) return;
+    if(!cat.drafts) cat.drafts = [];
+    cat.drafts.push({
+      id: id,
+      topic: pub.topic || '발행한 글',
+      angle: '',
+      roadmapStepId: SUBGOAL_MISC_ID,
+      miscLocked: true,
+      createdAt: pub.savedAt || ''
+    });
+    added++;
+  });
+  return added;
+}
 function applyPersistPayload(s, opts){
   if(!s) return;
+  try {
+    if(s.published) s.published = restoreOmittedBinaries_(s.published, state.published);
+    if(s.generatedOnly) s.generatedOnly = restoreOmittedBinaries_(s.generatedOnly, state.generatedOnly);
+  } catch(eBin){}
   opts = opts || {};
   var fastBoot = !!opts.fastBoot;
   var legacyDirtyBeforeRestore = !!s._syncDirty;
@@ -20717,6 +21010,7 @@ function applyPersistPayload(s, opts){
   }
   mergeExtraDrafts(s.extraDraftsByCat);
   purgeDeletedDraftsFromCatalog_();
+  try { ensurePublishedDraftCards_(); } catch(ePubCards){}
   if(!fastBoot) applyBuiltinDraftBrandSeeds_();
   if(!(opts && opts.skipRestorePending) && !fastBoot){
     restorePendingSubGoalPlan_();
@@ -20826,6 +21120,7 @@ function runPlannerStepIntegrityPass_(opts){
     CATEGORIES.forEach(function(cat, i){
       try { ensureUserAddedDraftsInMisc_(i); } catch(eCat){}
     });
+    try { ensurePublishedDraftCards_(); } catch(ePubCards){}
   } catch(eRep){ console.warn('[plan integrity]', eRep); }
   state._pendingHeavyRepair = false;
   state._forceStepIntegrityPass = false;
@@ -22512,7 +22807,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=180').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=192').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -22705,7 +23000,7 @@ function applyPlannerServerCaps_(data, isSyncResponse){
   if(data.syncCapabilities){
     state.syncProtocolVersion = parseInt(data.syncCapabilities.protocolVersion, 10) || 1;
     state.syncEntitySchemaVersion = parseInt(data.syncCapabilities.entitySchemaVersion, 10) || 1;
-  } else if(isSyncResponse){
+  } else if(isSyncResponse && data.result !== 'error' && data.result !== 'moved'){
     state.syncProtocolVersion = 1;
     state.syncEntitySchemaVersion = 1;
   }
@@ -22766,7 +23061,7 @@ async function refreshPlannerServerCaps_(){
     return;
   }
   try {
-    var data = await plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_META_TIMEOUT_MS);
+    var data = await plannerGasJsonRequest_({ action: 'plannerCaps' }, PLANNER_SYNC_META_TIMEOUT_MS);
     if(isPlannerAuthError_(data)){
       notifyPlannerAuthError_(data);
       updateGeminiServerStatusUI_();
@@ -23071,7 +23366,17 @@ function draftShowsOnPublishedList_(draftId, catId){
   if(!draftId) return false;
   if(getDraftPublishedChannelKeys_(draftId, catId).length) return true;
   var pub = state.published && state.published[draftId];
-  return !!(pub && pub.date);
+  if(!pub) return false;
+  if(pub.date) return true;
+  if(String(pub.finalText || '').trim().length >= 10) return true;
+  var texts = pub.finalTexts;
+  if(texts && typeof texts === 'object'){
+    var keys = Object.keys(texts);
+    for(var i = 0; i < keys.length; i++){
+      if(String(texts[keys[i]] || '').trim().length >= 10) return true;
+    }
+  }
+  return false;
 }
 /** 주제 추가·일상·참고 메모가 있는 글. 초안이 없어도 쓸 글에 둔다. */
 function draftWasIntentionallyAdded_(d){

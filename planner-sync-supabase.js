@@ -1,0 +1,254 @@
+/* 플래너 항목 동기화. GAS 동기화 쓰기는 호출하지 않습니다. */
+var PlannerSyncSupabase = (function(){
+  var SEQ_KEY = 'ht_planner_supa_seq';
+  var clientPromise = null;
+  var cachedEmail = '';
+  var CAPS = {
+    protocolVersion: 2,
+    entitySchemaVersion: 3,
+    patch: true,
+    entityRevision: true,
+    tombstones: true,
+    partialAck: true
+  };
+
+  function configured(){
+    return !!(typeof PLANNER_SUPABASE_URL === 'string' && PLANNER_SUPABASE_URL &&
+      typeof PLANNER_SUPABASE_ANON_KEY === 'string' && PLANNER_SUPABASE_ANON_KEY);
+  }
+
+  function loadLibrary(){
+    if(window.supabase && window.supabase.createClient) return Promise.resolve();
+    return new Promise(function(resolve, reject){
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+      s.onload = function(){ resolve(); };
+      s.onerror = function(){ reject(new Error('Supabase 라이브러리를 불러오지 못했습니다.')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function getClient(){
+    if(!configured()) return Promise.reject(new Error('planner-sync-config.js에 Supabase 주소와 공개 키를 넣어 주세요.'));
+    if(!clientPromise){
+      clientPromise = loadLibrary().then(function(){
+        return window.supabase.createClient(PLANNER_SUPABASE_URL, PLANNER_SUPABASE_ANON_KEY, {
+          auth: { persistSession: true, autoRefreshToken: true }
+        });
+      });
+    }
+    return clientPromise;
+  }
+
+  function readSeq(){
+    try { return parseInt(localStorage.getItem(SEQ_KEY) || '0', 10) || 0; } catch(e){ return 0; }
+  }
+  function writeSeq(n){
+    n = parseInt(n, 10) || 0;
+    if(n < readSeq()) return;
+    try { localStorage.setItem(SEQ_KEY, String(n)); } catch(e){}
+  }
+
+  function sessionClient(){
+    return getClient().then(function(client){
+      return client.auth.getSession().then(function(res){
+        var session = res && res.data && res.data.session;
+        cachedEmail = session && session.user && session.user.email ? session.user.email : '';
+        if(!session){
+          var err = new Error('팀 로그인이 필요합니다. 동기화 창에서 로그인해 주세요.');
+          err.authRequired = true;
+          throw err;
+        }
+        return client;
+      });
+    });
+  }
+
+  function shapeError(err){
+    var auth = !!(err && err.authRequired);
+    return {
+      result: 'error',
+      message: (err && err.message) || 'Supabase 동기화에 실패했습니다.',
+      retry: false,
+      authRequired: auth
+    };
+  }
+
+  function pull(client){
+    var since = readSeq();
+    var rows = [];
+    var from = 0;
+    var page = 200;
+    function next(){
+      return client.from('planner_entities')
+        .select('key,value,revision,deleted,updated_at,change_seq')
+        .gt('change_seq', since)
+        .order('change_seq', { ascending: true })
+        .range(from, from + page - 1)
+        .then(function(res){
+          if(res.error) throw new Error(res.error.message || '항목을 읽지 못했습니다.');
+          var chunk = res.data || [];
+          rows = rows.concat(chunk);
+          if(chunk.length < page) return rows;
+          from += page;
+          return next();
+        });
+    }
+    return next().then(function(){
+      var emptyTable = since === 0 && !rows.length;
+      var applied = { conflicts: [] };
+      if(typeof applySupabaseEntityRows_ === 'function'){
+        applied = applySupabaseEntityRows_(rows) || applied;
+      }
+      var maxSeq = since;
+      rows.forEach(function(row){
+        var seq = parseInt(row.change_seq, 10) || 0;
+        if(seq > maxSeq) maxSeq = seq;
+      });
+      writeSeq(maxSeq);
+      return {
+        result: 'success',
+        supabaseApplied: true,
+        emptyTable: emptyTable,
+        serverRevision: maxSeq,
+        savedAt: new Date().toISOString(),
+        payload: null,
+        conflicts: applied.conflicts || [],
+        syncCapabilities: CAPS
+      };
+    });
+  }
+
+  function patch(client, mutations){
+    var body = (mutations || []).map(function(mut){
+      return {
+        key: mut.key,
+        value: mut.deleted ? null : mut.value,
+        deleted: !!mut.deleted,
+        baseEntityRevision: parseInt(mut.baseEntityRevision, 10) || 0,
+        mutationId: mut.mutationId || ''
+      };
+    });
+    return client.rpc('planner_apply_batch', { p_rows: body }).then(function(res){
+      if(res.error) throw new Error(res.error.message || '항목을 저장하지 못했습니다.');
+      var data = res.data || {};
+      if(data.result === 'error'){
+        return { result: 'error', message: data.message || '저장 실패', retry: false };
+      }
+      writeSeq(data.changeSeq);
+      var accepted = (data.accepted || []).map(function(item){
+        return {
+          mutationId: item.mutationId || '',
+          key: item.key,
+          entityRevision: parseInt(item.revision, 10) || 0,
+          version: 1
+        };
+      });
+      var conflicts = (data.conflicts || []).map(function(item){
+        return {
+          key: item.key,
+          mutationId: item.mutationId || '',
+          version: 1,
+          serverValue: item.value,
+          serverDeleted: !!item.deleted,
+          serverEntityRevision: parseInt(item.revision, 10) || 0,
+          serverUpdatedAt: item.updatedAt || ''
+        };
+      });
+      if(typeof noteSupabaseAcceptedRevisions_ === 'function'){
+        noteSupabaseAcceptedRevisions_(accepted);
+      }
+      var payload = typeof getPersistPayload === 'function' ? getPersistPayload() : {};
+      if(data.changeSeq) payload.syncRevision = parseInt(data.changeSeq, 10) || payload.syncRevision;
+      var result = conflicts.length ? (accepted.length ? 'partial' : 'conflict') : 'success';
+      return {
+        result: result,
+        supabaseApplied: true,
+        serverRevision: parseInt(data.changeSeq, 10) || 0,
+        savedAt: new Date().toISOString(),
+        payload: payload,
+        accepted: accepted,
+        conflicts: conflicts,
+        syncCapabilities: CAPS
+      };
+    });
+  }
+
+  function importRows(rows){
+    return sessionClient().then(function(client){
+      var chunks = [];
+      var i;
+      for(i = 0; i < rows.length; i += 20) chunks.push(rows.slice(i, i + 20));
+      var seq = 0;
+      var chain = Promise.resolve();
+      var started = false;
+      chunks.forEach(function(chunk){
+        chain = chain.then(function(){
+          var cont = started;
+          started = true;
+          return client.rpc('planner_import_batch', { p_rows: chunk, p_continue: cont }).then(function(res){
+            if(res.error) throw new Error(res.error.message || '넣기 실패');
+            var data = res.data || {};
+            if(data.result === 'error') throw new Error(data.message || '넣기 실패');
+            seq = parseInt(data.changeSeq, 10) || seq;
+          });
+        });
+      });
+      return chain.then(function(){
+        writeSeq(seq);
+        return { ok: true, changeSeq: seq };
+      });
+    });
+  }
+
+  function signIn(email, password){
+    return getClient().then(function(client){
+      return client.auth.signInWithPassword({ email: email, password: password }).then(function(res){
+        if(res.error) throw new Error(res.error.message || '로그인 실패');
+        cachedEmail = email;
+        return { ok: true, email: email };
+      });
+    });
+  }
+
+  function handle(request){
+    if(!configured()){
+      return Promise.resolve({
+        result: 'error',
+        retry: false,
+        message: 'planner-sync-config.js에 Supabase 주소와 공개 키를 넣어 주세요.'
+      });
+    }
+    var action = request && request.action;
+    return sessionClient().then(function(client){
+      if(action === 'plannerSyncPull') return pull(client);
+      if(action === 'plannerSyncPatch') return patch(client, (request && request.mutations) || []);
+      return Promise.resolve({
+        result: 'error',
+        retry: false,
+        message: '전체 파일 저장은 쓰지 않습니다. 바뀐 항목만 올립니다.'
+      });
+    }).catch(function(err){
+      return shapeError(err);
+    });
+  }
+
+  setTimeout(function(){
+    if(!configured()) return;
+    getClient().then(function(client){
+      return client.auth.getSession();
+    }).then(function(res){
+      var session = res && res.data && res.data.session;
+      cachedEmail = session && session.user && session.user.email ? session.user.email : '';
+      try { if(typeof updateSyncStatusUI_ === 'function') updateSyncStatusUI_(); } catch(e){}
+    }).catch(function(){});
+  }, 0);
+
+  return {
+    configured: configured,
+    cachedEmail: function(){ return cachedEmail; },
+    handle: handle,
+    signIn: signIn,
+    importRows: importRows
+  };
+})();

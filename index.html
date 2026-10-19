@@ -115,8 +115,8 @@
       <input class="modal-input" type="email" id="planner-employee-id" placeholder="name@company.com" autocomplete="email" />
     </div>
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid #E5E7EB;">
-      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">서버 동기화 토큰 (관리자용)</div>
-      <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:8px;">직원은 공용 초대 링크로 접속하면 자동 저장되므로 직접 입력할 필요가 없습니다.</div>
+      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">Apps Script 토큰 (관리자용)</div>
+      <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:8px;">글 동기화에는 쓰지 않습니다. 글 생성·유튜브 분석·이미지 업스케일이 Apps Script를 호출할 때 사용합니다.</div>
       <input class="modal-input" type="password" id="planner-sync-token" placeholder="PLANNER_SYNC_TOKEN" autocomplete="off" />
       <button type="button" class="modal-btn-ghost" onclick="copyPlannerTeamInviteLink_()" style="margin-top:8px;">직원용 초대 링크 복사</button>
     </div>
@@ -210,7 +210,7 @@
       <div class="modal-title" style="margin:0;">동기화 및 설정</div>
       <button type="button" class="prompt-modal-close" onclick="closeSyncStatusModal_()" aria-label="닫기">×</button>
     </div>
-    <div class="modal-desc" style="font-size:12px;margin-bottom:12px;">서버·이 기기·Drive 상태와 AI 설정을 한곳에서 확인합니다. 기준본은 <strong>서버(GAS)</strong>이며 Drive는 개인 백업입니다.</div>
+    <div class="modal-desc" style="font-size:12px;margin-bottom:12px;">서버·이 기기·Drive 상태와 AI 설정을 한곳에서 확인합니다. 글과 기획의 기준본은 <strong>Supabase</strong>이며 Drive는 개인 백업입니다. 글 생성·유튜브 분석·이미지 업스케일은 Apps Script를 사용합니다.</div>
     <div id="sync-status-body" class="sync-status-body">불러오는 중…</div>
     <div id="sync-status-err" style="font-size:12px;color:#EF4444;min-height:18px;margin-top:8px;"></div>
     <div class="sync-status-actions">
@@ -437,7 +437,7 @@
 <script src="planner-reel.js?v=27"></script>
 <script src="planner-sync-config.js?v=1"></script>
 <script src="planner-sync-supabase.js?v=1"></script>
-<script src="planner.js?v=307" defer></script>
+<script src="planner.js?v=308" defer></script>
 <script>
 function openLinksModal_(){
   var o = document.getElementById('links-modal-overlay');

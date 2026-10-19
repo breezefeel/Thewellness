@@ -11536,10 +11536,17 @@ function finishTopicListCheck_(index){
   });
   var stillDeleted = Object.keys(local).filter(function(id){ return !!serverDeleted[id]; });
   if(onlyHere.length){
+    state._sessionUserEdit = true;
     enqueueSyncOutboxChanges_(onlyHere.map(function(id){ return 'draft:' + id; }), getPersistPayload());
+    onlyHere.forEach(function(id){
+      var key = 'draft:' + id;
+      (state.syncOutbox || []).forEach(function(op){
+        if(op && op.key === key) op.baseEntityRevision = 0;
+      });
+    });
   }
-  state._topicListGap = !!(missingHere.length || onlyHere.length || stillDeleted.length);
-  state._topicListGapCount = missingHere.length + onlyHere.length + stillDeleted.length;
+  state._topicListGap = !!(missingHere.length || stillDeleted.length);
+  state._topicListGapCount = missingHere.length + stillDeleted.length;
   return state._topicListGap;
 }
 function applySupabaseEntityRows_(rows){
@@ -15825,6 +15832,7 @@ function countRealUnpushedMutations_(){
 }
 /** 이전 세션 잔재(794건 루프)는 올리지 않음. 이 세션에서 고친 것만 푸시. */
 function shouldBlockStaleFloodPush_(){
+  if(outboxHasUserDraftUpload_()) return false;
   if(state._emptyServerSeed && state.syncNeedsSnapshot) return false;
   if(state._sessionUserEdit) return false;
   return countRealUnpushedMutations_() > REAL_UNPUSHED_PUSH_MAX_;
@@ -16018,11 +16026,16 @@ function discardStaleUnpushedBeforeConnect_(){
   if(n > 0 && n <= REAL_UNPUSHED_PUSH_MAX_){
     // 데스크탑에 남아 있는 전송은 새로고침마다 「전체」로 다시 도는 잔재. 폰이 맞춘 서버를 받는다.
     if(isPlannerDesktopBrowser_()){
-      state.syncOutbox = [];
+      var keptDrafts = (state.syncOutbox || []).filter(function(op){
+        return op && !op.deleted && /^draft:/.test(String(op.key || '')) && draftRowHasUserText_(op.value);
+      });
+      state.syncOutbox = keptDrafts;
       state.syncDirtyEntityKeys = {};
+      keptDrafts.forEach(function(op){ state.syncDirtyEntityKeys[op.key] = true; });
       state.syncNeedsSnapshot = false;
-      state.syncDirty = false;
-      state._sessionUserEdit = false;
+      state.syncDirty = keptDrafts.length > 0;
+      state._sessionUserEdit = keptDrafts.length > 0;
+      if(keptDrafts.length) rebuildDirtyStateFromOutbox_();
       return;
     }
     state._sessionUserEdit = true;
@@ -17059,9 +17072,14 @@ function pruneOrphanSubGoalStepOutbox_(){
     }
   }
 }
+function outboxHasUserDraftUpload_(){
+  return (state.syncOutbox || []).some(function(op){
+    return op && !op.deleted && /^draft:/.test(String(op.key || '')) && draftRowHasUserText_(op.value);
+  });
+}
 function schedulePlannerGasPush_(immediate){
   if(!plannerSyncBootstrapReady_ || !state._bootstrapChoiceDone || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return;
-  if(isPlannerDesktopBrowser_() && !state._sessionUserEdit && hasPendingLocalSyncChanges_()){
+  if(isPlannerDesktopBrowser_() && !state._sessionUserEdit && hasPendingLocalSyncChanges_() && !outboxHasUserDraftUpload_()){
     state.syncOutbox = [];
     state.syncDirtyEntityKeys = {};
     state.syncNeedsSnapshot = false;
@@ -17317,6 +17335,27 @@ async function plannerGasPushNow_(){
     } catch(parseErr) {
       throw new Error('서버 응답 형식 오류');
     }
+    }
+    if(Array.isArray(data.conflicts) && data.conflicts.length){
+      var retryMissingDraft = false;
+      data.conflicts.forEach(function(conflict){
+        var conflictRev = parseInt(conflict && conflict.serverEntityRevision, 10) || 0;
+        if(!conflict || conflict.serverDeleted || conflictRev !== 0) return;
+        if(String(conflict.key || '').indexOf('draft:') !== 0) return;
+        (state.syncOutbox || []).forEach(function(op){
+          if(!op || op.key !== conflict.key) return;
+          if((parseInt(op.baseEntityRevision, 10) || 0) !== 0){
+            op.baseEntityRevision = 0;
+            retryMissingDraft = true;
+          }
+        });
+      });
+      if(retryMissingDraft){
+        acknowledgeSyncOutbox_(data.accepted || [], mutations);
+        save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+        schedulePlannerGasPush_(true);
+        return { ok: true, retryMissing: true };
+      }
     }
     if(Array.isArray(data.conflicts) && data.conflicts.length && data.payload){
       acknowledgeSyncOutbox_(data.accepted || [], mutations);
@@ -18239,8 +18278,10 @@ function getSyncStatusInfo_(remoteMeta){
       (state._topicListGapCount ? ' (' + state._topicListGapCount + '건).' : '.');
     actionHint = '이 기기에 없는 주제는 서버에서 받고, 이 기기에만 있는 주제는 서버로 올립니다.';
   } else if(phase === 'pending'){
-    summary = '이 기기 변경이 아직 Supabase에 반영되지 않았어요' +
-      (pendingCount ? ' (남은 약 ' + pendingCount + '건)' : '') + '.';
+    summary = outboxHasUserDraftUpload_()
+      ? '이 기기에만 있는 주제를 서버로 올리는 중이에요. 올린 뒤 다른 기기가 받습니다.'
+      : ('이 기기 변경이 아직 Supabase에 반영되지 않았어요' +
+      (pendingCount ? ' (남은 약 ' + pendingCount + '건)' : '') + '.');
     actionHint = '자동으로 올라갑니다. 오래 멈추면 「동기화」→「지금 동기화」를 누르세요.';
   } else if(phase === 'warn'){
     if(loginRequired){
@@ -18920,16 +18961,18 @@ async function runPlannerBootstrapInBackground_(){
         save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
       } catch(eSupaSv){}
       try { renderTabs(); renderMain(); } catch(eSupaR){}
-      if(!bootstrapData.emptyTable && hasPendingLocalSyncChanges_()){
+        if(!bootstrapData.emptyTable && hasPendingLocalSyncChanges_()){
         try { schedulePlannerGasPush_(true); } catch(eSupaPush){}
       }
       try { updateSyncStatusUI_(); } catch(eSupaU){}
       if(typeof setAppToast === 'function'){
         setAppToast(bootstrapData.emptyTable
           ? 'Supabase에 아직 팀 내용이 없습니다. 이 브라우저의 내용은 올리지 않았습니다.'
-          : (bootstrapData.topicGap
-            ? '주제 목록이 서버와 달라 최신으로 두지 않았습니다. 빠진 주제를 맞추는 중이에요.'
-            : '주제 목록을 Supabase와 맞췄어요.'), { duration: 5200, variant: 'ok' });
+          : (hasPendingLocalSyncChanges_()
+            ? '이 기기에만 있는 주제를 서버로 올리는 중이에요. 올린 뒤 다른 기기가 받습니다.'
+            : (bootstrapData.topicGap
+              ? '서버에 있는 주제 중 이 기기에 없는 항목이 있어요. 받는 중이에요.'
+              : '주제 목록을 Supabase와 맞췄어요.')), { duration: 5200, variant: 'ok' });
       }
       return;
     }
@@ -20787,6 +20830,9 @@ async function syncAllSourcesIfNewerCore_(reason){
           renderMain();
         }
         updateSyncStatusUI_();
+        if(hasPendingLocalSyncChanges_()){
+          try { schedulePlannerGasPush_(true); } catch(eSupaPush2){}
+        }
         return true;
       }
       if(data.result === 'success' && data.payload){

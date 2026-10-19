@@ -1,6 +1,8 @@
 /* 플래너 항목 동기화. GAS 동기화 쓰기는 호출하지 않습니다. */
 var PlannerSyncSupabase = (function(){
   var SEQ_KEY = 'ht_planner_supa_seq';
+  var FULL_KEY = 'ht_planner_supa_full';
+  var FULL_GEN = '2';
   var clientPromise = null;
   var cachedEmail = '';
   var CAPS = {
@@ -75,6 +77,11 @@ var PlannerSyncSupabase = (function(){
   }
 
   function pull(client){
+    var replay = false;
+    try { replay = localStorage.getItem(FULL_KEY) !== FULL_GEN; } catch(eFull){ replay = true; }
+    if(replay){
+      try { localStorage.setItem(SEQ_KEY, '0'); } catch(eReset){}
+    }
     var since = readSeq();
     var rows = [];
     var from = 0;
@@ -106,6 +113,9 @@ var PlannerSyncSupabase = (function(){
         if(seq > maxSeq) maxSeq = seq;
       });
       writeSeq(maxSeq);
+      if(replay && applied && applied.appliedGeneration === 2){
+        try { localStorage.setItem(FULL_KEY, FULL_GEN); } catch(eMark){}
+      }
       return {
         result: 'success',
         supabaseApplied: true,

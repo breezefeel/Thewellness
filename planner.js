@@ -11569,7 +11569,7 @@ function applySupabaseEntityRows_(rows){
   if(conflicts.length && typeof openPlannerOutboxConflict_ === 'function'){
     openPlannerOutboxConflict_(conflicts, payload, parseInt(payload.syncRevision, 10) || 0);
   }
-  return { conflicts: conflicts, changed: changed };
+  return { conflicts: conflicts, changed: changed, appliedGeneration: 2 };
 }
 async function plannerGasJsonRequest_(requestPayload, timeoutMs){
   var syncAction = requestPayload && requestPayload.action;

@@ -8332,18 +8332,23 @@ function formatYearPeriodCreatedLabel_(iso){
 }
 function autoGrowTextarea_(ta){
   if(!ta || ta.nodeName !== 'TEXTAREA') return;
-  ta.style.height = 'auto';
-  ta.style.overflowY = 'hidden';
-  var style = window.getComputedStyle(ta);
-  var lineH = parseFloat(style.lineHeight);
-  if(!lineH || isNaN(lineH)) lineH = (parseFloat(style.fontSize) || 12) * 1.5;
-  var pad = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
-  var border = (parseFloat(style.borderTopWidth) || 0) + (parseFloat(style.borderBottomWidth) || 0);
-  var minRows = parseInt(ta.getAttribute('rows'), 10);
-  if(isNaN(minRows) || minRows < 1) minRows = 2;
-  var minH = Math.ceil(lineH * minRows + pad + border);
-  var next = Math.max(minH, ta.scrollHeight + 2);
-  ta.style.height = next + 'px';
+  if(ta._growRaf) return;
+  ta._growRaf = requestAnimationFrame(function(){
+    ta._growRaf = 0;
+    if(!ta.isConnected) return;
+    ta.style.height = 'auto';
+    ta.style.overflowY = 'hidden';
+    var style = window.getComputedStyle(ta);
+    var lineH = parseFloat(style.lineHeight);
+    if(!lineH || isNaN(lineH)) lineH = (parseFloat(style.fontSize) || 12) * 1.5;
+    var pad = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+    var border = (parseFloat(style.borderTopWidth) || 0) + (parseFloat(style.borderBottomWidth) || 0);
+    var minRows = parseInt(ta.getAttribute('rows'), 10);
+    if(isNaN(minRows) || minRows < 1) minRows = 2;
+    var minH = Math.ceil(lineH * minRows + pad + border);
+    var next = Math.max(minH, ta.scrollHeight + 2);
+    ta.style.height = next + 'px';
+  });
 }
 function autoGrowTextareas_(rootEl){
   var root = rootEl || document.getElementById('plan-workshop-body');
@@ -10754,19 +10759,26 @@ async function callClaudePlannerForDraftJson_(prompt, options){
     throw new Error('초안 JSON을 읽지 못했어요. (' + hint + ')');
   }
 }
+var topicFieldSaveTimer_ = null;
 window.updateTopicDraftField_ = function(draftId, field, value){
   var catId = state.currentCat;
   var cat = CATEGORIES[catId];
   if(!cat || !draftId) return;
   var d = (cat.drafts || []).find(function(x){ return x && x.id === draftId; });
   if(!d) return;
-  d[field] = field === 'rationale' ? stripTopicRationaleStepPrefix_(String(value || '').trim()) : String(value || '').trim();
+  var raw = String(value || '');
+  d[field] = field === 'rationale' ? stripTopicRationaleStepPrefix_(raw) : raw;
   d.updatedAt = new Date().toISOString();
-  if(!isUserAddedDraftId_(draftId)){
-    var patch = { topic: d.topic || '', angle: d.angle || '', rationale: d.rationale || '' };
-    stampDraftBrandOverride_(draftId, patch);
-  }
-  save({ driveImmediate: true, gasImmediate: true });
+  if(topicFieldSaveTimer_) clearTimeout(topicFieldSaveTimer_);
+  topicFieldSaveTimer_ = setTimeout(function(){
+    topicFieldSaveTimer_ = null;
+    var trimmed = String(d[field] || '').trim();
+    d[field] = field === 'rationale' ? stripTopicRationaleStepPrefix_(trimmed) : trimmed;
+    if(!isUserAddedDraftId_(draftId)){
+      stampDraftBrandOverride_(draftId, { topic: d.topic || '', angle: d.angle || '', rationale: d.rationale || '' });
+    }
+    save();
+  }, 800);
 };
 window.refreshTopicWorkshop_ = function(){
   if(state.planWorkshopMode === 'topic'){
@@ -17143,6 +17155,15 @@ function outboxHasUserDraftUpload_(){
 }
 function schedulePlannerGasPush_(immediate){
   if(!plannerSyncBootstrapReady_ || !state._bootstrapChoiceDone || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return;
+  if(typeof shouldProtectComposeUi_ === 'function' && shouldProtectComposeUi_()){
+    if(!plannerGasPushTimer){
+      plannerGasPushTimer = setTimeout(function(){
+        plannerGasPushTimer = null;
+        schedulePlannerGasPush_(false);
+      }, 1200);
+    }
+    return;
+  }
   if(isPlannerDesktopBrowser_() && !state._sessionUserEdit && hasPendingLocalSyncChanges_() && !plannerOutboxHasTeamContent_()){
     state.syncOutbox = [];
     state.syncDirtyEntityKeys = {};
@@ -17183,6 +17204,10 @@ function schedulePlannerGasPush_(immediate){
   plannerGasPushTimer = null;
   var run = function(){
     plannerGasPushTimer = null;
+    if(typeof shouldProtectComposeUi_ === 'function' && shouldProtectComposeUi_()){
+      schedulePlannerGasPush_(false);
+      return;
+    }
     if(Date.now() < (state._bootQuietUntil || 0)){
       schedulePlannerGasPush_(false);
       return;

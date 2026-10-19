@@ -11545,8 +11545,6 @@ function applySupabaseEntityRows_(rows){
       }
       return;
     }
-    var localRev = parseInt(payload.syncEntityRevisions[key], 10) || 0;
-    if(serverRev < localRev) return;
     setSyncEntity_(payload, key, serverVal);
     payload.syncEntityRevisions[key] = serverRev;
     if(row.deleted){
@@ -18151,8 +18149,7 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(busy){
     phase = 'queued';
     overall = 'syncing';
-  } else if(serverOn && !state._bootstrapChoiceDone && isPlannerEmployeeEmailValid_(getPlannerEmployeeId_()) &&
-      !(localRev && serverRev && localRev === serverRev && !localPending && !remoteNewer)){
+  } else if(serverOn && !state._bootstrapChoiceDone && isPlannerEmployeeEmailValid_(getPlannerEmployeeId_())){
     phase = 'checking';
     overall = 'syncing';
   }
@@ -18844,6 +18841,11 @@ async function runPlannerBootstrapInBackground_(){
   try {
     if(!isPlannerEmployeeEmailValid_(getPlannerEmployeeId_())) return;
     if(state._bootstrapChoiceDone || plannerBootstrapChoicePending_) return;
+    try {
+      var supaSeq = parseInt(localStorage.getItem('ht_planner_supa_seq') || '0', 10) || 0;
+      var shownRev = parseInt(state.syncRevision, 10) || 0;
+      if(shownRev > 100000 && shownRev > supaSeq * 10) localStorage.setItem('ht_planner_supa_seq', '0');
+    } catch(eSeq){}
     var heavyLocal = isPlannerLocalStoreHeavy_() || isPlannerPayloadHeavy_(getPersistPayload());
     if(typeof setAppToast === 'function'){
       setAppToast(
@@ -18861,6 +18863,10 @@ async function runPlannerBootstrapInBackground_(){
     if(bootstrapData && bootstrapData.supabaseApplied){
       state._teamLoginRequired = false;
       state._bootstrapChoiceDone = true;
+      if(bootstrapData.serverRevision){
+        state.syncRevision = parseInt(bootstrapData.serverRevision, 10) || state.syncRevision;
+        try { markGasSyncOk_(state.syncRevision, bootstrapData.savedAt); } catch(eSupaRev){}
+      }
       if(bootstrapData.emptyTable){
         state._emptyServerSeed = false;
         state.syncNeedsSnapshot = false;

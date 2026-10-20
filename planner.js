@@ -33824,16 +33824,29 @@ async function topicPhotoBlobToJpegData_(blob, maxEdge){
   var bmp = await loadBitmapForThumb_(blob);
   var w = bmp.naturalWidth || bmp.width || 1;
   var h = bmp.naturalHeight || bmp.height || 1;
-  var scale = Math.min(1, (maxEdge || 768) / Math.max(w, h));
-  var c = document.createElement('canvas');
-  c.width = Math.max(1, Math.round(w * scale));
-  c.height = Math.max(1, Math.round(h * scale));
-  var ctx = c.getContext('2d');
-  ctx.drawImage(bmp, 0, 0, c.width, c.height);
+  var edge = maxEdge || 1280;
+  var quality = 0.9;
+  var data = '';
+  var guard = 0;
+  while(guard < 4){
+    var scale = Math.min(1, edge / Math.max(w, h));
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w * scale));
+    c.height = Math.max(1, Math.round(h * scale));
+    var ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    if(ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bmp, 0, 0, c.width, c.height);
+    var dataUrl = c.toDataURL('image/jpeg', quality);
+    var m = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
+    data = m ? m[1] : '';
+    if(!data || data.length <= 800000) break;
+    quality = Math.max(0.72, quality - 0.08);
+    edge = Math.round(edge * 0.85);
+    guard++;
+  }
   if(bmp.close){ try { bmp.close(); } catch(eClose){} }
-  var dataUrl = c.toDataURL('image/jpeg', 0.82);
-  var m = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
-  return m ? m[1] : '';
+  return data;
 }
 async function loadTopicPhotoRefList_(paths, role, maxCount){
   var out = [];
@@ -33842,7 +33855,7 @@ async function loadTopicPhotoRefList_(paths, role, maxCount){
     try {
       var res = await fetch(topicPhotoRefUrl_(paths[i]), { cache: 'force-cache' });
       if(!res.ok) continue;
-      var data = await topicPhotoBlobToJpegData_(await res.blob(), 768);
+      var data = await topicPhotoBlobToJpegData_(await res.blob(), 1280);
       if(data) out.push({ mediaType: 'image/jpeg', data: data, role: role });
     } catch(eRef){}
   }
@@ -33873,20 +33886,31 @@ async function cropDataUrlToFourFive_(dataUrl){
   var h = img.naturalHeight || img.height || 1;
   var target = 4 / 5;
   var ratio = w / h;
+  var closeEnough = Math.abs(ratio - target) <= 0.02;
+  if(closeEnough && w >= 1080 && h >= 1350){
+    if(img.close){ try { img.close(); } catch(eClose){} }
+    return dataUrl;
+  }
   var sw = w, sh = h, sx = 0, sy = 0;
   if(ratio > target + 0.02){
     sh = h; sw = h * target; sx = (w - sw) / 2; sy = 0;
   } else if(ratio < target - 0.02){
     sw = w; sh = w / target; sx = 0; sy = 0;
   }
+  var outW = 1080;
+  var outH = 1350;
+  if(sw >= 1080 && sh >= 1350){
+    outW = Math.max(1080, Math.round(sw));
+    outH = Math.max(1350, Math.round(outW / target));
+  }
   var c = document.createElement('canvas');
-  c.width = 1080; c.height = 1350;
+  c.width = outW; c.height = outH;
   var ctx = c.getContext('2d');
   ctx.imageSmoothingEnabled = true;
   if(ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, 1080, 1350);
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
   if(img.close){ try { img.close(); } catch(eClose){} }
-  return c.toDataURL('image/jpeg', 0.9);
+  return c.toDataURL('image/jpeg', 0.92);
 }
 window.generateTopicPhoto_ = async function(btn){
   if(btn && btn.disabled) return;
@@ -33915,7 +33939,7 @@ window.generateTopicPhoto_ = async function(btn){
   }
   var branch = topicPhotoBranchKey_(content);
   var model = topicPhotoModelKey_(content);
-  var photoEstimateSec = 45;
+  var photoEstimateSec = 60;
   if(btn) startButtonCountdown_(btn, { estimateSec: photoEstimateSec, busyLabel: '만드는 중', idleText: '이미지 생성' });
   setAppToast('참고 사진으로 4:5 사진을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.', { duration: 4000, variant: 'ok' });
   try {

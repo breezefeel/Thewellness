@@ -2040,6 +2040,7 @@ color: #fff;
 padding: 10px 14px; border-radius: 10px; border: 1px solid #E5E7EB;
 background: #fff; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
 }
+.img-tool-copy-btn:disabled { opacity: .45; cursor: default; }
 .img-tool-hint {
 font-size: 11px; color: #92400E; line-height: 1.55; margin-top: 14px; padding: 10px 12px;
 background: #FFFBEB; border-radius: 8px; border: 1px solid #FDE68A;

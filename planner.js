@@ -33723,18 +33723,16 @@ function topicPhotoModelLine_(model){
 function buildTopicPhotoPrompt_(content, catId, topic){
   var branch = topicPhotoBranchKey_(content);
   var action = topicPhotoActionLine_(content, catId);
-  var topicLine = String(topic || (content && content.blog && content.blog.title) || (content && content.community && content.community.title) || action).replace(/^🌿\s*/, '').trim();
   return [
     '4:5 세로. 수업 중에 휴대폰으로 찍은 듯한 실사 한 장. 블로그에 넣고, 같은 사진을 4:5 썸네일 배경으로 쓴다.',
-    '주제 「' + topicLine + '」.',
     '이 순간의 동작: ' + action + '. 한 장면으로 멈추고, 손과 몸의 위치가 보이게.',
     '공간: ' + topicPhotoSpaceLine_(branch),
     topicPhotoModelLine_(topicPhotoModelKey_(content)),
     '함께 넣은 공간 사진 여러 장 중 구도 하나만 따른다. 여러 공간을 한 화면에 섞지 않는다. 방에 원래 있는 소품은 치우지 않는다.',
     '복장: 남색 반팔 운동 티, 검은 반바지. 참고 사진의 스크럽·츄리닝·홈웨어는 따르지 않는다.',
-    '인물은 화면 아래쪽에 둔다. 위쪽은 그 방의 창이나 벽이 조금 보여, 썸네일 제목이 올라갈 자리가 있게 한다. 얼굴은 그 글자 자리에 두지 않는다.',
+    '인물과 동작은 화면 위쪽에 둔다. 아래쪽 3분의 1은 바닥이나 매트만 남겨, 썸네일 글자가 그 위에 올라갈 자리로 비운다. 얼굴, 손, 동작의 핵심은 그 아래 자리에 두지 않는다.',
     '빛은 창으로 들어오는 낮 빛. 피부와 바닥은 실제처럼. 포스터처럼 한가운데 세우거나 윤곽을 깎지 않는다.',
-    '글자, 화살표, 도표, 해부 그림, 병원 침상, 로고, 워터마크는 넣지 않는다. 사람은 한 명.'
+    '사진 안에는 한글, 영문, 숫자, 자막, 제목, 간판 글씨, 화살표, 도표, 해부 그림, 병원 침상, 로고, 워터마크를 그리지 않는다. 참고 사진의 자격증·창 글씨도 따라 적지 않는다. 사람은 한 명.'
   ].join('\n');
 }
 function ensureTopicPhotoPrompt_(content, topic, catId, force){
@@ -33745,7 +33743,7 @@ function ensureTopicPhotoPrompt_(content, topic, catId, force){
   if(!content.images.photoBranch) content.images.photoBranch = 'incheon';
   if(content.images.photoModel !== 'f') content.images.photoModel = 'm';
   var current = (content.images.gptVisuals || [])[0];
-  if(!force && current && current.role === 'topicPhoto' && current.prompt && current.prompt.indexOf('9:16') < 0) return content;
+  if(!force && current && current.role === 'topicPhoto' && current.prompt && current.prompt.indexOf('9:16') < 0 && current.prompt.indexOf('화면 아래쪽') < 0 && current.prompt.indexOf('주제 「') < 0) return content;
   var draft = null;
   try {
     var cat = CATEGORIES[catId];
@@ -33784,6 +33782,7 @@ function renderTopicPhotoCard_(content){
   html += '</select>';
   html += '</div>';
   html += '<div class="topic-photo-bar-side topic-photo-bar-actions">';
+  html += '<button type="button" class="img-tool-copy-btn" id="topic-photo-download" onclick="downloadTopicPhoto_()"' + (preview ? '' : ' disabled') + '>다운로드</button>';
   html += '<button type="button" class="topic-photo-go" id="topic-photo-go" onclick="generateTopicPhoto_(this)">이미지 생성</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="copyCommunityOrDailyImageSlot_(0, this)">프롬프트 복사</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="rebuildTopicPhotoPrompt_()">프롬프트 재생성</button>';
@@ -33796,6 +33795,8 @@ function renderTopicPhotoCard_(content){
 }
 function fillTopicPhotoPreview_(dataUrl){
   var box = document.getElementById('topic-photo-preview');
+  var dl = document.getElementById('topic-photo-download');
+  if(dl) dl.disabled = !dataUrl;
   if(!box) return;
   box.innerHTML = dataUrl ? '<img alt="만든 주제 사진" src="' + dataUrl + '">' : '';
 }
@@ -33876,7 +33877,7 @@ async function cropDataUrlToFourFive_(dataUrl){
   if(ratio > target + 0.02){
     sh = h; sw = h * target; sx = (w - sw) / 2; sy = 0;
   } else if(ratio < target - 0.02){
-    sw = w; sh = w / target; sx = 0; sy = Math.max(0, (h - sh) * 0.35);
+    sw = w; sh = w / target; sx = 0; sy = 0;
   }
   var c = document.createElement('canvas');
   c.width = 1080; c.height = 1350;
@@ -33914,12 +33915,12 @@ window.generateTopicPhoto_ = async function(btn){
   }
   var branch = topicPhotoBranchKey_(content);
   var model = topicPhotoModelKey_(content);
-  var idle = btn ? btn.textContent : '이미지 생성';
-  if(btn){ btn.disabled = true; btn.textContent = '만드는 중…'; }
-  setAppToast('참고 사진을 넣어 4:5 사진을 만들고 있어요. 20~40초 걸릴 수 있어요.', { duration: 5000, variant: 'ok' });
+  var photoEstimateSec = 45;
+  if(btn) startButtonCountdown_(btn, { estimateSec: photoEstimateSec, busyLabel: '만드는 중', idleText: '이미지 생성' });
+  setAppToast('참고 사진으로 4:5 사진을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.', { duration: 4000, variant: 'ok' });
   try {
     var refs = await loadTopicPhotoRefs_(branch, model);
-    var apiPrompt = prompt + '\n\n첨부 사진 앞쪽은 공간, 마지막은 모델이다. 공간은 한 구도만 쓰고 얼굴은 모델 사진을 따른다. 4:5 한 장.';
+    var apiPrompt = prompt + '\n\n사진 안에 글자, 숫자, 자막, 제목, 로고를 그리지 않는다. 주제 문장을 사진에 적지 않는다. 인물과 동작은 화면 위쪽에 두고, 아래쪽 3분의 1은 바닥만 남겨 썸네일 글자가 올라갈 자리로 비운다. 얼굴과 손은 아래에 두지 않는다. 첨부 사진 앞쪽은 공간, 마지막은 모델이다. 4:5 한 장. 사람은 한 명.';
     var data = await plannerGasJsonRequest_({
       action: 'plannerGenerateTopicPhoto',
       prompt: apiPrompt,
@@ -33952,8 +33953,26 @@ window.generateTopicPhoto_ = async function(btn){
   } catch(err){
     setAppToast((err && err.message) || '이미지 생성에 실패했어요.', { duration: 5200, variant: 'err' });
   } finally {
-    if(btn){ btn.disabled = false; btn.textContent = idle; }
+    if(btn) stopButtonCountdown_(btn);
   }
+};
+window.downloadTopicPhoto_ = function(){
+  var st = ensureThumbMakerState_();
+  var url = (st && st.fileName === '주제 사진.jpg' && st.bgDataUrl) ? st.bgDataUrl : '';
+  if(!url){
+    var img = document.querySelector('#topic-photo-preview img');
+    url = img ? img.getAttribute('src') || '' : '';
+  }
+  if(!url){
+    setAppToast('아직 만든 사진이 없어요.', { duration: 2200, variant: 'err' });
+    return;
+  }
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = '주제사진-4x5.jpg';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 };
 function buildImageTabBody(content){
   const catId = state.selectedCatId;

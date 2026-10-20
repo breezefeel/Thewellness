@@ -11527,6 +11527,142 @@ function listLocalUserDraftIds_(){
   });
   return ids;
 }
+function classifyTopicGap_(spec){
+  spec = spec || {};
+  var outbox = spec.outbox || [];
+  var ids = {};
+  if(spec.selectedId) ids[String(spec.selectedId)] = true;
+  if(spec.focusIds){
+    Object.keys(spec.focusIds).forEach(function(id){ if(id) ids[String(id)] = true; });
+  }
+  var hasIds = Object.keys(ids).length > 0;
+  var real = [];
+  outbox.forEach(function(op){
+    if(!op || !op.key || op.key === 'setting:surfaceDigest') return;
+    if(outbox.length > 12 && !(op.localOnly || (hasIds && syncKeyBelongsToDraftIds_(op.key, ids)))) return;
+    real.push(op);
+  });
+  var serverRev = spec.serverRev || {};
+  var ask = [];
+  var upload = [];
+  var seen = {};
+  real.forEach(function(op){
+    var base = parseInt(op.base, 10) || 0;
+    var rev = parseInt(serverRev[op.key], 10) || 0;
+    if(rev > base){
+      if(ask.indexOf(op.key) < 0) ask.push(op.key);
+      return;
+    }
+    if(!seen[op.key]){
+      seen[op.key] = true;
+      upload.push(op.key);
+    }
+  });
+  (spec.onlyHere || []).forEach(function(id){
+    var key = 'draft:' + id;
+    if(seen[key] || ask.indexOf(key) >= 0) return;
+    seen[key] = true;
+    upload.push(key);
+  });
+  (spec.planOnlyHere || []).forEach(function(key){
+    if(!key || seen[key] || ask.indexOf(key) >= 0) return;
+    seen[key] = true;
+    upload.push(key);
+  });
+  (spec.keepLocal || []).forEach(function(key){
+    if(!key || seen[key] || ask.indexOf(key) >= 0) return;
+    seen[key] = true;
+    upload.push(key);
+  });
+  var listReceive = (spec.missingHere || []).length + (spec.missingContent || []).length + (spec.planMissingHere || []).length + (spec.stillDeleted || []).length + (spec.planStillDeleted || []).length;
+  var localRev = spec.localRev || {};
+  var serverAhead = false;
+  Object.keys(serverRev).forEach(function(key){
+    if(!key || key === 'setting:surfaceDigest') return;
+    var rev = parseInt(serverRev[key], 10) || 0;
+    var local = parseInt(localRev[key], 10) || 0;
+    if(local > 0 && rev > local) serverAhead = true;
+  });
+  var adoptSurface = !!(!ask.length && !upload.length && !listReceive && (spec.surfaceDiff || serverAhead));
+  return {
+    askKeys: ask,
+    uploadKeys: upload,
+    receive: !!(listReceive || adoptSurface),
+    adoptSurface: adoptSurface
+  };
+}
+function applyTopicGapDecision_(detail, index){
+  var serverRev = {};
+  (index || []).forEach(function(row){
+    if(row && row.key) serverRev[String(row.key)] = parseInt(row.revision, 10) || 0;
+  });
+  detail.serverRev = serverRev;
+  var decision = classifyTopicGap_({
+    outbox: (state.syncOutbox || []).map(function(op){
+      return { key: op && op.key, base: op && op.baseEntityRevision, localOnly: !!(op && op.localOnly) };
+    }),
+    selectedId: state.selectedId || '',
+    focusIds: state._syncFocusDraftIds || null,
+    serverRev: serverRev,
+    onlyHere: detail.onlyHere,
+    planOnlyHere: detail.planOnlyHere,
+    missingHere: detail.missingHere,
+    missingContent: detail.missingContent,
+    planMissingHere: detail.planMissingHere,
+    stillDeleted: detail.stillDeleted,
+    planStillDeleted: detail.planStillDeleted,
+    keepLocal: state._topicKeepLocalKeys || [],
+    surfaceDiff: !!detail.surfaceDiff,
+    localRev: state.syncEntityRevisions || {}
+  });
+  state._topicKeepLocalKeys = [];
+  detail.ambiguousKeys = decision.askKeys;
+  state._topicListGap = decision.askKeys.length > 0 && !plannerSyncConflictPending_;
+  state._topicListGapCount = decision.askKeys.length;
+  if(decision.uploadKeys.length && !state._topicGapResolving){
+    decision.uploadKeys.forEach(function(key){
+      queueTopicGapEntity_(key, false, serverRev[key] || 0);
+    });
+    (state.syncOutbox || []).forEach(function(op){
+      if(op && decision.uploadKeys.indexOf(op.key) >= 0) op.localOnly = true;
+    });
+    state.syncDirty = true;
+    state._sessionUserEdit = true;
+    try { rebuildDirtyStateFromOutbox_(); } catch(eGapUp){}
+    try { schedulePlannerGasPush_(true); } catch(eGapPush){}
+  }
+  var attempts = state._topicReceiveAttempts || 0;
+  if(decision.receive && !state._topicGapResolving && !plannerSyncConflictPending_){
+    if(attempts >= 2){
+      if(state._topicGapAdoptServer && detail.surfaceDiff && !decision.uploadKeys.length && !decision.askKeys.length){
+        try { maybeQueueSurfaceDigest_(); } catch(eDig){}
+      }
+      if(!state._topicReceiveGaveUp && decision.receive && !decision.askKeys.length){
+        state._topicReceiveGaveUp = true;
+        if(typeof setAppToast === 'function') setAppToast('서버 내용으로 한 번 더 맞추지 못했습니다. 이 기기의 수정은 그대로 두고, 다음 저장 때 다시 맞춥니다.', { duration: 4800, variant: 'ok' });
+      }
+    } else if(!state._topicReceiveScheduled){
+      state._topicReceiveAttempts = attempts + 1;
+      state._topicReceiveScheduled = true;
+      var adopt = !!(decision.adoptSurface && !decision.uploadKeys.length);
+      setTimeout(function(){
+        state._topicReceiveScheduled = false;
+        state._topicGapAdoptServer = !!adopt;
+        var pull = plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_PULL_TIMEOUT_MS);
+        var clearAdopt = function(){ state._topicGapAdoptServer = false; };
+        if(pull && typeof pull.then === 'function') pull.then(clearAdopt, clearAdopt);
+        else clearAdopt();
+      }, 400);
+    }
+  } else if(!decision.receive){
+    state._topicReceiveAttempts = 0;
+    state._topicReceiveGaveUp = false;
+  }
+  if(state._topicListGap && !state._topicGapResolving){
+    setTimeout(function(){ try { openTopicGapChoice_(); } catch(eGap){} }, 500);
+  }
+  return state._topicListGap;
+}
 function finishTopicListCheck_(index){
   var local = listLocalUserDraftIds_();
   var serverLive = {};
@@ -11647,12 +11783,7 @@ function finishTopicListCheck_(index){
     serverDigest: serverDigest,
     serverDigestRev: serverDigestRev
   };
-  state._topicListGap = !!(missingHere.length || stillDeleted.length || missingContent.length || planMissingHere.length || planStillDeleted.length || surfaceDiff);
-  state._topicListGapCount = missingHere.length + stillDeleted.length + missingContent.length + planMissingHere.length + planStillDeleted.length + planOnlyHere.length + (surfaceDiff ? 1 : 0);
-  if(state._topicListGap && !state._topicGapResolving){
-    setTimeout(function(){ try { openTopicGapChoice_(); } catch(eGap){} }, 500);
-  }
-  return state._topicListGap;
+  return applyTopicGapDecision_(state._topicListGapDetail, index);
 }
 function imageSigFromValue_(val){
   if(val == null || val === '') return '';
@@ -11771,21 +11902,16 @@ function openTopicGapChoice_(){
   if(!state._topicListGap) return;
   if(state._topicGapChoiceOpen || state._topicGapResolving) return;
   var detail = state._topicListGapDetail || {};
+  if(!(detail.ambiguousKeys || []).length){
+    state._topicListGap = false;
+    return;
+  }
   var body = document.getElementById('sync-gap-body');
   var overlay = document.getElementById('sync-gap-overlay');
   if(!body || !overlay) return;
-  var html = '<p>주제 수, 초안, 이미지, 순서, 기획, 채널 완료, 프롬프트, 지점 운영이 서버와 같지 않습니다. 고르면 그 기준으로 이 기기와 서버를 같게 만듭니다.</p>';
-  if(detail.surfaceDiff){
-    html += '<p>프로그램 설명, 1년·일상 기획, 목표, 채널 완료, 고정, 프롬프트, 지점 체크가 서버에 저장된 것과 다릅니다.</p>';
-  }
-  html += topicGapListHtml_('이 기기에만 있는 주제', detail.onlyHere, topicGapDraftLabel_);
-  html += topicGapListHtml_('서버에만 있는 주제', detail.missingHere, function(id){ return id; });
-  html += topicGapListHtml_('서버는 지웠고 이 기기에 남은 주제', detail.stillDeleted, topicGapDraftLabel_);
-  html += topicGapListHtml_('서버에만 있는 본문', detail.missingContent, function(key){ return key; });
-  html += topicGapListHtml_('이 기기에만 있는 프로그램 단계', detail.planOnlyHere, function(key){ return key; });
-  html += topicGapListHtml_('서버에만 있는 프로그램 단계', detail.planMissingHere, function(key){ return key; });
-  html += topicGapListHtml_('서버는 지웠고 이 기기에 남은 프로그램 단계', detail.planStillDeleted, function(key){ return key; });
-  html += '<p class="sync-gap-note">이 기기 기준: 여기 있는 주제는 서버에 되살리고, 서버에만 있는 항목은 서버에서 뺍니다.<br>서버 기준: 서버가 지운 주제는 이 기기에서도 지우고, 서버에만 있는 항목은 이 기기로 받습니다.</p>';
+  var html = '<p>같은 항목을 이 기기와 서버가 각각 고쳤습니다. 그 항목만 어느 쪽으로 남길지 고르면 됩니다.</p>';
+  html += topicGapListHtml_('양쪽에서 고친 항목', detail.ambiguousKeys, function(key){ return key; });
+  html += '<p class="sync-gap-note">이 기기: 고른 항목만 이 기기 내용으로 서버에 저장합니다.<br>서버: 고른 항목만 서버 내용으로 이 기기를 바꿉니다.</p>';
   body.innerHTML = html;
   state._topicGapChoiceOpen = true;
   try { closeSyncStatusModal_(); } catch(eClose){}
@@ -11870,103 +11996,55 @@ function queueTopicGapEntity_(key, deleted, baseRev, explicitValue){
 }
 window.applyTopicGapChoice_ = async function(side){
   var detail = state._topicListGapDetail || {};
+  var keys = (detail.ambiguousKeys || []).slice();
   closeTopicGapChoice_();
   state._topicGapResolving = true;
   var useLocal = side === 'local';
   try {
+    if(!keys.length){
+      state._topicListGap = false;
+      return;
+    }
     if(useLocal){
-      (detail.stillDeleted || []).forEach(function(id){
-        if(state.deletedDraftIds) delete state.deletedDraftIds[id];
-        queueTopicGapEntity_('draft:' + id, false, (detail.deletedRev || {})[id] || 0);
+      keys.forEach(function(key){
+        queueTopicGapEntity_(key, false, (detail.serverRev || {})[key] || 0);
       });
-      (detail.onlyHere || []).forEach(function(id){
-        queueTopicGapEntity_('draft:' + id, false, 0);
+      (state.syncOutbox || []).forEach(function(op){
+        if(op && keys.indexOf(op.key) >= 0) op.localOnly = true;
       });
-      (detail.missingHere || []).forEach(function(id){
-        queueTopicGapEntity_('draft:' + id, true, (detail.liveRev || {})[id] || 0);
-      });
-      (detail.missingContent || []).forEach(function(key){
-        queueTopicGapEntity_(key, true, (detail.contentRev || {})[key] || 0);
-      });
-      (detail.planOnlyHere || []).forEach(function(key){
-        queueTopicGapEntity_(key, false, 0);
-      });
-      (detail.planStillDeleted || []).forEach(function(key){
-        queueTopicGapEntity_(key, false, (detail.planDeletedRev || {})[key] || 0);
-      });
-      (detail.planMissingHere || []).forEach(function(key){
-        queueTopicGapEntity_(key, true, (detail.planLiveRev || {})[key] || 0);
-      });
-      if(detail.surfaceDiff){
-        try {
-          var surfaceKeys = Object.keys(collectSyncEntities_(getPersistPayload(), { skipEnsureIds: true }) || {}).filter(surfaceMatchEntityKey_);
-          surfaceKeys.forEach(function(key){ queueTopicGapEntity_(key, false, 0); });
-        } catch(eSurfaceKeys){}
-        queueTopicGapEntity_('setting:surfaceDigest', false, detail.serverDigestRev || 0, { digest: detail.localDigest || programSurfaceDigest_() });
-      }
       state.syncDirty = true;
       state._sessionUserEdit = true;
       state._gapUploadActive = true;
       plannerSyncBootstrapReady_ = true;
       state._bootstrapChoiceDone = true;
       try { rebuildDirtyStateFromOutbox_(); } catch(eReb){}
-      try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true }); } catch(eSv){}
       var last = await plannerGasPushNow_();
       state._gapUploadActive = false;
-      state._topicListGap = false;
+      state._topicListGap = !(last && last.ok);
       if(!last || !last.ok){
-        if(typeof setAppToast === 'function') setAppToast('이 기기 기준으로 맞추다 멈췄습니다. 동기화 창에서 다시 고르세요.', { duration: 5200, variant: 'err' });
-        state._topicListGap = true;
+        if(typeof setAppToast === 'function') setAppToast('고른 항목을 올리다 멈췄습니다. 다시 고르세요.', { duration: 5200, variant: 'err' });
       } else if(typeof setAppToast === 'function'){
-        setAppToast('이 기기 기준으로 서버와 같게 맞췄습니다. 다른 기기는 새로고침하면 받습니다.', { duration: 5200, variant: 'ok' });
+        setAppToast('고른 항목을 이 기기 내용으로 서버에 저장했습니다.', { duration: 4200, variant: 'ok' });
       }
     } else {
-      state._topicGapForceServer = true;
       state.syncOutbox = (state.syncOutbox || []).filter(function(op){
-        return !(op && (surfaceMatchEntityKey_(op.key) || op.key === 'setting:surfaceDigest'));
+        return !(op && keys.indexOf(op.key) >= 0);
       });
       try { rebuildDirtyStateFromOutbox_(); } catch(eOut){}
-      (detail.onlyHere || []).concat(detail.stillDeleted || []).forEach(dropTopicGapDraftLocally_);
-      try { purgeDeletedDraftsFromCatalog_(); } catch(ePurge){}
-      try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true }); } catch(eSv2){}
-      try { renderTabs(); renderMain(); } catch(eR){}
+      state._topicGapReceiveKeys = keys.slice();
+      state._topicGapForceKeys = true;
       await plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_PULL_TIMEOUT_MS);
-      var after = state._topicListGapDetail || {};
-      var listsLeft = (after.missingHere || []).length + (after.stillDeleted || []).length + (after.missingContent || []).length + (after.planMissingHere || []).length + (after.planStillDeleted || []).length + (after.onlyHere || []).length + (after.planOnlyHere || []).length;
-      if(listsLeft){
-        state._topicListGap = true;
-        if(typeof setAppToast === 'function') setAppToast('서버에만 있는 항목 중 아직 못 받은 것이 있습니다. 다시 고르세요.', { duration: 5200, variant: 'err' });
-      } else {
-        var adoptedDigest = '';
-        try { adoptedDigest = programSurfaceDigest_(); } catch(eDig){ adoptedDigest = ''; }
-        if(adoptedDigest && adoptedDigest !== String(after.serverDigest || '')){
-          queueTopicGapEntity_('setting:surfaceDigest', false, after.serverDigestRev || 0, { digest: adoptedDigest });
-          state._gapUploadActive = true;
-          state._sessionUserEdit = true;
-          plannerSyncBootstrapReady_ = true;
-          state._bootstrapChoiceDone = true;
-          var digPush = await plannerGasPushNow_();
-          state._gapUploadActive = false;
-          if(!digPush || !digPush.ok){
-            state._topicListGap = true;
-            if(typeof setAppToast === 'function') setAppToast('서버 내용으로 맞추다 멈췄습니다. 다시 고르세요.', { duration: 5200, variant: 'err' });
-          } else {
-            state._topicListGap = false;
-          }
-        } else {
-          state._topicListGap = false;
-        }
-        if(!state._topicListGap && typeof setAppToast === 'function'){
-          setAppToast('서버 기준으로 이 기기를 맞췄습니다.', { duration: 4200, variant: 'ok' });
-        }
-      }
+      state._topicListGap = false;
+      if(typeof setAppToast === 'function') setAppToast('고른 항목을 서버 내용으로 맞췄습니다.', { duration: 4200, variant: 'ok' });
     }
   } catch(eGap){
     state._gapUploadActive = false;
-    state._topicListGap = true;
+    state._topicGapForceKeys = false;
+    state._topicListGap = keys.length > 0;
     if(typeof setAppToast === 'function') setAppToast((eGap && eGap.message) || '맞추지 못했습니다.', { duration: 5200, variant: 'err' });
   } finally {
     state._topicGapForceServer = false;
+    state._topicGapForceKeys = false;
     state._topicGapResolving = false;
     try { updateSyncStatusUI_(); } catch(eUi){}
     if(state._topicListGap) setTimeout(function(){ try { openTopicGapChoice_(); } catch(eRe){} }, 400);
@@ -12032,7 +12110,19 @@ function collectGeneralProgramUploadKeys_(){
     return true;
   });
 }
+function syncServerValueBlank_(key, val){
+  if(val == null || val === '') return true;
+  key = String(key || '');
+  try {
+    if(key.indexOf('draft:') === 0) return !draftRowHasUserText_(val);
+    if(key.indexOf('generated:') === 0 || key.indexOf('published:') === 0) return !!syncValueIsPruned_(val);
+  } catch(eBlank){}
+  return false;
+}
 function applySupabaseEntityRows_(rows){
+  if(!state._gapUploadActive && !state._generalUploadOnly && !state._topicGapForceKeys){
+    try { dropBulkOutboxUnlessChosen_(); } catch(eDropBulk){}
+  }
   rows = rows || [];
   var payload = getPersistPayload();
   var keepGeneral = shouldKeepLocalGeneralPrograms_();
@@ -12056,9 +12146,13 @@ function applySupabaseEntityRows_(rows){
   });
   var conflicts = [];
   var changed = false;
+  var keepLocal = [];
+  var localEntities = {};
+  try { localEntities = collectSyncEntities_(payload, { skipEnsureIds: true }) || {}; } catch(eLocalEnt){}
   rows.forEach(function(row){
     if(!row || !row.key || isDeviceLocalSyncEntityKey_(row.key)) return;
     var key = String(row.key);
+    if(state._topicGapForceKeys && (state._topicGapReceiveKeys || []).indexOf(key) < 0) return;
     if(!row.deleted && key.indexOf('plan:subgoal:') === 0 && isFixedGeneralProgramKey_(key) && !(localGeneralKeys && localGeneralKeys[key])){
       sawIncomingGeneralPlan = true;
     }
@@ -12067,7 +12161,7 @@ function applySupabaseEntityRows_(rows){
     }
     var serverRev = parseInt(row.revision, 10) || 0;
     var serverVal = row.deleted ? undefined : row.value;
-    if(state._topicGapForceServer){
+    if(state._topicGapForceServer || state._topicGapForceKeys){
       setSyncEntity_(payload, key, serverVal);
       payload.syncEntityRevisions[key] = serverRev;
       if(row.deleted){
@@ -12102,6 +12196,11 @@ function applySupabaseEntityRows_(rows){
       }
       return;
     }
+    if(!row.deleted && syncServerValueBlank_(key, serverVal) && !syncServerValueBlank_(key, localEntities[key])){
+      keepLocal.push(key);
+      payload.syncEntityRevisions[key] = serverRev;
+      return;
+    }
     setSyncEntity_(payload, key, serverVal);
     payload.syncEntityRevisions[key] = serverRev;
     if(row.deleted){
@@ -12130,7 +12229,8 @@ function applySupabaseEntityRows_(rows){
     state.syncEntityRevisions = payload.syncEntityRevisions;
     state.syncEntityTombstones = payload.syncEntityTombstones;
   }
-  if(conflicts.length && !state._topicGapForceServer && typeof openPlannerOutboxConflict_ === 'function'){
+  if(keepLocal.length) state._topicKeepLocalKeys = (state._topicKeepLocalKeys || []).concat(keepLocal);
+  if(conflicts.length && !state._topicGapForceServer && !state._topicGapForceKeys && typeof openPlannerOutboxConflict_ === 'function'){
     openPlannerOutboxConflict_(conflicts, payload, parseInt(payload.syncRevision, 10) || 0);
   }
   return { conflicts: conflicts, changed: changed, appliedGeneration: 2 };
@@ -17816,6 +17916,28 @@ async function plannerPullRemoteIntoStateCore_(){
 async function plannerPullRemoteIntoState_(){
   return withPlannerSyncMutex_(function(){ return plannerPullRemoteIntoStateCore_(); });
 }
+function dropBulkOutboxUnlessChosen_(){
+  if(state._gapUploadActive || state._generalUploadOnly) return 0;
+  var before = (state.syncOutbox || []).length;
+  if(before <= 12) return 0;
+  var ids = {};
+  if(state.selectedId) ids[state.selectedId] = true;
+  if(state._syncFocusDraftIds){
+    Object.keys(state._syncFocusDraftIds).forEach(function(id){ ids[id] = true; });
+  }
+  var kept = (state.syncOutbox || []).filter(function(op){
+    if(!op || !op.key) return false;
+    if(op.localOnly || op.key === 'setting:surfaceDigest') return true;
+    return !!(Object.keys(ids).length && syncKeyBelongsToDraftIds_(op.key, ids));
+  });
+  state.syncOutbox = kept;
+  state.syncDirtyEntityKeys = {};
+  kept.forEach(function(op){ if(op && op.key) state.syncDirtyEntityKeys[op.key] = true; });
+  state.syncNeedsSnapshot = false;
+  state.syncDirty = kept.length > 0;
+  try { rebuildDirtyStateFromOutbox_(); } catch(eBulkReb){}
+  return before - kept.length;
+}
 async function plannerGasPushNow_(){
   var url = getPlannerGasUrl_();
   if(!url || !plannerSyncBootstrapReady_ || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return { ok: false, skipped: true };
@@ -17824,6 +17946,11 @@ async function plannerGasPushNow_(){
   }
   return withPlannerSyncMutex_(async function(){
   try {
+    var droppedBulk = 0;
+    try { droppedBulk = dropBulkOutboxUnlessChosen_(); } catch(eBulk){}
+    if(droppedBulk && typeof setAppToast === 'function'){
+      setAppToast('이번 수정이 아닌 ' + droppedBulk + '건은 올리지 않았습니다.', { duration: 4200, variant: 'ok' });
+    }
     try {
       if(clearStuckSyncFlagsIfClean_(null)){
         save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
@@ -17874,8 +18001,14 @@ async function plannerGasPushNow_(){
     var maxPatchRounds = usePatch ? ((state._generalUploadOnly || state._gapUploadActive) ? 80 : 12) : 1;
     var round = 0;
     var lastOkRevision = state.syncRevision;
+    var outboxPrevRound = (state.syncOutbox || []).length;
     while(round < maxPatchRounds){
       round++;
+      if(round > 1 && (state.syncOutbox || []).length >= outboxPrevRound && !state._gapUploadActive && !state._generalUploadOnly){
+        try { dropBulkOutboxUnlessChosen_(); } catch(eStall){}
+        if((state.syncOutbox || []).length >= outboxPrevRound) break;
+      }
+      outboxPrevRound = (state.syncOutbox || []).length;
       if(round > 1){
         if(plannerSyncConflictPending_ || !state.syncDirty) break;
         body = getPersistPayload();
@@ -18927,10 +19060,10 @@ function getSyncStatusInfo_(remoteMeta){
     summary = 'Supabase에 이 기기보다 최신 내용(rev ' + remoteRev + ')이 있어요.';
     actionHint = '「동기화」버튼을 누른 뒤 「지금 동기화」로 받아오세요.';
   } else if(phase === 'topic_gap'){
-    summary = '주제 수, 초안, 이미지, 순서, 기획, 채널 완료, 프롬프트, 지점 운영이 서버와 같지 않습니다' +
+    summary = '같은 항목을 양쪽에서 고쳤습니다' +
       (state._topicListGapCount ? ' (' + state._topicListGapCount + '건). ' : '. ') +
-      '어느 쪽으로 맞출지 고르면 이 기기와 서버가 같아집니다.';
-    actionHint = '선택 창에서 이 기기 또는 서버를 고르세요. 고르기 전에는 최신으로 두지 않습니다.';
+      '그 항목만 고르면 나머지는 최신 내용으로 맞춰집니다.';
+    actionHint = '선택 창에 나온 항목만 고르세요.';
   } else if(phase === 'pending'){
     summary = plannerOutboxHasTeamContent_()
       ? '이 기기에만 있는 주제·초안·기획을 서버로 올리는 중이에요. 올린 뒤 다른 기기가 받습니다.'
@@ -19629,7 +19762,7 @@ async function runPlannerBootstrapInBackground_(){
           : (hasPendingLocalSyncChanges_()
             ? '이 기기에만 있는 주제를 서버로 올리는 중이에요. 올린 뒤 다른 기기가 받습니다.'
             : (bootstrapData.topicGap
-              ? '화면 내용이 서버와 다릅니다. 어느 쪽으로 맞출지 고르세요.'
+              ? '같은 항목을 양쪽에서 고쳐 그 항목만 고르면 됩니다.'
               : '주제 목록을 Supabase와 맞췄어요.')), { duration: 5200, variant: 'ok' });
       }
       return;
@@ -20744,9 +20877,20 @@ function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
     return !shouldSkipPlannerConflict_(conflict.key, conflict.local, conflict.remote);
   });
   if(!conflicts.length) return false;
-  // 1~5건은 선택창. 대량만 이 기기 유지 후 서버 리비전으로 한 번 덮어씀
-  if(conflicts.length > 5){
-    keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts);
+  if(conflicts.length > 12){
+    var dropKeys = {};
+    conflicts.forEach(function(conflict){ if(conflict && conflict.key) dropKeys[conflict.key] = true; });
+    state.syncOutbox = (state.syncOutbox || []).filter(function(op){
+      return !(op && dropKeys[op.key]);
+    });
+    try { rebuildDirtyStateFromOutbox_(); } catch(eMany){}
+    state._topicGapAdoptServer = true;
+    setTimeout(function(){
+      var pull = plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_PULL_TIMEOUT_MS);
+      var clearAdopt = function(){ state._topicGapAdoptServer = false; };
+      if(pull && typeof pull.then === 'function') pull.then(clearAdopt, clearAdopt);
+      else clearAdopt();
+    }, 300);
     return true;
   }
   plannerSyncConflictPending_ = {

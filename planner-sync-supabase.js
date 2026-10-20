@@ -236,7 +236,14 @@ var PlannerSyncSupabase = (function(){
         syncCapabilities: CAPS
       };
     }
-    if(typeof state !== 'undefined' && state._topicGapForceServer){
+    if(typeof state !== 'undefined' && state._topicGapForceKeys && state._topicGapReceiveKeys && state._topicGapReceiveKeys.length && !state._topicGapForceServer && !state._topicGapAdoptServer){
+      var want = state._topicGapReceiveKeys.slice();
+      return loadDraftRows(want).then(function(extra){
+        rows = extra || [];
+        return finishPull(rows);
+      });
+    }
+    if(typeof state !== 'undefined' && (state._topicGapForceServer || state._topicGapAdoptServer)){
       return loadSurfaceRows().then(function(surfaceRows){
         var seen = {};
         rows = [];

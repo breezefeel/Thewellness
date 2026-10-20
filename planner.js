@@ -33730,7 +33730,7 @@ function buildTopicPhotoPrompt_(content, catId, topic){
     topicPhotoModelLine_(topicPhotoModelKey_(content)),
     '함께 넣은 공간 사진 여러 장 중 구도 하나만 따른다. 여러 공간을 한 화면에 섞지 않는다. 방에 원래 있는 소품은 치우지 않는다.',
     '복장: 남색 반팔 운동 티, 검은 반바지. 참고 사진의 스크럽·츄리닝·홈웨어는 따르지 않는다.',
-    '인물과 동작은 좌우 한가운데, 화면 위쪽에 둔다. 몸통과 얼굴의 중심이 세로 가운데선에 온다. 머리가 왼쪽, 다리가 오른쪽으로 치우치지 않는다. 아래쪽 3분의 1은 바닥이나 매트만 남겨, 썸네일 글자가 그 위에 올라갈 자리로 비운다. 얼굴, 손, 발은 그 아래 자리에 두지 않는다. 가장자리에 붙이지 않는다.',
+    '카메라는 동작이 크게 보이게 가까이 둔다. 인물과 동작이 화면 너비의 대부분을 채운다. 멀리서 방 전체를 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통과 얼굴의 중심이 세로 가운데선에 온다. 머리가 왼쪽, 다리가 오른쪽으로 치우치지 않는다. 아래쪽 약 4분의 1만 바닥이나 매트로 비워 썸네일 글자 자리로 둔다. 얼굴, 손, 발은 그 글자 자리에 넣지 않는다. 가장자리에 붙이지 않는다.',
     '빛은 창으로 들어오는 낮 빛. 피부와 바닥은 실제처럼. 포스터처럼 한가운데 세우거나 윤곽을 깎지 않는다.',
     '사진 안에는 한글, 영문, 숫자, 자막, 제목, 간판 글씨, 화살표, 도표, 해부 그림, 병원 침상, 로고, 워터마크를 그리지 않는다. 참고 사진의 자격증·창 글씨도 따라 적지 않는다. 사람은 한 명.'
   ].join('\n');
@@ -33743,7 +33743,7 @@ function ensureTopicPhotoPrompt_(content, topic, catId, force){
   if(!content.images.photoBranch) content.images.photoBranch = 'incheon';
   if(content.images.photoModel !== 'f') content.images.photoModel = 'm';
   var current = (content.images.gptVisuals || [])[0];
-  if(!force && current && current.role === 'topicPhoto' && current.prompt && current.prompt.indexOf('9:16') < 0 && current.prompt.indexOf('화면 아래쪽') < 0 && current.prompt.indexOf('주제 「') < 0 && current.prompt.indexOf('좌우 한가운데') >= 0) return content;
+  if(!force && current && current.role === 'topicPhoto' && current.prompt && current.prompt.indexOf('9:16') < 0 && current.prompt.indexOf('화면 아래쪽') < 0 && current.prompt.indexOf('주제 「') < 0 && current.prompt.indexOf('화면 너비의 대부분') >= 0) return content;
   var draft = null;
   try {
     var cat = CATEGORIES[catId];
@@ -33944,7 +33944,7 @@ window.generateTopicPhoto_ = async function(btn){
   setAppToast('참고 사진으로 4:5 사진을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.', { duration: 4000, variant: 'ok' });
   try {
     var refs = await loadTopicPhotoRefs_(branch, model);
-    var apiPrompt = prompt + '\n\n사진 안에 글자, 숫자, 자막, 제목, 로고를 그리지 않는다. 주제 문장을 사진에 적지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통 중심이 세로 가운데선에 오고, 머리와 다리가 좌우로 치우치지 않는다. 아래쪽 3분의 1은 바닥만 남겨 썸네일 글자가 올라갈 자리로 비운다. 얼굴, 손, 발은 아래에 두지 않는다. 첨부 사진 앞쪽은 공간, 마지막은 모델이다. 4:5 한 장. 사람은 한 명.';
+    var apiPrompt = prompt + '\n\n사진 안에 글자, 숫자, 자막, 제목, 로고를 그리지 않는다. 주제 문장을 사진에 적지 않는다. 카메라는 가까이. 인물과 동작이 화면 너비의 대부분을 채운다. 방 전체를 멀리서 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통 중심이 세로 가운데선에 온다. 아래쪽 약 4분의 1만 바닥으로 비워 썸네일 글자 자리로 둔다. 얼굴, 손, 발은 그 자리에 넣지 않는다. 첨부 사진 앞쪽은 공간, 마지막은 모델이다. 4:5 한 장. 사람은 한 명.';
     var data = await plannerGasJsonRequest_({
       action: 'plannerGenerateTopicPhoto',
       prompt: apiPrompt,

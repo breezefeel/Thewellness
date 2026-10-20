@@ -11577,13 +11577,250 @@ function finishTopicListCheck_(index){
     if(key.indexOf('generated:') !== 0 && key.indexOf('published:') !== 0) return false;
     return !localHasSyncedContentKey_(key);
   });
+  var deletedRev = {};
+  var liveRev = {};
+  var contentRev = {};
+  (index || []).forEach(function(row){
+    if(!row || !row.key) return;
+    var key = String(row.key);
+    var rev = parseInt(row.revision, 10) || 0;
+    if(key.indexOf('draft:') === 0){
+      var id = key.slice('draft:'.length);
+      if(row.deleted) deletedRev[id] = rev;
+      else liveRev[id] = rev;
+    } else if(key.indexOf('generated:') === 0 || key.indexOf('published:') === 0){
+      contentRev[key] = rev;
+    }
+  });
+  state._topicListGapDetail = {
+    missingHere: missingHere,
+    stillDeleted: stillDeleted,
+    missingContent: missingContent,
+    onlyHere: onlyHere,
+    deletedRev: deletedRev,
+    liveRev: liveRev,
+    contentRev: contentRev
+  };
   state._topicListGap = !!(missingHere.length || stillDeleted.length || missingContent.length);
   state._topicListGapCount = missingHere.length + stillDeleted.length + missingContent.length;
+  if(state._topicListGap && !state._topicGapResolving){
+    setTimeout(function(){ try { openTopicGapChoice_(); } catch(eGap){} }, 500);
+  }
   return state._topicListGap;
+}
+function topicGapDraftLabel_(id){
+  var topic = '';
+  CATEGORIES.forEach(function(cat){
+    (cat.drafts || []).forEach(function(d){
+      if(d && d.id === id && d.topic) topic = String(d.topic);
+    });
+  });
+  return topic || id;
+}
+function topicGapListHtml_(title, ids, labelFn){
+  ids = ids || [];
+  if(!ids.length) return '';
+  var shown = ids.slice(0, 6).map(function(id){
+    return '<li>' + escapeHtml(labelFn ? labelFn(id) : id) + '</li>';
+  }).join('');
+  var more = ids.length > 6 ? '<li>외 ' + (ids.length - 6) + '건</li>' : '';
+  return '<div class="sync-gap-block" style="margin:10px 0;"><strong>' + escapeHtml(title) + ' ' + ids.length + '건</strong><ul style="margin:6px 0 0;padding-left:18px;">' + shown + more + '</ul></div>';
+}
+function openTopicGapChoice_(){
+  if(!state._topicListGap) return;
+  if(state._topicGapChoiceOpen || state._topicGapResolving) return;
+  var detail = state._topicListGapDetail || {};
+  var body = document.getElementById('sync-gap-body');
+  var overlay = document.getElementById('sync-gap-overlay');
+  if(!body || !overlay) return;
+  var html = '<p>어느 쪽이 더 최신이라고 단정할 수 없는 차이가 있습니다. 고르면 그 기준으로 이 기기와 서버를 같게 만듭니다.</p>';
+  html += topicGapListHtml_('이 기기에만 있는 주제', detail.onlyHere, topicGapDraftLabel_);
+  html += topicGapListHtml_('서버에만 있는 주제', detail.missingHere, function(id){ return id; });
+  html += topicGapListHtml_('서버는 지웠고 이 기기에 남은 주제', detail.stillDeleted, topicGapDraftLabel_);
+  html += topicGapListHtml_('서버에만 있는 본문', detail.missingContent, function(key){ return key; });
+  html += '<p class="sync-gap-note">이 기기 기준: 여기 있는 주제는 서버에 되살리고, 서버에만 있는 항목은 서버에서 뺍니다.<br>서버 기준: 서버가 지운 주제는 이 기기에서도 지우고, 서버에만 있는 항목은 이 기기로 받습니다.</p>';
+  body.innerHTML = html;
+  state._topicGapChoiceOpen = true;
+  try { closeSyncStatusModal_(); } catch(eClose){}
+  if(typeof openScrollLockedOverlayEl_ === 'function') openScrollLockedOverlayEl_(overlay);
+  else overlay.classList.add('open');
+}
+function closeTopicGapChoice_(){
+  state._topicGapChoiceOpen = false;
+  var overlay = document.getElementById('sync-gap-overlay');
+  if(!overlay) return;
+  if(typeof closeScrollLockedOverlayEl_ === 'function') closeScrollLockedOverlayEl_(overlay);
+  else overlay.classList.remove('open');
+}
+function dropTopicGapDraftLocally_(id){
+  if(!id) return;
+  if(!state.deletedDraftIds) state.deletedDraftIds = {};
+  state.deletedDraftIds[id] = new Date().toISOString();
+  var keys = ['draft:' + id, 'generated:' + id, 'published:' + id];
+  state.syncOutbox = (state.syncOutbox || []).filter(function(op){
+    return !(op && keys.indexOf(op.key) >= 0);
+  });
+  delete state.generatedOnly[id];
+  delete state.published[id];
+}
+function queueTopicGapEntity_(key, deleted, baseRev){
+  if(!key) return;
+  if(!Array.isArray(state.syncOutbox)) state.syncOutbox = [];
+  var entities = {};
+  try { entities = collectSyncEntities_(getPersistPayload(), { skipEnsureIds: true }) || {}; } catch(eEnt){}
+  var hasValue = Object.prototype.hasOwnProperty.call(entities, key);
+  var existing = null;
+  state.syncOutbox.forEach(function(op){
+    if(op && op.key === key) existing = op;
+  });
+  var op = existing || {
+    mutationId: makePlannerMutationId_(),
+    version: 1,
+    key: key
+  };
+  op.value = deleted ? null : (hasValue ? cloneSyncValue_(entities[key]) : null);
+  op.deleted = !!deleted || !hasValue;
+  op.baseEntityRevision = parseInt(baseRev, 10) || 0;
+  op.updatedAt = new Date().toISOString();
+  op.version = (parseInt(op.version, 10) || 1) + (existing ? 1 : 0);
+  if(!existing) state.syncOutbox.push(op);
+  if(!state.syncDirtyEntityKeys) state.syncDirtyEntityKeys = {};
+  state.syncDirtyEntityKeys[key] = true;
+}
+window.applyTopicGapChoice_ = async function(side){
+  var detail = state._topicListGapDetail || {};
+  closeTopicGapChoice_();
+  state._topicGapResolving = true;
+  var useLocal = side === 'local';
+  try {
+    if(useLocal){
+      (detail.stillDeleted || []).forEach(function(id){
+        if(state.deletedDraftIds) delete state.deletedDraftIds[id];
+        queueTopicGapEntity_('draft:' + id, false, (detail.deletedRev || {})[id] || 0);
+      });
+      (detail.onlyHere || []).forEach(function(id){
+        queueTopicGapEntity_('draft:' + id, false, 0);
+      });
+      (detail.missingHere || []).forEach(function(id){
+        queueTopicGapEntity_('draft:' + id, true, (detail.liveRev || {})[id] || 0);
+      });
+      (detail.missingContent || []).forEach(function(key){
+        queueTopicGapEntity_(key, true, (detail.contentRev || {})[key] || 0);
+      });
+      state.syncDirty = true;
+      state._sessionUserEdit = true;
+      state._gapUploadActive = true;
+      plannerSyncBootstrapReady_ = true;
+      state._bootstrapChoiceDone = true;
+      try { rebuildDirtyStateFromOutbox_(); } catch(eReb){}
+      try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true }); } catch(eSv){}
+      var last = await plannerGasPushNow_();
+      state._gapUploadActive = false;
+      state._topicListGap = false;
+      if(!last || !last.ok){
+        if(typeof setAppToast === 'function') setAppToast('이 기기 기준으로 맞추다 멈췄습니다. 동기화 창에서 다시 고르세요.', { duration: 5200, variant: 'err' });
+        state._topicListGap = true;
+      } else if(typeof setAppToast === 'function'){
+        setAppToast('이 기기 기준으로 서버와 같게 맞췄습니다. 다른 기기는 새로고침하면 받습니다.', { duration: 5200, variant: 'ok' });
+      }
+    } else {
+      (detail.onlyHere || []).concat(detail.stillDeleted || []).forEach(dropTopicGapDraftLocally_);
+      try { purgeDeletedDraftsFromCatalog_(); } catch(ePurge){}
+      try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true }); } catch(eSv2){}
+      try { renderTabs(); renderMain(); } catch(eR){}
+      await plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_PULL_TIMEOUT_MS);
+      if(state._topicListGap){
+        if(typeof setAppToast === 'function') setAppToast('서버에만 있는 항목 중 아직 못 받은 것이 있습니다. 다시 고르세요.', { duration: 5200, variant: 'err' });
+      } else if(typeof setAppToast === 'function'){
+        setAppToast('서버 기준으로 이 기기를 맞췄습니다.', { duration: 4200, variant: 'ok' });
+      }
+    }
+  } catch(eGap){
+    state._gapUploadActive = false;
+    state._topicListGap = true;
+    if(typeof setAppToast === 'function') setAppToast((eGap && eGap.message) || '맞추지 못했습니다.', { duration: 5200, variant: 'err' });
+  } finally {
+    state._topicGapResolving = false;
+    try { updateSyncStatusUI_(); } catch(eUi){}
+    if(state._topicListGap) setTimeout(function(){ try { openTopicGapChoice_(); } catch(eRe){} }, 400);
+  }
+};
+var GENERAL_UPLOAD_DONE_KEY_ = 'ht_planner_general_upload_done';
+function generalRestoreCatSet_(){
+  var set = {};
+  var plans = (state.branding && state.branding.subGoalPlans) || {};
+  ['0', '1', '2', '7'].forEach(function(id){
+    var plan = plans[id];
+    if(plan && plan.steps && plan.steps.length) set[id] = true;
+  });
+  if(set['7']) set['6'] = true;
+  return set;
+}
+function generalUploadAlreadyDone_(){
+  try { return localStorage.getItem(GENERAL_UPLOAD_DONE_KEY_) === '1'; } catch(e){ return false; }
+}
+function markGeneralUploadDone_(){
+  try { localStorage.setItem(GENERAL_UPLOAD_DONE_KEY_, '1'); } catch(e){}
+}
+function shouldKeepLocalGeneralPrograms_(){
+  if(generalUploadAlreadyDone_()) return false;
+  if(typeof isPlannerDesktopBrowser_ === 'function' && isPlannerDesktopBrowser_()) return false;
+  var set = generalRestoreCatSet_();
+  return !!(set['0'] || set['1'] || set['2']);
+}
+function draftCatIdFromSyncId_(id){
+  var m = String(id || '').match(/^d(\d+)-/);
+  return m ? m[1] : '';
+}
+function generalProgramCatFromKey_(key){
+  key = String(key || '');
+  var m = key.match(/^plan:subgoal:(\d+):/);
+  if(m) return m[1];
+  m = key.match(/^(?:draft|generated|published|pinned|override):(.+)$/);
+  if(m) return draftCatIdFromSyncId_(m[1]);
+  return '';
+}
+function isFixedGeneralProgramKey_(key){
+  var cat = generalProgramCatFromKey_(key);
+  return cat === '0' || cat === '1' || cat === '2' || cat === '6' || cat === '7';
+}
+function isGeneralProgramSyncKey_(key){
+  var cat = generalProgramCatFromKey_(key);
+  return !!(cat && generalRestoreCatSet_()[cat]);
+}
+function generalUploadButtonVisible_(){
+  if(typeof isPlannerDesktopBrowser_ === 'function' && isPlannerDesktopBrowser_()) return false;
+  if(generalUploadAlreadyDone_()) return false;
+  var set = generalRestoreCatSet_();
+  return !!(set['0'] || set['1'] || set['2']);
+}
+function collectGeneralProgramUploadKeys_(){
+  var entities = {};
+  try { entities = collectSyncEntities_(getPersistPayload(), { skipEnsureIds: true }) || {}; } catch(eEnt){}
+  return Object.keys(entities).filter(function(key){
+    if(!isGeneralProgramSyncKey_(key)) return false;
+    if(isEmptyDefaultSyncEntity_(key, entities[key])) return false;
+    if(key.indexOf('draft:') === 0 && !draftRowHasUserText_(entities[key])) return false;
+    if((key.indexOf('generated:') === 0 || key.indexOf('published:') === 0) && syncValueIsPruned_(entities[key])) return false;
+    return true;
+  });
 }
 function applySupabaseEntityRows_(rows){
   rows = rows || [];
   var payload = getPersistPayload();
+  var keepGeneral = shouldKeepLocalGeneralPrograms_();
+  var localGeneralKeys = null;
+  if(keepGeneral){
+    localGeneralKeys = {};
+    try {
+      var localEnts = collectSyncEntities_(payload, { skipEnsureIds: true }) || {};
+      Object.keys(localEnts).forEach(function(k){
+        if(isGeneralProgramSyncKey_(k)) localGeneralKeys[k] = true;
+      });
+    } catch(eKeep){}
+  }
+  var restoredGeneralDrafts = {};
+  var sawIncomingGeneralPlan = false;
   if(!payload.syncEntityRevisions) payload.syncEntityRevisions = state.syncEntityRevisions || {};
   if(!payload.syncEntityTombstones) payload.syncEntityTombstones = state.syncEntityTombstones || {};
   var outboxByKey = {};
@@ -11595,6 +11832,12 @@ function applySupabaseEntityRows_(rows){
   rows.forEach(function(row){
     if(!row || !row.key || isDeviceLocalSyncEntityKey_(row.key)) return;
     var key = String(row.key);
+    if(!row.deleted && key.indexOf('plan:subgoal:') === 0 && isFixedGeneralProgramKey_(key) && !(localGeneralKeys && localGeneralKeys[key])){
+      sawIncomingGeneralPlan = true;
+    }
+    if(!row.deleted && key.indexOf('draft:') === 0 && isFixedGeneralProgramKey_(key)){
+      restoredGeneralDrafts[key.slice('draft:'.length)] = true;
+    }
     var serverRev = parseInt(row.revision, 10) || 0;
     var op = outboxByKey[key];
     var serverVal = row.deleted ? undefined : row.value;
@@ -11630,6 +11873,13 @@ function applySupabaseEntityRows_(rows){
     }
     changed = true;
   });
+  Object.keys(restoredGeneralDrafts).forEach(function(id){
+    if(payload.deletedDraftIds && payload.deletedDraftIds[id]){
+      delete payload.deletedDraftIds[id];
+      changed = true;
+    }
+  });
+  if(sawIncomingGeneralPlan && !keepGeneral) markGeneralUploadDone_();
   if(changed){
     state.syncEntityRevisions = payload.syncEntityRevisions;
     state.syncEntityTombstones = payload.syncEntityTombstones;
@@ -15663,6 +15913,7 @@ function setSyncEntity_(payload, key, wrapped){
       var cat = String(wrapped.catId);
       if(!payload.extraDraftsByCat[cat]) payload.extraDraftsByCat[cat] = [];
       payload.extraDraftsByCat[cat].push(cloneSyncValue_(wrapped.value));
+      if(payload.deletedDraftIds) delete payload.deletedDraftIds[draftId];
     }
     return;
   }
@@ -16902,7 +17153,10 @@ function plannerPushTimeoutMs_(bodyBytes, snapshot){
 function buildPendingSyncMutations_(payload){
   ensureOutboxFromLegacyDirty_(payload);
   migrateIndexedPlanEntityKeysInPayload_(payload || {}, state.syncOutbox);
-  var sorted = (state.syncOutbox || []).slice().sort(function(a, b){
+  var sorted = (state.syncOutbox || []).slice().filter(function(op){
+    if(!state._generalUploadOnly || state._gapUploadActive) return true;
+    return !!(op && isGeneralProgramSyncKey_(op.key) && !op.deleted);
+  }).sort(function(a, b){
     var light = syncMutationLightness_(a) - syncMutationLightness_(b);
     if(light) return light;
     return compareSyncEntityKeysForApply_(a && a.key, b && b.key);
@@ -17320,7 +17574,7 @@ async function plannerGasPushNow_(){
         return { ok: true, cleared: true };
       }
     } catch(ePreStuck){}
-    var skipPull = false;
+    var skipPull = !!(state._generalUploadOnly || state._gapUploadActive);
     try {
       var preBody = getPersistPayload();
       var preMut = buildPendingSyncMutations_(preBody);
@@ -17329,9 +17583,9 @@ async function plannerGasPushNow_(){
       var locRev = parseInt(state.syncRevision, 10) || 0;
       var storedRev = readStoredSyncRev_(GAS_LAST_SYNC_REV_KEY);
       var localQuartersEmpty = yearPlanPeriodTextCount_(state.branding && state.branding.yearPlan) < 1;
-      skipPull = prePatch && !localQuartersEmpty;
+      if(!skipPull) skipPull = prePatch && !localQuartersEmpty;
     } catch(eSkipPull){}
-    if(shouldBlockStaleFloodPush_()){
+    if(shouldBlockStaleFloodPush_() && !state._generalUploadOnly && !state._gapUploadActive){
       var adoptedFlood = await plannerPullRemoteIntoStateCore_();
       if(adoptedFlood){
         try {
@@ -17343,6 +17597,9 @@ async function plannerGasPushNow_(){
     }
     if(!skipPull) await plannerPullRemoteIntoStateCore_();
     if(plannerSyncConflictPending_) return { ok: false, conflict: true };
+    if((state._generalUploadOnly || state._gapUploadActive) && !(buildPendingSyncMutations_(getPersistPayload()).length)){
+      return { ok: true, skipped: true, generalDone: true };
+    }
     if(!hasPendingLocalSyncChanges_()){
       markLocalInSyncWithServer_({ syncRevision: state.syncRevision });
       save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
@@ -17357,7 +17614,7 @@ async function plannerGasPushNow_(){
     var requestDirtyGeneration = plannerDirtyGeneration_;
     var usePatch = mutations.length > 0 && state.syncProtocolVersion >= 2;
     if(usePatch) state.syncNeedsSnapshot = false;
-    var maxPatchRounds = usePatch ? 12 : 1;
+    var maxPatchRounds = usePatch ? ((state._generalUploadOnly || state._gapUploadActive) ? 80 : 12) : 1;
     var round = 0;
     var lastOkRevision = state.syncRevision;
     while(round < maxPatchRounds){
@@ -17424,6 +17681,21 @@ async function plannerGasPushNow_(){
     } catch(parseErr) {
       throw new Error('서버 응답 형식 오류');
     }
+    }
+    if((state._generalUploadOnly || state._gapUploadActive) && Array.isArray(data.conflicts) && data.conflicts.length){
+      acknowledgeSyncOutbox_(data.accepted || [], mutations);
+      var generalConflicts = data.conflicts.filter(function(conflict){
+        return conflict && isGeneralProgramSyncKey_(conflict.key);
+      });
+      (data.conflicts || []).forEach(function(conflict){
+        if(!conflict || isGeneralProgramSyncKey_(conflict.key)) return;
+        state.syncOutbox = (state.syncOutbox || []).filter(function(op){
+          return !(op && op.key === conflict.key);
+        });
+      });
+      if(generalConflicts.length) forceOutboxOverwriteBase_(generalConflicts);
+      try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true }); } catch(eGenSv){}
+      continue;
     }
     if(Array.isArray(data.conflicts) && data.conflicts.length){
       var retryMissingDraft = false;
@@ -17580,7 +17852,7 @@ async function plannerGasPushNow_(){
     }
     break;
     }
-    if((state.syncOutbox || []).length && !plannerSyncConflictPending_) schedulePlannerGasPush_(true);
+    if((state.syncOutbox || []).length && !plannerSyncConflictPending_ && !state._generalUploadOnly && !state._gapUploadActive) schedulePlannerGasPush_(true);
     return { ok: true, revision: lastOkRevision, batches: round };
   } catch(err) {
     console.warn('[GAS push]', err);
@@ -18207,7 +18479,7 @@ function formatSyncHeaderSub_(info){
   if(info.phase === 'pending'){
     return left || '반영 대기';
   }
-  if(info.phase === 'topic_gap') return '주제 다름';
+  if(info.phase === 'topic_gap') return '선택 필요';
   if(info.overall === 'ok') return '최신 · ' + info.localRev;
   if(info.overall === 'warn') return left ? ('다시 시도 · ' + left) : '확인 필요';
   return String(info.localRev || '');
@@ -18364,9 +18636,10 @@ function getSyncStatusInfo_(remoteMeta){
     summary = 'Supabase에 이 기기보다 최신 내용(rev ' + remoteRev + ')이 있어요.';
     actionHint = '「동기화」버튼을 누른 뒤 「지금 동기화」로 받아오세요.';
   } else if(phase === 'topic_gap'){
-    summary = '주제 목록이 서버와 다릅니다. 번호가 같아도 최신으로 두지 않고, 빠진 주제를 맞추는 중이에요' +
-      (state._topicListGapCount ? ' (' + state._topicListGapCount + '건).' : '.');
-    actionHint = '이 기기에 없는 주제는 서버에서 받고, 이 기기에만 있는 주제는 서버로 올립니다.';
+    summary = '주제 목록이 서버와 다릅니다' +
+      (state._topicListGapCount ? ' (' + state._topicListGapCount + '건). ' : '. ') +
+      '어느 쪽으로 맞출지 고르면 이 기기와 서버가 같아집니다.';
+    actionHint = '선택 창에서 이 기기 또는 서버를 고르세요. 고르기 전에는 최신으로 두지 않습니다.';
   } else if(phase === 'pending'){
     summary = plannerOutboxHasTeamContent_()
       ? '이 기기에만 있는 주제·초안·기획을 서버로 올리는 중이에요. 올린 뒤 다른 기기가 받습니다.'
@@ -18535,6 +18808,10 @@ function updateSyncStatusUI_(){
   if(sub) sub.textContent = formatSyncHeaderSub_(info);
   btn.title = '동기화 및 설정\n' + info.summary +
     (info.actionHint ? '\n\n할 일: ' + info.actionHint : '');
+  var generalUpBtn = document.getElementById('btn-sync-general-up');
+  if(generalUpBtn && !generalUpBtn.disabled){
+    generalUpBtn.style.display = generalUploadButtonVisible_() ? '' : 'none';
+  }
   try { refreshSyncStatusBodyHtml_(info); } catch(eBody){}
   try { armSyncProgressTicker_(info); } catch(eTickArm){}
   try { kickPendingSyncIfIdle_(info); } catch(eKickUi){}
@@ -19061,7 +19338,7 @@ async function runPlannerBootstrapInBackground_(){
           : (hasPendingLocalSyncChanges_()
             ? '이 기기에만 있는 주제를 서버로 올리는 중이에요. 올린 뒤 다른 기기가 받습니다.'
             : (bootstrapData.topicGap
-              ? '서버에 있는 주제 중 이 기기에 없는 항목이 있어요. 받는 중이에요.'
+              ? '주제 목록이 서버와 다릅니다. 어느 쪽으로 맞출지 고르세요.'
               : '주제 목록을 Supabase와 맞췄어요.')), { duration: 5200, variant: 'ok' });
       }
       return;
@@ -20827,6 +21104,73 @@ window.confirmManualSyncFromPreview_ = async function(){
     var btn = document.getElementById('btn-sync-now');
     if(btn) btn.disabled = false;
     try { updateSyncStatusUI_(); } catch(eUi){}
+  }
+};
+window.pushGeneralProgramsFromThisDevice_ = async function(){
+  if(!generalUploadButtonVisible_()){
+    if(typeof setAppToast === 'function'){
+      setAppToast('이 버튼은 일반인 단계가 남아 있는 태블릿에서만 누릅니다.', { duration: 4200, variant: 'err' });
+    }
+    return;
+  }
+  var keys = collectGeneralProgramUploadKeys_();
+  if(!keys.length){
+    if(typeof setAppToast === 'function') setAppToast('올릴 일반인 단계와 주제가 이 기기에 없습니다.', { duration: 4200, variant: 'err' });
+    return;
+  }
+  var set = generalRestoreCatSet_();
+  var names = [];
+  if(set['0']) names.push('도수치료');
+  if(set['1']) names.push('리얼 무브먼트');
+  if(set['2']) names.push('리얼 페이스');
+  if(set['7'] || set['6']) names.push('생활건강');
+  if(!confirm('이 기기의 일반인 프로그램만 서버에 올립니다.\n' + names.join(', ') + '\n' + keys.length + '건\n\n서버 내용을 먼저 받지 않습니다. 전문가 과정은 올리지 않습니다.')) return;
+  var btn = document.getElementById('btn-sync-general-up');
+  if(btn){
+    btn.disabled = true;
+    btn.textContent = '올리는 중…';
+  }
+  state._generalUploadOnly = true;
+  state._sessionUserEdit = true;
+  plannerSyncBootstrapReady_ = true;
+  state._bootstrapChoiceDone = true;
+  enqueueSyncOutboxChanges_(keys, getPersistPayload());
+  try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true }); } catch(eSaveUp){}
+  try {
+    var guard = 0;
+    var last = null;
+    while(guard < 6){
+      guard++;
+      last = await plannerGasPushNow_();
+      if(!last || !last.ok) break;
+      var left = (state.syncOutbox || []).some(function(op){
+        return op && isGeneralProgramSyncKey_(op.key);
+      });
+      if(!left) break;
+    }
+    var remain = (state.syncOutbox || []).filter(function(op){
+      return op && isGeneralProgramSyncKey_(op.key);
+    }).length;
+    if(!last || !last.ok || remain){
+      if(typeof setAppToast === 'function'){
+        setAppToast('아직 다 올라가지 않았습니다. 같은 버튼을 한 번 더 누르세요.', { duration: 5200, variant: 'err' });
+      }
+    } else {
+      markGeneralUploadDone_();
+      state._topicListGap = false;
+      if(typeof setAppToast === 'function'){
+        setAppToast('일반인 프로그램을 서버에 올렸습니다. 컴퓨터 브라우저에서 플래너를 새로고침하세요.', { duration: 7000, variant: 'ok' });
+      }
+    }
+  } catch(eUp){
+    if(typeof setAppToast === 'function') setAppToast((eUp && eUp.message) || '올리지 못했습니다.', { duration: 5200, variant: 'err' });
+  } finally {
+    state._generalUploadOnly = false;
+    if(btn){
+      btn.disabled = false;
+      btn.textContent = '일반인 프로그램을 이 기기에서 올리기';
+    }
+    try { updateSyncStatusUI_(); } catch(eUiUp){}
   }
 };
 window.runManualFullSync_ = async function(opts){

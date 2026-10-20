@@ -11598,15 +11598,6 @@ function finishTopicListCheck_(index){
     return planKeyPresent_(serverDeletedPlan, key);
   });
   planOnlyHere.forEach(function(key){ uploadKeys.push(key); });
-  if(uploadKeys.length && !state._topicGapForceServer){
-    state._sessionUserEdit = true;
-    enqueueSyncOutboxChanges_(uploadKeys, getPersistPayload());
-    uploadKeys.forEach(function(key){
-      (state.syncOutbox || []).forEach(function(op){
-        if(op && op.key === key && String(key).indexOf('plan:') !== 0) op.baseEntityRevision = 0;
-      });
-    });
-  }
   var missingContent = Object.keys(serverLiveContent).filter(function(key){
     if(key.indexOf('generated:') !== 0 && key.indexOf('published:') !== 0) return false;
     return !localHasSyncedContentKey_(key);
@@ -35886,12 +35877,31 @@ function ensureSheetBlogOnContent_(draftId){
   return content;
 }
 
+function focusSyncOutboxOnDraft_(draftId){
+  if(!draftId) return;
+  var ids = {};
+  ids[draftId] = true;
+  state._syncFocusDraftIds = ids;
+  state.syncOutbox = (state.syncOutbox || []).filter(function(op){
+    return !!(op && (syncKeyBelongsToDraftIds_(op.key, ids) || op.key === 'setting:surfaceDigest'));
+  });
+  Object.keys(state.syncDirtyEntityKeys || {}).forEach(function(key){
+    if(!syncKeyBelongsToDraftIds_(key, ids) && key !== 'setting:surfaceDigest') delete state.syncDirtyEntityKeys[key];
+  });
+  state.syncNeedsSnapshot = false;
+  rebuildDirtyStateFromOutbox_();
+}
+function saveFocusedDraftChange_(draftId){
+  focusSyncOutboxOnDraft_(draftId);
+  try { save({ driveImmediate: true, gasImmediate: true }); }
+  finally { state._syncFocusDraftIds = null; }
+}
 function persistDraftContent_(draftId, content){
   flushSheetTitleBackgroundWork_({ save: false });
   if(!state.published[draftId]) state.published[draftId] = {};
   state.published[draftId].content = content;
   state.generatedOnly[draftId] = content;
-  save({ driveImmediate: true, gasImmediate: true });
+  saveFocusedDraftChange_(draftId);
 }
 
 var sheetTitleBgTimer_ = null;
@@ -36038,7 +36048,7 @@ function syncDraftTopicFromTitle_(title, opts){
       rationale: draft.rationale || ''
     });
   }
-  if(opts.save !== false) save({ driveImmediate: true, gasImmediate: true });
+  if(opts.save !== false) saveFocusedDraftChange_(draftId);
   return true;
 }
 window.onSheetTitleSyncTopic_ = function(el){

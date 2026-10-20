@@ -31373,7 +31373,7 @@ function syncThumbMakerFields_(content, force){
     if(!keepVisual) resetThumbMakerVisualState_(st);
     st.fields = null;
     st.programMode = isDailyShareCategory(catId) ? 'photo' : 'topic';
-    st.sizeKey = isDailyShareCategory(catId) ? '4x5' : (st.sizeKey || '4x5');
+    st.sizeKey = '4x5';
     if(!keepVisual) st.photoIndex = 0;
     st.fields = isDailyShareCategory(catId)
       ? emptyThumbPhotoCopy_()
@@ -33685,9 +33685,109 @@ window.downloadAllDailyPhotos_ = async function(btn){
   paintThumbMakerPreview_();
 };
 
+function topicPhotoBranchKey_(content){
+  var key = content && content.images && content.images.photoBranch;
+  return key === 'yaksu' ? 'yaksu' : 'incheon';
+}
+function topicPhotoActionLine_(content, catId){
+  var blog = content && content.blog;
+  var community = content && content.community;
+  var hints = blog ? getBlogInsertSourceHints_(blog, catId) : { title: '', care: '', expl: '', problem: '' };
+  if(community && !hints.care){
+    hints.care = String(community.selfCare || '');
+    hints.expl = String(community.explanation || '');
+    hints.title = String(community.title || hints.title || '');
+    hints.problem = String(getCommunityProblemText_(community) || hints.problem || '');
+  }
+  var stripRe = /^(👉|✅|▶|Step\s*\d+[.:)]?|\d+[.)]|[①②③④⑤⑥⑦⑧⑨⑩]|[-·•])\s*/i;
+  var steps = [];
+  try { steps = parseSelfCareSteps_(hints.care || ''); } catch(eSteps){ steps = []; }
+  var first = String(steps[0] || hints.expl || hints.problem || hints.title || '편한 범위에서 하는 동작 하나').replace(stripRe, '').replace(/\s+/g, ' ').trim();
+  return first.replace(/[\s.。…]+$/g, '').slice(0, 160);
+}
+function topicPhotoSpaceLine_(branch){
+  if(branch === 'yaksu'){
+    return '약수점. 검은 고무 타일 바닥, 도시가 보이는 창, 거울. 운동공이나 플라이오 박스는 고른 참고 사진에 있을 때만 남긴다. 사람은 한 명.';
+  }
+  return '인천점. 점박이 테라조 바닥. 정원 쪽 큰 창이 있는 운동 공간, 또는 나무 리셉션이 있는 로비 중 참고 사진 한 구도. 흰 커튼·초록 공·자격증 선반은 그 사진에 있을 때만 남긴다.';
+}
+function buildTopicPhotoPrompt_(content, catId, topic){
+  var branch = topicPhotoBranchKey_(content);
+  var folder = branch === 'yaksu' ? '이미지참고/약수' : '이미지참고/인천';
+  var action = topicPhotoActionLine_(content, catId);
+  var topicLine = String(topic || (content && content.blog && content.blog.title) || (content && content.community && content.community.title) || action).replace(/^🌿\s*/, '').trim();
+  return [
+    '9:16 세로. 수업 중에 휴대폰으로 찍은 듯한 실사 한 장. 블로그에 넣고, 같은 사진 위에 썸네일 제목을 올린다.',
+    '주제 「' + topicLine + '」.',
+    '이 순간의 동작: ' + action + '. 한 장면으로 멈추고, 손과 몸의 위치가 보이게.',
+    '공간: ' + topicPhotoSpaceLine_(branch),
+    '만들 때 ' + folder + ' 5장과 이미지참고/모델 을 함께 넣는다. 공간 5장 중 구도 하나만 따른다. 다섯 장을 한 화면에 섞지 않는다. 얼굴과 체형은 모델 사진을 따른다.',
+    '복장: 남색 반팔 운동 티, 검은 반바지. 참고 사진의 스크럽·츄리닝·홈웨어는 따르지 않는다.',
+    '인물과 동작은 화면 아래쪽에 둔다. 위쪽 3분의 1은 그 방의 창·벽·천장만 보여, 나중에 썸네일 제목이 올라갈 자리다. 얼굴은 그 글자 자리에 두지 않는다.',
+    '빛은 창으로 들어오는 낮 빛. 피부와 바닥은 실제처럼. 포스터처럼 한가운데 세우거나 윤곽을 깎지 않는다. 방에 원래 있는 소품은 치우지 않는다.',
+    '글자, 화살표, 도표, 해부 그림, 병원 침상, 로고, 워터마크는 넣지 않는다.'
+  ].join('\n');
+}
+function ensureTopicPhotoPrompt_(content, topic, catId, force){
+  if(!content) return content;
+  catId = catId != null ? catId : (state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId));
+  if(isDailyShareCategory(catId)) return content;
+  if(!content.images || typeof content.images !== 'object') content.images = { gptVisuals: [], mangoBrief: null };
+  if(!content.images.photoBranch) content.images.photoBranch = 'incheon';
+  var current = (content.images.gptVisuals || [])[0];
+  if(!force && current && current.role === 'topicPhoto' && current.prompt) return content;
+  var draft = null;
+  try {
+    var cat = CATEGORIES[catId];
+    draft = cat && cat.drafts.find(function(d){ return d.id === state.selectedId; });
+  } catch(eDraft){}
+  content.images.gptVisuals = [{
+    title: '이미지 생성',
+    role: 'topicPhoto',
+    prompt: buildTopicPhotoPrompt_(content, catId, topic || (draft && draft.topic) || '')
+  }];
+  return content;
+}
+function renderTopicPhotoCard_(content){
+  var catId = state.selectedCatId;
+  var branch = topicPhotoBranchKey_(content);
+  var prompt = '';
+  if(content && content.images && content.images.gptVisuals && content.images.gptVisuals[0]){
+    prompt = String(content.images.gptVisuals[0].prompt || '');
+  }
+  var html = '';
+  html += '<div class="img-section-title">이미지 생성</div>';
+  html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">주제의 핵심 동작 <strong>한 장</strong>입니다. 비율은 <strong>9:16</strong>이고, 인물은 아래, 위쪽은 그 방의 창·벽을 남겨 다음 썸네일 제목이 올라갑니다. 만들 때 고른 지점 사진 5장과 모델 사진을 함께 넣습니다. 나온 사진은 아래 썸네일 배경으로 올립니다.</p>';
+  html += '<div class="img-tool-card">';
+  html += '<label style="display:block;font-size:11px;color:#374151;margin:0 0 6px;">공간</label>';
+  html += '<select id="sheet-photo-branch" onchange="setTopicPhotoBranch_(this.value)" style="margin-bottom:10px;padding:8px 10px;border:1px solid #E5E7EB;border-radius:8px;font-family:inherit;">';
+  html += '<option value="incheon"' + (branch === 'incheon' ? ' selected' : '') + '>인천점</option>';
+  html += '<option value="yaksu"' + (branch === 'yaksu' ? ' selected' : '') + '>약수점</option>';
+  html += '</select>';
+  html += '<textarea class="sheet-edit" id="sheet-image-prompt-0" data-image-index="0" rows="8" oninput="autoGrowTextarea_(this)">' + escapeHtml(prompt) + '</textarea>';
+  html += '<div class="img-tool-actions" style="margin-top:10px;">';
+  html += '<button type="button" class="img-tool-copy-btn" onclick="copyCommunityOrDailyImageSlot_(0, this)">프롬프트 복사</button>';
+  html += '<button type="button" class="img-tool-copy-btn" onclick="rebuildTopicPhotoPrompt_()">주제에 맞춰 다시 쓰기</button>';
+  html += '</div></div>';
+  return html;
+}
+window.setTopicPhotoBranch_ = function(branch){
+  var content = getDraftContent_(state.selectedId);
+  if(!content) return;
+  if(!content.images) content.images = { gptVisuals: [], mangoBrief: null };
+  content.images.photoBranch = branch === 'yaksu' ? 'yaksu' : 'incheon';
+  ensureTopicPhotoPrompt_(content, null, state.selectedCatId, true);
+  var ta = document.getElementById('sheet-image-prompt-0');
+  var item = content.images.gptVisuals && content.images.gptVisuals[0];
+  if(ta && item) ta.value = item.prompt || '';
+};
+window.rebuildTopicPhotoPrompt_ = function(){
+  var sel = document.getElementById('sheet-photo-branch');
+  window.setTopicPhotoBranch_(sel ? sel.value : 'incheon');
+  if(typeof setAppToast === 'function') setAppToast('주제 동작에 맞춰 프롬프트를 다시 썼어요.', { duration: 2200, variant: 'ok' });
+};
 function buildImageTabBody(content){
   const catId = state.selectedCatId;
-  const isHj = isHeiljagyaeCategory(catId);
   const isDaily = isDailyShareCategory(catId);
 
   if(isDaily){
@@ -33699,80 +33799,14 @@ function buildImageTabBody(content){
     return renderThumbMakerCard_(content);
   }
 
-  // 힐자계: 망고보드 AI 디자인용 한글 프롬프트
-  if(isHj){
+  if(!isDaily){
     if(!content){
-      return '<p class="empty-note" style="padding:0;line-height:1.55;">게시판 초안이 없어요. 게시판 탭에서 먼저 초안을 만들어 주세요.</p>' + renderThumbMakerCard_(null);
+      return '<p class="empty-note" style="padding:0;line-height:1.55;">초안이 없어요. 블로그 탭에서 먼저 초안을 만들어 주세요.</p>' +
+        renderTopicPhotoCard_(null) + renderThumbMakerCard_(null);
     }
-    ensureHeiljagyaeImagePrompts_(content);
-    var slots = getDisplayGptVisuals_((content.images && content.images.gptVisuals) || [], catId);
-    var htmlHj = '';
-    htmlHj += renderThumbMakerCard_(content);
-    htmlHj += '<div class="img-section-title">망고보드 AI 디자인 · 따라하기 이미지</div>';
-    htmlHj += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">게시판 <strong>셀프 케어(따라하기)</strong>를 바탕으로 만든 프롬프트입니다. 하단 <strong>복사</strong>를 누르면 따라하기 컷 프롬프트를 복사하고 <strong>망고보드 AI 디자인</strong>으로 이동합니다. Cursor에 <strong>「이 초안 이미지 만들어줘」</strong>라고 해도 됩니다.</p>';
-    if(!slots.length){
-      htmlHj += '<p class="empty-note" style="padding:0;line-height:1.55;">프롬프트가 아직 없어요. 본문 초안이 있으면 자동으로 채워지고, 아래에서 AI가 다시 다듬을 수 있어요.</p>';
-      htmlHj += '<button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin:10px 0 14px;">프롬프트 재생성</button>';
-      return htmlHj;
-    }
-    slots.forEach(function(item, i){
-      var title = String(item.title || ('이미지 ' + (i + 1))).trim();
-      var roleHint = '';
-      if(item.role === 'selfCare') roleHint = '따라하기 핵심 동작';
-      else if(item.role === 'problem') roleHint = '일상 불편 장면';
-      htmlHj += '<div class="cb"><div class="cb-label">' + escapeHtml(title) +
-        (roleHint ? ' <span style="color:#9CA3AF;font-weight:600;">· ' + escapeHtml(roleHint) + '</span>' : '') +
-        ' <button type="button" class="sheet-field-btn sheet-field-copy" onclick="copyCommunityOrDailyImageSlot_(' + i + ', this)">복사</button></div>';
-      htmlHj += '<textarea class="sheet-edit" id="sheet-image-prompt-' + i + '" data-image-index="' + i + '" rows="7" oninput="autoGrowTextarea_(this)">' +
-        escapeHtml(String(item.prompt || '')) + '</textarea></div>';
-    });
-    htmlHj += '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">프롬프트를 수정한 뒤 하단 <strong>복사</strong> → 망고보드 AI 채팅란에 붙여넣기 하세요. <a href="' + escapeHtml(DEFAULT_MANGO_DESIGNER_URL) + '" target="_blank" rel="noopener noreferrer">AI 디자이너 열기</a></p>';
-    htmlHj += '<button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin:10px 0 8px;">프롬프트 재생성</button>';
-    return htmlHj;
+    ensureTopicPhotoPrompt_(content, null, catId, false);
+    return renderTopicPhotoCard_(content) + renderThumbMakerCard_(content);
   }
-
-  // 블로그·전문가: 본문 삽입 컷 프롬프트 + 선택 망고보드
-  if(!content){
-    return '<p class="empty-note" style="padding:0;line-height:1.55;">초안이 없어요. 블로그 탭에서 먼저 초안을 만들어 주세요.</p>' +
-      renderThumbMakerCard_(null);
-  }
-  if(!content.images) content.images = { gptVisuals: [], mangoBrief: null };
-  ensureBlogInsertImagePrompts_(content);
-  ensureMangoBriefOnContent_(content);
-  var slots = getDisplayGptVisuals_((content.images && content.images.gptVisuals) || [], catId);
-  const brief = content.images.mangoBrief || null;
-
-  let html = '';
-  html += renderThumbMakerCard_(content);
-  html += '<div class="img-section-title">본문 삽입용 사진 프롬프트</div>';
-  html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">긴 글 <strong>문단 사이</strong>에 넣을 실사 컷입니다. 상세페이지가 아니에요. Cursor 채팅에 <strong>「이 초안 이미지 만들어줘」</strong>라고 하면 아래 프롬프트로 사진을 바로 만들 수 있어요. 프롬프트는 복사해서 그대로 써도 됩니다.</p>';
-  if(!slots.length){
-    html += '<p class="empty-note" style="padding:0;line-height:1.55;">프롬프트가 아직 없어요. 본문 초안이 있으면 자동으로 채워지고, 아래에서 AI가 다시 다듬을 수 있어요.</p>';
-    html += '<button type="button" class="btn-gen-big" data-regen="insert" onclick="genContent(event)" style="width:100%;margin:10px 0 14px;">프롬프트 재생성</button>';
-  } else {
-    slots.forEach(function(item, i){
-      var title = String(item.title || ('이미지 ' + (i + 1))).trim();
-      var place = String(item.placeAfter || getBlogInsertPlaceAfter_(item.role)).trim();
-      var roleHint = '';
-      if(item.role === 'selfCare') roleHint = '따라하기 핵심 동작';
-      else if(item.role === 'problem') roleHint = '일상 불편 장면';
-      else if(item.role === 'explanation') roleHint = '원리·유지 장면';
-      html += '<div class="cb"><div class="cb-label">' + escapeHtml(title) +
-        (place ? ' <span style="color:#9CA3AF;font-weight:600;">· ' + escapeHtml(place) + '</span>' : '') +
-        (roleHint ? ' <span style="color:#9CA3AF;font-weight:600;">· ' + escapeHtml(roleHint) + '</span>' : '') +
-        ' <button type="button" class="sheet-field-btn sheet-field-copy" onclick="copyCommunityOrDailyImageSlot_(' + i + ', this)">복사</button></div>';
-      html += '<textarea class="sheet-edit" id="sheet-image-prompt-' + i + '" data-image-index="' + i + '" rows="7" oninput="autoGrowTextarea_(this)">' +
-        escapeHtml(String(item.prompt || '')) + '</textarea></div>';
-    });
-    html += '<div class="img-tool-actions" style="margin:4px 0 12px;">';
-    html += '<button type="button" class="img-tool-copy-btn" onclick="copyAllBlogInsertPrompts_(this)">프롬프트 전체 복사</button>';
-    html += '</div>';
-    html += '<button type="button" class="btn-gen-big" data-regen="insert" onclick="genContent(event)" style="width:100%;margin:0 0 8px;">프롬프트 재생성</button>';
-  }
-  html += renderMangoDetailInputCard_(brief);
-  html += '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">하단 <strong>저장</strong>으로 초안만 보관할 수 있어요. <strong>발행완료</strong>는 이미지 최종본을 확정할 때 쓰며, 카드의「발행완료」배지에는 <strong>필수가 아니에요</strong>(블로그·인스타·쓰레드만). 망고보드 7장은 <strong>선택</strong>입니다.</p>';
-  html += '<div class="img-tool-hint">망고보드가 필요할 때만 <strong>제목·소개 복사</strong> → 소개란에 붙여넣기 → <strong>첫 줄(제목)</strong>만 제품명란으로. <a href="' + escapeHtml(DEFAULT_MANGO_DESIGNER_URL) + '" target="_blank" rel="noopener noreferrer">AI 디자이너</a></div>';
-  return html;
 }
 
 window.updateMangoFieldCounts_ = function(){
@@ -33907,42 +33941,8 @@ function buildBlogInsertImagePromptsFromBlog_(blog, topic, catId){
 }
 
 function ensureBlogInsertImagePrompts_(content, topic, catId){
-  if(!content) return content;
-  catId = catId != null ? catId : (state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId));
-  if(!isBlogInstaCategory(catId)) return content;
-  if(!content.images || typeof content.images !== 'object') content.images = { gptVisuals: [], mangoBrief: null };
-  var existing = getDisplayGptVisuals_(content.images.gptVisuals, catId).map(function(item, i){
-    return normalizeBlogInsertVisualItem_(item, i);
-  }).filter(function(x){ return x.prompt; });
-  if(existing.length >= 3){
-    content.images.gptVisuals = existing.slice(0, 3);
-    return content;
-  }
-  var draft = null;
-  try {
-    var cat = CATEGORIES[catId];
-    draft = cat && cat.drafts.find(function(d){ return d.id === state.selectedId; });
-  } catch(e){}
-  var local = buildBlogInsertImagePromptsFromBlog_(
-    content.blog,
-    topic || (draft && draft.topic) || '',
-    catId
-  );
-  if(!content.blog){
-    if(existing.length) content.images.gptVisuals = existing;
-    return content;
-  }
-  var merged = existing.slice();
-  local.forEach(function(item){
-    if(merged.length >= 3) return;
-    var hasRole = merged.some(function(x){ return x.role === item.role; });
-    if(!hasRole) merged.push(item);
-  });
-  while(merged.length < 3 && local[merged.length]) merged.push(local[merged.length]);
-  content.images.gptVisuals = merged.slice(0, 3);
-  return content;
+  return ensureTopicPhotoPrompt_(content, topic, catId, true);
 }
-
 /** 게시판 셀프케어 → 망고보드 AI용 한글 프롬프트 2장 (로컬 백업) */
 function buildHeiljagyaeImagePromptsFromCommunity_(community, topic){
   var co = normalizeCommunityBlock(community) || community || {};
@@ -34478,14 +34478,11 @@ function renderSheetContent(content) {
   var tabSaved = pubKey && state.published[state.selectedId]?.tabPublished?.[pubKey];
   // 이미 저장했어도 CTA는 항상「발행완료」—「저장됨」은 상태처럼 보여 버튼을 못 찾는 경우가 많음
   var pubTitle = tabSaved ? ' title="이미 저장됨 · 다시 누르면 수정본을 저장·복사합니다"' : '';
-  var isHjImages = isHeiljagyaeCategory(state.selectedCatId) && tab === 'images';
   var isDailyImages = isDailyShareCategory(state.selectedCatId) && tab === 'images';
   setSheetActionsHtml_(
     '<button type="button" class="btn-save-draft" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
     '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
-    (isHjImages
-      ? '<button type="button" class="btn-pub" onclick="copyCommunityOrDailyPromptAndOpenMango_()">복사</button>'
-      : (isDailyImages ? '' : '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">발행완료</button>'))
+    (isDailyImages ? '' : '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">발행완료</button>')
   );
   restoreTextFieldFocus_(focusSnap);
   scheduleWorkshopTextareaGrow_(document.getElementById('sheet-body'));
@@ -37211,35 +37208,13 @@ function buildFinalPublishDefault_(draftId, catId){
 
 function getImagePromptTextForData_(content, catId){
   var im = content && content.images;
-  if(!im) return '';
-  if(isHeiljagyaeCategory(catId)){
-    var slots = getDisplayGptVisuals_(im.gptVisuals, catId);
-    if(!slots.length) return '';
-    return slots.map(function(item, i){
-      var title = String(item.title || ('이미지 ' + (i + 1))).trim();
-      return '【' + title + '】\n' + String(item.prompt || '').trim();
-    }).filter(Boolean).join('\n\n');
-  }
-  if(isDailyShareCategory(catId)) return '';
-  var insertSlots = getDisplayGptVisuals_(im.gptVisuals, catId);
-  var insertText = insertSlots.map(function(item, i){
+  if(!im || isDailyShareCategory(catId)) return '';
+  var slots = getDisplayGptVisuals_(im.gptVisuals, catId);
+  if(!slots.length) return '';
+  return slots.map(function(item, i){
     var title = String(item.title || ('이미지 ' + (i + 1))).trim();
-    var place = String(item.placeAfter || getBlogInsertPlaceAfter_(item.role)).trim();
-    return '【' + title + (place ? ' · ' + place : '') + '】\n' + String(item.prompt || '').trim();
+    return '【' + title + '】\n' + String(item.prompt || '').trim();
   }).filter(Boolean).join('\n\n');
-  var briefText = formatMangoBriefPaste_(im.mangoBrief, catId);
-  if(!insertText && !briefText && !(im.mangoBrief && im.mangoBrief.productName)) return '';
-  var parts = [];
-  if(insertText) parts.push('[본문 삽입용 사진 프롬프트]\n' + insertText);
-  if(briefText || (im.mangoBrief && im.mangoBrief.productName)){
-    var mb = im.mangoBrief || {};
-    var head = '[망고보드 상세페이지 입력 · 선택]';
-    if(mb.productName) head += '\n제품명(' + String(mb.productName).length + '/' + MANGO_DETAIL_TITLE_MAX + '): ' + mb.productName;
-    if(briefText) head += '\n소개(' + briefText.length + '/' + MANGO_DETAIL_INTRO_MAX + '):\n' + briefText;
-    if(mb.photoTip) head += '\n참고사진 TIP: ' + mb.photoTip;
-    parts.push(head);
-  }
-  return parts.join('\n\n');
 }
 
 function buildPublishedPromptData_(draft, catId, content, finalTexts){
@@ -38909,99 +38884,27 @@ window.genContent = async function(ev){
     setAppToast('수정된 인스타 기준으로 쓰레드(본문+댓글)를 만들고 있어요…', { duration: 5000, variant: 'ok' });
     return;
   }
-  if(tab === 'images' && !isHeiljagyaeCategory(catId) && !isDailyShareCategory(catId)){
-    if(!state.apiKey){
-      openApiModal();
+  if(tab === 'images' && !isDailyShareCategory(catId)){
+    var photoContent = getDraftContent_(draftId);
+    var photoCat = CATEGORIES[catId];
+    var photoDraft = photoCat && photoCat.drafts.find(function(d){ return d.id === draftId; });
+    var hasBody = isHeiljagyaeCategory(catId)
+      ? !!(photoContent && photoContent.community)
+      : !!(photoContent && photoContent.blog && blogHasMinimumContent_(catId, photoContent.blog));
+    if(!hasBody){
+      setAppToast('초안이 없어요.\n본문 탭에서 먼저 초안을 생성해 주세요.', { duration: 5000, variant: 'err' });
       return;
     }
-    var mangoOnly = !!(clickBtn && (clickBtn.getAttribute('data-regen') === 'mango' || /소개 재생성/.test(String(clickBtn.textContent || ''))));
-    var mangoContent = getDraftContent_(draftId);
-    if(!mangoContent || !mangoContent.blog || !blogHasMinimumContent_(catId, mangoContent.blog)){
-      setAppToast('블로그 초안이 없어요.\n블로그 탭에서 먼저 초안을 생성해 주세요.', { duration: 5000, variant: 'err' });
-      return;
+    applySheetEditsForTab_(photoContent, 'images');
+    ensureTopicPhotoPrompt_(photoContent, photoDraft ? photoDraft.topic : '', catId, true);
+    persistDraftContent_(draftId, photoContent);
+    if(state.selectedId === draftId){
+      state.activeTab = 'images';
+      renderSheetContent(photoContent);
     }
-    applySheetEditsForTab_(mangoContent, 'images');
-    var catMg = CATEGORIES[catId];
-    var draftMg = catMg && catMg.drafts.find(function(d){ return d.id === draftId; });
-    if(mangoOnly){
-      if(mangoBgByDraft[draftId]){
-        setAppToast('망고보드 소개를 만들고 있어요.\n잠시만 기다려 주세요.', { duration: 4500, variant: 'ok' });
-        return;
-      }
-      if(clickBtn) startButtonCountdown_(clickBtn, { estimateSec: Math.ceil(MANGO_BG_ESTIMATE_MS / 1000), busyLabel: '망고보드 재생성 중', idleText: clickBtn.textContent });
-      enqueueMangoFromBlog_(draftId, catId, draftMg ? draftMg.topic : '', mangoContent.blog, draftMg);
-      setAppToast('블로그 기준으로 망고보드 소개만 다시 만들고 있어요…', { duration: 5000, variant: 'ok' });
-      return;
-    }
-    if(clickBtn) startButtonCountdown_(clickBtn, { estimateSec: Math.ceil(MANGO_BG_ESTIMATE_MS / 1000), busyLabel: '이미지 프롬프트 재생성 중', idleText: '프롬프트 재생성' });
-    setAppToast('블로그 기준으로 본문 삽입 사진 프롬프트를 다시 만들고 있어요…', { duration: 4500, variant: 'ok' });
-    try {
-      var insertSlots = await generateBlogInsertPromptsFromBlog_(
-        catId,
-        mangoContent.blog,
-        draftMg ? draftMg.topic : '',
-        draftMg
-      );
-      var insertLatest = getDraftContent_(draftId) || mangoContent;
-      if(!insertLatest.images) insertLatest.images = { gptVisuals: [], mangoBrief: null };
-      insertLatest.images.gptVisuals = insertSlots;
-      persistDraftContent_(draftId, insertLatest);
-      if(state.selectedId === draftId){
-        state.activeTab = 'images';
-        renderSheetContent(insertLatest);
-      }
-      renderTabs();
-      renderMain();
-      setAppToast('본문 삽입 사진 프롬프트를 다시 만들었어요. Cursor에 「이 초안 이미지 만들어줘」라고 하면 사진을 만들 수 있어요.', { duration: 5000, variant: 'ok' });
-    } catch(err){
-      console.warn('[본문 삽입 이미지 재생성]', err);
-      setAppToast('이미지 프롬프트 재생성에 실패했어요.\n' + ((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
-    } finally {
-      if(clickBtn) stopButtonCountdown_(clickBtn);
-    }
-    return;
-  }
-
-  if(tab === 'images' && isHeiljagyaeCategory(catId)){
-    if(!state.apiKey){
-      openApiModal();
-      return;
-    }
-    var hjImgContent = getDraftContent_(draftId);
-    if(!hjImgContent || !hjImgContent.community){
-      setAppToast('게시판 초안이 없어요.\n게시판 탭에서 먼저 초안을 생성해 주세요.', { duration: 5000, variant: 'err' });
-      return;
-    }
-    applySheetEditsForTab_(hjImgContent, 'community');
-    applySheetEditsForTab_(hjImgContent, 'images');
-    var catHj = CATEGORIES[catId];
-    var draftHj = catHj && catHj.drafts.find(function(d){ return d.id === draftId; });
-    if(clickBtn) startButtonCountdown_(clickBtn, { estimateSec: Math.ceil(MANGO_BG_ESTIMATE_MS / 1000), busyLabel: '이미지 프롬프트 재생성 중', idleText: '재생성' });
-    setAppToast('게시판 따라하기 기준으로 이미지 프롬프트를 다시 만들고 있어요…', { duration: 4500, variant: 'ok' });
-    try {
-      var hjSlots = await generateHeiljagyaeImagePromptsFromCommunity_(
-        catId,
-        hjImgContent.community,
-        draftHj ? draftHj.topic : ''
-      );
-      var hjLatest = getDraftContent_(draftId) || hjImgContent;
-      if(!hjLatest.images) hjLatest.images = { gptVisuals: [], mangoBrief: null };
-      hjLatest.images.gptVisuals = hjSlots;
-      hjLatest.images.mangoBrief = null;
-      persistDraftContent_(draftId, hjLatest);
-      if(state.selectedId === draftId){
-        state.activeTab = 'images';
-        renderSheetContent(hjLatest);
-      }
-      renderTabs();
-      renderMain();
-      setAppToast('이미지 프롬프트를 다시 만들었어요.', { duration: 4000, variant: 'ok' });
-    } catch(err){
-      console.warn('[힐자계 이미지 재생성]', err);
-      setAppToast('이미지 프롬프트 재생성에 실패했어요.\n' + ((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
-    } finally {
-      if(clickBtn) stopButtonCountdown_(clickBtn);
-    }
+    renderTabs();
+    renderMain();
+    setAppToast('주제 동작에 맞춰 9:16 프롬프트를 다시 썼어요.', { duration: 3200, variant: 'ok' });
     return;
   }
 

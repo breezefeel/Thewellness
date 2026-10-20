@@ -11616,6 +11616,18 @@ function applyTopicGapDecision_(detail, index){
     localRev: state.syncEntityRevisions || {}
   });
   state._topicKeepLocalKeys = [];
+  var equalKeys = state._topicEqualDiffKeys || [];
+  state._topicEqualDiffKeys = [];
+  if(!detail.surfaceDiff && !equalKeys.length) state._surfaceUnmatched = false;
+  if(equalKeys.length > 5){
+    state._surfaceUnmatched = true;
+  } else if(equalKeys.length){
+    equalKeys.forEach(function(key){
+      if(decision.askKeys.indexOf(key) < 0) decision.askKeys.push(key);
+    });
+    decision.receive = false;
+    decision.adoptSurface = false;
+  }
   detail.ambiguousKeys = decision.askKeys;
   state._topicListGap = decision.askKeys.length > 0 && !plannerSyncConflictPending_;
   state._topicListGapCount = decision.askKeys.length;
@@ -11634,10 +11646,13 @@ function applyTopicGapDecision_(detail, index){
   var attempts = state._topicReceiveAttempts || 0;
   if(decision.receive && !state._topicGapResolving && !plannerSyncConflictPending_){
     if(attempts >= 2){
-      if(state._topicGapAdoptServer && detail.surfaceDiff && !decision.uploadKeys.length && !decision.askKeys.length){
+      if(state._topicGapAdoptServer && detail.surfaceDiff && !decision.uploadKeys.length && !decision.askKeys.length && !equalKeys.length){
         try { maybeQueueSurfaceDigest_(); } catch(eDig){}
+        state._surfaceUnmatched = false;
+      } else if(detail.surfaceDiff || equalKeys.length){
+        state._surfaceUnmatched = true;
       }
-      if(!state._topicReceiveGaveUp && decision.receive && !decision.askKeys.length){
+      if(!state._topicReceiveGaveUp && decision.receive && !decision.askKeys.length && state._surfaceUnmatched){
         state._topicReceiveGaveUp = true;
         if(typeof setAppToast === 'function') setAppToast('서버 내용으로 한 번 더 맞추지 못했습니다. 이 기기의 수정은 그대로 두고, 다음 저장 때 다시 맞춥니다.', { duration: 4800, variant: 'ok' });
       }
@@ -12119,6 +12134,22 @@ function syncServerValueBlank_(key, val){
   } catch(eBlank){}
   return false;
 }
+function syncKeptTextSize_(key, val){
+  var text = '';
+  try {
+    var row = unwrapSyncEntityValue_(val);
+    if(row && row.value && typeof row.value === 'object' && row.topic == null && row.content == null) row = row.value;
+    key = String(key || '');
+    if(key.indexOf('draft:') === 0 && row && typeof row === 'object'){
+      text = [row.topic, row.angle, row.rationale, row.writingBrief].map(function(part){ return String(part || '').trim(); }).join('\n');
+    } else if(key.indexOf('generated:') === 0 || key.indexOf('published:') === 0){
+      var content = row && typeof row === 'object' && row.content != null ? row.content : row;
+      text = typeof content === 'string' ? content : JSON.stringify(content || '');
+      text = String(text || '').replace(/data:image\/[a-zA-Z0-9+.-]+;base64,[a-zA-Z0-9+/=]+/g, '');
+    }
+  } catch(eSize){ text = ''; }
+  return String(text || '').trim().length;
+}
 function applySupabaseEntityRows_(rows){
   if(!state._gapUploadActive && !state._generalUploadOnly && !state._topicGapForceKeys){
     try { dropBulkOutboxUnlessChosen_(); } catch(eDropBulk){}
@@ -12147,6 +12178,7 @@ function applySupabaseEntityRows_(rows){
   var conflicts = [];
   var changed = false;
   var keepLocal = [];
+  var equalDiff = [];
   var localEntities = {};
   try { localEntities = collectSyncEntities_(payload, { skipEnsureIds: true }) || {}; } catch(eLocalEnt){}
   rows.forEach(function(row){
@@ -12201,6 +12233,24 @@ function applySupabaseEntityRows_(rows){
       payload.syncEntityRevisions[key] = serverRev;
       return;
     }
+    if(!row.deleted && !state._topicGapForceServer && !state._topicGapForceKeys && !syncServerValueBlank_(key, serverVal) && !syncServerValueBlank_(key, localEntities[key])){
+      var sameBody = false;
+      try { sameBody = syncEntitiesEquivalent_(key, localEntities[key], serverVal); } catch(eSameBody){}
+      if(!sameBody){
+        var knownLocalRev = parseInt((payload.syncEntityRevisions || {})[key], 10) || 0;
+        var serverClearlyNewer = knownLocalRev > 0 && serverRev > knownLocalRev;
+        var localSize = syncKeptTextSize_(key, localEntities[key]);
+        var serverSize = syncKeptTextSize_(key, serverVal);
+        if(!serverClearlyNewer && localSize > 0 && localSize > serverSize){
+          keepLocal.push(key);
+          return;
+        }
+        if(!serverClearlyNewer && localSize > 0 && localSize === serverSize){
+          equalDiff.push(key);
+          return;
+        }
+      }
+    }
     setSyncEntity_(payload, key, serverVal);
     payload.syncEntityRevisions[key] = serverRev;
     if(row.deleted){
@@ -12230,6 +12280,7 @@ function applySupabaseEntityRows_(rows){
     state.syncEntityTombstones = payload.syncEntityTombstones;
   }
   if(keepLocal.length) state._topicKeepLocalKeys = (state._topicKeepLocalKeys || []).concat(keepLocal);
+  if(equalDiff.length) state._topicEqualDiffKeys = (state._topicEqualDiffKeys || []).concat(equalDiff);
   if(conflicts.length && !state._topicGapForceServer && !state._topicGapForceKeys && typeof openPlannerOutboxConflict_ === 'function'){
     openPlannerOutboxConflict_(conflicts, payload, parseInt(payload.syncRevision, 10) || 0);
   }
@@ -19018,6 +19069,9 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(state._topicListGap){
     phase = 'topic_gap';
     overall = 'pending';
+  } else if(state._surfaceUnmatched){
+    phase = 'pending';
+    overall = 'pending';
   }
 
   var loginRequired = !!state._teamLoginRequired;
@@ -19065,11 +19119,15 @@ function getSyncStatusInfo_(remoteMeta){
       '그 항목만 고르면 나머지는 최신 내용으로 맞춰집니다.';
     actionHint = '선택 창에 나온 항목만 고르세요.';
   } else if(phase === 'pending'){
-    summary = plannerOutboxHasTeamContent_()
+    summary = state._surfaceUnmatched && !plannerOutboxHasTeamContent_()
+      ? '화면이 서버와 아직 같지 않습니다. 최신으로 두지 않고, 다음 저장 때 다시 맞춥니다.'
+      : plannerOutboxHasTeamContent_()
       ? '이 기기에만 있는 주제·초안·기획을 서버로 올리는 중이에요. 올린 뒤 다른 기기가 받습니다.'
       : ('이 기기 변경이 아직 Supabase에 반영되지 않았어요' +
       (pendingCount ? ' (남은 약 ' + pendingCount + '건)' : '') + '.');
-    actionHint = '자동으로 올라갑니다. 오래 멈추면 「동기화」→「지금 동기화」를 누르세요.';
+    actionHint = state._surfaceUnmatched && !plannerOutboxHasTeamContent_()
+      ? '빈 글이 더 긴 글을 지우지는 않습니다. 다음 저장 때 다시 맞춥니다.'
+      : '자동으로 올라갑니다. 오래 멈추면 「동기화」→「지금 동기화」를 누르세요.';
   } else if(phase === 'warn'){
     if(loginRequired){
       summary = '팀 로그인이 필요합니다. 동기화 창에서 로그인한 뒤 Supabase 내용을 받습니다.';

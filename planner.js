@@ -11564,12 +11564,35 @@ function finishTopicListCheck_(index){
   }
   queueLocalContent_('generated:', state.generatedOnly);
   queueLocalContent_('published:', state.published);
+  var localPlans = {};
+  try { if(_localPlanKeyCache_) _localPlanKeyCache_.at = 0; } catch(eCache){}
+  try { localPlans = localPlanSyncKeys_(); } catch(ePlans){}
+  var serverLivePlan = {};
+  var serverDeletedPlan = {};
+  (index || []).forEach(function(row){
+    if(!row || !row.key || String(row.key).indexOf('plan:subgoal:') !== 0) return;
+    if(row.deleted) serverDeletedPlan[row.key] = parseInt(row.revision, 10) || 0;
+    else serverLivePlan[row.key] = parseInt(row.revision, 10) || 0;
+  });
+  var planOnlyHere = [];
+  Object.keys(localPlans).forEach(function(key){
+    if(Object.prototype.hasOwnProperty.call(serverLivePlan, key) || Object.prototype.hasOwnProperty.call(serverDeletedPlan, key)) return;
+    planOnlyHere.push(key);
+  });
+  var planMissingHere = [];
+  Object.keys(serverLivePlan).forEach(function(key){
+    if(!localPlans[key]) planMissingHere.push(key);
+  });
+  var planStillDeleted = Object.keys(localPlans).filter(function(key){
+    return Object.prototype.hasOwnProperty.call(serverDeletedPlan, key);
+  });
+  planOnlyHere.forEach(function(key){ uploadKeys.push(key); });
   if(uploadKeys.length){
     state._sessionUserEdit = true;
     enqueueSyncOutboxChanges_(uploadKeys, getPersistPayload());
     uploadKeys.forEach(function(key){
       (state.syncOutbox || []).forEach(function(op){
-        if(op && op.key === key) op.baseEntityRevision = 0;
+        if(op && op.key === key && String(key).indexOf('plan:') !== 0) op.baseEntityRevision = 0;
       });
     });
   }
@@ -11592,21 +11615,137 @@ function finishTopicListCheck_(index){
       contentRev[key] = rev;
     }
   });
+  var localDigest = '';
+  var serverDigest = '';
+  var serverDigestRev = 0;
+  try { localDigest = programSurfaceDigest_(); } catch(eDigest){ localDigest = ''; }
+  (index || []).forEach(function(row){
+    if(!row || row.key !== 'setting:surfaceDigest' || row.deleted) return;
+    var packed = row.value;
+    if(packed && packed.value) packed = packed.value;
+    serverDigest = packed && packed.digest ? String(packed.digest) : '';
+    serverDigestRev = parseInt(row.revision, 10) || 0;
+  });
+  var surfaceDiff = !!(localDigest && localDigest !== serverDigest);
   state._topicListGapDetail = {
     missingHere: missingHere,
     stillDeleted: stillDeleted,
     missingContent: missingContent,
     onlyHere: onlyHere,
+    planOnlyHere: planOnlyHere,
+    planMissingHere: planMissingHere,
+    planStillDeleted: planStillDeleted,
+    planDeletedRev: serverDeletedPlan,
+    planLiveRev: serverLivePlan,
     deletedRev: deletedRev,
     liveRev: liveRev,
-    contentRev: contentRev
+    contentRev: contentRev,
+    surfaceDiff: surfaceDiff,
+    localDigest: localDigest,
+    serverDigest: serverDigest,
+    serverDigestRev: serverDigestRev
   };
-  state._topicListGap = !!(missingHere.length || stillDeleted.length || missingContent.length);
-  state._topicListGapCount = missingHere.length + stillDeleted.length + missingContent.length;
+  state._topicListGap = !!(missingHere.length || stillDeleted.length || missingContent.length || planMissingHere.length || planStillDeleted.length || surfaceDiff);
+  state._topicListGapCount = missingHere.length + stillDeleted.length + missingContent.length + planMissingHere.length + planStillDeleted.length + planOnlyHere.length + (surfaceDiff ? 1 : 0);
   if(state._topicListGap && !state._topicGapResolving){
     setTimeout(function(){ try { openTopicGapChoice_(); } catch(eGap){} }, 500);
   }
   return state._topicListGap;
+}
+function imageSigFromValue_(val){
+  if(val == null || val === '') return '';
+  var s = '';
+  try { s = typeof val === 'string' ? val : JSON.stringify(val); } catch(eImg){ return ''; }
+  if(!s) return '';
+  if(s.indexOf('data:image') < 0 && s.indexOf('gptVisuals') < 0 && s.indexOf('thumbMaker') < 0 && s.indexOf('refImage') < 0) return '';
+  return syncStringHash_(s.length + ':' + s.slice(0, 180) + ':' + s.slice(-180));
+}
+function channelKeysFromPub_(pub){
+  if(!pub || !pub.tabPublished || typeof pub.tabPublished !== 'object') return '';
+  return Object.keys(pub.tabPublished).filter(function(k){ return !!pub.tabPublished[k]; }).sort().join(',');
+}
+function sortedRecordPart_(obj){
+  obj = obj && typeof obj === 'object' ? obj : {};
+  return Object.keys(obj).sort().map(function(k){
+    var v = obj[k];
+    if(v == null || v === '') return '';
+    var text = typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : syncValueFingerprint_(v);
+    return text ? (k + '=' + text) : '';
+  }).filter(Boolean).join('|');
+}
+function surfaceMatchEntityKey_(key){
+  key = String(key || '');
+  if(!key || isDeviceLocalSyncEntityKey_(key) || key === 'setting:surfaceDigest') return false;
+  if(key.indexOf('plan:') === 0 || key.indexOf('draft:') === 0 || key.indexOf('generated:') === 0 || key.indexOf('published:') === 0) return true;
+  if(key.indexOf('prompt:') === 0 || key.indexOf('branding:') === 0 || key.indexOf('milestone:') === 0) return true;
+  if(key.indexOf('pinned:') === 0 || key.indexOf('override:') === 0 || key.indexOf('deleted:') === 0) return true;
+  return key.indexOf('ops:checked:') === 0 || key.indexOf('ops:note:') === 0 || key.indexOf('ops:collapsed:') === 0 ||
+    key.indexOf('ops:review:') === 0 || key.indexOf('ops:newBranchMeta:') === 0 || key.indexOf('ops:keywordAds:') === 0 ||
+    key === 'ops:root';
+}
+function programSurfaceDigest_(){
+  var parts = [];
+  CATEGORIES.forEach(function(cat, catId){
+    if(typeof isOpsManualCategory === 'function' && isOpsManualCategory(catId)) return;
+    var plan = state.branding && state.branding.subGoalPlans && state.branding.subGoalPlans[String(catId)];
+    var steps = (plan && plan.steps) || [];
+    var stepPart = steps.map(function(step, i){
+      var id = step && step.id != null ? String(step.id) : '';
+      var ordered = [];
+      try { ordered = id && typeof getDraftsForSubGoalStep_ === 'function' ? getDraftsForSubGoalStep_(catId, id) : []; } catch(eOrd){ ordered = []; }
+      return i + ':' + id + ':' + String((step && step.title) || '') + '>' + ordered.map(function(d){ return d && d.id; }).join(',');
+    }).join('|');
+    var topicCount = 0;
+    try { topicCount = countUnpublishedTopicsForCat_(catId); } catch(eCnt){ topicCount = (cat.drafts || []).length; }
+    var draftPart = (cat.drafts || []).map(function(d){
+      if(!d || !d.id) return '';
+      var gen = state.generatedOnly && state.generatedOnly[d.id];
+      var pub = state.published && state.published[d.id];
+      return [
+        d.id,
+        String(d.topic || ''),
+        String(d.roadmapStepId || ''),
+        String(d.step || ''),
+        channelKeysFromPub_(pub),
+        imageSigFromValue_(d.refImages || d.refImage || ''),
+        imageSigFromValue_(gen),
+        imageSigFromValue_(pub),
+        draftEntityFingerprint_(d)
+      ].join('~');
+    }).join('|');
+    var profile = String((plan && plan.brandProfile) || '');
+    var guide = String((plan && (plan.strategyGuide || plan.criteria || plan.intent)) || '');
+    parts.push(String(catId) + '#' + topicCount + '#' + stepPart + '#' + syncStringHash_(profile + '\n' + guide) + '#' + draftPart);
+  });
+  var branding = state.branding || {};
+  var year = branding.yearPlan || {};
+  var yearPeriods = [];
+  try { yearPeriods = collapseYearPlanPeriods_(year.periods || []); } catch(eYear){ yearPeriods = year.periods || []; }
+  parts.push('year#' + String(year.goal || '') + ':' + String(year.intent || '') + ':' + String(year.anchorDate || year.anchor || '') + '#' + yearPeriods.map(function(p, i){
+    p = p || {};
+    return i + ':' + String(p.id || '') + ':' + String(p.goal || p.topic || '') + ':' + String(p.rationale || '');
+  }).join('|'));
+  var daily = branding.dailySharePlan || {};
+  parts.push('daily#' + String(daily.intent || '') + '#' + (daily.themes || []).map(function(t, i){
+    t = t || {};
+    return i + ':' + String(t.id || '') + ':' + String(t.label || '') + ':' + String(t.note || '');
+  }).join('|'));
+  parts.push('goals#' + sortedRecordPart_(branding.categoryGoals) + '#' + sortedRecordPart_(branding.seriesGoals));
+  var brandSkip = { yearPlan: 1, dailySharePlan: 1, subGoalPlans: 1, categoryGoals: 1, seriesGoals: 1 };
+  parts.push('brand#' + Object.keys(branding).filter(function(k){ return !brandSkip[k]; }).sort().map(function(k){
+    return k + '=' + syncValueFingerprint_(branding[k]);
+  }).join('|'));
+  var prompts = state.prompts || {};
+  var promptCats = prompts.categories || {};
+  parts.push('prompt#' + syncStringHash_(String(prompts.base || '')) + '#' + Object.keys(promptCats).sort().map(function(catId){
+    return catId + '{' + sortedRecordPart_(promptCats[catId]) + '}';
+  }).join('|'));
+  parts.push('milestone#' + sortedRecordPart_(state.promptRefineMilestones));
+  parts.push('pin#' + sortedRecordPart_(state.pinnedDraftIds));
+  parts.push('override#' + sortedRecordPart_(state.draftBrandOverrides));
+  var ops = state.opsManual || {};
+  parts.push('ops#' + sortedRecordPart_(ops.checked) + '#' + sortedRecordPart_(ops.notes) + '#' + sortedRecordPart_(ops.collapsed) + '#' + sortedRecordPart_(ops.review) + '#' + sortedRecordPart_(ops.newBranchMeta) + '#' + sortedRecordPart_(ops.keywordAds));
+  return syncStringHash_(parts.join('\n'));
 }
 function topicGapDraftLabel_(id){
   var topic = '';
@@ -11633,11 +11772,17 @@ function openTopicGapChoice_(){
   var body = document.getElementById('sync-gap-body');
   var overlay = document.getElementById('sync-gap-overlay');
   if(!body || !overlay) return;
-  var html = '<p>어느 쪽이 더 최신이라고 단정할 수 없는 차이가 있습니다. 고르면 그 기준으로 이 기기와 서버를 같게 만듭니다.</p>';
+  var html = '<p>주제 수, 초안, 이미지, 순서, 기획, 채널 완료, 프롬프트, 지점 운영이 서버와 같지 않습니다. 고르면 그 기준으로 이 기기와 서버를 같게 만듭니다.</p>';
+  if(detail.surfaceDiff){
+    html += '<p>프로그램 설명, 1년·일상 기획, 목표, 채널 완료, 고정, 프롬프트, 지점 체크가 서버에 저장된 것과 다릅니다.</p>';
+  }
   html += topicGapListHtml_('이 기기에만 있는 주제', detail.onlyHere, topicGapDraftLabel_);
   html += topicGapListHtml_('서버에만 있는 주제', detail.missingHere, function(id){ return id; });
   html += topicGapListHtml_('서버는 지웠고 이 기기에 남은 주제', detail.stillDeleted, topicGapDraftLabel_);
   html += topicGapListHtml_('서버에만 있는 본문', detail.missingContent, function(key){ return key; });
+  html += topicGapListHtml_('이 기기에만 있는 프로그램 단계', detail.planOnlyHere, function(key){ return key; });
+  html += topicGapListHtml_('서버에만 있는 프로그램 단계', detail.planMissingHere, function(key){ return key; });
+  html += topicGapListHtml_('서버는 지웠고 이 기기에 남은 프로그램 단계', detail.planStillDeleted, function(key){ return key; });
   html += '<p class="sync-gap-note">이 기기 기준: 여기 있는 주제는 서버에 되살리고, 서버에만 있는 항목은 서버에서 뺍니다.<br>서버 기준: 서버가 지운 주제는 이 기기에서도 지우고, 서버에만 있는 항목은 이 기기로 받습니다.</p>';
   body.innerHTML = html;
   state._topicGapChoiceOpen = true;
@@ -11663,7 +11808,7 @@ function dropTopicGapDraftLocally_(id){
   delete state.generatedOnly[id];
   delete state.published[id];
 }
-function queueTopicGapEntity_(key, deleted, baseRev){
+function queueTopicGapEntity_(key, deleted, baseRev, explicitValue){
   if(!key) return;
   if(!Array.isArray(state.syncOutbox)) state.syncOutbox = [];
   var entities = {};
@@ -11678,8 +11823,13 @@ function queueTopicGapEntity_(key, deleted, baseRev){
     version: 1,
     key: key
   };
-  op.value = deleted ? null : (hasValue ? cloneSyncValue_(entities[key]) : null);
-  op.deleted = !!deleted || !hasValue;
+  if(explicitValue !== undefined){
+    op.value = cloneSyncValue_(explicitValue);
+    op.deleted = false;
+  } else {
+    op.value = deleted ? null : (hasValue ? cloneSyncValue_(entities[key]) : null);
+    op.deleted = !!deleted || !hasValue;
+  }
   op.baseEntityRevision = parseInt(baseRev, 10) || 0;
   op.updatedAt = new Date().toISOString();
   op.version = (parseInt(op.version, 10) || 1) + (existing ? 1 : 0);
@@ -11707,6 +11857,22 @@ window.applyTopicGapChoice_ = async function(side){
       (detail.missingContent || []).forEach(function(key){
         queueTopicGapEntity_(key, true, (detail.contentRev || {})[key] || 0);
       });
+      (detail.planOnlyHere || []).forEach(function(key){
+        queueTopicGapEntity_(key, false, 0);
+      });
+      (detail.planStillDeleted || []).forEach(function(key){
+        queueTopicGapEntity_(key, false, (detail.planDeletedRev || {})[key] || 0);
+      });
+      (detail.planMissingHere || []).forEach(function(key){
+        queueTopicGapEntity_(key, true, (detail.planLiveRev || {})[key] || 0);
+      });
+      if(detail.surfaceDiff){
+        try {
+          var surfaceKeys = Object.keys(collectSyncEntities_(getPersistPayload(), { skipEnsureIds: true }) || {}).filter(surfaceMatchEntityKey_);
+          surfaceKeys.forEach(function(key){ queueTopicGapEntity_(key, false, 0); });
+        } catch(eSurfaceKeys){}
+        queueTopicGapEntity_('setting:surfaceDigest', false, detail.serverDigestRev || 0, { digest: detail.localDigest || programSurfaceDigest_() });
+      }
       state.syncDirty = true;
       state._sessionUserEdit = true;
       state._gapUploadActive = true;
@@ -15941,6 +16107,8 @@ function normalizeDraftRowForSync_(draft){
     row[k] = v;
   });
   if(draft.youtubeUrls && draft.youtubeUrls.length) row.youtubeUrls = draft.youtubeUrls;
+  var imageSig = imageSigFromValue_(draft.refImages || draft.refImage || null);
+  if(imageSig) row.imageSig = imageSig;
   return row;
 }
 function omitEmptyForSyncCompare_(value){
@@ -16692,6 +16860,9 @@ function syncEntitiesEquivalent_(key, localVal, remoteVal){
     return syncValueFingerprint_(subMetaCore_(l)) === syncValueFingerprint_(subMetaCore_(r));
   }
   if(key.indexOf('plan:subgoal:') === 0 && l && typeof l === 'object' && r && typeof r === 'object'){
+    var localOrder = (typeof l.order === 'number') ? l.order : null;
+    var remoteOrder = (typeof r.order === 'number') ? r.order : null;
+    if(localOrder !== remoteOrder) return false;
     l = Object.assign({}, l);
     r = Object.assign({}, r);
     if(l.id != null) l.id = canonicalizeStepIdForCompare_(l.id);
@@ -17391,8 +17562,22 @@ function syncValueIsPruned_(val){
 function isUserContentSyncOp_(op){
   return plannerTeamContentOp_(op);
 }
+var _localPlanKeyCache_ = null;
+function localPlanSyncKeys_(){
+  if(_localPlanKeyCache_ && (Date.now() - _localPlanKeyCache_.at) < 1500) return _localPlanKeyCache_.keys;
+  var keys = {};
+  try {
+    var ents = collectSyncEntities_(getPersistPayload(), { skipEnsureIds: true }) || {};
+    Object.keys(ents).forEach(function(k){
+      if(String(k).indexOf('plan:subgoal:') === 0) keys[k] = true;
+    });
+  } catch(ePlanKeys){}
+  _localPlanKeyCache_ = { at: Date.now(), keys: keys };
+  return keys;
+}
 function localHasSyncedContentKey_(key){
   key = String(key || '');
+  if(key.indexOf('plan:subgoal:') === 0) return !!localPlanSyncKeys_()[key];
   if(key.indexOf('draft:') === 0) return !!listLocalUserDraftIds_()[key.slice('draft:'.length)];
   if(key.indexOf('generated:') === 0){
     var generated = (state.generatedOnly || {})[key.slice('generated:'.length)];
@@ -17684,16 +17869,23 @@ async function plannerGasPushNow_(){
     }
     if((state._generalUploadOnly || state._gapUploadActive) && Array.isArray(data.conflicts) && data.conflicts.length){
       acknowledgeSyncOutbox_(data.accepted || [], mutations);
-      var generalConflicts = data.conflicts.filter(function(conflict){
-        return conflict && isGeneralProgramSyncKey_(conflict.key);
-      });
-      (data.conflicts || []).forEach(function(conflict){
-        if(!conflict || isGeneralProgramSyncKey_(conflict.key)) return;
-        state.syncOutbox = (state.syncOutbox || []).filter(function(op){
-          return !(op && op.key === conflict.key);
+      if(state._gapUploadActive){
+        var gapConflicts = data.conflicts.filter(function(conflict){
+          return conflict && conflict.key && !isDeviceLocalSyncEntityKey_(conflict.key);
         });
-      });
-      if(generalConflicts.length) forceOutboxOverwriteBase_(generalConflicts);
+        if(gapConflicts.length) forceOutboxOverwriteBase_(gapConflicts);
+      } else {
+        var generalConflicts = data.conflicts.filter(function(conflict){
+          return conflict && isGeneralProgramSyncKey_(conflict.key);
+        });
+        (data.conflicts || []).forEach(function(conflict){
+          if(!conflict || isGeneralProgramSyncKey_(conflict.key)) return;
+          state.syncOutbox = (state.syncOutbox || []).filter(function(op){
+            return !(op && op.key === conflict.key);
+          });
+        });
+        if(generalConflicts.length) forceOutboxOverwriteBase_(generalConflicts);
+      }
       try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true }); } catch(eGenSv){}
       continue;
     }
@@ -18636,7 +18828,7 @@ function getSyncStatusInfo_(remoteMeta){
     summary = 'Supabase에 이 기기보다 최신 내용(rev ' + remoteRev + ')이 있어요.';
     actionHint = '「동기화」버튼을 누른 뒤 「지금 동기화」로 받아오세요.';
   } else if(phase === 'topic_gap'){
-    summary = '주제 목록이 서버와 다릅니다' +
+    summary = '주제 수, 초안, 이미지, 순서, 기획, 채널 완료, 프롬프트, 지점 운영이 서버와 같지 않습니다' +
       (state._topicListGapCount ? ' (' + state._topicListGapCount + '건). ' : '. ') +
       '어느 쪽으로 맞출지 고르면 이 기기와 서버가 같아집니다.';
     actionHint = '선택 창에서 이 기기 또는 서버를 고르세요. 고르기 전에는 최신으로 두지 않습니다.';
@@ -19338,7 +19530,7 @@ async function runPlannerBootstrapInBackground_(){
           : (hasPendingLocalSyncChanges_()
             ? '이 기기에만 있는 주제를 서버로 올리는 중이에요. 올린 뒤 다른 기기가 받습니다.'
             : (bootstrapData.topicGap
-              ? '주제 목록이 서버와 다릅니다. 어느 쪽으로 맞출지 고르세요.'
+              ? '화면 내용이 서버와 다릅니다. 어느 쪽으로 맞출지 고르세요.'
               : '주제 목록을 Supabase와 맞췄어요.')), { duration: 5200, variant: 'ok' });
       }
       return;

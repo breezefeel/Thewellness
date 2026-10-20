@@ -125,7 +125,15 @@ var PlannerSyncSupabase = (function(){
       return loadPrefixIndex('draft:').then(function(drafts){
         return loadPrefixIndex('generated:').then(function(generated){
           return loadPrefixIndex('published:').then(function(published){
-            return drafts.concat(generated).concat(published);
+            return loadPrefixIndex('plan:subgoal:').then(function(plans){
+              return client.from('planner_entities')
+                .select('key,value,revision,deleted,updated_at,change_seq')
+                .eq('key', 'setting:surfaceDigest')
+                .then(function(res){
+                  var digestRows = (res && res.data) || [];
+                  return drafts.concat(generated).concat(published).concat(plans).concat(digestRows);
+                });
+            });
           });
         });
       });

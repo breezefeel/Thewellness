@@ -30999,7 +30999,7 @@ function ensureThumbMakerState_(){
       hitRegions: [],
       activeField: null,
       paintGen: 0,
-      focusX: 0.62,
+      focusX: 0.5,
       focusY: 0.45,
       zoom: 1,
       outFocus: false,
@@ -31021,7 +31021,7 @@ function ensureThumbMakerState_(){
   }
   if(st.photoIndex == null) st.photoIndex = 0;
   if(st.programMode !== 'topic' && st.programMode !== 'brand' && st.programMode !== 'photo') st.programMode = 'topic';
-  if(st.focusX == null) st.focusX = 0.62;
+  if(st.focusX == null) st.focusX = 0.5;
   if(st.focusY == null) st.focusY = 0.45;
   if(st.zoom == null) st.zoom = 1;
   if(st.typeScale == null) st.typeScale = 1;
@@ -31050,7 +31050,7 @@ function resetThumbMakerVisualState_(st){
   st.bgImg = null;
   st.fileName = '';
   st.activeField = null;
-  st.focusX = 0.62;
+  st.focusX = 0.5;
   st.focusY = 0.45;
   st.zoom = 1;
   st.outFocus = false;
@@ -31084,7 +31084,7 @@ function serializeThumbWorkspace_(st){
     programMode: st.programMode || 'topic',
     photoIndex: st.photoIndex || 0,
     sizeKey: st.sizeKey || '4x5',
-    focusX: st.focusX != null ? st.focusX : 0.62,
+    focusX: st.focusX != null ? st.focusX : 0.5,
     focusY: st.focusY != null ? st.focusY : 0.45,
     zoom: st.zoom != null ? st.zoom : 1,
     typeScale: st.typeScale != null ? st.typeScale : 1,
@@ -31142,7 +31142,7 @@ async function applyThumbWorkspaceRow_(st, row){
     st.outFocus = !!row.outFocus;
   }
   st.photoIndex = row.photoIndex != null ? row.photoIndex : 0;
-  st.focusX = row.focusX != null ? row.focusX : 0.62;
+  st.focusX = row.focusX != null ? row.focusX : 0.5;
   st.focusY = row.focusY != null ? row.focusY : 0.45;
   st.zoom = row.zoom != null ? row.zoom : 1;
   st.typeScale = row.typeScale != null ? clampThumbTypeScale_(row.typeScale) : 1;
@@ -32591,7 +32591,7 @@ function renderThumbMakerCard_(content){
     { v: 0.62, label: '오른쪽' },
     { v: 0.82, label: '맨오른쪽' }
   ].forEach(function(opt){
-    var on = Math.abs((st.focusX == null ? 0.62 : st.focusX) - opt.v) < 0.02;
+    var on = Math.abs((st.focusX == null ? 0.5 : st.focusX) - opt.v) < 0.02;
     html += '<button type="button" class="thumb-maker-mode-btn' + (on ? ' on' : '') + '" data-thumb-focus-x="' + opt.v + '" onclick="setThumbFocusX_(' + opt.v + ')">' + opt.label + '</button>';
   });
   html += '</div>';
@@ -33730,7 +33730,7 @@ function buildTopicPhotoPrompt_(content, catId, topic){
     topicPhotoModelLine_(topicPhotoModelKey_(content)),
     '함께 넣은 공간 사진 여러 장 중 구도 하나만 따른다. 여러 공간을 한 화면에 섞지 않는다. 방에 원래 있는 소품은 치우지 않는다.',
     '복장: 남색 반팔 운동 티, 검은 반바지. 참고 사진의 스크럽·츄리닝·홈웨어는 따르지 않는다.',
-    '인물과 동작은 화면 위쪽에 둔다. 아래쪽 3분의 1은 바닥이나 매트만 남겨, 썸네일 글자가 그 위에 올라갈 자리로 비운다. 얼굴, 손, 동작의 핵심은 그 아래 자리에 두지 않는다.',
+    '인물과 동작은 좌우 한가운데, 화면 위쪽에 둔다. 몸통과 얼굴의 중심이 세로 가운데선에 온다. 머리가 왼쪽, 다리가 오른쪽으로 치우치지 않는다. 아래쪽 3분의 1은 바닥이나 매트만 남겨, 썸네일 글자가 그 위에 올라갈 자리로 비운다. 얼굴, 손, 발은 그 아래 자리에 두지 않는다. 가장자리에 붙이지 않는다.',
     '빛은 창으로 들어오는 낮 빛. 피부와 바닥은 실제처럼. 포스터처럼 한가운데 세우거나 윤곽을 깎지 않는다.',
     '사진 안에는 한글, 영문, 숫자, 자막, 제목, 간판 글씨, 화살표, 도표, 해부 그림, 병원 침상, 로고, 워터마크를 그리지 않는다. 참고 사진의 자격증·창 글씨도 따라 적지 않는다. 사람은 한 명.'
   ].join('\n');
@@ -33743,7 +33743,7 @@ function ensureTopicPhotoPrompt_(content, topic, catId, force){
   if(!content.images.photoBranch) content.images.photoBranch = 'incheon';
   if(content.images.photoModel !== 'f') content.images.photoModel = 'm';
   var current = (content.images.gptVisuals || [])[0];
-  if(!force && current && current.role === 'topicPhoto' && current.prompt && current.prompt.indexOf('9:16') < 0 && current.prompt.indexOf('화면 아래쪽') < 0 && current.prompt.indexOf('주제 「') < 0) return content;
+  if(!force && current && current.role === 'topicPhoto' && current.prompt && current.prompt.indexOf('9:16') < 0 && current.prompt.indexOf('화면 아래쪽') < 0 && current.prompt.indexOf('주제 「') < 0 && current.prompt.indexOf('좌우 한가운데') >= 0) return content;
   var draft = null;
   try {
     var cat = CATEGORIES[catId];
@@ -33920,7 +33920,7 @@ window.generateTopicPhoto_ = async function(btn){
   setAppToast('참고 사진으로 4:5 사진을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.', { duration: 4000, variant: 'ok' });
   try {
     var refs = await loadTopicPhotoRefs_(branch, model);
-    var apiPrompt = prompt + '\n\n사진 안에 글자, 숫자, 자막, 제목, 로고를 그리지 않는다. 주제 문장을 사진에 적지 않는다. 인물과 동작은 화면 위쪽에 두고, 아래쪽 3분의 1은 바닥만 남겨 썸네일 글자가 올라갈 자리로 비운다. 얼굴과 손은 아래에 두지 않는다. 첨부 사진 앞쪽은 공간, 마지막은 모델이다. 4:5 한 장. 사람은 한 명.';
+    var apiPrompt = prompt + '\n\n사진 안에 글자, 숫자, 자막, 제목, 로고를 그리지 않는다. 주제 문장을 사진에 적지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통 중심이 세로 가운데선에 오고, 머리와 다리가 좌우로 치우치지 않는다. 아래쪽 3분의 1은 바닥만 남겨 썸네일 글자가 올라갈 자리로 비운다. 얼굴, 손, 발은 아래에 두지 않는다. 첨부 사진 앞쪽은 공간, 마지막은 모델이다. 4:5 한 장. 사람은 한 명.';
     var data = await plannerGasJsonRequest_({
       action: 'plannerGenerateTopicPhoto',
       prompt: apiPrompt,
@@ -33943,10 +33943,13 @@ window.generateTopicPhoto_ = async function(btn){
     var cropped = await cropDataUrlToFourFive_(rawUrl);
     var st = ensureThumbMakerState_();
     st.sizeKey = '4x5';
+    st.focusX = 0.5;
+    st.focusY = 0.4;
     var sizeEl = document.getElementById('thumb-size');
     if(sizeEl) sizeEl.value = '4x5';
     clearThumbAiUpscaleCache_();
     await setThumbMakerBackgroundFromDataUrl_(cropped, '주제 사진.jpg');
+    syncThumbFocusPresetButtons_();
     fillTopicPhotoPreview_(cropped);
     persistDraftContent_(state.selectedId, content);
     setAppToast('4:5 사진을 만들었어요. 아래 썸네일 배경에 올려 두었어요.', { duration: 3200, variant: 'ok' });

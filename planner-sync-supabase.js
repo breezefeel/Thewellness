@@ -121,6 +121,48 @@ var PlannerSyncSupabase = (function(){
       }
       return nextIndex();
     }
+    function loadPrefixRows(prefix){
+      var loaded = [];
+      var rowFrom = 0;
+      function nextRows(){
+        return client.from('planner_entities')
+          .select('key,value,revision,deleted,updated_at,change_seq')
+          .like('key', prefix + '%')
+          .order('key', { ascending: true })
+          .range(rowFrom, rowFrom + page - 1)
+          .then(function(res){
+            if(res.error) throw new Error(res.error.message || '서버 항목을 읽지 못했습니다.');
+            var chunk = res.data || [];
+            loaded = loaded.concat(chunk);
+            if(chunk.length < page) return loaded;
+            rowFrom += page;
+            return nextRows();
+          });
+      }
+      return nextRows();
+    }
+    function loadSurfaceRows(){
+      var prefixes = ['draft:', 'generated:', 'published:', 'plan:', 'prompt:', 'branding:', 'milestone:', 'pinned:', 'override:', 'deleted:', 'ops:'];
+      var acc = [];
+      var pi = 0;
+      function nextPrefix(){
+        if(pi >= prefixes.length){
+          return client.from('planner_entities')
+            .select('key,value,revision,deleted,updated_at,change_seq')
+            .eq('key', 'setting:surfaceDigest')
+            .then(function(res){
+              if(res.error) throw new Error(res.error.message || '비교 기록을 읽지 못했습니다.');
+              return acc.concat(res.data || []);
+            });
+        }
+        var prefix = prefixes[pi++];
+        return loadPrefixRows(prefix).then(function(chunk){
+          acc = acc.concat(chunk || []);
+          return nextPrefix();
+        });
+      }
+      return nextPrefix();
+    }
     function loadDraftIndex(){
       return loadPrefixIndex('draft:').then(function(drafts){
         return loadPrefixIndex('generated:').then(function(generated){
@@ -156,31 +198,14 @@ var PlannerSyncSupabase = (function(){
       }
       return nextKeys();
     }
-    return next().then(function(){
-      return loadDraftIndex();
-    }).then(function(index){
-      var have = {};
-      rows.forEach(function(row){ if(row && row.key) have[row.key] = true; });
-      var need = [];
-      (index || []).forEach(function(row){
-        if(!row || !row.key || have[row.key]) return;
-        var key = String(row.key);
-        var localHas = (typeof localHasSyncedContentKey_ === 'function') ? localHasSyncedContentKey_(key) : false;
-        if(row.deleted){
-          if(localHas) need.push(key);
-          return;
-        }
-        if(!localHas) need.push(key);
-      });
-      return loadDraftRows(need).then(function(extra){
-        rows = rows.concat(extra || []);
-        return index;
-      });
-    }).then(function(index){
+    function finishPull(index){
       var emptyTable = since === 0 && !rows.length && !(index && index.length);
       var applied = { conflicts: [] };
       if(typeof applySupabaseEntityRows_ === 'function'){
         applied = applySupabaseEntityRows_(rows) || applied;
+      }
+      if(typeof state !== 'undefined' && state._topicGapForceServer && typeof dropSurfaceKeysAbsentOnServer_ === 'function'){
+        try { dropSurfaceKeysAbsentOnServer_(index); } catch(eDrop){}
       }
       var topicGap = false;
       if(typeof finishTopicListCheck_ === 'function'){
@@ -210,6 +235,41 @@ var PlannerSyncSupabase = (function(){
         conflicts: applied.conflicts || [],
         syncCapabilities: CAPS
       };
+    }
+    if(typeof state !== 'undefined' && state._topicGapForceServer){
+      return loadSurfaceRows().then(function(surfaceRows){
+        var seen = {};
+        rows = [];
+        (surfaceRows || []).forEach(function(row){
+          if(!row || !row.key || seen[row.key]) return;
+          seen[row.key] = true;
+          rows.push(row);
+        });
+        return finishPull(rows);
+      });
+    }
+    return next().then(function(){
+      return loadDraftIndex();
+    }).then(function(index){
+      var have = {};
+      rows.forEach(function(row){ if(row && row.key) have[row.key] = true; });
+      var need = [];
+      (index || []).forEach(function(row){
+        if(!row || !row.key || have[row.key]) return;
+        var key = String(row.key);
+        var localHas = (typeof localHasSyncedContentKey_ === 'function') ? localHasSyncedContentKey_(key) : false;
+        if(row.deleted){
+          if(localHas) need.push(key);
+          return;
+        }
+        if(!localHas) need.push(key);
+      });
+      return loadDraftRows(need).then(function(extra){
+        rows = rows.concat(extra || []);
+        return index;
+      });
+    }).then(function(index){
+      return finishPull(index);
     });
   }
 

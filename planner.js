@@ -24716,14 +24716,31 @@ function getDraftCreatedAtMs_(d) {
   return 0;
 }
 
-function getDraftCreatedDateLabel_(d) {
-  var ms = getDraftCreatedAtMs_(d);
+function formatDraftMonthDayLabel_(ms) {
   if (!ms) return '-';
   try {
     return new Date(ms).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
   } catch (e) {
     return '-';
   }
+}
+function getDraftCreatedDateLabel_(d) {
+  return formatDraftMonthDayLabel_(getDraftCreatedAtMs_(d));
+}
+function getDraftListDateInfo_(d) {
+  var createdMs = getDraftCreatedAtMs_(d);
+  var editedMs = 0;
+  if (d && d.updatedAt) {
+    var parsed = Date.parse(d.updatedAt);
+    if (!isNaN(parsed)) editedMs = parsed;
+  }
+  var createdLabel = formatDraftMonthDayLabel_(createdMs);
+  var editedLabel = formatDraftMonthDayLabel_(editedMs);
+  var edited = !!(editedMs && createdMs && editedMs > createdMs && editedLabel !== '-' && editedLabel !== createdLabel);
+  return {
+    label: edited ? editedLabel : createdLabel,
+    edited: edited
+  };
 }
 
 
@@ -26246,13 +26263,14 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
   const color = cat.color;
   const brandMeta = getDraftBrandMeta_(d, cat.id, draftIndex);
   const stepBadge = formatDraftStepBadgeForDisplay_(d, cat.id, draftIndex);
-  const createdDateLabel = getDraftCreatedDateLabel_(d);
+  const listDate = getDraftListDateInfo_(d);
+  const createdDateLabel = listDate.label;
   // 일부 발행이어도 첫 발행일이 있으면 날짜 표시 (이전엔 전부 미발행으로 잘못 표시됨)
   const dateLabel = (pub && pub.date)
     ? ('발행: ' + escapeHtml(String(pub.date)))
     : '미발행';
   const createdBadge = (createdDateLabel && createdDateLabel !== '-')
-    ? '<span class="topic-line-created" title="생성일">' + escapeHtml(createdDateLabel) + '</span>'
+    ? '<span class="topic-line-created" title="' + (listDate.edited ? '수정일' : '생성일') + '">' + escapeHtml(createdDateLabel) + '</span>'
     : '';
   const badges = [
     createdBadge,
@@ -26300,7 +26318,7 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
   var moreBody =
     intentLines.join('') +
     '<div class="card-intent-foot">' +
-      '<div class="card-intent-dates"><span>' + dateLabel + '</span><span>생성 ' + createdDateLabel + '</span></div>' +
+      '<div class="card-intent-dates"><span>' + dateLabel + '</span><span>' + (listDate.edited ? '수정 ' : '생성 ') + createdDateLabel + '</span></div>' +
       '<div class="card-more-actions">' +
         '<div class="card-more-step-chips" title="카테고리(단계) 이동">' +
           renderMoveDraftStepChipsHTML_(cat.id, d.id) +
@@ -36100,6 +36118,8 @@ function saveFocusedDraftChange_(draftId){
 }
 function persistDraftContent_(draftId, content){
   flushSheetTitleBackgroundWork_({ save: false });
+  var editedDraft = findDraftByIdAnywhere_(draftId);
+  if(editedDraft) editedDraft.updatedAt = new Date().toISOString();
   if(!state.published[draftId]) state.published[draftId] = {};
   state.published[draftId].content = content;
   state.generatedOnly[draftId] = content;

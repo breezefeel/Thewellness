@@ -269,6 +269,19 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="sync-gap-overlay" role="dialog" aria-modal="true" aria-labelledby="sync-gap-title">
+  <div class="modal-box sync-conflict-box" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-title" id="sync-gap-title">주제를 어느 쪽으로 맞출까요?</div>
+    </div>
+    <div id="sync-gap-body" class="modal-desc"></div>
+    <div class="sync-conflict-actions">
+      <button type="button" class="modal-btn" onclick="applyTopicGapChoice_('local')">이 기기 기준으로 맞추기</button>
+      <button type="button" class="modal-btn" style="background:#F3F4F6;color:#374151;margin-top:8px;" onclick="applyTopicGapChoice_('server')">서버 기준으로 맞추기</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="sync-conflict-overlay" role="dialog" aria-modal="true" aria-labelledby="sync-conflict-title">
   <div class="modal-box sync-conflict-box" onclick="event.stopPropagation()">
     <div class="modal-header">
@@ -436,7 +449,7 @@
 <script src="planner-reel.js?v=27"></script>
 <script src="planner-sync-config.js?v=1"></script>
 <script src="planner-sync-supabase.js?v=4"></script>
-<script src="planner.js?v=320" defer></script>
+<script src="planner.js?v=322" defer></script>
 <script>
 function openLinksModal_(){
   var o = document.getElementById('links-modal-overlay');

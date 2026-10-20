@@ -289,7 +289,6 @@ var PlannerSyncSupabase = (function(){
       if(data.result === 'error'){
         return { result: 'error', message: data.message || '저장 실패', retry: false };
       }
-      writeSeq(data.changeSeq);
       var accepted = (data.accepted || []).map(function(item){
         return {
           mutationId: item.mutationId || '',
@@ -312,15 +311,13 @@ var PlannerSyncSupabase = (function(){
       if(typeof noteSupabaseAcceptedRevisions_ === 'function'){
         noteSupabaseAcceptedRevisions_(accepted);
       }
-      var payload = typeof getPersistPayload === 'function' ? getPersistPayload() : {};
-      if(data.changeSeq) payload.syncRevision = parseInt(data.changeSeq, 10) || payload.syncRevision;
       var result = conflicts.length ? (accepted.length ? 'partial' : 'conflict') : 'success';
       return {
         result: result,
         supabaseApplied: true,
         serverRevision: parseInt(data.changeSeq, 10) || 0,
         savedAt: new Date().toISOString(),
-        payload: payload,
+        payload: null,
         accepted: accepted,
         conflicts: conflicts,
         syncCapabilities: CAPS

@@ -20764,6 +20764,27 @@ function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts, opts
       real.forEach(function(conflict){ delete _conflictAutoKeepCount_[String(conflict.key)]; });
     }
     if(looping.length && !opts.fromUser){
+      var settledLoop = settleContentConflictsByLatest_(real.filter(function(conflict){
+        return looping.indexOf(String(conflict.key)) >= 0;
+      }));
+      real = real.filter(function(conflict){
+        return looping.indexOf(String(conflict.key)) < 0;
+      }).concat(settledLoop.rest || []);
+      if(settledLoop.upload || settledLoop.kept){
+        try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true }); } catch(eLoopSave){}
+        if(settledLoop.upload && hasPendingLocalSyncChanges_()) schedulePlannerGasPush_(true);
+      }
+      if(!real.length){
+        plannerSyncConflictPending_ = null;
+        var ovLoop = document.getElementById('sync-conflict-overlay');
+        closeScrollLockedOverlayEl_(ovLoop);
+        if(typeof setAppToast === 'function'){
+          setAppToast(settledLoop.upload
+            ? '더 나중 내용을 서버에 올리고 있어요.'
+            : '서버의 더 나중 내용을 이 기기에 맞춰 두었어요.', { duration: 3200, variant: 'ok' });
+        }
+        return;
+      }
       plannerSyncConflictPending_ = {
         mode: 'outbox',
         local: getPersistPayload(),
@@ -20913,6 +20934,61 @@ window.retryPlannerBootstrapSync_ = function(){
   }
   runPlannerBootstrapSync_();
 };
+function contentSyncConflictKey_(key){
+  key = String(key || '');
+  return key.indexOf('generated:') === 0 || key.indexOf('published:') === 0 || key.indexOf('draft:') === 0;
+}
+function settleContentConflictsByLatest_(conflicts){
+  var upload = [];
+  var kept = 0;
+  var rest = [];
+  (conflicts || []).forEach(function(conflict){
+    if(!conflict || !contentSyncConflictKey_(conflict.key)){
+      rest.push(conflict);
+      return;
+    }
+    var localMs = parseIsoMs_(conflict.localAt);
+    var remoteMs = parseIsoMs_(conflict.remoteAt);
+    var key = String(conflict.key);
+    if(localMs > remoteMs && localMs > 0){
+      upload.push(conflict);
+      return;
+    }
+    var payload = getPersistPayload();
+    setSyncEntity_(payload, key, conflict.remote);
+    var rev = parseInt(conflict.serverEntityRevision, 10) || 0;
+    if(rev){
+      if(!state.syncEntityRevisions) state.syncEntityRevisions = {};
+      state.syncEntityRevisions[key] = rev;
+    }
+    if(conflict.remoteAt){
+      if(!state.syncEntityUpdatedAt) state.syncEntityUpdatedAt = {};
+      state.syncEntityUpdatedAt[key] = conflict.remoteAt;
+    }
+    state.syncOutbox = (state.syncOutbox || []).filter(function(op){
+      return !(op && op.key === key);
+    });
+    if(state.syncDirtyEntityKeys) delete state.syncDirtyEntityKeys[key];
+    delete _conflictAutoKeepCount_[key];
+    kept++;
+  });
+  if(upload.length){
+    forceOutboxOverwriteBase_(upload);
+    upload.forEach(function(conflict){
+      var rev = parseInt(conflict.serverEntityRevision, 10) || 0;
+      var key = String(conflict.key || '');
+      if(rev && key){
+        if(!state.syncEntityRevisions) state.syncEntityRevisions = {};
+        state.syncEntityRevisions[key] = rev;
+      }
+      delete _conflictAutoKeepCount_[key];
+    });
+    state.syncDirty = true;
+    state._sessionUserEdit = true;
+  }
+  try { rebuildDirtyStateFromOutbox_(); } catch(eSettle){}
+  return { upload: upload.length, kept: kept, rest: rest };
+}
 function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
   var localPayload = getPersistPayload();
   var localEntities = collectSyncEntities_(localPayload, { skipEnsureIds: true });
@@ -20934,6 +21010,17 @@ function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
   }).filter(function(conflict){
     return !shouldSkipPlannerConflict_(conflict.key, conflict.local, conflict.remote);
   });
+  var settled = settleContentConflictsByLatest_(conflicts);
+  conflicts = settled.rest;
+  if(settled.upload || settled.kept){
+    try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true }); } catch(eSettleSave){}
+    if(settled.upload && hasPendingLocalSyncChanges_()) schedulePlannerGasPush_(true);
+    if(!conflicts.length && typeof setAppToast === 'function'){
+      setAppToast(settled.upload
+        ? '더 나중 내용을 서버에 올리고 있어요.'
+        : '서버의 더 나중 내용을 이 기기에 맞춰 두었어요.', { duration: 3200, variant: 'ok' });
+    }
+  }
   if(!conflicts.length) return false;
   if(conflicts.length > 12){
     var dropKeys = {};

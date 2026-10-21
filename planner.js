@@ -127,10 +127,10 @@ function resolveLifeHealthAddCat_(){
 const CAT_GROUP_EXPERT = [3, 5, 4];
 /** 지점브랜딩 상단 드롭다운 — opsManual.activeBranch 와 연동 */
 const CAT_GROUP_OPS = [
-  { branch: 'global', label: '공통' },
-  { branch: 'yaksu', label: '약수 지점' },
-  { branch: 'jakjeon', label: '인천 지점' },
-  { branch: 'new', label: '3호점 · 신규' }
+  { branch: 'promo', label: '홍보 현황' },
+  { branch: 'yaksu', label: '약수점' },
+  { branch: 'jakjeon', label: '인천점' },
+  { branch: 'new', label: '신규' }
 ];
 /** 추가 폼 카테고리 선택 순서 */
 const ADD_FORM_CAT_ORDER = [0, 3, 1, 5, 2, 4, 7, 6];
@@ -178,18 +178,19 @@ function buildBlogHubCtaSamples_(){
 }
 
 /** 지점·브랜딩 탭 — 플래너 밖 운영·오픈 체크리스트 */
-const OPS_BRANCH_IDS = ['global', 'yaksu', 'jakjeon', 'new'];
+const OPS_BRANCH_IDS = ['promo', 'yaksu', 'jakjeon', 'new'];
+const OPS_BRANCH_DEFAULT = 'promo';
 const OPS_BRANCH_LABELS = {
-  global: '공통 브랜딩',
-  yaksu: '약수 지점',
-  jakjeon: '인천 지점',
-  new: '3호점 · 신규'
+  promo: '홍보 현황',
+  yaksu: '약수점',
+  jakjeon: '인천점',
+  new: '신규'
 };
 const OPS_BRANCH_HINTS = {
-  global: '콘텐츠 플래너가 담지 못하는 브랜딩·GEO·법적 문구',
-  yaksu: '새 지점 오픈 시 1→8 순서로 채널을 셋팅하세요. 각 항목 오른쪽 「자세히」에서 등록 가이드·기본값을 확인합니다.',
-  jakjeon: '새 지점 오픈 시 1→8 순서로 채널을 셋팅하세요. 각 항목 오른쪽 「자세히」에서 등록 가이드·기본값을 확인합니다.',
-  new: '3호점 — 약수·인천과 같은 스마트플레이스 순서로 셋팅한 뒤, 지점 오픈 1→8 채널을 이어 갑니다.'
+  promo: '미카닥·약수점·인천점의 광고와 콘텐츠를 함께 보고 오늘·이번 주 할 일을 정리합니다.',
+  yaksu: '새 지점 오픈 시 1→9 순서로 채널을 셋팅하세요. 각 항목 오른쪽 「자세히」에서 등록 가이드·기본값을 확인합니다.',
+  jakjeon: '새 지점 오픈 시 1→9 순서로 채널을 셋팅하세요. 각 항목 오른쪽 「자세히」에서 등록 가이드·기본값을 확인합니다.',
+  new: '신규 지점 — 브랜드 기준(포지셔닝·면책·허브·링크)을 먼저 맞추고, 약수·인천과 같은 스마트플레이스 순서로 셋팅한 뒤 지점 오픈 채널을 이어 갑니다.'
 };
 /** 리얼무브먼트 — 공통 브랜딩 확정 문구 (플레이스·채널 동기화) */
 const OPS_BRAND_COPY = {
@@ -356,6 +357,7 @@ function opsPlaceBranchKey_(itemId){
   var id = String(itemId || '');
   if(id.indexOf('ops-j-') === 0) return 'jakjeon';
   if(id.indexOf('ops-n-') === 0) return 'new';
+  if(id.indexOf('ops-m-') === 0) return 'mikadoc';
   return 'yaksu';
 }
 function buildOpsPlaceBasicInfo_(branchKey){
@@ -690,10 +692,26 @@ function applyOpsNaverKwBranchAdGroupSeed_(st, branchKey, opts){
   st.adGroupSeedVersion = pack.version;
   return true;
 }
-function opsNaverKwSeedKeywords_(){
+function opsNaverKwSeedKeywords_(branchKey){
   var seed = (typeof OPS_NAVER_KW_SEED !== 'undefined' && OPS_NAVER_KW_SEED) ? OPS_NAVER_KW_SEED : null;
   if(!seed || !Array.isArray(seed.keywords)) return [];
-  return parseOpsNaverKwLines_(seed.keywords.join('\n'));
+  var extra = (branchKey && seed.branchKeywords && seed.branchKeywords[branchKey]) || [];
+  return parseOpsNaverKwLines_(seed.keywords.concat(extra).join('\n'));
+}
+function opsNaverKwSeedHoodKeywords_(branchKey){
+  var seed = (typeof OPS_NAVER_KW_SEED !== 'undefined' && OPS_NAVER_KW_SEED) ? OPS_NAVER_KW_SEED : null;
+  if(!seed || !Array.isArray(seed.hoodKeywords)) return [];
+  var extra = (branchKey && seed.branchHoodKeywords && seed.branchHoodKeywords[branchKey]) || [];
+  return parseOpsNaverKwLines_(seed.hoodKeywords.concat(extra).join('\n'));
+}
+function opsNaverKwSeedVersion_(){
+  return (typeof OPS_NAVER_KW_SEED !== 'undefined' && OPS_NAVER_KW_SEED && OPS_NAVER_KW_SEED.version) || '';
+}
+/** 동네 조합에 붙일 말: 동네 조합 키워드가 있으면 그것만, 없으면 예전처럼 일반 키워드 전체 */
+function opsNaverKwHoodTerms_(kwState){
+  var hk = kwState && kwState.hoodKeywords;
+  if(Array.isArray(hk) && hk.length) return hk;
+  return (kwState && kwState.keywords) || [];
 }
 function opsNaverKwPreferredLandingUrl_(branchKey){
   var pack = opsNaverKwBranchAdGroupPack_(branchKey || 'yaksu');
@@ -829,7 +847,7 @@ function getOpsNaverKwBaseAdGroupId_(st){
 /** 동네별 조합 키워드(광고그룹 매핑용) */
 function buildOpsNaverKwCombinedByHood_(kwState){
   var sep = (kwState && kwState.joinMode === 'none') ? '' : ' ';
-  var kws = (kwState && kwState.keywords) || [];
+  var kws = opsNaverKwHoodTerms_(kwState);
   var hoods = (kwState && kwState.neighborhoods) || [];
   var globalSeen = {};
   var skippedLong = 0;
@@ -866,7 +884,7 @@ function getOpsNaverKwState_(itemId){
   var meta = opsNaverKwSeedMeta_(branchKey);
   if(!cur || typeof cur !== 'object'){
     cur = {
-      keywords: opsNaverKwSeedKeywords_(),
+      keywords: opsNaverKwSeedKeywords_(branchKey),
       neighborhoods: opsDefaultNaverNeighborhoods_(branchKey),
       adGroupId: opsDefaultNaverAdGroupIds_(branchKey).join('\n') || meta.adGroupId,
       adGroupIdBase: meta.adGroupId,
@@ -882,9 +900,18 @@ function getOpsNaverKwState_(itemId){
   if(!Array.isArray(cur.neighborhoods)) cur.neighborhoods = [];
   // 예전에 빈 시드로 저장된 경우 → 시드가 있으면 자동 복구
   if(!cur.keywords.length){
-    var seedKw = opsNaverKwSeedKeywords_();
+    var seedKw = opsNaverKwSeedKeywords_(branchKey);
     if(seedKw.length) cur.keywords = seedKw;
   }
+  // 키워드 시드 개편(버전) → 일반·동네 조합 키워드를 새 목록으로 교체
+  var kwSeedVer = opsNaverKwSeedVersion_();
+  if(kwSeedVer && cur.kwSeedVersion !== kwSeedVer){
+    var newKw = opsNaverKwSeedKeywords_(branchKey);
+    if(newKw.length) cur.keywords = newKw;
+    cur.hoodKeywords = opsNaverKwSeedHoodKeywords_(branchKey);
+    cur.kwSeedVersion = kwSeedVer;
+  }
+  if(!Array.isArray(cur.hoodKeywords)) cur.hoodKeywords = opsNaverKwSeedHoodKeywords_(branchKey);
   // 약수 등 지점 광고그룹 시드 반영(버전 바뀌면 목록·ID·URL·입찰가 갱신)
   applyOpsNaverKwBranchAdGroupSeed_(cur, branchKey, { force: false });
   if(!cur.neighborhoods.length){
@@ -926,7 +953,7 @@ function parseOpsNaverKwLines_(text, opts){
 }
 function buildOpsNaverKwCombined_(kwState){
   var sep = (kwState && kwState.joinMode === 'none') ? '' : ' ';
-  var kws = (kwState && kwState.keywords) || [];
+  var kws = opsNaverKwHoodTerms_(kwState);
   var hoods = (kwState && kwState.neighborhoods) || [];
   var seen = {};
   var out = [];
@@ -1004,8 +1031,10 @@ function syncOpsNaverKwPanelFromDom_(itemId){
   if(!panel) return st;
   var kwTa = panel.querySelector('textarea[data-ops-kw-field="keywords"]');
   var hoodTa = panel.querySelector('textarea[data-ops-kw-field="neighborhoods"]');
+  var hoodKwTa = panel.querySelector('textarea[data-ops-kw-field="hoodKeywords"]');
   if(kwTa) st.keywords = parseOpsNaverKwLines_(kwTa.value);
   if(hoodTa) st.neighborhoods = parseOpsNaverKwLines_(hoodTa.value);
+  if(hoodKwTa) st.hoodKeywords = parseOpsNaverKwLines_(hoodKwTa.value);
   var joinSel = panel.querySelector('select[data-ops-kw-meta="joinMode"]');
   if(joinSel) st.joinMode = joinSel.value === 'none' ? 'none' : 'space';
   var hoodIdInputs = panel.querySelectorAll('[data-ops-kw-hood-adgroup]');
@@ -2744,7 +2773,6 @@ function buildOpsBranchOnlineItems_(prefix, branchKey){
     items.splice(6, 0, opsBranchItem_(prefix + '-25', '구글 애즈 검색광고', '', { brand: 'google', step: 7 }));
     items[7].step = 8;
     items[8].step = 9;
-    items.unshift(opsBranchItem_(prefix + '-26', '마케팅 현황 · 광고 보고서', '', { step: 0 }));
   }
   return items;
 }
@@ -3467,24 +3495,23 @@ function regenerateOpsReviewText_(fieldName, current, base){
   return cur;
 }
 const OPS_MANUAL_SECTIONS = [
-  { id: 'ops-g-brand', branch: 'global', phase: '브랜딩 기반', items: [
-    opsBranchItem_('ops-g-1', '포지셔닝 문장 확정 — 근골격·움직임 전문가 · 1:1 리:얼(Re Alignment) 프로그램',
-      opsItemPurpose_('전 채널이 같은 한 문장·톤을 말하게 합니다.', '근골격·움직임 전문가 · 1:1 리:얼이 검색·상담·콘텐츠마다 흔들리지 않게 합니다.')),
-    opsBranchItem_('ops-g-2', '의료법 준수 문구·면책 — 프로필·블로그·상담 결과·플래너 프롬프트 동기화',
-      opsItemPurpose_('의료법·광고 심의 경계를 전 채널에 동일하게 맞춥니다.', '면책·금지 표현·병원 권고가 프로필·블로그·상담·AI 생성에 한 벌로 적용되게 합니다.')),
-    opsBranchItem_('ops-g-4', '프로필 증상 허브 5개 + FAQ·JSON-LD — 허리·목·어깨·무릎·골반',
-      opsItemPurpose_('증상별 안내 허브 5개와 FAQ·검색 노출을 점검합니다.', '허리·목·어깨·무릎·골반이 같은 URL·문장으로 연결되게 합니다.')),
-    opsBranchItem_('ops-g-9', '네이버 블로그 시리즈·카테고리·지점 안내 글 구조 정리',
-      opsItemPurpose_('블로그 카테고리·글 구조·발행 리듬을 고정합니다.', '플래너 초안과 맞는 시리즈·말미 CTA·지점 안내 글이 운영 가능한 틀로 정리되게 합니다.')),
-    opsBranchItem_('ops-g-11', '강사용·프로필·플래너 URL·동기화·배포 버전 점검',
-      opsItemPurpose_('공개 URL·배포 파일·버전을 한곳에서 점검합니다.', '강사용·프로필·플래너 링크 오타·구버전 캐시를 배포 때마다 확인합니다.'))
-  ]},
   { id: 'ops-y-online', branch: 'yaksu', phase: '지점 오픈 셋팅 · 순서대로', items: buildOpsBranchOnlineItems_('ops-y', 'yaksu') },
   { id: 'ops-y-search', branch: 'yaksu', phase: '추가 연결', items: buildOpsBranchSearchItems_('ops-y', 'yaksu') },
   { id: 'ops-y-open', branch: 'yaksu', phase: '운영', items: buildOpsBranchOpsItems_('ops-y') },
   { id: 'ops-j-online', branch: 'jakjeon', phase: '지점 오픈 셋팅 · 순서대로', items: buildOpsBranchOnlineItems_('ops-j', 'jakjeon') },
   { id: 'ops-j-search', branch: 'jakjeon', phase: '추가 연결', items: buildOpsBranchSearchItems_('ops-j', 'jakjeon') },
   { id: 'ops-j-open', branch: 'jakjeon', phase: '운영', items: buildOpsBranchOpsItems_('ops-j') },
+  // 예전 「공통」 항목은 id(ops-g-*)를 그대로 두고 신규로 옮김 → 체크·메모·가이드 유지
+  { id: 'ops-n-base', branch: 'new', phase: '0. 브랜드 기준 (공통에서 통합)', items: [
+    opsBranchItem_('ops-g-1', '포지셔닝 문장 — 근골격·움직임 전문가 · 1:1 리:얼(Re Alignment) 프로그램을 신규 지점 채널에도 그대로',
+      opsItemPurpose_('전 채널이 같은 한 문장·톤을 말하게 합니다.', '신규 지점 플레이스·블로그·상담에서도 근골격·움직임 전문가 · 1:1 리:얼이 흔들리지 않게 합니다.')),
+    opsBranchItem_('ops-g-2', '의료법 준수 문구·면책 — 프로필·블로그·상담 결과·플래너 프롬프트 동기화',
+      opsItemPurpose_('의료법·광고 심의 경계를 전 채널에 동일하게 맞춥니다.', '면책·금지 표현·병원 권고가 신규 지점 채널과 AI 생성에도 한 벌로 적용되게 합니다.')),
+    opsBranchItem_('ops-g-4', '프로필 증상 허브 5개 + FAQ·JSON-LD — 신규 지점 링크 추가',
+      opsItemPurpose_('증상별 안내 허브 5개와 FAQ·검색 노출을 점검합니다.', '허리·목·어깨·무릎·골반 허브에서 신규 지점까지 같은 URL·문장으로 이어지게 합니다.')),
+    opsBranchItem_('ops-g-11', '강사용·프로필·플래너 URL·동기화·배포 버전 점검 — 신규 지점 링크 포함',
+      opsItemPurpose_('공개 URL·배포 파일·버전을 한곳에서 점검합니다.', '신규 지점 링크가 강사용·프로필·플래너에 빠짐없이 들어가고 구버전 캐시가 남지 않게 합니다.'))
+  ]},
   { id: 'ops-n-plan', branch: 'new', phase: '1. 후보·기획', items: [
     opsBranchItem_('ops-n-1', '지역 후보·상권 조사 — 지점명·경쟁·임대료·상권 메모',
       opsItemPurpose_('신규 지점 후보 지역·상권을 조사·기록합니다.', '지점명·경쟁·임대료·타깃을 한곳에 모아 오픈 결정에 씁니다.')),
@@ -3502,6 +3529,8 @@ const OPS_MANUAL_SECTIONS = [
       opsItemPurpose_('신규 지역×증상 SEO 키워드를 미리 선정합니다.', '오픈 후 블로그·플레이스·허브 링크에 바로 연결합니다.')),
     opsBranchItem_('ops-n-8', '오픈 전 콘텐츠 4편 주제 (플래너에서 작성)',
       opsItemPurpose_('오픈 전에 미리 쓸 블로그·채널 주제 4개를 정합니다.', '플래너에서 초안을 만들어 오픈 직후 발행 리듬을 잡습니다.')),
+    opsBranchItem_('ops-g-9', '네이버 블로그 시리즈·카테고리·지점 안내 글 구조 — 신규 지점 오시는 길 글 추가',
+      opsItemPurpose_('블로그 카테고리·글 구조·발행 리듬을 고정합니다.', '플래너 초안과 맞는 시리즈·말미 CTA에 신규 지점 안내 글이 같은 틀로 들어가게 합니다.')),
     opsBranchItem_('ops-n-9', '인테리어·사진 컨셉 10컷 리스트',
       opsItemPurpose_('매장·프로그램 사진 10컷 콘셉트를 정합니다.', '플레이스·SNS·블로그에 쓸 사진 방향을 미리 맞춥니다.'))
   ]},
@@ -13238,6 +13267,10 @@ const REAL_MOVEMENT_PLACE_YAKSU_URL = 'https://naver.me/x2YstInq';
 const REAL_MOVEMENT_PLACE_INCHEON_URL = 'https://naver.me/xYNbHrY9';
 const REAL_MOVEMENT_IG_PARK_URL = 'https://www.instagram.com/dr.park_dc.pt/';
 const REAL_MOVEMENT_IG_CENTER_URL = 'https://www.instagram.com/re.al_movement_official/';
+const REAL_MOVEMENT_BOOKING_YAKSU_URL = 'https://booking.naver.com/booking/13/bizes/1704376';
+const REAL_MOVEMENT_BOOKING_INCHEON_URL = 'https://booking.naver.com/booking/6/bizes/1668922/search';
+const REAL_MOVEMENT_DIRECTIONS_YAKSU_URL = 'https://blog.naver.com/allenjoy/224307689748';
+const REAL_MOVEMENT_DIRECTIONS_INCHEON_URL = 'https://blog.naver.com/allenjoy/224122998739';
 /** 소식 탭 — 약수 작성창. 폰·태블릿은 앱, 데스크탑은 브라우저 */
 const YAKSU_NAVER_NEWS_WRITE_ = 'https://new.smartplace.naver.com/bizes/place/2018185163/feeds/new';
 const YAKSU_KAKAO_NEWS_WRITE_ = 'https://business.kakao.com/space/998814/channel/_nVSxdn/posts';
@@ -13400,18 +13433,48 @@ function getRealMovementBlogFooterText_(){
     '',
     REAL_MOVEMENT_IG_CENTER_URL,
     '',
-    '👇리얼무브먼트 예약 / 상세정보 / 전화문의',
-    REAL_MOVEMENT_PLACE_YAKSU_URL,
-    '',
-    REAL_MOVEMENT_PLACE_INCHEON_URL
+    getBranchBookingDirectionsFooterText_('리얼무브먼트')
   ].join('\n');
+}
+function getBranchBookingDirectionsFooterText_(brand){
+  return [
+    '👇' + brand + ' 약수점 네이버 예약',
+    REAL_MOVEMENT_BOOKING_YAKSU_URL,
+    '',
+    '👇약수점 오시는 길',
+    REAL_MOVEMENT_DIRECTIONS_YAKSU_URL,
+    '',
+    '👇' + brand + ' 인천점 네이버 예약',
+    REAL_MOVEMENT_BOOKING_INCHEON_URL,
+    '',
+    '👇인천점 오시는 길',
+    REAL_MOVEMENT_DIRECTIONS_INCHEON_URL
+  ].join('\n');
+}
+function getRealFaceBlogFooterText_(){
+  return [
+    '👇리얼 페이스는 약수점·인천점 모두 박준규 원장이 직접 진행합니다',
+    '',
+    getBranchBookingDirectionsFooterText_('리얼 페이스')
+  ].join('\n');
+}
+/** 리얼무브먼트·리얼페이스 블로그 말미: 네이버 예약 + 오시는 길 */
+function isBranchBookingBlogCategory_(catId){
+  var id = Number(catId);
+  return id === 1 || id === 2;
+}
+function getBranchBlogFooterText_(catId){
+  var id = Number(catId);
+  if(id === 1) return getRealMovementBlogFooterText_();
+  if(id === 2) return getRealFaceBlogFooterText_();
+  return '';
 }
 function withRealMovementBlogFooter_(text, catId){
   var body = String(text || '').trim();
-  if(!body || !isRealMovementBlogCategory_(catId)) return body;
-  var footer = getRealMovementBlogFooterText_();
+  if(!body || !isBranchBookingBlogCategory_(catId)) return body;
+  var footer = getBranchBlogFooterText_(catId);
   if(!footer) return body;
-  if(body.indexOf(REAL_MOVEMENT_TALK_YAKSU_URL) !== -1) return body;
+  if(body.indexOf(REAL_MOVEMENT_BOOKING_YAKSU_URL) !== -1) return body;
   return body + '\n\n' + footer;
 }
 function getExpertCourseBlogFooterText_(catId){
@@ -13435,8 +13498,8 @@ function expertCourseBlogFooterSheetHtml_(catId){
     '<div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">' +
     escapeHtml(t) + '</div></div>';
 }
-function realMovementBlogFooterHtml_(){
-  var t = getRealMovementBlogFooterText_();
+function realMovementBlogFooterHtml_(catId){
+  var t = catId == null ? getRealMovementBlogFooterText_() : (getBranchBlogFooterText_(catId) || getExpertCourseBlogFooterText_(catId));
   if(!t) return '';
   return String(t).split(/\n\s*\n/).map(function(block){
     var lines = String(block || '').split('\n').map(function(ln){ return ln.trim(); }).filter(Boolean);
@@ -13450,10 +13513,12 @@ function realMovementBlogFooterHtml_(){
     }).join('');
   }).join('');
 }
-function realMovementBlogFooterSheetHtml_(){
+function realMovementBlogFooterSheetHtml_(catId){
+  var t = catId == null ? getRealMovementBlogFooterText_() : getBranchBlogFooterText_(catId);
+  if(!t) return '';
   return '<div class="cb"><div class="cb-label">말미 링크 (고정 · 네이버에 붙여넣으면 카드로 변환)</div>' +
     '<div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">' +
-    escapeHtml(getRealMovementBlogFooterText_()) + '</div></div>';
+    escapeHtml(t) + '</div></div>';
 }
 const APARTNER_ANDROID_PKG = 'kr.co.azsmart.apartner';
 const APARTNER_IOS_STORE = 'https://apps.apple.com/kr/app/id1243505765';
@@ -13582,12 +13647,12 @@ function getInstagramUsernameForCat_(catId){
 function getInstagramUrlForCat_(catId){
   return 'https://www.instagram.com/' + getInstagramUsernameForCat_(catId) + '/';
 }
-/** 도수·CMT → cmt_academy / 리얼페이스·IFC → face / 리얼무브먼트·움직임 → movement */
+/** 공동작업 계정: CMT → cmt_academy / 리얼페이스·IFC → face / 리얼무브먼트 → movement (도수치료·Re:Al 과정은 박준규 계정만) */
 function getInstagramCollabProgramKeyForCat_(catId){
   var id = parseInt(catId, 10);
   if(id === 2 || id === 4) return 'face';
-  if(id === 1 || id === 5) return 'movement';
-  if(id === 0 || id === 3) return 'cmt';
+  if(id === 1) return 'movement';
+  if(id === 3) return 'cmt';
   return '';
 }
 function getInstagramCollabUsernameForCat_(catId){
@@ -15118,7 +15183,7 @@ const DEFAULT_PROMPTS = {
 ${BLOG_CONTENT_VOICE_RULE}
 ${MEDICAL_COMPLIANCE_RULE}
 인스타(프로그램별): 도수·CMT @dr.park_dc.pt · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트·움직임 @re.al_movement_official
-인스타 연결 계정(시스템이 캡션에 자동 삽입, 본문에 쓰지 말 것): 도수·CMT @cmt_academy · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트·움직임 @re.al_movement_official
+인스타 연결 계정(시스템이 캡션에 자동 삽입, 본문에 쓰지 말 것): CMT @cmt_academy · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트 @re.al_movement_official (도수치료·Re:Al 과정은 연결 계정 없음)
 ※ 무브먼트·움직임 채널 블로그·이미지·캡션: 「리:얼」 대신 「리얼」 표기 (리얼무브먼트·리얼 움직임). 「리얼무브먼트」붙여 쓰기·한 줄 고정. 영문 Re:Al은 유지.
 ※ 페이스 채널 한글 표기: 「리얼 페이스」(「리:얼」 금지). 영문 Re:Al Face는 유지.
 ※ 도수·CMT 외 채널: 치료행위 수행 암시 금지(치료한 결과·치료했어요 등). 「치료를 해도 반복=자세/움직임」 맥락은 허용.
@@ -16071,7 +16136,7 @@ function collectSyncEntities_(payload, opts){
   } else if(payload.opsManual){
     var ops = payload.opsManual;
     if(Object.prototype.hasOwnProperty.call(ops, 'activeBranch') || Object.prototype.hasOwnProperty.call(ops, 'updatedAt')){
-      out['ops:meta'] = { activeBranch: ops.activeBranch || 'global', updatedAt: ops.updatedAt || '' };
+      out['ops:meta'] = { activeBranch: ops.activeBranch || OPS_BRANCH_DEFAULT, updatedAt: ops.updatedAt || '' };
     }
     Object.keys(ops.checked || {}).forEach(function(key){
       out['ops:checked:' + key] = { value: ops.checked[key], updatedAt: (ops.checkedAt || {})[key] || '' };
@@ -16321,7 +16386,7 @@ function setSyncEntity_(payload, key, wrapped){
         delete payload.opsManual.activeBranch;
         delete payload.opsManual.updatedAt;
       } else {
-        payload.opsManual.activeBranch = wrapped.activeBranch || 'global';
+        payload.opsManual.activeBranch = wrapped.activeBranch || OPS_BRANCH_DEFAULT;
         payload.opsManual.updatedAt = wrapped.updatedAt || '';
       }
     } else if(parts[1] === 'checked' || parts[1] === 'note'){
@@ -18752,7 +18817,7 @@ function mergeOpsManual_(local, remote, preferRemote){
     local.notes, local.notesAt, remote.notes, remote.notesAt, preferRemote
   );
   return {
-    activeBranch: base.activeBranch || other.activeBranch || 'global',
+    activeBranch: base.activeBranch || other.activeBranch || OPS_BRANCH_DEFAULT,
     checked: checkedMerged.val,
     checkedAt: checkedMerged.at,
     notes: notesMerged.val,
@@ -24470,11 +24535,12 @@ function renderTabs() {
     var om = getOpsManualState_();
     var isActive = isOpsManualCategory(state.currentCat);
     var displayBranch = om.activeBranch;
+    var promoToday = countOpsPromoTodayTasks_();
     var branchProg = countOpsManualProgress_(displayBranch);
-    var activeCount = Math.max(0, branchProg.total - branchProg.done);
+    var activeCount = displayBranch === 'promo' ? promoToday : Math.max(0, branchProg.total - branchProg.done);
     var options = CAT_GROUP_OPS.map(function(opt){
       var bp = countOpsManualProgress_(opt.branch);
-      var count = Math.max(0, bp.total - bp.done);
+      var count = opt.branch === 'promo' ? promoToday : Math.max(0, bp.total - bp.done);
       return '<option value="' + opt.branch + '"' + (displayBranch === opt.branch ? ' selected' : '') + '>' +
         opt.label + ' · ' + count + '</option>';
     }).join('');
@@ -25013,7 +25079,7 @@ function getNextPublishRecommendation() {
 // ── Main render ──
 function getOpsManualState_(){
   if(!state.opsManual || typeof state.opsManual !== 'object'){
-    state.opsManual = { activeBranch: 'global', checked: {}, checkedAt: {}, notes: {}, notesAt: {}, collapsed: {}, review: {}, keywordAds: {}, newBranchMeta: { name: '', area: '', note: '' } };
+    state.opsManual = { activeBranch: OPS_BRANCH_DEFAULT, checked: {}, checkedAt: {}, notes: {}, notesAt: {}, collapsed: {}, review: {}, keywordAds: {}, newBranchMeta: { name: '', area: '', note: '' } };
   }
   if(!state.opsManual.checked) state.opsManual.checked = {};
   if(!state.opsManual.checkedAt) state.opsManual.checkedAt = {};
@@ -25023,7 +25089,7 @@ function getOpsManualState_(){
   if(!state.opsManual.review) state.opsManual.review = {};
   if(!state.opsManual.keywordAds) state.opsManual.keywordAds = {};
   if(!state.opsManual.newBranchMeta) state.opsManual.newBranchMeta = { name: '', area: '', note: '' };
-  if(!OPS_BRANCH_IDS.includes(state.opsManual.activeBranch)) state.opsManual.activeBranch = 'global';
+  if(!OPS_BRANCH_IDS.includes(state.opsManual.activeBranch)) state.opsManual.activeBranch = OPS_BRANCH_DEFAULT;
   return state.opsManual;
 }
 function isOpsItemChecked_(om, itemId){
@@ -25326,10 +25392,10 @@ function getOpsGoogleAdsState_(itemId){
   var def = (getOpsGoogleAdsSeed_() || {}).defaults || {};
   var cur = om.keywordAds[itemId];
   if(!cur || typeof cur !== 'object'){
-    cur = { dailyBudget: def.dailyBudget || 5000, maxCpc: def.maxCpc || 1 };
+    cur = { dailyBudget: def.dailyBudget || 5000, maxCpc: def.maxCpc || 70 };
     om.keywordAds[itemId] = cur;
   }
-  if(!cur.maxCpcEdited) cur.maxCpc = def.maxCpc || 1;
+  if(!cur.maxCpcEdited) cur.maxCpc = def.maxCpc || 70;
   return cur;
 }
 /** 화면 = CSV (동일 소스) */
@@ -25356,7 +25422,9 @@ function buildOpsGoogleAdsPlan_(itemId){
   });
   var seen = {};
   var keywordCount = 0;
-  var groups = (seed.adGroups || []).map(function(g){
+  var groups = (seed.adGroups || []).filter(function(g){
+    return !g.branches || g.branches.indexOf(branchKey) >= 0;
+  }).map(function(g){
     var raw = [];
     (g.keywords || []).forEach(function(k){ raw.push(String(k).replace(/\{\{short\}\}/g, short)); });
     (g.areaKeywords || []).forEach(function(tpl){
@@ -25372,13 +25440,25 @@ function buildOpsGoogleAdsPlan_(itemId){
     keywordCount += kws.length;
     var path2 = String(g.path2 || '');
     if(googleAdsTextWidth_(path2) > 15) path2 = '';
-    return { name: g.name, path2: path2, keywords: kws };
+    // 그룹 전용 문구가 있으면 그것만 (예: 리얼페이스)
+    var gh = (g.headlines || []).map(function(t){ return toGoogleAdsText_(t).replace(/!/g, '').trim(); })
+      .filter(function(t){ return t && googleAdsTextWidth_(t) <= 30; }).slice(0, 15);
+    var gd = (g.descriptions || []).map(toGoogleAdsText_)
+      .filter(function(t){ return t && googleAdsTextWidth_(t) <= 90; }).slice(0, 4);
+    // extraHeadlines: 그룹 주제 제목을 앞에 두고 공통 제목으로 15개까지 채움
+    var gx = (g.extraHeadlines || []).map(function(t){ return toGoogleAdsText_(t).replace(/!/g, '').trim(); })
+      .filter(function(t){ return t && googleAdsTextWidth_(t) <= 30; });
+    if(gh.length < 3 && gx.length){
+      gh = gx.concat(headlines).filter(function(t, i, a){ return a.indexOf(t) === i; }).slice(0, 15);
+    }
+    return { name: g.name, path2: path2, keywords: kws,
+      headlines: gh.length >= 3 ? gh : null, descriptions: gd.length >= 2 ? gd : null };
   });
   return {
     branchKey: branchKey,
     campaign: (opsStoreName_(branchKey) || vars.store) + ' 검색',
     dailyBudget: normalizeOpsGoogleAdsWon_(st.dailyBudget, def.dailyBudget || 5000, 1000),
-    maxCpc: normalizeOpsGoogleAdsWon_(st.maxCpc, def.maxCpc || 1, 1),
+    maxCpc: normalizeOpsGoogleAdsWon_(st.maxCpc, def.maxCpc || 70, 1),
     finalUrl: normalizeOpsNaverKwUrl_(creative.finalUrlPc),
     path1: googleAdsTextWidth_(vars.areaSt) <= 15 ? vars.areaSt : '',
     locations: (br.locations || []).slice(),
@@ -25419,15 +25499,15 @@ function buildOpsGoogleAdsCsv_(itemId){
     });
     var ad = { 'Campaign': camp, 'Ad group': g.name, 'Ad type': 'Responsive search ad', 'Status': 'Enabled',
       'Path 1': plan.path1, 'Path 2': g.path2, 'Final URL': plan.finalUrl };
-    plan.headlines.forEach(function(t, i){ ad['Headline ' + (i + 1)] = t; });
-    plan.descriptions.forEach(function(t, i){ ad['Description ' + (i + 1)] = t; });
+    (g.headlines || plan.headlines).forEach(function(t, i){ ad['Headline ' + (i + 1)] = t; });
+    (g.descriptions || plan.descriptions).forEach(function(t, i){ ad['Description ' + (i + 1)] = t; });
     row(ad);
   });
   return { text: lines.join('\r\n') + '\r\n', plan: plan };
 }
 function buildOpsGoogleAdsBudgetHint_(plan){
   if(plan.maxCpc < 100){
-    return '입찰가 ' + plan.maxCpc + '원 (최저)으로 시작합니다. 노출이 거의 없을 수 있으니, 「마케팅 현황」에서 분석한 뒤 금액을 정해 올리세요. 하루 예산 상한 ' + plan.dailyBudget.toLocaleString() + '원.';
+    return '입찰가 ' + plan.maxCpc + '원으로 낮게 시작합니다. 구글은 경쟁이 없어도 최소 기준을 넘어야 노출되니, 「마케팅 현황」의 첫 페이지 예상 입찰가를 보고 올리세요. 하루 예산 상한 ' + plan.dailyBudget.toLocaleString() + '원.';
   }
   var clicks = Math.max(1, Math.floor(plan.dailyBudget / plan.maxCpc));
   return '하루 최대 약 ' + clicks + '클릭 · 한 달 상한 약 ' + Math.round(plan.dailyBudget * 30.4).toLocaleString() + '원 (구글은 하루에 예산의 2배까지 쓸 수 있지만 월 합계는 이 안에서 맞춥니다)';
@@ -25455,8 +25535,8 @@ function setOpsGoogleAdsMeta_(itemId, field, value){
   var def = (getOpsGoogleAdsSeed_() || {}).defaults || {};
   if(field === 'dailyBudget') st.dailyBudget = normalizeOpsGoogleAdsWon_(value, def.dailyBudget || 5000, 1000);
   else if(field === 'maxCpc'){
-    st.maxCpc = normalizeOpsGoogleAdsWon_(value, def.maxCpc || 1, 1);
-    st.maxCpcEdited = st.maxCpc !== (def.maxCpc || 1);
+    st.maxCpc = normalizeOpsGoogleAdsWon_(value, def.maxCpc || 70, 1);
+    st.maxCpcEdited = st.maxCpc !== (def.maxCpc || 70);
   }
   else return;
   getOpsManualState_().updatedAt = new Date().toISOString();
@@ -25470,7 +25550,7 @@ function setOpsGoogleAdsMeta_(itemId, field, value){
   if(hint && plan) hint.textContent = buildOpsGoogleAdsBudgetHint_(plan);
 }
 window.setOpsGoogleAdsMeta_ = setOpsGoogleAdsMeta_;
-var OPS_MARKETING_ITEM_IDS = ['ops-y-26', 'ops-j-26'];
+var OPS_MARKETING_ITEM_IDS = ['ops-m-26', 'ops-y-26', 'ops-j-26'];
 function isOpsMarketingItemId_(itemId){
   return OPS_MARKETING_ITEM_IDS.indexOf(String(itemId || '')) >= 0;
 }
@@ -25524,18 +25604,26 @@ function importOpsMarketingReport_(itemId, input){
     }
     OPS_MARKETING_ITEM_IDS.forEach(function(id){
       var st = getOpsMarketingState_(id);
+      var bk = opsPlaceBranchKey_(id);
       st.report = {
         generatedAt: data.generatedAt || '',
         period7: data.period7 || null,
         bizmoney: data.naver.bizmoney || 0,
         budgetLock: !!data.naver.budgetLock,
-        naver: (data.naver.branches || {})[opsPlaceBranchKey_(id)] || null
+        naver: (data.naver.branches || {})[bk] || null,
+        google: data.google ? {
+          generatedAt: data.google.generatedAt || '',
+          branch: (data.google.branches || {})[bk] || null,
+          other: data.google.otherCampaigns || []
+        } : null,
+        blog: (data.blog && Array.isArray(data.blog.posts)) ? { posts: data.blog.posts.slice(0, 40) } : null,
+        channels: (data.channels && data.channels.items) ? data.channels : null
       };
     });
     getOpsManualState_().updatedAt = new Date().toISOString();
     save({ skipDriveUpload: true, skipGasPush: true });
     refreshOpsMarketingPanel_(itemId);
-    if(typeof setAppToast === 'function') setAppToast('네이버 현황을 불러왔습니다 (약수·인천 모두)', { duration: 4000, variant: 'ok' });
+    if(typeof setAppToast === 'function') setAppToast('보고서를 불러왔습니다 (미카닥·약수·인천 모두)', { duration: 4000, variant: 'ok' });
   };
   reader.readAsText(file, 'utf-8');
   input.value = '';
@@ -25553,6 +25641,153 @@ function setOpsMarketingManual_(itemId, channel, field, value){
   refreshOpsMarketingPanel_(itemId);
 }
 window.setOpsMarketingManual_ = setOpsMarketingManual_;
+/** 플래너 발행 기록 → [{key, catId, at(ms), topic, draftId}] */
+function opsMktPublishLog_(){
+  var log = [];
+  Object.keys(state.published || {}).forEach(function(id){
+    var pub = state.published[id];
+    if(!pub || !pub.tabPublished || typeof pub.tabPublished !== 'object') return;
+    var catId = pub.catId != null ? Number(pub.catId) : getCatIdFromDraftId_(id);
+    var fallback = pub.savedAt ? Date.parse(pub.savedAt) : NaN;
+    Object.keys(pub.tabPublished).forEach(function(k){
+      var v = pub.tabPublished[k];
+      if(!v) return;
+      var ms = typeof v === 'string' ? Date.parse(v) : NaN;
+      if(isNaN(ms)) ms = fallback;
+      if(isNaN(ms)) return;
+      log.push({ key: k, catId: catId, at: ms, topic: pub.topic || '', draftId: id });
+    });
+  });
+  return log;
+}
+/** 해당 채널에 아직 안 올린 준비 글 (다른 채널에 먼저 올린 글 우선) */
+function opsMktReadyDraft_(cats, keys){
+  var found = [];
+  var catList = (cats && cats.length) ? cats : CATEGORIES.map(function(c){ return c.id; });
+  catList.forEach(function(catId){
+    var cat = CATEGORIES[catId];
+    (cat && cat.drafts || []).forEach(function(d){
+      if(!d || !d.id || found.length > 30) return;
+      var pub = state.published && state.published[d.id];
+      var tp = (pub && pub.tabPublished) || {};
+      keys.forEach(function(key){
+        if(tp[key]) return;
+        var content = getDraftContent_(d.id);
+        if(!content) return;
+        var newsCh = key === 'newsNaver' ? 'naver' : (key === 'newsKakao' ? 'kakao' : (key === 'newsKarrot' ? 'karrot' : ''));
+        var raw = newsCh ? (content.news && content.news[newsCh] && content.news[newsCh].body) : content[key];
+        if(!raw) return;
+        var text = '';
+        try { text = buildFinalTextForKey_(content, catId, key); } catch(eText){}
+        if(String(text || '').trim().length < 20) return;
+        found.push({ draftId: d.id, catId: catId, key: key, topic: d.topic || (pub && pub.topic) || '', elsewhere: Object.keys(tp).some(function(k){ return !!tp[k]; }),
+          at: pub && pub.savedAt ? Date.parse(pub.savedAt) : 0 });
+      });
+    });
+  });
+  found.sort(function(a, b){ return (b.elsewhere ? 1 : 0) - (a.elsewhere ? 1 : 0) || b.at - a.at; });
+  return found[0] || null;
+}
+function opsMktCatLabel_(catId){
+  var c = CATEGORIES[catId];
+  return c ? c.name : '';
+}
+/** 블로그·인스타·쓰레드·소식 게시 주기 → 채널 행 + 할 일 */
+/** 탭 범위(promoScopes)에 맞춰 채널 목록·프로그램·목표를 덮어쓴다 */
+function opsMktScopedChannels_(scope){
+  var base = getOpsMarketingSeed_().contentChannels || [];
+  var conf = scope && scope.channels;
+  if(!conf) return base;
+  return base.filter(function(ch){ return !!conf[ch.id]; }).map(function(ch){
+    var o = conf[ch.id] || {};
+    return Object.assign({}, ch, {
+      cats: o.cats || ch.cats,
+      perWeek: o.perWeek != null ? o.perWeek : ch.perWeek,
+      label: ch.label + (o.note ? ' · ' + o.note : ''),
+      rss: ch.id === 'blog' ? !!o.rss : false,
+      rssMatch: ch.id === 'blog' ? (o.rssMatch || '') : ''
+    });
+  });
+}
+function buildOpsContentStatus_(branchKey, rep, tip, scope){
+  var seed = getOpsMarketingSeed_();
+  var now = Date.now();
+  var DAY = 86400000;
+  var log = opsMktPublishLog_();
+  var rss = (rep && rep.blog && rep.blog.posts) || [];
+  var obsItems = (rep && rep.channels && rep.channels.items) || {};
+  var obsDate = rep && rep.channels && rep.channels.checkedAt ? String(rep.channels.checkedAt).slice(5, 10).replace('-', '/') : '';
+  var rows = [];
+  var good = [];
+  var scoped = !!(scope && scope.channels);
+  opsMktScopedChannels_(scope).forEach(function(ch){
+    var events = [];
+    var source = [];
+    var obs = obsItems[ch.branch ? ch.id + '_' + branchKey : ch.id];
+    var ownLast = 0;
+    if(obs && Array.isArray(obs.posts) && obs.posts.length){
+      obs.posts.forEach(function(p){ var ms = Date.parse(p); if(!isNaN(ms)) events.push(ms); });
+      ownLast = obs.ownLast ? Date.parse(obs.ownLast) : 0;
+      source.push('계정 확인' + (obsDate ? ' ' + obsDate : ''));
+      if(obs.channelName && ch.id === 'kakao' && !/리얼\s*무브먼트/.test(obs.channelName)){
+        tip('low', ch.label, '약수점으로 연결된 카카오 채널 이름이 「' + obs.channelName + '」입니다. 리얼무브먼트 약수점 채널이 맞는지 확인하세요.');
+      }
+    } else if(ch.id === 'blog' && rss.length && (!scoped || ch.rss || ch.rssMatch)){
+      var rssRe = ch.rssMatch ? new RegExp(ch.rssMatch) : null;
+      rss.forEach(function(p){
+        if(rssRe && !rssRe.test((p.title || '') + ' ' + (p.category || ''))) return;
+        var ms = Date.parse(p.at);
+        if(!isNaN(ms)) events.push(ms);
+      });
+      source.push(rssRe ? '블로그 RSS (제목·카테고리)' : '블로그 RSS');
+    } else if(!ch.branch || branchKey === 'yaksu'){
+      log.forEach(function(e){
+        if(ch.keys.indexOf(e.key) < 0) return;
+        if(ch.cats && ch.cats.indexOf(e.catId) < 0) return;
+        events.push(e.at);
+      });
+      source.push('플래너 발행');
+    }
+    var last = events.length ? Math.max.apply(null, events) : 0;
+    var n7 = events.filter(function(ms){ return now - ms < 7 * DAY; }).length;
+    var n30 = events.filter(function(ms){ return now - ms < 30 * DAY; }).length;
+    var days = last ? Math.floor((now - last) / DAY) : null;
+    var interval = 7 / (ch.perWeek || 1);
+    var weekTarget = ch.perWeek >= 1 ? Math.round(ch.perWeek) : 0;
+    var level = 'good';
+    if(!last || days >= interval * 1.5) level = 'high';
+    else if(weekTarget ? n7 < weekTarget : days >= interval) level = 'mid';
+    rows.push({ id: ch.id, label: ch.label, last: last, days: days, n7: n7, n30: n30, perWeek: ch.perWeek, level: level, source: source.join(' + ') || '기록 없음' });
+    if(ownLast && n30 && ch.id !== 'ig_park' && now - ownLast > 30 * DAY){
+      tip('mid', ch.label, '피드에는 박준규 계정 콜라보 글이 올라오지만, 이 계정에서 직접 올린 글은 ' + Math.floor((now - ownLast) / DAY) + '일 전이 마지막입니다. 과정 공지·후기·고정 게시물은 이 계정에서 직접 올리세요.');
+    }
+    if(level === 'good'){ good.push(ch.label + ' (7일 ' + n7 + '개)'); return; }
+    var ready = opsMktReadyDraft_(ch.cats, ch.keys);
+    var action;
+    if(ready){
+      action = (ready.elsewhere ? '이미 다른 채널에 올린 ' : '준비된 ') + '「' + ready.topic + '」(' + opsMktCatLabel_(ready.catId) + ')를 ' + ch.use + '로 올리세요.';
+    } else if(ch.branch){
+      action = '운영 안내·동작 팁·후기 중 하나로 소식을 올리세요. 플래너 「소식」 탭에서 만들 수 있습니다.';
+    } else {
+      var progs = (ch.cats || []).map(opsMktCatLabel_).filter(Boolean).join('·');
+      action = '준비된 글이 없습니다. ' + (progs ? progs + ' ' : '') + '주제를 하나 골라 글을 생성하세요.';
+    }
+    var state_ = !last ? '최근 게시 기록 없음' : ('마지막 게시 ' + (days === 0 ? '오늘' : days + '일 전'));
+    var goal = ch.perWeek >= 1 ? '이번 주 ' + n7 + '/' + weekTarget + '회' : '2주에 1회 목표';
+    tip(level, ch.label, state_ + ' · ' + goal + '. ' + action);
+  });
+  if(good.length) tip('good', '콘텐츠', '목표대로 가는 채널: ' + good.join(', ') + '.');
+  var gapDays = seed.programGapDays || 14;
+  var scopeCats = scope && scope.cats;
+  if(log.length){
+    var quiet = (seed.programCats || []).filter(function(p){
+      if(scopeCats && scopeCats.indexOf(p.id) < 0) return false;
+      return !log.some(function(e){ return e.catId === p.id && now - e.at < gapDays * DAY; });
+    });
+    if(quiet.length) tip('mid', '콘텐츠', '최근 ' + gapDays + '일 동안 어느 채널에도 안 나간 프로그램: ' + quiet.map(function(p){ return p.label; }).join(', ') + '. 주제 서랍에서 하나씩 생성해 블로그 → 인스타 → 쓰레드 순으로 올리세요.');
+  }
+  return rows;
+}
 /** 화면 · 복사용 보고서가 같이 쓰는 판단 결과 */
 function buildOpsMarketingReport_(itemId){
   var branchKey = opsPlaceBranchKey_(itemId);
@@ -25567,10 +25802,14 @@ function buildOpsMarketingReport_(itemId){
   var k = opsMarketingManual_(st, 'karrot');
   var nvManual = opsMarketingManual_(st, 'naver');
   var etc = opsMarketingManual_(st, 'etc');
-  var gStatus = g.status || 'canceled';
+  var gStatus = g.status || 'none';
   var kStatus = k.status || 'unknown';
+  var scope = (seed.promoScopes || {})[branchKey] || {};
+  var adsOn = scope.ads !== false;
+  // 광고가 없는 탭(미카닥)은 아래 광고 진단을 건너뛰고 콘텐츠만 본다
+  var muteAds = !adsOn;
   var tips = [];
-  function tip(level, channel, text){ tips.push({ level: level, channel: channel, text: text }); }
+  function tip(level, channel, text){ if(muteAds) return; tips.push({ level: level, channel: channel, text: text }); }
   function row(channel, status, imp, clk, cost, leads, hasData){
     return { channel: channel, status: status, imp: imp, clk: clk, cost: cost, leads: leads, hasData: hasData,
       ctr: imp ? (clk / imp * 100) : 0, cpc: clk ? (cost / clk) : 0, cpl: leads ? (cost / leads) : 0 };
@@ -25604,7 +25843,15 @@ function buildOpsMarketingReport_(itemId){
       tip('mid', '네이버', '광고그룹 ' + nv.adGroups + '개 중 ' + nv.adGroupsZeroImp + '개가 7일 동안 노출 0입니다. 동네×증상 조합 키워드는 검색량이 거의 없습니다. 동네 그룹은 동네 대표 키워드 몇 개만 남기고, 입찰은 노출이 나오는 그룹에 모으세요.');
     }
     if(s7.imp && (s7.avgRnk || 0) > (th.lowRank || 10)){
-      tip('high', '네이버', '평균 노출 순위 ' + s7.avgRnk + '위. 첫 화면은 보통 1~5위라 지금은 거의 보이지 않습니다. 키워드 도구의 「순위별 예상 입찰가」를 보고, 운동·교정 핵심 키워드 10~20개만 골라 5위 안에 들 만큼 입찰가를 올리세요.');
+      tip('high', '네이버', '평균 노출 순위 ' + s7.avgRnk + '위. 첫 화면은 보통 1~5위라 지금은 거의 보이지 않습니다. 아래 「입찰가 제안」 표의 모바일 3위 금액을 보고, 지역·운동 핵심 키워드만 골라 입찰가를 올리세요.');
+    }
+    if(nv.expSearchOn === 0 && th.expSearchOffSince){
+      var offDays = Math.floor((Date.now() - Date.parse(th.expSearchOffSince + 'T00:00:00+09:00')) / 86400000);
+      if(offDays >= 7 && (s7.imp || 0) < (th.expSearchMinImp7 || 500)){
+        tip('mid', '네이버', '확장 검색을 끈 지 ' + offDays + '일, 최근 7일 노출이 ' + (s7.imp || 0).toLocaleString() + '회로 적습니다. 확장 검색을 켜면 등록하지 않은 연관 검색어에도 노출됩니다. 병원·시술 검색어가 섞일 수 있으니 켠 뒤 1~2주 뒤 노출 키워드를 다시 확인하세요. 커서에 「확장 검색 켜줘」라고 하면 바꿉니다.');
+      }
+    } else if(nv.expSearchOn > 0 && (nv.topKeywords || []).some(function(r){ return medicalRe.test(r.kw || ''); })){
+      tip('mid', '네이버', '확장 검색이 ' + nv.expSearchOn + '개 그룹에서 켜져 있어 병원·시술 검색어에 노출될 수 있습니다. 끄려면 커서에 「확장 검색 꺼줘」라고 하세요.');
     }
     if((s7.imp || 0) >= (th.minImpForCtr || 1000) && (s7.ctr || 0) < (th.lowCtr || 0.5)){
       tip('mid', '네이버', '클릭률 ' + (s7.ctr || 0).toFixed(2) + '%로 낮습니다. 순위가 낮거나, 검색 의도와 맞지 않는 키워드에 노출되고 있다는 신호입니다.');
@@ -25618,17 +25865,52 @@ function buildOpsMarketingReport_(itemId){
     }
     goodKw = kws.filter(function(r){ return r.avgRnk && r.avgRnk <= 3 && !medicalRe.test(r.kw || ''); });
     if(goodKw.length) tip('good', '네이버', '상위에 잘 노출되는 키워드: ' + goodKw.slice(0, 5).map(function(r){ return r.kw + ' (' + r.avgRnk + '위)'; }).join(', ') + '. 브랜드·고유 키워드는 그대로 유지하세요.');
+    var est = (nv.bidEstimates || []).filter(function(e){ return e.m3 && e.core; });
+    var raise = est.filter(function(e){ return e.m3 > (e.bid || 70); }).sort(function(a, b){ return a.m3 - b.m3; });
+    var cheap = est.filter(function(e){ return e.m3 <= (e.bid || 70); });
+    if(raise.length){
+      var sum = raise.reduce(function(a, e){ return a + e.m3; }, 0);
+      tip('mid', '네이버', '지역 핵심 키워드 모바일 3위 예상 입찰가: ' + raise.map(function(e){ return e.kw + ' ' + opsMktWon_(e.m3); }).join(', ') +
+        (cheap.length ? '. 70원으로도 3위가 되는 키워드: ' + cheap.map(function(e){ return e.kw; }).join(', ') : '') +
+        '. 하루 각 1번씩만 클릭돼도 약 ' + opsMktWon_(sum) + '이라, 싼 키워드부터 일예산 안에서 올려 보세요.');
+    }
   }
   // 구글
   var gList = seed.googleStatus || [];
-  var gHas = gStatus === 'running' && (opsMktNum_(g.imp) || opsMktNum_(g.clk) || opsMktNum_(g.cost));
-  rows.push(row('구글 애즈', opsMktStatusLabel_(gList, gStatus), opsMktNum_(g.imp), opsMktNum_(g.clk), opsMktNum_(g.cost), opsMktNum_(g.leads), !!gHas));
-  if(gStatus === 'canceled') tip('high', '구글', '계정이 취소된 상태라 광고가 나가지 않습니다. 구글 애즈 상단 「재활성화」 → 「구글 애즈 검색광고」 항목에서 CSV를 받아 Editor로 올리세요.');
+  var gAuto = !!(rep && rep.google);
+  var gb = gAuto ? rep.google.branch : null;
+  var gImp = opsMktNum_(g.imp), gClk = opsMktNum_(g.clk), gCost = opsMktNum_(g.cost);
+  var gStatusLabel;
+  if(gAuto){
+    if(!gb) gStatus = 'none';
+    else if(gb.campaign.status === 'ENABLED') gStatus = (gb.adsByStatus && (gb.adsByStatus.APPROVED || gb.adsByStatus.APPROVED_LIMITED)) ? 'running' : 'review';
+    else gStatus = 'paused';
+    if(gb){
+      gImp = gb.stats7.imp || 0; gClk = gb.stats7.clk || 0; gCost = gb.stats7.cost || 0;
+    }
+    gStatusLabel = opsMktStatusLabel_(gList, gStatus) + ' · 시트 자동';
+  } else {
+    gStatusLabel = opsMktStatusLabel_(gList, gStatus);
+  }
+  var gHas = gAuto ? !!gb : (gStatus === 'running' && (gImp || gClk || gCost));
+  rows.push(row('구글 애즈', gStatusLabel, gImp, gClk, gCost, opsMktNum_(g.leads), !!gHas));
+  if(gAuto && !gb){
+    var others = (rep.google.other || []).map(function(c){ return c.name + ' (' + c.status + ')'; });
+    tip('high', '구글', '구글 애즈에 이 지점 검색 캠페인이 아직 없습니다' + (others.length ? ' (지금 있는 캠페인: ' + others.join(', ') + ')' : '') + '. 「구글 애즈 검색광고」 항목의 CSV를 Editor로 가져와 게시하세요.');
+  }
+  if(gb && gb.adsByStatus && gb.adsByStatus.DISAPPROVED) tip('high', '구글', '반려된 광고 ' + gb.adsByStatus.DISAPPROVED + '개. 구글 애즈 「광고」에서 반려 사유를 확인하고 문구를 고치세요.');
+  if(gb && (gb.bids || []).length){
+    var under = gb.bids.filter(function(b){ return b.firstPage && b.bid < b.firstPage; });
+    if(under.length) tip('mid', '구글', '키워드 ' + gb.bids.length + '개 중 ' + under.length + '개가 첫 페이지 예상 입찰가보다 낮습니다. 아래 「입찰가 제안」의 첫 페이지 금액을 참고하세요.');
+  }
+  if(gAuto){
+    // 시트 기준 상태는 위·아래에서 따로 진단
+  } else if(gStatus === 'canceled') tip('high', '구글', '계정이 취소된 상태라 광고가 나가지 않습니다. 구글 애즈 상단 「재활성화」 → 「구글 애즈 검색광고」 항목에서 CSV를 받아 Editor로 올리세요.');
   else if(gStatus === 'none') tip('high', '구글', '캠페인이 없습니다. 「구글 애즈 검색광고」 항목의 CSV로 캠페인·키워드·광고를 한 번에 만드세요.');
   else if(gStatus === 'paused') tip('mid', '구글', '캠페인이 일시중지 상태입니다. 위치 옵션을 「타겟 지역에 있거나 정기적으로 방문하는 사용자」로 바꾸고, 광고가 승인되면 「사용」으로 켜세요.');
   else if(gStatus === 'review') tip('low', '구글', '광고 검토는 보통 1영업일 안에 끝납니다. 반려되면 사유를 확인하세요.');
-  else if(gStatus === 'running'){
-    var gImp = opsMktNum_(g.imp), gClk = opsMktNum_(g.clk), gCost = opsMktNum_(g.cost);
+  if(gAuto && gb && gStatus === 'paused') tip('mid', '구글', '검색 캠페인 「' + gb.campaign.name + '」이 일시중지 상태입니다. 위치 옵션을 「타겟 지역에 있거나 정기적으로 방문하는 사용자」로 바꾸고, 광고가 승인되면 「사용」으로 켜세요.');
+  if(gStatus === 'running'){
     if(!gHas) tip('low', '구글', '최근 7일 노출·클릭·비용을 입력하면 진단이 붙습니다.');
     else if(!gImp) tip('mid', '구글', '노출 0회. 클릭당 최대 입찰가가 낮거나 위치가 좁습니다. 입찰가를 올리거나 키워드를 넓은 표현으로 추가하세요.');
     else {
@@ -25647,6 +25929,16 @@ function buildOpsMarketingReport_(itemId){
     if(!kHas) tip('low', '당근', '최근 7일 노출·클릭·비용·채팅 문의를 입력하면 진단이 붙습니다.');
     else if(opsMktNum_(k.clk) && !opsMktNum_(k.leads)) tip('mid', '당근', '클릭은 있는데 문의가 0입니다. 광고 소재에 가격대·예약 방법·위치를 분명히 넣고, 비즈프로필 후기를 늘리세요.');
   }
+  muteAds = false;
+  if(!adsOn) rows = [];
+  var faceCandidates = scope.face ? (seed.faceKeywordCandidates || []) : [];
+  if(faceCandidates.length){
+    var local = faceCandidates.filter(function(f){ return /지역/.test(f.note || ''); });
+    tip('mid', '리얼페이스', '인천점 리얼페이스 키워드: 지역 수요는 ' + local.map(function(f){ return f.kw + ' ' + f.vol.toLocaleString(); }).join(' · ') +
+      '이고, 「동네+얼굴교정」 조합은 월 10회 미만입니다. 리얼페이스 전용 광고그룹을 따로 만들어 이 키워드와 리얼페이스 소재를 넣고, 전국 키워드는 지역 타게팅(계양·부평)을 걸어 쓰세요.');
+  }
+  // 블로그·인스타·쓰레드·소식
+  var contentRows = buildOpsContentStatus_(branchKey, rep, tip, scope);
   // 전체
   var tot = rows.reduce(function(a, r){ a.imp += r.imp; a.clk += r.clk; a.cost += r.cost; a.leads += r.leads; return a; }, { imp: 0, clk: 0, cost: 0, leads: 0 });
   var leadsAll = tot.leads + opsMktNum_(etc.leads);
@@ -25655,13 +25947,15 @@ function buildOpsMarketingReport_(itemId){
   if(withCpl.length >= 2) tip('mid', '공통', '문의 1건당 비용이 가장 낮은 채널은 ' + withCpl[0].channel + ' (' + opsMktWon_(withCpl[0].cpl) + '), 가장 높은 채널은 ' + withCpl[withCpl.length - 1].channel + ' (' + opsMktWon_(withCpl[withCpl.length - 1].cpl) + ')입니다. 예산을 낮은 쪽으로 옮겨 보세요.');
   var order = { high: 0, mid: 1, low: 2, good: 3 };
   tips.sort(function(a, b){ return order[a.level] - order[b.level]; });
-  var extras = (seed.extraChannels || []).map(function(x){
+  var extras = ((adsOn ? seed.extraChannels : seed.mikadocExtras) || []).map(function(x){
     return { title: x.title, cost: x.cost, fit: x.fit, why: String(x.why || '').replace(/\{\{areaSt\}\}/g, vars.areaSt).replace(/\{\{area\}\}/g, vars.area) };
   });
-  return { branchKey: branchKey, store: opsStoreName_(branchKey) || vars.store, report: rep, naver: nv, rows: rows, total: tot, etcLeads: opsMktNum_(etc.leads),
-    tips: tips, extras: extras, medical: medical, goodKw: goodKw, gStatus: gStatus, kStatus: kStatus, manual: { google: g, karrot: k, naver: nvManual, etc: etc } };
+  return { branchKey: branchKey, store: adsOn ? (opsStoreName_(branchKey) || vars.store) : (scope.label || '미카닥'), adsOn: adsOn, faceCandidates: faceCandidates,
+    report: rep, naver: adsOn ? nv : null, rows: rows, total: tot, etcLeads: opsMktNum_(etc.leads),
+    tips: tips, extras: extras, medical: medical, goodKw: goodKw, gStatus: gStatus, kStatus: kStatus, google: adsOn ? gb : null, googleAuto: adsOn && gAuto, contentRows: contentRows,
+    manual: { google: g, karrot: k, naver: nvManual, etc: etc } };
 }
-var OPS_MKT_LEVEL_LABEL = { high: '지금', mid: '이번 주', low: '참고', good: '잘 되는 점' };
+var OPS_MKT_LEVEL_LABEL = { high: '오늘', mid: '이번 주', low: '참고', good: '잘 되는 점' };
 var OPS_MKT_LEVEL_COLOR = { high: '#B91C1C', mid: '#B45309', low: '#475569', good: '#0F766E' };
 function buildOpsMarketingReportText_(itemId){
   var r = buildOpsMarketingReport_(itemId);
@@ -25672,7 +25966,12 @@ function buildOpsMarketingReportText_(itemId){
     if(x.hasData) lines.push('  노출 ' + x.imp.toLocaleString() + ' · 클릭 ' + x.clk.toLocaleString() + ' · 클릭률 ' + x.ctr.toFixed(2) + '% · 비용 ' + opsMktWon_(x.cost) + (x.clk ? ' · 클릭당 ' + opsMktWon_(x.cpc) : '') + (x.leads ? ' · 문의 ' + x.leads + '건 (건당 ' + opsMktWon_(x.cpl) + ')' : ''));
   });
   lines.push('');
-  lines.push('■ 개선 제안');
+  lines.push('■ 콘텐츠 채널 (최근 7일 / 30일 · 목표 주당)');
+  (r.contentRows || []).forEach(function(c){
+    lines.push('  ' + c.label + ': ' + c.n7 + ' / ' + c.n30 + ' · 목표 ' + c.perWeek + ' · ' + (c.last ? (c.days === 0 ? '오늘' : c.days + '일 전') + ' 게시' : '기록 없음'));
+  });
+  lines.push('');
+  lines.push('■ 할 일');
   r.tips.forEach(function(t){ lines.push('· [' + OPS_MKT_LEVEL_LABEL[t.level] + '] ' + t.channel + ': ' + t.text); });
   lines.push('');
   lines.push('■ 같이 하면 좋은 것');
@@ -25716,6 +26015,29 @@ function renderOpsMarketingPanelHTML_(itemId){
         return '<tr' + (medSet[k.kw] ? ' style="color:#B91C1C"' : '') + '><td style="' + cell + ';text-align:left">' + escapeHtml(k.kw) + ' <span style="opacity:.55">' + escapeHtml(k.group || '') + '</span></td><td style="' + cell + '">' + k.imp.toLocaleString() + '</td><td style="' + cell + '">' + k.clk + '</td><td style="' + cell + '">' + k.avgRnk + '</td><td style="' + cell + '">' + (k.useGroupBid ? '그룹' : opsMktWon_(k.bid)) + '</td></tr>';
       }).join('') + '</table>';
   }
+  var bidHtml = '';
+  var estRows = ((r.naver && r.naver.bidEstimates) || []).slice().sort(function(a, b){ return (b.core ? 1 : 0) - (a.core ? 1 : 0); });
+  if(estRows.length){
+    var wonOrDash = function(v){ return v ? opsMktWon_(v) : '-'; };
+    bidHtml += '<div class="ops-kw-preview-head" style="margin-top:12px">네이버 입찰가 제안 <span>순위별 예상 입찰가 · 지역 상담은 모바일 3위를 기준으로 권장</span></div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr><th style="' + head + ';text-align:left">키워드</th><th style="' + head + '">현재</th><th style="' + head + '">모바일 1위</th><th style="' + head + ';color:#0F766E">모바일 3위</th><th style="' + head + '">모바일 5위</th><th style="' + head + '">PC 3위</th></tr>' +
+      estRows.map(function(e){
+        var up = e.m3 && e.m3 > (e.bid || 70);
+        return '<tr><td style="' + cell + ';text-align:left">' + escapeHtml(e.kw) + (e.core ? ' <span style="font-size:10.5px;font-weight:700;color:#0F766E">지역 핵심</span>' : '') + '</td><td style="' + cell + '">' + (e.bid ? opsMktWon_(e.bid) : '<span style="opacity:.5">미등록</span>') + '</td>' +
+          '<td style="' + cell + '">' + wonOrDash(e.m1) + '</td><td style="' + cell + ';font-weight:700' + (up ? ';color:#0F766E' : '') + '">' + wonOrDash(e.m3) + '</td>' +
+          '<td style="' + cell + '">' + wonOrDash(e.m5) + '</td><td style="' + cell + '">' + wonOrDash(e.p3) + '</td></tr>';
+      }).join('') + '</table>' +
+      '<p class="ops-kw-chip-hint">「미등록」은 광고 계정에 없거나 최근 노출이 없는 지역 핵심 키워드입니다. 70원이면 이미 최저라 올릴 필요가 없습니다.</p>';
+  }
+  if(r.google && (r.google.bids || []).length){
+    bidHtml += '<div class="ops-kw-preview-head" style="margin-top:12px">구글 입찰가 제안 <span>첫 페이지 · 상단 노출 예상 금액 (구글 추정치)</span></div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr><th style="' + head + ';text-align:left">키워드</th><th style="' + head + '">현재</th><th style="' + head + ';color:#0F766E">첫 페이지</th><th style="' + head + '">상단 노출</th><th style="' + head + '">품질</th></tr>' +
+      r.google.bids.slice().sort(function(a, b){ return (b.firstPage || 0) - (a.firstPage || 0); }).slice(0, 25).map(function(b){
+        return '<tr><td style="' + cell + ';text-align:left">' + escapeHtml(b.kw) + ' <span style="opacity:.55">' + escapeHtml(b.group || '') + '</span></td><td style="' + cell + '">' + opsMktWon_(b.bid) + '</td>' +
+          '<td style="' + cell + ';font-weight:700;color:#0F766E">' + (b.firstPage ? opsMktWon_(b.firstPage) : '-') + '</td><td style="' + cell + '">' + (b.topPage ? opsMktWon_(b.topPage) : '-') + '</td><td style="' + cell + '">' + escapeHtml(String(b.qs || '-')) + '</td></tr>';
+      }).join('') + '</table>' +
+      '<p class="ops-kw-chip-hint">캠페인을 막 켰거나 검색량이 적으면 예상 금액이 비어 있습니다. 며칠 운영한 뒤 다시 불러오세요.</p>';
+  }
   var nvInfo = r.naver
     ? ('캠페인 「' + escapeHtml(r.naver.campaign.name) + '」 · 일예산 ' + (r.naver.campaign.dailyBudget ? opsMktWon_(r.naver.campaign.dailyBudget) : '제한 없음') +
       ' · 비즈머니 ' + opsMktWon_(rep.bizmoney) + ' · 광고그룹 ' + r.naver.adGroups + '개 (노출 0: ' + r.naver.adGroupsZeroImp + ' · 소재 없음: ' + (r.naver.adGroupsNoAd || []).length + ')' +
@@ -25739,31 +26061,67 @@ function renderOpsMarketingPanelHTML_(itemId){
   var extrasHtml = r.extras.map(function(x){
     return '<li style="margin:8px 0;line-height:1.55"><strong>' + escapeHtml(x.title) + '</strong> <span style="font-size:11.5px;opacity:.7">' + escapeHtml(x.cost) + ' · 적합도 ' + escapeHtml(x.fit) + '</span><div style="font-size:12.5px;opacity:.85">' + escapeHtml(x.why) + '</div></li>';
   }).join('');
+  var levelBadge = function(level){
+    return '<span style="display:inline-block;min-width:52px;font-size:11px;font-weight:700;color:#fff;background:' + OPS_MKT_LEVEL_COLOR[level] + ';border-radius:999px;padding:1px 8px;text-align:center">' +
+      (level === 'good' ? '정상' : OPS_MKT_LEVEL_LABEL[level]) + '</span>';
+  };
+  var contentRowsHtml = (r.contentRows || []).map(function(c){
+    var lastTxt = c.last ? (new Date(c.last).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }) + (c.days === 0 ? ' (오늘)' : ' (' + c.days + '일 전)')) : '-';
+    return '<tr><td style="' + cell + ';text-align:left;font-weight:700">' + escapeHtml(c.label) + '<div style="font-weight:500;font-size:11px;opacity:.6">' + escapeHtml(c.source) + '</div></td>' +
+      '<td style="' + cell + '">' + escapeHtml(lastTxt) + '</td><td style="' + cell + '">' + c.n7 + '</td><td style="' + cell + '">' + c.n30 + '</td>' +
+      '<td style="' + cell + '">주 ' + (c.perWeek >= 1 ? c.perWeek : c.perWeek.toFixed(1)) + '회</td><td style="' + cell + '">' + levelBadge(c.level) + '</td></tr>';
+  }).join('');
+  var scope = (seed.promoScopes || {})[r.branchKey] || null;
+  var reportButtons = '<div class="ops-kw-actions" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px">' +
+      '<label class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" style="cursor:pointer">보고서 불러오기<input type="file" accept=".json,application/json" style="display:none" onchange="importOpsMarketingReport_(\'' + itemId + '\', this)" /></label>' +
+      '<button type="button" class="ops-kw-btn" onclick="copyOpsMarketingReport_(\'' + itemId + '\')">보고서 복사</button>' +
+    '</div>' +
+    '<p class="ops-kw-chip-hint">커서에 「마케팅 현황 업데이트해줘」라고 하면 다운로드 폴더에 marketing_status_날짜.json이 생깁니다. 한 번 불러오면 미카닥·약수·인천 모두 반영됩니다.' +
+      (rep && rep.generatedAt ? ' 마지막 보고서: ' + escapeHtml(String(rep.generatedAt).slice(0, 16).replace('T', ' ')) : '') + '</p>';
+  var faceHtml = (r.faceCandidates || []).length
+    ? ('<div class="ops-kw-preview-head" style="margin-top:12px">리얼페이스 키워드 후보 <span>네이버 월간 검색수 · 리얼페이스 전용 광고그룹용</span></div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr><th style="' + head + ';text-align:left">키워드</th><th style="' + head + '">월 검색</th><th style="' + head + ';text-align:left">메모</th></tr>' +
+      r.faceCandidates.map(function(f){
+        return '<tr><td style="' + cell + ';text-align:left;font-weight:700">' + escapeHtml(f.kw) + '</td><td style="' + cell + '">' + f.vol.toLocaleString() + '</td><td style="' + cell + ';text-align:left;opacity:.75">' + escapeHtml(f.note || '') + '</td></tr>';
+      }).join('') + '</table>')
+    : '';
   return '<div class="ops-kw-panel ops-mkt-panel" data-ops-mkt="' + escapeHtml(itemId) + '">' +
+    '<div class="ops-review-group ops-kw-group" style="border:1px solid rgba(30,58,110,.2);background:rgba(30,58,110,.03)">' +
+      '<div class="ops-review-group-title"><strong>할 일</strong> <span class="ops-review-group-hint">오늘 · 이번 주 순 · 광고와 블로그·인스타·쓰레드·소식을 함께 봅니다</span></div>' +
+      '<ul style="list-style:none;margin:6px 0 0;padding:0;font-size:13px">' + tipsHtml + '</ul>' +
+    '</div>' +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>채널 현황</strong> <span class="ops-review-group-hint">' + (p ? escapeHtml(p.since + ' ~ ' + p.until) + ' · ' : '') + (rep && rep.generatedAt ? '네이버 ' + escapeHtml(String(rep.generatedAt).slice(0, 16).replace('T', ' ')) + ' 기준' : '네이버 수치 미불러옴') + '</span></div>' +
+      '<div class="ops-review-group-title"><strong>콘텐츠 채널</strong> <span class="ops-review-group-hint">계정 확인 · 블로그 RSS · 플래너 발행 기록 순으로 사용</span></div>' +
+      '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px"><tr><th style="' + head + ';text-align:left">채널</th><th style="' + head + '">최근 게시</th><th style="' + head + '">7일</th><th style="' + head + '">30일</th><th style="' + head + '">목표</th><th style="' + head + '">상태</th></tr>' + contentRowsHtml + '</table></div>' +
+      '<p class="ops-kw-chip-hint">' + (rep && rep.channels
+        ? '각 계정 페이지를 직접 확인한 결과입니다 (' + escapeHtml(String(rep.channels.checkedAt || '').slice(0, 16).replace('T', ' ')) + '). 인스타는 콜라보 글도 그 계정 피드에 보이는 대로 셉니다.'
+        : '아직 계정 확인 결과가 없어 플래너 발행 기록으로만 셉니다. 커서에 「마케팅 현황 업데이트해줘」라고 하면 각 계정을 확인해 보고서에 넣습니다.') + '</p>' +
+      (r.adsOn ? '' : reportButtons) +
+    '</div>' +
+    (r.adsOn ? ('<div class="ops-review-group ops-kw-group">' +
+      '<div class="ops-review-group-title"><strong>광고 현황</strong> <span class="ops-review-group-hint">' + (p ? escapeHtml(p.since + ' ~ ' + p.until) + ' · ' : '') + (rep && rep.generatedAt ? '네이버 ' + escapeHtml(String(rep.generatedAt).slice(0, 16).replace('T', ' ')) + ' 기준' : '네이버 수치 미불러옴') + '</span></div>' +
       '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px"><tr><th style="' + head + ';text-align:left">채널</th><th style="' + head + '">노출</th><th style="' + head + '">클릭</th><th style="' + head + '">클릭률</th><th style="' + head + '">비용</th><th style="' + head + '">문의</th><th style="' + head + '">문의당</th></tr>' + tableRows + '</table></div>' +
       '<p class="ops-kw-chip-hint" style="margin-top:8px">' + nvInfo + '</p>' +
-      '<div class="ops-kw-actions" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px">' +
-        '<label class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" style="cursor:pointer">네이버 보고서 불러오기<input type="file" accept=".json,application/json" style="display:none" onchange="importOpsMarketingReport_(\'' + itemId + '\', this)" /></label>' +
-        '<button type="button" class="ops-kw-btn" onclick="copyOpsMarketingReport_(\'' + itemId + '\')">보고서 복사</button>' +
-      '</div>' +
-      '<p class="ops-kw-chip-hint">커서에 「마케팅 현황 업데이트해줘」라고 하면 다운로드 폴더에 marketing_status_날짜.json이 생깁니다. 한 번 불러오면 약수·인천 모두 반영됩니다.</p>' +
-    '</div>' +
+      reportButtons +
+    '</div>') : '') +
+    ((r.adsOn && (kwHtml || bidHtml || faceHtml)) ? ('<div class="ops-review-group ops-kw-group">' +
+      '<div class="ops-review-group-title"><strong>키워드 · 입찰가</strong> <span class="ops-review-group-hint">네이버·구글 노출 키워드와 예상 입찰가</span></div>' +
+      kwHtml + bidHtml + faceHtml +
+    '</div>') : '') +
+    (r.adsOn ? ('<div class="ops-review-group ops-kw-group">' +
+      '<div class="ops-review-group-title"><strong>직접 입력</strong> <span class="ops-review-group-hint">API가 없는 광고·문의 수는 화면 숫자를 옮겨 적습니다</span></div>' +
+      (
+        (r.googleAuto
+          ? ('<div style="margin-top:10px"><div class="ops-kw-preview-head">구글 애즈 <span>구글 시트에서 자동 · ' + escapeHtml(String((rep.google && rep.google.generatedAt) || '').slice(0, 16).replace('T', ' ')) + ' (UTC)</span></div>' +
+              '<div class="ops-kw-meta-grid">' + num('google', 'leads', '구글 광고로 온 문의 (건)') + '</div></div>')
+          : manualBlock('구글 애즈', 'google', seed.googleStatus || [], r.gStatus, '문의 (건)')) +
+        manualBlock('당근 광고', 'karrot', seed.karrotStatus || [], r.kStatus, '채팅 문의 (건)') +
+        '<div style="margin-top:10px"><div class="ops-kw-preview-head">문의 수 <span>상담 때 「어디서 보고 오셨어요?」로 확인</span></div>' +
+          '<div class="ops-kw-meta-grid">' + num('naver', 'leads', '네이버 광고로 온 문의') + num('etc', 'leads', '그 외 (플레이스·블로그·지인 등)') + '</div></div>'
+      ) +
+    '</div>') : '') +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>개선 제안</strong> <span class="ops-review-group-hint">' + r.tips.length + '개 · 급한 순</span></div>' +
-      '<ul style="list-style:none;margin:6px 0 0;padding:0;font-size:13px">' + tipsHtml + '</ul>' +
-      kwHtml +
-    '</div>' +
-    '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>직접 입력</strong> <span class="ops-review-group-hint">구글·당근은 API가 없어 화면 숫자를 옮겨 적습니다</span></div>' +
-      manualBlock('구글 애즈', 'google', seed.googleStatus || [], r.gStatus, '문의 (건)') +
-      manualBlock('당근 광고', 'karrot', seed.karrotStatus || [], r.kStatus, '채팅 문의 (건)') +
-      '<div style="margin-top:10px"><div class="ops-kw-preview-head">문의 수 <span>상담 때 「어디서 보고 오셨어요?」로 확인</span></div>' +
-        '<div class="ops-kw-meta-grid">' + num('naver', 'leads', '네이버 광고로 온 문의') + num('etc', 'leads', '그 외 (플레이스·블로그·지인 등)') + '</div></div>' +
-    '</div>' +
-    '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>세 광고 외에 해볼 것</strong> <span class="ops-review-group-hint">비용 낮은 순</span></div>' +
+      '<div class="ops-review-group-title"><strong>' + (r.adsOn ? '세 광고 외에 해볼 것' : '같이 해볼 것') + '</strong> <span class="ops-review-group-hint">비용 낮은 순</span></div>' +
       '<ul style="list-style:none;margin:6px 0 0;padding:0;font-size:13px">' + extrasHtml + '</ul>' +
     '</div>' +
   '</div>';
@@ -26036,7 +26394,7 @@ function renderOpsNaverKwPanelHTML_(itemId){
   var bothRows = buildOpsNaverKwCsvRows_(st, 'both');
   var bothCount = bothRows.length;
   var skippedLong = bothRows._skippedLong || 0;
-  var seedCount = opsNaverKwSeedKeywords_().length;
+  var seedCount = opsNaverKwSeedKeywords_(opsPlaceBranchKey_(itemId)).length;
   var hoodAdIds = syncOpsNaverKwAdGroupIdsToHoods_(st);
   var hoodSel = getOpsNaverKwHoodCsvSelected_(st);
   var hoodFilled = hoodAdIds.filter(Boolean).length;
@@ -26100,6 +26458,12 @@ function renderOpsNaverKwPanelHTML_(itemId){
             '<option value="none"' + (st.joinMode !== 'space' ? ' selected' : '') + '>붙여쓰기 (약수허리통증) · 권장</option>' +
             '<option value="space"' + (st.joinMode === 'space' ? ' selected' : '') + '>띄어쓰기 (약수 허리통증)</option>' +
           '</select></label>' +
+      '</div>' +
+      '<div class="ops-kw-preview-head" style="margin-top:10px">동네 조합 키워드 <span>동네 뒤에 붙일 서비스어 · ' + (st.hoodKeywords || []).length + '개 · 비우면 일반 키워드 전체를 붙임</span></div>' +
+      '<textarea class="ops-review-input ops-kw-textarea" rows="4" data-ops-kw-field="hoodKeywords" placeholder="예: PT&#10;체형교정" onchange="setOpsNaverKwList_(\'' + itemId + '\', \'hoodKeywords\', this.value)">' + escapeHtml((st.hoodKeywords || []).join('\n')) + '</textarea>' +
+      '<div class="ops-kw-actions">' +
+        '<button type="button" class="ops-kw-btn" onclick="addOpsNaverKwLine_(\'' + itemId + '\', \'hoodKeywords\')">추가</button>' +
+        '<button type="button" class="ops-kw-btn ops-kw-btn-regen" onclick="regenOpsNaverKwList_(\'' + itemId + '\', \'hoodKeywords\')">재생성</button>' +
       '</div>' +
       '<div class="ops-kw-preview-head">동네 조합 미리보기 <span>' + comboCount.toLocaleString() + '개</span></div>' +
       '<pre class="ops-kw-preview">' + escapeHtml(comboPreview || '(동네·키워드를 입력하면 여기에 표시됩니다. 「일반」은 조합하지 않습니다.)') + '</pre>' +
@@ -26267,7 +26631,7 @@ function focusOpsNaverKwField_(itemId, field){
 }
 window.focusOpsNaverKwField_ = focusOpsNaverKwField_;
 function addOpsNaverKwLine_(itemId, field){
-  var label = field === 'neighborhoods' ? '추가할 동네 이름' : '추가할 키워드';
+  var label = field === 'neighborhoods' ? '추가할 동네 이름' : (field === 'hoodKeywords' ? '동네 뒤에 붙일 서비스어' : '추가할 키워드');
   var raw = window.prompt(label + ' (여러 개는 쉼표·줄바꿈)');
   if(raw == null) return;
   var parts = parseOpsNaverKwLines_(raw, { allowCommaSplit: true });
@@ -26300,8 +26664,12 @@ function regenOpsNaverKwList_(itemId, field){
       st.neighborhoods = opsDefaultNaverNeighborhoods_(branchKey);
       syncOpsNaverKwAdGroupIdsToHoods_(st);
     }
+  } else if(field === 'hoodKeywords'){
+    var hoodSeed = opsNaverKwSeedHoodKeywords_(branchKey);
+    if(!window.confirm('동네 조합 키워드를 기본값(' + hoodSeed.join(', ') + ')으로 다시 불러올까요?')) return;
+    st.hoodKeywords = hoodSeed;
   } else {
-    var seed = opsNaverKwSeedKeywords_();
+    var seed = opsNaverKwSeedKeywords_(branchKey);
     if(!seed.length){
       if(typeof setAppToast === 'function') setAppToast('시드 키워드가 비어 있습니다. ops-naver-kw-seed.js에 keywords 배열이 있는지 확인하세요.', { duration: 4500, variant: 'err' });
       return;
@@ -26318,7 +26686,7 @@ function regenOpsNaverKwList_(itemId, field){
   getOpsManualState_().updatedAt = new Date().toISOString();
   save({ skipDriveUpload: false, gasImmediate: true, driveImmediate: true });
   refreshOpsNaverKwPanel_(itemId, { skipDomSync: true });
-  if(typeof setAppToast === 'function') setAppToast(field === 'neighborhoods' ? '일반·동네·광고그룹ID를 재생성했습니다.' : '일반 키워드를 재생성했습니다.', { duration: 2500 });
+  if(typeof setAppToast === 'function') setAppToast(field === 'neighborhoods' ? '일반·동네·광고그룹ID를 재생성했습니다.' : (field === 'hoodKeywords' ? '동네 조합 키워드를 재생성했습니다.' : '일반 키워드를 재생성했습니다.'), { duration: 2500 });
 }
 window.regenOpsNaverKwList_ = regenOpsNaverKwList_;
 function refreshOpsNaverKwPanel_(itemId, opts){
@@ -26503,6 +26871,7 @@ function renderOpsManualMainHTML_(){
   try{ ensureOpsBrandStyles_(); }catch(eSt){}
   var om = getOpsManualState_();
   var branch = om.activeBranch;
+  if(branch === 'promo') return renderOpsPromoMainHTML_();
   var prog = countOpsManualProgress_(branch);
   var branchLabel = (CAT_GROUP_OPS.find(function(o){ return o.branch === branch; }) || {}).label || OPS_BRANCH_LABELS[branch] || branch;
   var intro = '<div class="ops-manual-intro">' +
@@ -26549,8 +26918,6 @@ function renderOpsManualMainHTML_(){
         panelInner = renderOpsNaverKwPanelHTML_(it.id);
       } else if(isOpsGoogleAdsItemId_(it.id)){
         panelInner = renderOpsGoogleAdsPanelHTML_(it.id);
-      } else if(isOpsMarketingItemId_(it.id)){
-        panelInner = renderOpsMarketingPanelHTML_(it.id);
       } else {
         var proposalItems = review.proposalItems || [];
         var proposalHtml = proposalItems.map(function(p){
@@ -26607,10 +26974,54 @@ function renderOpsManualMainHTML_(){
       '<ol class="ops-check-list">' + itemsHtml + '</ol>' +
     '</details>';
   }).join('');
+  var foot = '<p class="ops-manual-foot">체크와 작성 내용은 이 기기·Drive·서버 동기화에 저장됩니다. 지점은 상단 「지점브랜딩」에서 바꿀 수 있어요.</p>';
   return '<div class="ops-manual-wrap">' + intro + newMeta +
-    '<div class="ops-sections">' + sections + '</div>' +
-    '<p class="ops-manual-foot">체크와 작성 내용은 이 기기·Drive·서버 동기화에 저장됩니다. 지점은 상단 「지점브랜딩」에서 바꿀 수 있어요.</p>' +
+    '<div class="ops-sections">' + sections + '</div>' + foot +
   '</div>';
+}
+var OPS_PROMO_TABS = [
+  { id: 'mikadoc', label: '미카닥', itemId: 'ops-m-26' },
+  { id: 'yaksu', label: '약수점', itemId: 'ops-y-26' },
+  { id: 'jakjeon', label: '인천점', itemId: 'ops-j-26' }
+];
+function getOpsPromoTab_(){
+  var t = getOpsManualState_().promoTab;
+  return OPS_PROMO_TABS.some(function(x){ return x.id === t; }) ? t : 'mikadoc';
+}
+function setOpsPromoTab_(tab){
+  var om = getOpsManualState_();
+  om.promoTab = OPS_PROMO_TABS.some(function(x){ return x.id === tab; }) ? tab : 'mikadoc';
+  save({ skipDriveUpload: true, skipGasPush: true });
+  renderMain();
+}
+window.setOpsPromoTab_ = setOpsPromoTab_;
+/** 지점브랜딩 「홍보 현황」 — 미카닥 · 약수점 · 인천점 */
+function renderOpsPromoMainHTML_(){
+  ensureOpsKwChipStyles_();
+  var tab = getOpsPromoTab_();
+  var cur = OPS_PROMO_TABS.filter(function(x){ return x.id === tab; })[0];
+  var scope = ((getOpsMarketingSeed_().promoScopes) || {})[tab] || {};
+  var tabs = '<div role="tablist" class="ops-promo-tabs" style="display:flex;gap:6px;padding:4px;margin:0 0 12px;border-radius:12px;background:rgba(30,58,110,.08)">' +
+    OPS_PROMO_TABS.map(function(x){
+      var on = x.id === tab;
+      return '<button type="button" role="tab" aria-selected="' + (on ? 'true' : 'false') + '" onclick="setOpsPromoTab_(\'' + x.id + '\')" style="flex:1;appearance:none;border:0;border-radius:10px;padding:10px 12px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;' +
+        (on ? 'background:#1e3a6e;color:#fff;box-shadow:0 1px 3px rgba(15,23,42,.18)' : 'background:transparent;color:#1e3a6e') + '">' + x.label + '</button>';
+    }).join('') + '</div>';
+  var intro = '<div class="ops-manual-intro">' +
+    '<div class="ops-manual-title">지점 브랜딩 · 홍보 현황 · ' + escapeHtml(cur.label) + '</div>' +
+    '<p class="ops-manual-desc">' + escapeHtml(scope.desc || '') + ' — 오늘·이번 주 할 일을 정리합니다.</p>' +
+  '</div>';
+  return '<div class="ops-manual-wrap">' + tabs + intro +
+    '<div class="ops-review-panel open ops-promo-status" data-item-id="' + cur.itemId + '">' + renderOpsMarketingPanelHTML_(cur.itemId) + '</div>' +
+  '</div>';
+}
+/** 상단 지점브랜딩 배지: 홍보 현황은 「오늘」 할 일 수 */
+function countOpsPromoTodayTasks_(){
+  var n = 0;
+  OPS_PROMO_TABS.forEach(function(x){
+    try { n += buildOpsMarketingReport_(x.itemId).tips.filter(function(t){ return t.level === 'high'; }).length; } catch(eCnt){}
+  });
+  return n;
 }
 function selectOpsBranch_(branchId){
   selectOpsBranchFromNav_(branchId);
@@ -30976,7 +31387,7 @@ function formatGeneralBlogPostText(b, catId){
     if(i === 0) return true;
     return String(p || '').trim();
   }).join('\n').replace(/\n{3,}/g, '\n\n').trim();
-  return withRealMovementBlogFooter_(body, catId);
+  return withExpertCourseBlogFooter_(withRealMovementBlogFooter_(body, catId), catId);
 }
 function blogHasMinimumContent_(catId, b){
   if(!b || !String(b.title || '').trim()) return false;
@@ -35473,9 +35884,9 @@ function renderSheetContent(content) {
         sheetEditField_('원리 설명', 'sheet-blog-explanation', b.explanation || '', { rows: 6, regen: 'blog.explanation', copy: true, paragraphs: true }) +
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
-        (isRealMovementBlogCategory_(blogCatId) ? realMovementBlogFooterSheetHtml_() : '') +
+        (isBranchBookingBlogCategory_(blogCatId) ? realMovementBlogFooterSheetHtml_(blogCatId) : expertCourseBlogFooterSheetHtml_(blogCatId)) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. <strong>수정된 블로그 최종본</strong>으로 인스타 캡션이 백그라운드에서 만들어져요.' +
-        (isRealMovementBlogCategory_(blogCatId) ? ' 하단 <strong>말미 링크</strong>는 고정으로 붙어요.' : '') + '</p>'
+        ((isBranchBookingBlogCategory_(blogCatId) || isExpertCourseCategory(blogCatId)) ? ' 하단 <strong>말미 링크</strong>는 고정으로 붙어요.' : '') + '</p>'
       );
     } else if(isExpertCourseCategory(blogCatId)){
       bodyHTML = composeSheetTabLayout_(tab,
@@ -36703,8 +37114,8 @@ window.copyWholeTab_ = function(btn){
   if(tab === 'community' && clone.community){
     html = formatCommunityPostHtmlForCopy_(clone.community);
   } else if(tab === 'blog' && clone.blog && blogUsesStructuredGeneralFormat_(catId, clone.blog)){
-    // 리얼무브먼트는 말미 URL이 OG 카드로 바뀌도록 평문만 복사
-    html = isRealMovementBlogCategory_(catId) ? '' : formatGeneralBlogPostHtmlForCopy_(clone.blog, catId);
+    // 리얼무브먼트·리얼페이스는 말미 URL이 OG 카드로 바뀌도록 평문만 복사
+    html = isBranchBookingBlogCategory_(catId) ? '' : formatGeneralBlogPostHtmlForCopy_(clone.blog, catId);
   } else {
     html = '<div style="white-space:pre-wrap;line-height:1.7;font-size:14px;color:#1F2937;font-family:sans-serif;word-break:keep-all;">' +
       escapeHtml(text).replace(/\n/g, '<br/>') + '</div>';
@@ -37134,8 +37545,8 @@ function formatGeneralBlogPostHtmlForCopy_(b, catId){
   if(tags){
     parts.push('<p style="margin:12px 0 0;line-height:1.6;font-size:13px;color:#4B5563;">' + escapeHtml(tags) + '</p>');
   }
-  if(isRealMovementBlogCategory_(catId)){
-    parts.push(realMovementBlogFooterHtml_());
+  if(isBranchBookingBlogCategory_(catId) || getExpertCourseBlogFooterText_(catId)){
+    parts.push(realMovementBlogFooterHtml_(catId));
   }
   return '<div style="font-family:sans-serif;">' + parts.filter(Boolean).join('') + '</div>';
 }

@@ -11,7 +11,9 @@ var OPS_MARKETING_SEED = {
     lowCtr: 0.5,        // % · 노출 1,000 이상인데 이보다 낮으면 문구·키워드 점검
     minImpForCtr: 1000,
     zeroImpShare: 0.5,  // 노출 0 그룹 비율
-    bizmoneyDays: 7     // 비즈머니가 일예산 × 이 일수보다 적으면 충전
+    bizmoneyDays: 7,    // 비즈머니가 일예산 × 이 일수보다 적으면 충전
+    expSearchOffSince: '2026-10-21', // 네이버 확장 검색을 끈 날
+    expSearchMinImp7: 500,           // 끈 뒤 7일이 지났는데 주간 노출이 이보다 적으면 켜기를 제안
   },
   googleStatus: [
     { id: 'canceled', label: '계정 취소됨 (재활성화 필요)' },
@@ -25,6 +27,81 @@ var OPS_MARKETING_SEED = {
     { id: 'none', label: '미진행' },
     { id: 'profile', label: '비즈프로필만 운영' },
     { id: 'running', label: '광고 운영 중' }
+  ],
+  /**
+   * 콘텐츠 채널 목표 (주당 게시 수). 근거 우선순위: 계정 확인(보고서 channels · tools/channel_check.js) → 블로그 RSS → 플래너 발행 기록.
+   * keys = 발행 기록 키, cats = 이 계정에 올라가는 프로그램(카테고리 id). 인스타 계정 매핑은 planner.js INSTAGRAM_* 와 같다.
+   * branch: true 는 지점마다 따로 올리는 소식 → 최근 게시일을 지점별로 적는다.
+   */
+  contentChannels: [
+    { id: 'blog', label: '네이버 블로그', perWeek: 3, keys: ['blog'], use: '블로그' },
+    // 실제 운영: @dr.park_dc.pt가 모든 프로그램 글을 올리고, 프로그램 계정은 공동작업(콜라보)으로 함께 걸린다
+    { id: 'ig_park', label: '인스타 @dr.park_dc.pt', perWeek: 5, keys: ['insta'], cats: [0, 1, 2, 3, 4, 5], use: '인스타' },
+    { id: 'ig_movement', label: '인스타 @re.al_movement_official', perWeek: 2, keys: ['insta'], cats: [1], use: '인스타 (리얼무브먼트 콜라보)' },
+    { id: 'ig_cmt', label: '인스타 @cmt_academy', perWeek: 1, keys: ['insta'], cats: [3], use: '인스타 (CMT 콜라보)' },
+    { id: 'ig_face', label: '인스타 @dr.face_ifc', perWeek: 2, keys: ['insta'], cats: [2, 4], use: '인스타 (IFC·리얼페이스 콜라보)' },
+    { id: 'threads', label: '쓰레드 @dr.park_dc.pt', perWeek: 3, keys: ['threads', 'thread'], use: '쓰레드' },
+    { id: 'place', label: '네이버 플레이스 소식', perWeek: 1, keys: ['newsNaver'], branch: true, use: '소식 (네이버)' },
+    { id: 'karrot', label: '당근 소식', perWeek: 1, keys: ['newsKarrot'], branch: true, use: '소식 (당근)' },
+    { id: 'kakao', label: '카카오 채널 소식', perWeek: 0.5, keys: ['newsKakao'], branch: true, use: '소식 (카카오)' }
+  ],
+  /**
+   * 홍보 현황 탭 — 미카닥 · 약수점 · 인천점
+   * channels: 위 contentChannels id → 이 탭에서 볼 프로그램(cats)·목표(perWeek)·표시 이름 덧붙임(note)만 바꾼다.
+   * blog.rss: true 는 블로그 전체(RSS), 아니면 플래너 발행 기록에서 해당 프로그램 글만 센다.
+   */
+  promoScopes: {
+    mikadoc: { label: '미카닥', desc: '개인 브랜딩 · 전문가 과정(CMT·IFC·Re:Al) · 도수치료', ads: false, cats: [0, 3, 4, 5],
+      channels: {
+        blog: { rss: true, perWeek: 3, note: '전체' },
+        ig_park: { perWeek: 5, note: '전 프로그램' },
+        ig_cmt: { perWeek: 1, note: 'CMT' },
+        ig_face: { perWeek: 2, note: 'IFC·리얼페이스' },
+        threads: { perWeek: 3 }
+      } },
+    yaksu: { label: '약수점', desc: '리얼무브먼트 · 네이버·구글 키워드 광고 · 약수점 소식', ads: true, cats: [1],
+      channels: {
+        blog: { cats: [1], perWeek: 1, note: '리얼무브먼트', rssMatch: '약수|리얼\\s?무브먼트' },
+        ig_movement: { perWeek: 2 },
+        place: {}, karrot: {}, kakao: {}
+      } },
+    jakjeon: { label: '인천점', desc: '리얼무브먼트 · 리얼페이스 · 네이버·구글 키워드 광고 · 인천점 소식', ads: true, cats: [1, 2], face: true,
+      channels: {
+        blog: { cats: [1, 2], perWeek: 2, note: '리얼무브먼트·리얼페이스', rssMatch: '인천|계양|작전|리얼\\s?무브먼트|리얼\\s?페이스|얼굴|안면' },
+        ig_movement: { perWeek: 2 },
+        ig_face: { perWeek: 2, note: 'IFC·리얼페이스' },
+        place: {}, karrot: {}, kakao: {}
+      } }
+  },
+  /** 인천점 리얼페이스 키워드 후보 — 네이버 키워드 도구 월간 검색수 (2026-10-21) · 아직 광고 계정에 없음 */
+  faceKeywordCandidates: [
+    { kw: '부평경락', vol: 2990, note: '지역 · 얼굴 관리 수요' },
+    { kw: '인천경락', vol: 730, note: '지역' },
+    { kw: '인천안면비대칭', vol: 65, note: '지역' },
+    { kw: '부평안면비대칭', vol: 15, note: '지역' },
+    { kw: '얼굴비대칭교정', vol: 6910, note: '전국 · 지역 타게팅 필요' },
+    { kw: '얼굴경락', vol: 5420, note: '전국 · 지역 타게팅 필요' },
+    { kw: '안면비대칭교정', vol: 4440, note: '전국 · 지역 타게팅 필요' },
+    { kw: '턱교정', vol: 1320, note: '전국 · 치과 의도 섞임' },
+    { kw: '인디바', vol: 570, note: '장비명 · 리얼페이스 고유' },
+    { kw: '얼굴교정', vol: 180, note: '전국' }
+  ],
+  /** 미카닥 탭에서 같이 해볼 것 */
+  mikadocExtras: [
+    { title: '프로필 링크 허브 점검', cost: '무료', fit: '필수',
+      why: '인스타·블로그·쓰레드 프로필 링크가 미카닥 프로필(전문가 과정·지점·예약)로 한 번에 이어지는지 확인합니다.' },
+    { title: '전문가 과정 모집 전 후기·사례 글', cost: '무료', fit: '높음',
+      why: '모집 시작 2~3주 전부터 수강 후기·현장 사진·연구모임 소식을 블로그와 @cmt_academy·@dr.face_ifc에 올려 신청 직전 신뢰를 쌓습니다.' },
+    { title: '시연 릴스 → 유튜브 쇼츠 재활용', cost: '무료', fit: '중간',
+      why: '이미 만든 시연 영상을 그대로 쇼츠에 올리면 검색 노출 채널이 하나 늘어납니다.' },
+    { title: '치료사 커뮤니티·협회 채널 공지', cost: '무료', fit: '중간',
+      why: '물리치료·도수 치료사 모임, 학회 공지에 과정 일정을 올려 전문가 대상 유입을 늘립니다.' }
+  ],
+  /** 프로그램 균형 점검: 이 기간 동안 어느 채널에도 안 나간 프로그램을 알린다 */
+  programGapDays: 14,
+  programCats: [
+    { id: 0, label: '도수치료' }, { id: 1, label: '리얼 무브먼트' }, { id: 2, label: '리얼 페이스' },
+    { id: 3, label: 'CMT' }, { id: 4, label: 'IFC' }, { id: 5, label: 'Re:Al' }
   ],
   /** 세 광고 외에 해볼 만한 것 — 비용 낮은 순 */
   extraChannels: [

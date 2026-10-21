@@ -404,6 +404,8 @@ var PlannerSyncSupabase = (function(){
 
   return {
     configured: configured,
+    /** 팀 로그인된 Supabase 클라이언트 (인스타·쓰레드 미디어 업로드·게시 요청용) */
+    client: sessionClient,
     cachedEmail: function(){ return cachedEmail; },
     handle: handle,
     signIn: signIn,

@@ -187,7 +187,7 @@ const OPS_BRANCH_LABELS = {
   new: '신규'
 };
 const OPS_BRANCH_HINTS = {
-  promo: '미카닥·약수점·인천점의 광고와 콘텐츠를 함께 보고 오늘·이번 주 할 일을 정리합니다.',
+  promo: '브랜딩(SNS·소식·채널 프로필)과 약수점·인천점 키워드 광고를 보고 오늘·이번 주 할 일을 정리합니다.',
   yaksu: '새 지점 오픈 시 1→9 순서로 채널을 셋팅하세요. 각 항목 오른쪽 「자세히」에서 등록 가이드·기본값을 확인합니다.',
   jakjeon: '새 지점 오픈 시 1→9 순서로 채널을 셋팅하세요. 각 항목 오른쪽 「자세히」에서 등록 가이드·기본값을 확인합니다.',
   new: '신규 지점 — 브랜드 기준(포지셔닝·면책·허브·링크)을 먼저 맞추고, 약수·인천과 같은 스마트플레이스 순서로 셋팅한 뒤 지점 오픈 채널을 이어 갑니다.'
@@ -1438,15 +1438,9 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
   if(byId === 'ops-y-23' || byId === 'ops-j-23'){
     var pk23 = opsPlaceBranchKey_(byId);
     return [
-      { id:'kw-creative', title:'소재 만들기',
-        brief: opsPurposeIntent_('파워링크 「소재 만들기」에 넣을 유형·URL·제목·설명을 확정합니다.', '반응형 권장 · 의료 업종 제한 시 단일형.'),
-        text: opsProposalWithReason_(buildOpsNaverKwCreativeGuideText_(pk23), '치료·완치 표현 없이 운동·웰니스·예약 톤을 유지하세요.') },
-      { id:'kw-extension', title:'확장소재 만들기',
-        brief: opsPurposeIntent_('캠페인 「확장 소재」에 전화·위치·추가링크를 등록합니다.', '소재와 함께 파트 2로 진행하세요.'),
-        text: opsProposalWithReason_(buildOpsNaverKwExtensionGuideText_(pk23), '키워드 등록(파트 1) 이후·병행 모두 가능합니다.') },
       { id:'kw-tips', title:'보완하면 좋은 점',
-        brief: opsPurposeIntent_('등록 실수·한도·채널 검토를 줄이는 운영 팁입니다.', '체크리스트로 쓰고 완료 표시하세요.'),
-        text: opsProposalWithReason_(buildOpsNaverKwImproveTipsText_(), '비즈채널 승인·그룹명 순서·소재/확장소재 순서가 중요합니다.') }
+        brief: opsPurposeIntent_('키워드·소재 운영 팁입니다.', '체크리스트로 쓰고 완료 표시하세요.'),
+        text: opsProposalWithReason_(buildOpsNaverKwImproveTipsText_(), '노출·클릭은 「홍보 현황」 보고서에서 보고 입찰가·키워드를 고칩니다.') }
     ];
   }
   if(byId === 'ops-y-17' || byId === 'ops-j-17'){
@@ -2944,12 +2938,12 @@ function buildOpsGuideForItem_(item, branchId){
   }
   if(byId === 'ops-y-23' || byId === 'ops-j-23'){
     var kwGuide = [
-      '무엇을 하나요: 파워링크 키워드 대량등록(파트 1)과 소재·확장소재(파트 2)를 세팅합니다.',
-      '파트 1 · 키워드:',
-      '1) 새 캠페인 → 2) 광고그룹(일반·동네) → 3) ID 다운로드 → 4) 플래너 입력 → 5) CSV 다운로드 → 6) 대량관리 업로드',
-      '파트 2 · 소재·확장소재:',
-      '1) 소재 만들기(반응형·제목/설명 기본값) → 2) 확장 소재(전화·위치·링크)',
-      '제안: 비즈채널 승인 후 진행하고, 의료 업종 제한 시 소재는 단일형으로 전환하세요.'
+      '무엇을 하나요: 네이버 검색광고 API로 파워링크 키워드·소재·확장소재를 계정에 바로 반영합니다.',
+      '1) 작업하는 컴퓨터에서 「광고연결켜기.bat」 실행',
+      '2) 일반 키워드 · 동네(= 광고그룹) · 동네 조합 키워드 확인 → 「키워드 적용하기」',
+      '3) 소재 제목·설명·연결 URL 확인 → 「소재 적용하기」',
+      '4) 확장소재(전화·플레이스·서브링크) 확인 → 「확장소재 적용하기」',
+      '매번 바뀔 내용을 먼저 보여 주고, 「이대로 적용」을 눌러야 계정이 바뀝니다. 뺀 항목은 끄기만 하고 삭제하지 않습니다.'
     ].join('\n');
     return { short: kwGuide, full: kwGuide, long: true };
   }
@@ -3181,11 +3175,11 @@ function buildOpsReviewDraft_(item, branchId){
     proposals = '제안 문장\n- 운영: ' + OPS_BRAND_COPY.hoursNote + '\n- 예약: ' + OPS_BRAND_COPY.cta;
     placement = '반영 위치 가이드\n- 스마트플레이스 부가정보·가격·휴무일·영업시간\n- 네이버 예약 상품·톡톡·스마트콜';
   } else if(byId === 'ops-y-23' || byId === 'ops-j-23'){
-    purpose = '네이버 파워링크에 일반·동네 키워드를 대량등록하고 확장소재를 세팅합니다.';
+    purpose = '네이버 파워링크 키워드·소재·확장소재를 API로 계정에 반영합니다.';
     intent = '지역×증상 검색 유입을 키워드·확장소재로 상담·예약에 연결합니다.';
-    todo = '해야 할 일\n【파트 1 키워드】\n1) 캠페인·광고그룹(일반 포함)\n2) ID 확보·플래너 입력\n3) CSV 다운로드·대량등록\n【파트 2 소재】\n4) 소재 만들기(제목·설명)\n5) 확장소재(전화·위치·링크)';
-    proposals = '제안 문장\n- 「소재 만들기」「확장소재 만들기」「보완하면 좋은 점」 참고';
-    placement = '반영 위치 가이드\n- 파워링크 캠페인·광고그룹·소재\n- 도구 → 대량 관리 (키워드)\n- 캠페인 확장 소재\n- 플래너 키워드·소재 기본값';
+    todo = '해야 할 일\n1) 「광고연결켜기.bat」 실행\n2) 키워드·동네 확인 → 키워드 적용하기\n3) 소재 확인 → 소재 적용하기\n4) 확장소재 확인 → 확장소재 적용하기';
+    proposals = '제안 문장\n- 「보완하면 좋은 점」 참고';
+    placement = '반영 위치 가이드\n- 파워링크 캠페인·광고그룹·키워드·소재 (API로 바로 반영)\n- 캠페인 확장 소재\n- 플래너 키워드·소재 기본값';
   } else if(byId === 'ops-y-17' || byId === 'ops-j-17'){
     var gbpKey = opsPlaceBranchKey_(byId);
     purpose = 'Google Business Profile 지점 정보를 최신화해 지도/검색 전환을 높입니다.';
@@ -24197,6 +24191,7 @@ window.onload = () => {
         try { updateSyncStatusUI_(); } catch(e3){}
         bindPlannerMainClickDelegation_();
         bindPlannerConflictButtons_();
+        try { openOpsPromoOnBoot_(); } catch(eOpen){}
         try { renderTabs(); } catch(e4){}
         try { updateAddButtonVisibility_(); } catch(e5){}
         try { renderMain(); } catch(e6){}
@@ -24218,6 +24213,7 @@ window.onload = () => {
   setTimeout(function(){
     try {
       if(!state._bootFirstPaintDone){
+        try { openOpsPromoOnBoot_(); } catch(eOpen){}
         try { renderTabs(); } catch(eTabs){}
         try { updateAddButtonVisibility_(); } catch(eAdd){}
         try { renderMain(); } catch(eMain){}
@@ -25454,15 +25450,25 @@ function buildOpsGoogleAdsPlan_(itemId){
     return { name: g.name, path2: path2, keywords: kws,
       headlines: gh.length >= 3 ? gh : null, descriptions: gd.length >= 2 ? gd : null };
   });
+  // 플래너에서 고친 값 (그룹별 키워드·제목·설명, 연결 URL, 제외 키워드)
+  var edits = (st.groupEdits && typeof st.groupEdits === 'object') ? st.groupEdits : {};
+  keywordCount = 0;
+  groups.forEach(function(g){
+    var e = edits[g.name] || {};
+    if(Array.isArray(e.keywords)) g.keywords = e.keywords.slice();
+    g.headlines = Array.isArray(e.headlines) ? e.headlines.slice(0, 15) : (g.headlines || headlines.slice(0, 15));
+    g.descriptions = Array.isArray(e.descriptions) ? e.descriptions.slice(0, 4) : (g.descriptions || descriptions.slice(0, 4));
+    keywordCount += g.keywords.length;
+  });
   return {
     branchKey: branchKey,
     campaign: (opsStoreName_(branchKey) || vars.store) + ' 검색',
     dailyBudget: normalizeOpsGoogleAdsWon_(st.dailyBudget, def.dailyBudget || 5000, 1000),
     maxCpc: normalizeOpsGoogleAdsWon_(st.maxCpc, def.maxCpc || 70, 1),
-    finalUrl: normalizeOpsNaverKwUrl_(creative.finalUrlPc),
+    finalUrl: normalizeOpsNaverKwUrl_(st.finalUrl || creative.finalUrlPc),
     path1: googleAdsTextWidth_(vars.areaSt) <= 15 ? vars.areaSt : '',
     locations: (br.locations || []).slice(),
-    negatives: (seed.negatives || []).slice(),
+    negatives: Array.isArray(st.negatives) ? st.negatives.slice() : (seed.negatives || []).slice(),
     groups: groups,
     headlines: headlines.slice(0, 15),
     descriptions: descriptions.slice(0, 4),
@@ -25538,13 +25544,15 @@ function setOpsGoogleAdsMeta_(itemId, field, value){
     st.maxCpc = normalizeOpsGoogleAdsWon_(value, def.maxCpc || 70, 1);
     st.maxCpcEdited = st.maxCpc !== (def.maxCpc || 70);
   }
+  else if(field === 'finalUrl') st.finalUrl = normalizeOpsNaverKwUrl_(value);
+  else if(field === 'negatives') st.negatives = parseOpsNaverKwLines_(value);
   else return;
   getOpsManualState_().updatedAt = new Date().toISOString();
   save({ skipDriveUpload: true, skipGasPush: true });
   var panel = document.querySelector('[data-ops-gads="' + itemId + '"]');
   if(!panel) return;
   var el = panel.querySelector('[data-ops-gads-meta="' + field + '"]');
-  if(el) el.value = String(st[field]);
+  if(el && (field === 'dailyBudget' || field === 'maxCpc' || field === 'finalUrl')) el.value = String(st[field]);
   var plan = buildOpsGoogleAdsPlan_(itemId);
   var hint = panel.querySelector('[data-ops-gads-hint]');
   if(hint && plan) hint.textContent = buildOpsGoogleAdsBudgetHint_(plan);
@@ -25598,37 +25606,62 @@ function importOpsMarketingReport_(itemId, input){
   reader.onload = function(){
     var data = null;
     try { data = JSON.parse(String(reader.result || '').replace(/^\ufeff/, '')); } catch(eParse){}
-    if(!data || data.kind !== 'realmovement-marketing-status' || !data.naver){
+    if(!applyOpsMarketingReportData_(data)){
       if(typeof setAppToast === 'function') setAppToast('마케팅 현황 파일이 아닙니다.\ntools/marketing_report.py가 만든 marketing_status_날짜.json을 선택해 주세요.', { duration: 6000, variant: 'err' });
       return;
     }
-    OPS_MARKETING_ITEM_IDS.forEach(function(id){
-      var st = getOpsMarketingState_(id);
-      var bk = opsPlaceBranchKey_(id);
-      st.report = {
-        generatedAt: data.generatedAt || '',
-        period7: data.period7 || null,
-        bizmoney: data.naver.bizmoney || 0,
-        budgetLock: !!data.naver.budgetLock,
-        naver: (data.naver.branches || {})[bk] || null,
-        google: data.google ? {
-          generatedAt: data.google.generatedAt || '',
-          branch: (data.google.branches || {})[bk] || null,
-          other: data.google.otherCampaigns || []
-        } : null,
-        blog: (data.blog && Array.isArray(data.blog.posts)) ? { posts: data.blog.posts.slice(0, 40) } : null,
-        channels: (data.channels && data.channels.items) ? data.channels : null
-      };
-    });
-    getOpsManualState_().updatedAt = new Date().toISOString();
-    save({ skipDriveUpload: true, skipGasPush: true });
     refreshOpsMarketingPanel_(itemId);
-    if(typeof setAppToast === 'function') setAppToast('보고서를 불러왔습니다 (미카닥·약수·인천 모두)', { duration: 4000, variant: 'ok' });
+    if(typeof setAppToast === 'function') setAppToast('보고서를 불러왔습니다 (브랜딩·약수·인천 모두)', { duration: 4000, variant: 'ok' });
   };
   reader.readAsText(file, 'utf-8');
   input.value = '';
 }
 window.importOpsMarketingReport_ = importOpsMarketingReport_;
+/** 보고서(marketing_report.py 결과)를 브랜딩·약수·인천 상태에 넣는다 → 동기화로 다른 기기에도 보인다 */
+function applyOpsMarketingReportData_(data){
+  if(!data || data.kind !== 'realmovement-marketing-status' || !data.naver) return false;
+  OPS_MARKETING_ITEM_IDS.forEach(function(id){
+    var st = getOpsMarketingState_(id);
+    var bk = opsPlaceBranchKey_(id);
+    st.report = {
+      generatedAt: data.generatedAt || '',
+      period7: data.period7 || null,
+      bizmoney: data.naver.bizmoney || 0,
+      budgetLock: !!data.naver.budgetLock,
+      naver: (data.naver.branches || {})[bk] || null,
+      google: data.google ? {
+        generatedAt: data.google.generatedAt || '',
+        branch: (data.google.branches || {})[bk] || null,
+        other: data.google.otherCampaigns || []
+      } : null,
+      blog: (data.blog && Array.isArray(data.blog.posts)) ? { posts: data.blog.posts.slice(0, 40) } : null,
+      channels: (data.channels && data.channels.items) ? data.channels : null
+    };
+  });
+  getOpsManualState_().updatedAt = new Date().toISOString();
+  save({ skipDriveUpload: true, skipGasPush: true });
+  return true;
+}
+function isOpsMobileDevice_(){
+  var ua = (navigator && navigator.userAgent) || '';
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1);
+}
+var OPS_ADS_DESKTOP_ONLY_MSG = '핸드폰에서는 실행할 수 없어요.\n네이버 박스가 연결된 데스크탑에서 실행하세요.\n(데스크탑에서 코딩 폴더의 「광고연결켜기.bat」을 켠 뒤 플래너에서 같은 버튼을 누르면 됩니다)';
+/** 「마케팅 현황 업데이트」와 같은 분석을 데스크탑 연결로 실행하고, 결과를 바로 홍보 현황에 넣는다 */
+function runOpsMarketingAnalyze_(itemId){
+  openOpsAdsApplyDialog_('홍보 현황 분석', '/analyze', {}, {
+    runOnly: true,
+    busyText: '분석하는 중입니다… 네이버·구글 광고, 블로그, 플레이스·카카오·당근 소식을 확인합니다 (1~2분)',
+    onResult: function(res){
+      if(!res || !res.report) return;
+      applyOpsMarketingReportData_(res.report);
+      refreshOpsMarketingPanel_(itemId);
+      try { renderTabs(); } catch(eTabs){}
+      if(typeof setAppToast === 'function') setAppToast('분석 결과를 홍보 현황에 반영했습니다 (브랜딩·약수·인천)', { duration: 4000, variant: 'ok' });
+    }
+  });
+}
+window.runOpsMarketingAnalyze_ = runOpsMarketingAnalyze_;
 function setOpsMarketingManual_(itemId, channel, field, value){
   var st = getOpsMarketingState_(itemId);
   if(!st.manual[channel] || typeof st.manual[channel] !== 'object') st.manual[channel] = {};
@@ -25698,16 +25731,23 @@ function opsMktScopedChannels_(scope){
   var base = getOpsMarketingSeed_().contentChannels || [];
   var conf = scope && scope.channels;
   if(!conf) return base;
-  return base.filter(function(ch){ return !!conf[ch.id]; }).map(function(ch){
+  var out = [];
+  base.filter(function(ch){ return !!conf[ch.id]; }).forEach(function(ch){
     var o = conf[ch.id] || {};
-    return Object.assign({}, ch, {
+    var one = Object.assign({}, ch, {
       cats: o.cats || ch.cats,
       perWeek: o.perWeek != null ? o.perWeek : ch.perWeek,
       label: ch.label + (o.note ? ' · ' + o.note : ''),
       rss: ch.id === 'blog' ? !!o.rss : false,
       rssMatch: ch.id === 'blog' ? (o.rssMatch || '') : ''
     });
+    if(ch.branch && Array.isArray(o.branches) && o.branches.length){
+      o.branches.forEach(function(b){
+        out.push(Object.assign({}, one, { branchKey: b, label: one.label + ' · ' + (opsBranchShortLabel_(b) || b) + '점' }));
+      });
+    } else out.push(one);
   });
+  return out;
 }
 function buildOpsContentStatus_(branchKey, rep, tip, scope){
   var seed = getOpsMarketingSeed_();
@@ -25723,12 +25763,14 @@ function buildOpsContentStatus_(branchKey, rep, tip, scope){
   opsMktScopedChannels_(scope).forEach(function(ch){
     var events = [];
     var source = [];
-    var obs = obsItems[ch.branch ? ch.id + '_' + branchKey : ch.id];
+    var chBranch = ch.branchKey || branchKey;
+    var obs = obsItems[ch.branch ? ch.id + '_' + chBranch : ch.id];
     var ownLast = 0;
-    if(obs && Array.isArray(obs.posts) && obs.posts.length){
+    if(ch.source !== 'planner' && obs && Array.isArray(obs.posts) && obs.posts.length){
       obs.posts.forEach(function(p){ var ms = Date.parse(p); if(!isNaN(ms)) events.push(ms); });
       ownLast = obs.ownLast ? Date.parse(obs.ownLast) : 0;
-      source.push('계정 확인' + (obsDate ? ' ' + obsDate : ''));
+      var obsAt = obs.checkedAt ? String(obs.checkedAt).slice(5, 10).replace('-', '/') : obsDate;
+      source.push('계정 확인' + (obsAt ? ' ' + obsAt : ''));
       if(obs.channelName && ch.id === 'kakao' && !/리얼\s*무브먼트/.test(obs.channelName)){
         tip('low', ch.label, '약수점으로 연결된 카카오 채널 이름이 「' + obs.channelName + '」입니다. 리얼무브먼트 약수점 채널이 맞는지 확인하세요.');
       }
@@ -25740,13 +25782,13 @@ function buildOpsContentStatus_(branchKey, rep, tip, scope){
         if(!isNaN(ms)) events.push(ms);
       });
       source.push(rssRe ? '블로그 RSS (제목·카테고리)' : '블로그 RSS');
-    } else if(!ch.branch || branchKey === 'yaksu'){
+    } else if(!ch.branch || chBranch === 'yaksu'){
       log.forEach(function(e){
         if(ch.keys.indexOf(e.key) < 0) return;
         if(ch.cats && ch.cats.indexOf(e.catId) < 0) return;
         events.push(e.at);
       });
-      source.push('플래너 발행');
+      source.push('플래너 발행완료');
     }
     var last = events.length ? Math.max.apply(null, events) : 0;
     var n7 = events.filter(function(ms){ return now - ms < 7 * DAY; }).length;
@@ -25831,7 +25873,7 @@ function buildOpsMarketingReport_(itemId){
     if(ageDays >= 7) tip('mid', '네이버', '보고서가 ' + ageDays + '일 전 것입니다. 새로 불러오세요.');
     if(!camp.on) tip('high', '네이버', '캠페인 「' + camp.name + '」이 꺼져 있습니다.');
     if((nv.adGroupsNoAd || []).length){
-      tip('high', '네이버', '소재가 없는 광고그룹 ' + nv.adGroupsNoAd.length + '개 (' + nv.adGroupsNoAd.slice(0, 5).join(', ') + (nv.adGroupsNoAd.length > 5 ? ' …' : '') + '). 소재가 없으면 키워드가 있어도 노출되지 않습니다. 「네이버 키워드 등록」에서 반응형 소재 CSV를 올리세요.');
+      tip('high', '네이버', '소재가 없는 광고그룹 ' + nv.adGroupsNoAd.length + '개 (' + nv.adGroupsNoAd.slice(0, 5).join(', ') + (nv.adGroupsNoAd.length > 5 ? ' …' : '') + '). 소재가 없으면 키워드가 있어도 노출되지 않습니다. 「네이버 키워드 등록」의 「소재 적용하기」를 누르세요.');
     }
     if((nv.refused || []).length) tip('high', '네이버', '반려된 소재 ' + nv.refused.length + '개: ' + nv.refused.slice(0, 3).map(function(r){ return r.group + (r.reason ? ' (' + r.reason + ')' : ''); }).join(', '));
     var avgDaily = (s7.cost || 0) / 7;
@@ -25896,7 +25938,7 @@ function buildOpsMarketingReport_(itemId){
   rows.push(row('구글 애즈', gStatusLabel, gImp, gClk, gCost, opsMktNum_(g.leads), !!gHas));
   if(gAuto && !gb){
     var others = (rep.google.other || []).map(function(c){ return c.name + ' (' + c.status + ')'; });
-    tip('high', '구글', '구글 애즈에 이 지점 검색 캠페인이 아직 없습니다' + (others.length ? ' (지금 있는 캠페인: ' + others.join(', ') + ')' : '') + '. 「구글 애즈 검색광고」 항목의 CSV를 Editor로 가져와 게시하세요.');
+    tip('high', '구글', '구글 애즈에 이 지점 검색 캠페인이 아직 없습니다' + (others.length ? ' (지금 있는 캠페인: ' + others.join(', ') + ')' : '') + '. 「구글 애즈 검색광고」 항목의 「구글에 적용하기」로 만드세요.');
   }
   if(gb && gb.adsByStatus && gb.adsByStatus.DISAPPROVED) tip('high', '구글', '반려된 광고 ' + gb.adsByStatus.DISAPPROVED + '개. 구글 애즈 「광고」에서 반려 사유를 확인하고 문구를 고치세요.');
   if(gb && (gb.bids || []).length){
@@ -25905,8 +25947,8 @@ function buildOpsMarketingReport_(itemId){
   }
   if(gAuto){
     // 시트 기준 상태는 위·아래에서 따로 진단
-  } else if(gStatus === 'canceled') tip('high', '구글', '계정이 취소된 상태라 광고가 나가지 않습니다. 구글 애즈 상단 「재활성화」 → 「구글 애즈 검색광고」 항목에서 CSV를 받아 Editor로 올리세요.');
-  else if(gStatus === 'none') tip('high', '구글', '캠페인이 없습니다. 「구글 애즈 검색광고」 항목의 CSV로 캠페인·키워드·광고를 한 번에 만드세요.');
+  } else if(gStatus === 'canceled') tip('high', '구글', '계정이 취소된 상태라 광고가 나가지 않습니다. 구글 애즈 상단 「재활성화」 → 「구글 애즈 검색광고」 항목의 「구글에 적용하기」를 누르세요.');
+  else if(gStatus === 'none') tip('high', '구글', '캠페인이 없습니다. 「구글 애즈 검색광고」 항목의 「구글에 적용하기」로 캠페인·키워드·광고를 한 번에 만드세요.');
   else if(gStatus === 'paused') tip('mid', '구글', '캠페인이 일시중지 상태입니다. 위치 옵션을 「타겟 지역에 있거나 정기적으로 방문하는 사용자」로 바꾸고, 광고가 승인되면 「사용」으로 켜세요.');
   else if(gStatus === 'review') tip('low', '구글', '광고 검토는 보통 1영업일 안에 끝납니다. 반려되면 사유를 확인하세요.');
   if(gAuto && gb && gStatus === 'paused') tip('mid', '구글', '검색 캠페인 「' + gb.campaign.name + '」이 일시중지 상태입니다. 위치 옵션을 「타겟 지역에 있거나 정기적으로 방문하는 사용자」로 바꾸고, 광고가 승인되면 「사용」으로 켜세요.');
@@ -25918,27 +25960,18 @@ function buildOpsMarketingReport_(itemId){
       if(gClk && gCost / gClk > 1500) tip('mid', '구글', '클릭당 평균 ' + opsMktWon_(gCost / gClk) + '. 하루 예산이 작으면 몇 번 클릭에 예산이 끝납니다. 비싼 키워드는 끄고 지역어 키워드에 집중하세요.');
     }
   }
-  // 당근
-  var kList = seed.karrotStatus || [];
-  var kHas = kStatus === 'running' && (opsMktNum_(k.imp) || opsMktNum_(k.clk) || opsMktNum_(k.cost));
-  rows.push(row('당근 광고', opsMktStatusLabel_(kList, kStatus), opsMktNum_(k.imp), opsMktNum_(k.clk), opsMktNum_(k.cost), opsMktNum_(k.leads), !!kHas));
-  if(kStatus === 'unknown') tip('mid', '당근', '당근 비즈니스에 비즈프로필·광고가 있는지 확인하고 위에서 상태를 골라 주세요.');
-  else if(kStatus === 'none') tip('mid', '당근', '비즈프로필부터 만들고 소식을 주 1회 올리세요. 그다음 지역광고를 하루 5,000원으로 지점 주변 동네 2~3곳에 테스트합니다.');
-  else if(kStatus === 'profile') tip('low', '당근', '소식을 꾸준히 올려 단골을 모으고, 지역광고를 소액으로 테스트해 보세요.');
-  else if(kStatus === 'running'){
-    if(!kHas) tip('low', '당근', '최근 7일 노출·클릭·비용·채팅 문의를 입력하면 진단이 붙습니다.');
-    else if(opsMktNum_(k.clk) && !opsMktNum_(k.leads)) tip('mid', '당근', '클릭은 있는데 문의가 0입니다. 광고 소재에 가격대·예약 방법·위치를 분명히 넣고, 비즈프로필 후기를 늘리세요.');
+  // 당근 광고는 진행 중일 때만 (scope.karrotAds). 당근 프로필은 브랜딩 탭 채널 검토에서 본다
+  if(scope.karrotAds){
+    var kList = seed.karrotStatus || [];
+    var kHas = kStatus === 'running' && (opsMktNum_(k.imp) || opsMktNum_(k.clk) || opsMktNum_(k.cost));
+    rows.push(row('당근 광고', opsMktStatusLabel_(kList, kStatus), opsMktNum_(k.imp), opsMktNum_(k.clk), opsMktNum_(k.cost), opsMktNum_(k.leads), !!kHas));
+    if(kStatus === 'running' && kHas && opsMktNum_(k.clk) && !opsMktNum_(k.leads)) tip('mid', '당근', '클릭은 있는데 문의가 0입니다. 광고 소재에 가격대·예약 방법·위치를 분명히 넣고, 비즈프로필 후기를 늘리세요.');
   }
   muteAds = false;
   if(!adsOn) rows = [];
   var faceCandidates = scope.face ? (seed.faceKeywordCandidates || []) : [];
-  if(faceCandidates.length){
-    var local = faceCandidates.filter(function(f){ return /지역/.test(f.note || ''); });
-    tip('mid', '리얼페이스', '인천점 리얼페이스 키워드: 지역 수요는 ' + local.map(function(f){ return f.kw + ' ' + f.vol.toLocaleString(); }).join(' · ') +
-      '이고, 「동네+얼굴교정」 조합은 월 10회 미만입니다. 리얼페이스 전용 광고그룹을 따로 만들어 이 키워드와 리얼페이스 소재를 넣고, 전국 키워드는 지역 타게팅(계양·부평)을 걸어 쓰세요.');
-  }
   // 블로그·인스타·쓰레드·소식
-  var contentRows = buildOpsContentStatus_(branchKey, rep, tip, scope);
+  var contentRows = adsOn ? [] : buildOpsContentStatus_(branchKey, rep, tip, scope);
   // 전체
   var tot = rows.reduce(function(a, r){ a.imp += r.imp; a.clk += r.clk; a.cost += r.cost; a.leads += r.leads; return a; }, { imp: 0, clk: 0, cost: 0, leads: 0 });
   var leadsAll = tot.leads + opsMktNum_(etc.leads);
@@ -25950,33 +25983,142 @@ function buildOpsMarketingReport_(itemId){
   var extras = ((adsOn ? seed.extraChannels : seed.mikadocExtras) || []).map(function(x){
     return { title: x.title, cost: x.cost, fit: x.fit, why: String(x.why || '').replace(/\{\{areaSt\}\}/g, vars.areaSt).replace(/\{\{area\}\}/g, vars.area) };
   });
-  return { branchKey: branchKey, store: adsOn ? (opsStoreName_(branchKey) || vars.store) : (scope.label || '미카닥'), adsOn: adsOn, faceCandidates: faceCandidates,
+  return { branchKey: branchKey, store: adsOn ? (opsStoreName_(branchKey) || vars.store) : (scope.label || '브랜딩'), adsOn: adsOn, faceCandidates: faceCandidates,
     report: rep, naver: adsOn ? nv : null, rows: rows, total: tot, etcLeads: opsMktNum_(etc.leads),
     tips: tips, extras: extras, medical: medical, goodKw: goodKw, gStatus: gStatus, kStatus: kStatus, google: adsOn ? gb : null, googleAuto: adsOn && gAuto, contentRows: contentRows,
     manual: { google: g, karrot: k, naver: nvManual, etc: etc } };
 }
 var OPS_MKT_LEVEL_LABEL = { high: '오늘', mid: '이번 주', low: '참고', good: '잘 되는 점' };
 var OPS_MKT_LEVEL_COLOR = { high: '#B91C1C', mid: '#B45309', low: '#475569', good: '#0F766E' };
+/** 커서에 붙여 넣는 보고서 (마크다운) — 할 일은 T1·T2…, 채널 검토는 PL-01 같은 고정 ID */
 function buildOpsMarketingReportText_(itemId){
   var r = buildOpsMarketingReport_(itemId);
   var p = r.report && r.report.period7;
-  var lines = ['【' + r.store + ' 마케팅 현황】' + (p ? ' ' + p.since + ' ~ ' + p.until : ''), ''];
-  r.rows.forEach(function(x){
-    lines.push('■ ' + x.channel + ' · ' + x.status);
-    if(x.hasData) lines.push('  노출 ' + x.imp.toLocaleString() + ' · 클릭 ' + x.clk.toLocaleString() + ' · 클릭률 ' + x.ctr.toFixed(2) + '% · 비용 ' + opsMktWon_(x.cost) + (x.clk ? ' · 클릭당 ' + opsMktWon_(x.cpc) : '') + (x.leads ? ' · 문의 ' + x.leads + '건 (건당 ' + opsMktWon_(x.cpl) + ')' : ''));
-  });
-  lines.push('');
-  lines.push('■ 콘텐츠 채널 (최근 7일 / 30일 · 목표 주당)');
-  (r.contentRows || []).forEach(function(c){
-    lines.push('  ' + c.label + ': ' + c.n7 + ' / ' + c.n30 + ' · 목표 ' + c.perWeek + ' · ' + (c.last ? (c.days === 0 ? '오늘' : c.days + '일 전') + ' 게시' : '기록 없음'));
-  });
-  lines.push('');
-  lines.push('■ 할 일');
-  r.tips.forEach(function(t){ lines.push('· [' + OPS_MKT_LEVEL_LABEL[t.level] + '] ' + t.channel + ': ' + t.text); });
-  lines.push('');
-  lines.push('■ 같이 하면 좋은 것');
-  r.extras.forEach(function(x){ lines.push('· ' + x.title + ' (' + x.cost + ') — ' + x.why); });
+  var md = function(s){ return String(s == null ? '' : s).replace(/\|/g, '/').replace(/\n+/g, ' '); };
+  var lines = ['# ' + r.store + ' 홍보 현황' + (p ? ' (' + p.since + ' ~ ' + p.until + ')' : ''),
+    '> 플래너 「홍보 현황」에서 복사 · ' + new Date().toLocaleDateString('ko-KR') + ' · 커서에 「T2 개선해줘」「채널 검토 PL-01 반영해줘」처럼 번호로 요청하세요.', ''];
+  if(r.adsOn){
+    lines.push('## 광고 (최근 7일)', '| 채널 | 상태 | 노출 | 클릭 | 클릭률 | 비용 | 문의 |', '|---|---|---:|---:|---:|---:|---:|');
+    r.rows.forEach(function(x){
+      lines.push('| ' + md(x.channel) + ' | ' + md(x.status) + ' | ' + (x.hasData ? x.imp.toLocaleString() + ' | ' + x.clk.toLocaleString() + ' | ' + x.ctr.toFixed(2) + '% | ' + opsMktWon_(x.cost) + ' | ' + (x.leads || '-') : '- | - | - | - | -') + ' |');
+    });
+    var nv = r.naver;
+    if(nv) lines.push('', '- 네이버 캠페인 「' + nv.campaign.name + '」 · 광고그룹 ' + nv.adGroups + '개 (7일 노출 0: ' + nv.adGroupsZeroImp + ') · 30일 노출 ' + (nv.stats30.imp || 0).toLocaleString() + ' · 클릭 ' + (nv.stats30.clk || 0) + ' · 비용 ' + opsMktWon_(nv.stats30.cost));
+    if(nv && (nv.topKeywords || []).length){
+      lines.push('', '### 네이버 노출 상위 키워드', '| 키워드 | 그룹 | 노출 | 클릭 | 평균순위 | 입찰가 |', '|---|---|---:|---:|---:|---:|');
+      nv.topKeywords.slice(0, 12).forEach(function(k){ lines.push('| ' + md(k.kw) + ' | ' + md(k.group) + ' | ' + k.imp + ' | ' + k.clk + ' | ' + k.avgRnk + ' | ' + (k.useGroupBid ? '그룹' : k.bid) + ' |'); });
+    }
+    var est = ((nv && nv.bidEstimates) || []).filter(function(e){ return e.core; });
+    if(est.length){
+      lines.push('', '### 네이버 입찰가 제안 (지역 핵심)', '| 키워드 | 현재 | 모바일 1위 | 모바일 3위 | 모바일 5위 |', '|---|---:|---:|---:|---:|');
+      est.forEach(function(e){ lines.push('| ' + md(e.kw) + ' | ' + (e.bid || '미등록') + ' | ' + (e.m1 || '-') + ' | ' + (e.m3 || '-') + ' | ' + (e.m5 || '-') + ' |'); });
+    }
+    if(r.google && (r.google.bids || []).length){
+      lines.push('', '### 구글 입찰가 (첫 페이지 예상)', '| 키워드 | 현재 | 첫 페이지 | 상단 |', '|---|---:|---:|---:|');
+      r.google.bids.slice(0, 25).forEach(function(b){ lines.push('| ' + md(b.kw) + ' | ' + b.bid + ' | ' + (b.firstPage || '-') + ' | ' + (b.topPage || '-') + ' |'); });
+    }
+  } else {
+    lines.push('## 콘텐츠 · SNS · 소식', '| 채널 | 최근 게시 | 7일 | 30일 | 목표(주) | 근거 |', '|---|---|---:|---:|---:|---|');
+    (r.contentRows || []).forEach(function(c){
+      lines.push('| ' + md(c.label) + ' | ' + (c.last ? (c.days === 0 ? '오늘' : c.days + '일 전') : '기록 없음') + ' | ' + c.n7 + ' | ' + c.n30 + ' | ' + c.perWeek + ' | ' + md(c.source) + ' |');
+    });
+  }
+  lines.push('', '## ' + (r.adsOn ? '할 일' : '제안'));
+  r.tips.forEach(function(t, i){ lines.push('- [ ] **T' + (i + 1) + '** [' + OPS_MKT_LEVEL_LABEL[t.level] + '] ' + t.channel + ': ' + t.text); });
+  if(!r.adsOn){
+    lines.push('', buildOpsChannelReviewMarkdown_(itemId));
+  }
+  lines.push('', '## ' + (r.adsOn ? '광고와 같이 볼 것' : '같이 해볼 것'));
+  r.extras.forEach(function(x){ lines.push('- ' + x.title + ' (' + x.cost + ') — ' + x.why); });
   return lines.join('\n');
+}
+function getOpsChannelReviewSeed_(){
+  return (typeof OPS_CHANNEL_REVIEW_SEED !== 'undefined' && OPS_CHANNEL_REVIEW_SEED) ? OPS_CHANNEL_REVIEW_SEED : { items: [], channels: [] };
+}
+/** 완료 체크는 홍보 현황(브랜딩) 상태에 둔다 → 기기 간 동기화 */
+function getOpsChannelReviewDone_(){
+  var st = getOpsMarketingState_('ops-m-26');
+  if(!st.reviewDone || typeof st.reviewDone !== 'object') st.reviewDone = {};
+  return st.reviewDone;
+}
+function setOpsChannelReviewDone_(id, on){
+  var done = getOpsChannelReviewDone_();
+  if(on) done[id] = new Date().toISOString().slice(0, 10);
+  else delete done[id];
+  getOpsManualState_().updatedAt = new Date().toISOString();
+  save({ skipDriveUpload: true, skipGasPush: true });
+  refreshOpsMarketingPanel_('ops-m-26');
+}
+window.setOpsChannelReviewDone_ = setOpsChannelReviewDone_;
+var OPS_REVIEW_BRANCH_LABEL = { all: '약수·인천', yaksu: '약수점', jakjeon: '인천점' };
+var OPS_REVIEW_WHO_LABEL = { draft: '커서가 문구 초안', user: '직접 수정' };
+function opsChannelReviewItemMarkdown_(it, done){
+  var ch = (getOpsChannelReviewSeed_().channels || []).filter(function(c){ return c.id === it.channel; })[0];
+  return ['### ' + (done ? '~~' : '') + '[' + it.id + '] ' + it.title + (done ? '~~ (완료 ' + done + ')' : ''),
+    '- 채널: ' + (ch ? ch.label : it.channel) + ' · ' + (OPS_REVIEW_BRANCH_LABEL[it.branch] || it.branch) + ' · 우선: ' + OPS_MKT_LEVEL_LABEL[it.level] + ' · ' + (OPS_REVIEW_WHO_LABEL[it.who] || ''),
+    '- 위치: ' + it.where,
+    '- 현재: ' + it.now,
+    '- 제안: ' + it.fix,
+    '- 이유: ' + it.why].join('\n');
+}
+function buildOpsChannelReviewMarkdown_(){
+  var seed = getOpsChannelReviewSeed_();
+  var done = getOpsChannelReviewDone_();
+  var lines = ['## 채널 프로필 검토 (' + (seed.checkedAt || '') + ' 확인 · 출처: 플래너/ops-channel-review-seed.js)'];
+  (seed.channels || []).forEach(function(c){
+    var items = (seed.items || []).filter(function(it){ return it.channel === c.id; });
+    if(!items.length) return;
+    lines.push('', '#### ' + c.label);
+    items.forEach(function(it){ lines.push('', opsChannelReviewItemMarkdown_(it, done[it.id])); });
+  });
+  return lines.join('\n');
+}
+function copyOpsChannelReviewItem_(id){
+  var it = (getOpsChannelReviewSeed_().items || []).filter(function(x){ return x.id === id; })[0];
+  if(!it) return;
+  var text = '채널 검토 ' + it.id + ' 반영해줘. 붙여 넣을 문구 초안과 작업 위치를 알려줘.\n\n' + opsChannelReviewItemMarkdown_(it, '');
+  var done = function(ok){ if(ok && typeof setAppToast === 'function') setAppToast(it.id + ' 요청을 복사했습니다. 커서 채팅에 붙여 넣으세요.', { duration: 2600, variant: 'ok' }); };
+  if(typeof copyTextOnly_ === 'function') copyTextOnly_(text, done);
+  else if(navigator.clipboard) navigator.clipboard.writeText(text).then(function(){ done(true); });
+}
+window.copyOpsChannelReviewItem_ = copyOpsChannelReviewItem_;
+function buildOpsChannelReviewHTML_(){
+  var seed = getOpsChannelReviewSeed_();
+  var done = getOpsChannelReviewDone_();
+  var items = seed.items || [];
+  if(!items.length) return '';
+  var open = items.filter(function(it){ return !done[it.id]; }).length;
+  var order = { high: 0, mid: 1, low: 2 };
+  var groups = (seed.channels || []).map(function(c){
+    var list = items.filter(function(it){ return it.channel === c.id; }).sort(function(a, b){
+      return (done[a.id] ? 1 : 0) - (done[b.id] ? 1 : 0) || order[a.level] - order[b.level];
+    });
+    if(!list.length) return '';
+    return '<div class="ops-kw-preview-head" style="margin-top:14px">' + escapeHtml(c.label) + ' <span>' + list.filter(function(it){ return !done[it.id]; }).length + '/' + list.length + '개 남음</span></div>' +
+      list.map(function(it){
+        var d = done[it.id];
+        var row = function(k, v){ return '<div style="margin-top:4px"><b style="display:inline-block;min-width:34px;opacity:.65">' + k + '</b> ' + escapeHtml(v) + '</div>'; };
+        return '<div style="margin-top:8px;border:1px solid rgba(30,58,110,.14);border-radius:10px;padding:10px 12px;background:#fff;font-size:12.5px;line-height:1.55' + (d ? ';opacity:.55' : '') + '">' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">' +
+            '<span style="font-family:ui-monospace,monospace;font-size:11.5px;font-weight:700;background:#1e3a6e;color:#fff;border-radius:6px;padding:1px 6px">' + escapeHtml(it.id) + '</span>' +
+            '<span style="display:inline-block;font-size:11px;font-weight:700;color:#fff;background:' + OPS_MKT_LEVEL_COLOR[it.level] + ';border-radius:999px;padding:1px 8px">' + OPS_MKT_LEVEL_LABEL[it.level] + '</span>' +
+            '<strong style="font-size:13px">' + escapeHtml(it.title) + '</strong>' +
+            '<span style="opacity:.65">' + escapeHtml(OPS_REVIEW_BRANCH_LABEL[it.branch] || '') + ' · ' + escapeHtml(OPS_REVIEW_WHO_LABEL[it.who] || '') + '</span>' +
+          '</div>' +
+          row('위치', it.where) + row('현재', it.now) + row('제안', it.fix) + row('이유', it.why) +
+          '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
+            '<button type="button" class="ops-kw-btn" onclick="copyOpsChannelReviewItem_(\'' + escapeHtml(it.id) + '\')">커서 요청 복사</button>' +
+            '<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px"><input type="checkbox"' + (d ? ' checked' : '') + ' onchange="setOpsChannelReviewDone_(\'' + escapeHtml(it.id) + '\', this.checked)" />완료' + (d ? ' (' + escapeHtml(d) + ')' : '') + '</label>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+  }).join('');
+  return '<div class="ops-review-group ops-kw-group">' +
+    '<div class="ops-review-group-title"><strong>채널 프로필 검토</strong> <span class="ops-review-group-hint">네이버 플레이스 · 카카오 채널 · 당근 · 그 밖에 · ' + escapeHtml(seed.checkedAt || '') + ' 공개 페이지 확인</span>' +
+      '<span class="ops-review-group-progress">' + open + '/' + items.length + '개 남음</span></div>' +
+    '<p class="ops-kw-chip-hint">항목마다 번호가 있습니다. 「커서 요청 복사」를 눌러 커서에 붙여 넣으면 붙여 넣을 문구 초안을 만들어 드립니다. 계정 화면 수정은 직접 하시고, 끝나면 「완료」를 체크하세요. 전체는 위 「커서용 복사」에 같이 들어갑니다.</p>' +
+    groups +
+  '</div>';
 }
 function copyOpsMarketingReport_(itemId){
   var text = buildOpsMarketingReportText_(itemId);
@@ -26073,55 +26215,66 @@ function renderOpsMarketingPanelHTML_(itemId){
   }).join('');
   var scope = (seed.promoScopes || {})[r.branchKey] || null;
   var reportButtons = '<div class="ops-kw-actions" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px">' +
-      '<label class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" style="cursor:pointer">보고서 불러오기<input type="file" accept=".json,application/json" style="display:none" onchange="importOpsMarketingReport_(\'' + itemId + '\', this)" /></label>' +
-      '<button type="button" class="ops-kw-btn" onclick="copyOpsMarketingReport_(\'' + itemId + '\')">보고서 복사</button>' +
+      '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="runOpsMarketingAnalyze_(\'' + itemId + '\')">분석하기 (업데이트)</button>' +
+      '<button type="button" class="ops-kw-btn" onclick="copyOpsMarketingReport_(\'' + itemId + '\')">커서용 복사</button>' +
+      '<label class="ops-kw-btn" style="cursor:pointer">파일 불러오기<input type="file" accept=".json,application/json" style="display:none" onchange="importOpsMarketingReport_(\'' + itemId + '\', this)" /></label>' +
     '</div>' +
-    '<p class="ops-kw-chip-hint">커서에 「마케팅 현황 업데이트해줘」라고 하면 다운로드 폴더에 marketing_status_날짜.json이 생깁니다. 한 번 불러오면 미카닥·약수·인천 모두 반영됩니다.' +
+    '<p class="ops-kw-chip-hint">「분석하기」는 네이버 박스가 연결된 데스크탑에서 「광고연결켜기.bat」이 켜져 있을 때 동작합니다. 네이버·구글 광고, 블로그, 플레이스·카카오·당근 소식을 새로 확인해 브랜딩·약수·인천에 한 번에 넣고, 결과는 동기화로 핸드폰에서도 보입니다. 인스타·쓰레드는 플래너 「발행완료」로 셉니다. 「커서용 복사」는 항목마다 번호가 붙은 보고서입니다.' +
       (rep && rep.generatedAt ? ' 마지막 보고서: ' + escapeHtml(String(rep.generatedAt).slice(0, 16).replace('T', ' ')) : '') + '</p>';
   var faceHtml = (r.faceCandidates || []).length
-    ? ('<div class="ops-kw-preview-head" style="margin-top:12px">리얼페이스 키워드 후보 <span>네이버 월간 검색수 · 리얼페이스 전용 광고그룹용</span></div>' +
+    ? ('<div class="ops-kw-preview-head" style="margin-top:12px">리얼페이스 키워드 <span>네이버 월간 검색수 · 「리얼페이스」 광고그룹(계양·부평 지역)에 들어가 있음</span></div>' +
       '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr><th style="' + head + ';text-align:left">키워드</th><th style="' + head + '">월 검색</th><th style="' + head + ';text-align:left">메모</th></tr>' +
       r.faceCandidates.map(function(f){
         return '<tr><td style="' + cell + ';text-align:left;font-weight:700">' + escapeHtml(f.kw) + '</td><td style="' + cell + '">' + f.vol.toLocaleString() + '</td><td style="' + cell + ';text-align:left;opacity:.75">' + escapeHtml(f.note || '') + '</td></tr>';
       }).join('') + '</table>')
     : '';
+  var tipsBlock = '<div class="ops-review-group ops-kw-group" style="border:1px solid rgba(30,58,110,.2);background:rgba(30,58,110,.03)">' +
+      '<div class="ops-review-group-title"><strong>' + (r.adsOn ? '할 일' : '제안') + '</strong> <span class="ops-review-group-hint">오늘 · 이번 주 순 · ' + (r.adsOn ? '네이버·구글 키워드 광고' : '블로그·인스타·쓰레드·지점 소식') + '</span></div>' +
+      '<ul style="list-style:none;margin:6px 0 0;padding:0;font-size:13px">' + (tipsHtml || '<li style="opacity:.7">지금은 따로 할 일이 없습니다.</li>') + '</ul>' +
+    '</div>';
+  if(!r.adsOn){
+    return '<div class="ops-kw-panel ops-mkt-panel" data-ops-mkt="' + escapeHtml(itemId) + '">' +
+      '<div class="ops-review-group ops-kw-group">' +
+        '<div class="ops-review-group-title"><strong>콘텐츠 · SNS · 소식</strong> <span class="ops-review-group-hint">계정 확인 · 블로그 RSS · 플래너 발행 기록 순으로 사용</span></div>' +
+        '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px"><tr><th style="' + head + ';text-align:left">채널</th><th style="' + head + '">최근 게시</th><th style="' + head + '">7일</th><th style="' + head + '">30일</th><th style="' + head + '">목표</th><th style="' + head + '">상태</th></tr>' + contentRowsHtml + '</table></div>' +
+        '<p class="ops-kw-chip-hint">' + (rep && rep.channels
+          ? '블로그는 RSS, 지점 소식은 각 페이지에서 직접 확인한 결과입니다 (' + escapeHtml(String(rep.channels.checkedAt || '').slice(0, 16).replace('T', ' ')) + '). 인스타·쓰레드는 플래너 「발행완료」 기준입니다 — 플래너 밖에서 올린 글은 세지 않습니다.'
+          : '아직 분석 결과가 없어 플래너 「발행완료」 기록으로만 셉니다. 「분석하기」를 누르면 블로그와 지점 소식을 직접 확인합니다.') + '</p>' +
+        reportButtons +
+      '</div>' +
+      tipsBlock +
+      buildOpsChannelReviewHTML_(itemId) +
+      '<div class="ops-review-group ops-kw-group">' +
+        '<div class="ops-review-group-title"><strong>같이 해볼 것</strong> <span class="ops-review-group-hint">비용 낮은 순</span></div>' +
+        '<ul style="list-style:none;margin:6px 0 0;padding:0;font-size:13px">' + extrasHtml + '</ul>' +
+      '</div>' +
+    '</div>';
+  }
   return '<div class="ops-kw-panel ops-mkt-panel" data-ops-mkt="' + escapeHtml(itemId) + '">' +
-    '<div class="ops-review-group ops-kw-group" style="border:1px solid rgba(30,58,110,.2);background:rgba(30,58,110,.03)">' +
-      '<div class="ops-review-group-title"><strong>할 일</strong> <span class="ops-review-group-hint">오늘 · 이번 주 순 · 광고와 블로그·인스타·쓰레드·소식을 함께 봅니다</span></div>' +
-      '<ul style="list-style:none;margin:6px 0 0;padding:0;font-size:13px">' + tipsHtml + '</ul>' +
-    '</div>' +
-    '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>콘텐츠 채널</strong> <span class="ops-review-group-hint">계정 확인 · 블로그 RSS · 플래너 발행 기록 순으로 사용</span></div>' +
-      '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px"><tr><th style="' + head + ';text-align:left">채널</th><th style="' + head + '">최근 게시</th><th style="' + head + '">7일</th><th style="' + head + '">30일</th><th style="' + head + '">목표</th><th style="' + head + '">상태</th></tr>' + contentRowsHtml + '</table></div>' +
-      '<p class="ops-kw-chip-hint">' + (rep && rep.channels
-        ? '각 계정 페이지를 직접 확인한 결과입니다 (' + escapeHtml(String(rep.channels.checkedAt || '').slice(0, 16).replace('T', ' ')) + '). 인스타는 콜라보 글도 그 계정 피드에 보이는 대로 셉니다.'
-        : '아직 계정 확인 결과가 없어 플래너 발행 기록으로만 셉니다. 커서에 「마케팅 현황 업데이트해줘」라고 하면 각 계정을 확인해 보고서에 넣습니다.') + '</p>' +
-      (r.adsOn ? '' : reportButtons) +
-    '</div>' +
-    (r.adsOn ? ('<div class="ops-review-group ops-kw-group">' +
+    ('<div class="ops-review-group ops-kw-group">' +
       '<div class="ops-review-group-title"><strong>광고 현황</strong> <span class="ops-review-group-hint">' + (p ? escapeHtml(p.since + ' ~ ' + p.until) + ' · ' : '') + (rep && rep.generatedAt ? '네이버 ' + escapeHtml(String(rep.generatedAt).slice(0, 16).replace('T', ' ')) + ' 기준' : '네이버 수치 미불러옴') + '</span></div>' +
       '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px"><tr><th style="' + head + ';text-align:left">채널</th><th style="' + head + '">노출</th><th style="' + head + '">클릭</th><th style="' + head + '">클릭률</th><th style="' + head + '">비용</th><th style="' + head + '">문의</th><th style="' + head + '">문의당</th></tr>' + tableRows + '</table></div>' +
       '<p class="ops-kw-chip-hint" style="margin-top:8px">' + nvInfo + '</p>' +
       reportButtons +
-    '</div>') : '') +
-    ((r.adsOn && (kwHtml || bidHtml || faceHtml)) ? ('<div class="ops-review-group ops-kw-group">' +
+    '</div>') +
+    tipsBlock +
+    ((kwHtml || bidHtml || faceHtml) ? ('<div class="ops-review-group ops-kw-group">' +
       '<div class="ops-review-group-title"><strong>키워드 · 입찰가</strong> <span class="ops-review-group-hint">네이버·구글 노출 키워드와 예상 입찰가</span></div>' +
       kwHtml + bidHtml + faceHtml +
     '</div>') : '') +
-    (r.adsOn ? ('<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>직접 입력</strong> <span class="ops-review-group-hint">API가 없는 광고·문의 수는 화면 숫자를 옮겨 적습니다</span></div>' +
+    ('<div class="ops-review-group ops-kw-group">' +
+      '<div class="ops-review-group-title"><strong>직접 입력</strong> <span class="ops-review-group-hint">문의 수는 상담 때 「어디서 보고 오셨어요?」로 확인해 적습니다</span></div>' +
       (
         (r.googleAuto
           ? ('<div style="margin-top:10px"><div class="ops-kw-preview-head">구글 애즈 <span>구글 시트에서 자동 · ' + escapeHtml(String((rep.google && rep.google.generatedAt) || '').slice(0, 16).replace('T', ' ')) + ' (UTC)</span></div>' +
               '<div class="ops-kw-meta-grid">' + num('google', 'leads', '구글 광고로 온 문의 (건)') + '</div></div>')
           : manualBlock('구글 애즈', 'google', seed.googleStatus || [], r.gStatus, '문의 (건)')) +
-        manualBlock('당근 광고', 'karrot', seed.karrotStatus || [], r.kStatus, '채팅 문의 (건)') +
         '<div style="margin-top:10px"><div class="ops-kw-preview-head">문의 수 <span>상담 때 「어디서 보고 오셨어요?」로 확인</span></div>' +
           '<div class="ops-kw-meta-grid">' + num('naver', 'leads', '네이버 광고로 온 문의') + num('etc', 'leads', '그 외 (플레이스·블로그·지인 등)') + '</div></div>'
       ) +
-    '</div>') : '') +
+    '</div>') +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>' + (r.adsOn ? '세 광고 외에 해볼 것' : '같이 해볼 것') + '</strong> <span class="ops-review-group-hint">비용 낮은 순</span></div>' +
+      '<div class="ops-review-group-title"><strong>광고와 같이 볼 것</strong> <span class="ops-review-group-hint">콘텐츠·SNS·프로필 제안은 「브랜딩」 탭</span></div>' +
       '<ul style="list-style:none;margin:6px 0 0;padding:0;font-size:13px">' + extrasHtml + '</ul>' +
     '</div>' +
   '</div>';
@@ -26133,53 +26286,192 @@ function renderOpsGoogleAdsPanelHTML_(itemId){
     return '<div class="ops-review-group ops-kw-group">구글 애즈 시드(ops-google-ads-seed.js)를 불러오지 못했습니다. 새로고침해 주세요.</div>';
   }
   var chip = function(t, opts){ return buildOpsKwCopyChipHTML_(t, opts || {}); };
-  var groupHtml = plan.groups.map(function(g){
-    return '<div style="margin-top:10px"><div class="ops-kw-preview-head">' + escapeHtml(g.name) + ' <span>' + g.keywords.length + '개 · 구문 일치 · 경로 /' + escapeHtml(plan.path1) + (g.path2 ? '/' + escapeHtml(g.path2) : '') + '</span></div>' +
-      '<div class="ops-kw-chip-row">' + g.keywords.map(function(k){ return chip(k); }).join('') + '</div></div>';
+  var id = escapeHtml(itemId);
+  var groupHtml = plan.groups.map(function(g, gi){
+    var hw = g.headlines.filter(function(t){ return googleAdsTextWidth_(t) > 30; }).length;
+    var dw = g.descriptions.filter(function(t){ return googleAdsTextWidth_(t) > 90; }).length;
+    return '<details class="ops-ads-group" style="margin-top:8px;border:1px solid rgba(30,58,110,.14);border-radius:10px;padding:8px 10px;background:#fff">' +
+      '<summary style="cursor:pointer;font-size:13px;font-weight:700">' + escapeHtml(g.name) +
+        ' <span style="font-weight:500;opacity:.7">키워드 ' + g.keywords.length + ' · 제목 ' + g.headlines.length + '/15 · 설명 ' + g.descriptions.length + '/4 · 경로 /' + escapeHtml(plan.path1) + (g.path2 ? '/' + escapeHtml(g.path2) : '') + '</span></summary>' +
+      '<div class="ops-kw-preview-head" style="margin-top:8px">키워드 <span>한 줄에 하나 · 구문 일치</span></div>' +
+      '<textarea class="ops-review-input ops-kw-textarea" rows="5" onchange="setOpsGoogleAdsGroupField_(\'' + id + '\', ' + gi + ', \'keywords\', this.value)">' + escapeHtml(g.keywords.join('\n')) + '</textarea>' +
+      '<div class="ops-kw-preview-head" style="margin-top:8px">제목 <span>한 줄에 하나 · 30칸 이내(한글 2칸) · 3~15개' + (hw ? ' · <b style="color:#b91c1c">' + hw + '개 길이 초과</b>' : '') + '</span></div>' +
+      '<textarea class="ops-review-input ops-kw-textarea" rows="5" onchange="setOpsGoogleAdsGroupField_(\'' + id + '\', ' + gi + ', \'headlines\', this.value)">' + escapeHtml(g.headlines.join('\n')) + '</textarea>' +
+      '<div class="ops-kw-preview-head" style="margin-top:8px">설명 <span>한 줄에 하나 · 90칸 이내 · 2~4개' + (dw ? ' · <b style="color:#b91c1c">' + dw + '개 길이 초과</b>' : '') + '</span></div>' +
+      '<textarea class="ops-review-input ops-kw-textarea" rows="4" onchange="setOpsGoogleAdsGroupField_(\'' + id + '\', ' + gi + ', \'descriptions\', this.value)">' + escapeHtml(g.descriptions.join('\n')) + '</textarea>' +
+    '</details>';
   }).join('');
-  return '<div class="ops-kw-panel ops-gads-panel" data-ops-gads="' + escapeHtml(itemId) + '">' +
-    '<div class="ops-review-group ops-kw-group" style="border:1px solid rgba(185,28,28,.25);background:rgba(185,28,28,.04);padding:12px 14px;border-radius:10px">' +
-      '<div class="ops-review-group-title"><strong>등록 순서</strong> <span class="ops-review-group-hint">Google Ads Editor 대량 가져오기</span></div>' +
-      '<ol style="margin:8px 0 0;padding-left:1.25em;line-height:1.6;font-size:13px">' +
-        '<li>구글 애즈(' + escapeHtml(plan.accountId) + ') 상단에 「계정이 취소되었습니다」가 보이면 <strong>「재활성화」</strong>부터 누르고 결제 수단을 확인합니다. 취소 상태에서는 광고가 나가지 않습니다</li>' +
-        '<li>Google Ads Editor를 설치하고 이 계정을 추가한 뒤 「최근 변경사항 가져오기」</li>' +
-        '<li>아래 <strong>CSV 다운로드</strong> → Editor 「계정 → 가져오기 → 파일에서 가져오기」 → 검토 → 「변경사항 유지」</li>' +
-        '<li>오른쪽 위 <strong>「게시」</strong>. 캠페인은 「일시중지」로 들어가서 아직 비용이 나가지 않습니다</li>' +
-        '<li>웹에서 캠페인 설정 → 위치 → 위치 옵션을 「타겟 지역에 있거나 정기적으로 방문하는 사용자」로 바꿉니다</li>' +
-        '<li>광고 검토가 「승인」되면 캠페인을 「사용」으로 켭니다</li>' +
-      '</ol>' +
-    '</div>' +
+  return '<div class="ops-kw-panel ops-gads-panel" data-ops-gads="' + id + '">' +
+    buildOpsAdsApiGuideHTML_('google', plan.accountId) +
     '<div class="ops-review-group ops-kw-group">' +
       '<div class="ops-review-group-title"><strong>캠페인 설정</strong> <span class="ops-review-group-hint">' + escapeHtml(plan.campaign) + ' · 검색 · Google 검색만 · 한국어 · 수동 CPC</span></div>' +
       '<div class="ops-kw-meta-grid">' +
-        '<label class="ops-kw-meta"><span>하루 예산 (원)</span><input type="text" inputmode="numeric" data-ops-gads-meta="dailyBudget" value="' + plan.dailyBudget + '" onchange="setOpsGoogleAdsMeta_(\'' + itemId + '\', \'dailyBudget\', this.value)" /></label>' +
-        '<label class="ops-kw-meta"><span>클릭당 최대 입찰가 (원)</span><input type="text" inputmode="numeric" data-ops-gads-meta="maxCpc" value="' + plan.maxCpc + '" onchange="setOpsGoogleAdsMeta_(\'' + itemId + '\', \'maxCpc\', this.value)" /></label>' +
+        '<label class="ops-kw-meta"><span>하루 예산 (원)</span><input type="text" inputmode="numeric" data-ops-gads-meta="dailyBudget" value="' + plan.dailyBudget + '" onchange="setOpsGoogleAdsMeta_(\'' + id + '\', \'dailyBudget\', this.value)" /></label>' +
+        '<label class="ops-kw-meta"><span>클릭당 최대 입찰가 (원)</span><input type="text" inputmode="numeric" data-ops-gads-meta="maxCpc" value="' + plan.maxCpc + '" onchange="setOpsGoogleAdsMeta_(\'' + id + '\', \'maxCpc\', this.value)" /></label>' +
+        '<label class="ops-kw-meta ops-kw-meta-wide"><span>연결 URL</span><input type="text" data-ops-gads-meta="finalUrl" value="' + escapeHtml(plan.finalUrl) + '" onchange="setOpsGoogleAdsMeta_(\'' + id + '\', \'finalUrl\', this.value)" /></label>' +
       '</div>' +
       '<p class="ops-kw-chip-hint" data-ops-gads-hint>' + escapeHtml(buildOpsGoogleAdsBudgetHint_(plan)) + '</p>' +
-      '<div style="margin-top:8px;font-size:13px"><strong>지역</strong> (구 단위 위치 타깃)</div>' +
+      '<div style="margin-top:8px;font-size:13px"><strong>지역</strong> (구 단위 위치 타깃 · 그 지역에 있는 사람)</div>' +
       '<div class="ops-kw-chip-row">' + plan.locations.map(function(l){ return chip(l.name + ' · ' + l.id, { meta: true }); }).join('') + '</div>' +
-      '<div style="margin-top:8px;font-size:13px"><strong>연결 URL</strong></div>' +
-      '<div class="ops-kw-chip-row">' + chip(plan.finalUrl, { meta: true, wide: true }) + '</div>' +
     '</div>' +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>광고그룹 · 키워드</strong> <span class="ops-review-group-hint">' + plan.groups.length + '개 그룹 · ' + plan.keywordCount + '개 · 지역은 위치 타깃으로 거릅니다</span></div>' +
+      '<div class="ops-review-group-title"><strong>광고그룹 · 키워드 · 광고</strong> <span class="ops-review-group-hint">' + plan.groups.length + '개 그룹 · 키워드 ' + plan.keywordCount + '개 · 그룹을 눌러 고칩니다</span></div>' +
       groupHtml +
-      '<div class="ops-kw-preview-head" style="margin-top:12px">제외 키워드 ' + plan.negatives.length + '개 <span>병원·시술·채용 검색 차단</span></div>' +
-      '<div class="ops-kw-chip-row">' + plan.negatives.map(function(n){ return chip(n, { meta: true }); }).join('') + '</div>' +
+      '<div class="ops-kw-preview-head" style="margin-top:12px">제외 키워드 ' + plan.negatives.length + '개 <span>한 줄에 하나 · 병원·시술·채용 검색 차단</span></div>' +
+      '<textarea class="ops-review-input ops-kw-textarea" rows="4" onchange="setOpsGoogleAdsMeta_(\'' + id + '\', \'negatives\', this.value)">' + escapeHtml(plan.negatives.join('\n')) + '</textarea>' +
     '</div>' +
-    '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>반응형 검색 광고</strong> <span class="ops-review-group-hint">네이버 등록팩과 같은 문구 · 「리:얼」→「리얼」 · 제목 느낌표 제거</span></div>' +
-      '<div class="ops-kw-preview-head" style="margin-top:8px">제목 ' + plan.headlines.length + '/15 <span>30칸 이내 (한글 2칸)</span></div>' +
-      '<div class="ops-kw-chip-row">' + plan.headlines.map(function(t){ return chip(t); }).join('') + '</div>' +
-      '<div class="ops-kw-preview-head" style="margin-top:12px">설명 ' + plan.descriptions.length + '/4 <span>90칸 이내</span></div>' +
-      '<div class="ops-kw-chip-row">' + plan.descriptions.map(function(t){ return chip(t, { wide: true }); }).join('') + '</div>' +
-      '<div class="ops-kw-actions ops-kw-dl-actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">' +
-        '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="downloadOpsGoogleAdsCsv_(\'' + itemId + '\')">구글 애즈 에디터 CSV 다운로드</button>' +
-      '</div>' +
-      '<p class="ops-kw-chip-hint">캠페인 1개 · 위치 ' + plan.locations.length + '곳 · 광고그룹 ' + plan.groups.length + '개(그룹마다 광고 1개) · 키워드 ' + plan.keywordCount + '개 · 제외 ' + plan.negatives.length + '개가 한 파일에 들어갑니다.</p>' +
-    '</div>' +
+    buildOpsAdsApplyBarHTML_('applyOpsGoogleAds_(\'' + id + '\')', '구글에 적용하기',
+      '캠페인 1개 · 그룹 ' + plan.groups.length + '개 · 키워드 ' + plan.keywordCount + '개 · 제외 ' + plan.negatives.length + '개. 먼저 바뀔 내용을 보여 드리고, 「이대로 적용」을 눌러야 계정이 바뀝니다. 계획에서 뺀 키워드·그룹·예전 광고는 일시중지합니다.') +
   '</div>';
 }
+function setOpsGoogleAdsGroupField_(itemId, index, field, value){
+  var plan = buildOpsGoogleAdsPlan_(itemId);
+  var g = plan && plan.groups[index | 0];
+  if(!g) return;
+  var st = getOpsGoogleAdsState_(itemId);
+  if(!st.groupEdits || typeof st.groupEdits !== 'object') st.groupEdits = {};
+  var e = st.groupEdits[g.name] || (st.groupEdits[g.name] = {});
+  e[field] = field === 'keywords' ? parseOpsNaverKwLines_(value) : parseOpsAdTextLines_(value);
+  getOpsManualState_().updatedAt = new Date().toISOString();
+  save({ skipDriveUpload: true, skipGasPush: true });
+}
+window.setOpsGoogleAdsGroupField_ = setOpsGoogleAdsGroupField_;
+function applyOpsGoogleAds_(itemId){
+  var plan = buildOpsGoogleAdsPlan_(itemId);
+  if(!plan) return;
+  var body = { campaign: plan.campaign, budget: plan.dailyBudget, cpc: plan.maxCpc, finalUrl: plan.finalUrl, path1: plan.path1,
+    locations: plan.locations, negatives: plan.negatives,
+    groups: plan.groups.map(function(g){ return { name: g.name, path2: g.path2, keywords: g.keywords, headlines: g.headlines, descriptions: g.descriptions }; }) };
+  openOpsAdsApplyDialog_('구글 애즈 · ' + plan.campaign, '/google', { plan: body });
+}
+window.applyOpsGoogleAds_ = applyOpsGoogleAds_;
+/** 광고 문구 줄 파싱 — 키워드와 달리 대소문자·문장부호를 그대로 둔다 */
+function parseOpsAdTextLines_(text){
+  var seen = {};
+  var out = [];
+  String(text || '').split(/[\r\n]+/).forEach(function(line){
+    var t = String(line || '').replace(/\s+/g, ' ').trim();
+    if(!t || seen[t]) return;
+    seen[t] = true;
+    out.push(t);
+  });
+  return out;
+}
+var OPS_ADS_API_URL = 'http://127.0.0.1:28765';
+function buildOpsAdsApiGuideHTML_(kind, accountId){
+  var isG = kind === 'google';
+  var steps = isG
+    ? ['작업하는 컴퓨터에서 코딩 폴더의 <strong>「광고연결켜기.bat」</strong>을 실행해 둡니다 (검은 창이 켜져 있는 동안만 연결됩니다)',
+      '아래 캠페인 설정, 그룹별 키워드·제목·설명, 연결 URL, 제외 키워드를 확인하고 필요하면 고칩니다. 고친 내용은 바로 저장됩니다',
+      '<strong>「구글에 적용하기」</strong> → 바뀔 내용 미리보기(구글 검증까지) → <strong>「이대로 적용」</strong>',
+      '새 캠페인은 「일시중지」로 만들어집니다. 광고 검토가 끝나면 구글 애즈(' + escapeHtml(accountId || '') + ')에서 캠페인을 켭니다']
+    : ['작업하는 컴퓨터에서 코딩 폴더의 <strong>「광고연결켜기.bat」</strong>을 실행해 둡니다 (검은 창이 켜져 있는 동안만 연결됩니다)',
+      '일반 키워드, 동네(= 광고그룹 이름), 동네 조합 키워드를 확인하고 필요하면 고칩니다',
+      '소재(제목·설명·연결 URL)와 확장소재(전화·플레이스·서브링크)를 확인하고 고칩니다',
+      '각 칸의 <strong>「적용하기」</strong> → 바뀔 내용 미리보기 → <strong>「이대로 적용」</strong>. 없는 그룹은 만들고, 목록에서 뺀 키워드·그룹·예전 소재는 끕니다(삭제는 하지 않음)'];
+  setTimeout(checkOpsAdsApi_, 50);
+  return '<div class="ops-review-group ops-kw-group" style="border:1px solid rgba(15,118,110,.18);background:rgba(15,118,110,.04);padding:12px 14px;border-radius:10px">' +
+    '<div class="ops-review-group-title"><strong>API 연결</strong> <span class="ops-review-group-hint">' + (isG ? '구글 애즈 API' : '네이버 검색광고 API') + ' · 파일 다운로드·업로드 없이 바로 반영</span>' +
+      '<span class="ops-review-group-progress" data-ops-ads-api-status>' + (opsAdsApiOnline_ === true ? '연결됨' : (opsAdsApiOnline_ === false ? '꺼짐' : '확인 중')) + '</span></div>' +
+    '<ol style="margin:8px 0 0;padding-left:1.25em;line-height:1.6;font-size:13px">' + steps.map(function(s){ return '<li>' + s + '</li>'; }).join('') + '</ol>' +
+    '<p style="margin:10px 0 0;font-size:12px;line-height:1.45;color:#475569">API 키는 코딩\\_비공개키 폴더(마이박스)에만 있고 플래너에는 들어가지 않습니다. 연결이 꺼져 있으면 커서에 「' + (isG ? '구글' : '네이버') + ' 키워드·소재 반영해줘」라고 해도 됩니다. 치료·완치·시술 표현은 넣지 않습니다.</p>' +
+  '</div>';
+}
+function buildOpsAdsApplyBarHTML_(onclick, label, hint){
+  return '<div class="ops-kw-actions ops-kw-dl-actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
+      '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onmousedown="event.preventDefault()" onclick="flushOpsAdsEdits_(); ' + onclick + '">' + escapeHtml(label) + '</button>' +
+    '</div>' +
+    (hint ? '<p class="ops-kw-chip-hint">' + escapeHtml(hint) + '</p>' : '');
+}
+/** 적용 버튼은 포커스를 뺏지 않으므로, 입력 중인 칸의 change를 여기서 먼저 반영한다 */
+function flushOpsAdsEdits_(){
+  var el = document.activeElement;
+  if(el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') && typeof el.blur === 'function') el.blur();
+}
+window.flushOpsAdsEdits_ = flushOpsAdsEdits_;
+var opsAdsApiOnline_ = null;
+function checkOpsAdsApi_(){
+  if(typeof fetch !== 'function') return;
+  fetch(OPS_ADS_API_URL + '/status', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(j){
+    opsAdsApiOnline_ = !!(j && j.ok);
+  }).catch(function(){ opsAdsApiOnline_ = false; }).then(function(){
+    document.querySelectorAll('[data-ops-ads-api-status]').forEach(function(el){
+      el.textContent = opsAdsApiOnline_ ? '연결됨' : '꺼짐 · 광고연결켜기.bat 실행';
+      el.style.color = opsAdsApiOnline_ ? '#0F766E' : '#b91c1c';
+    });
+  });
+}
+window.checkOpsAdsApi_ = checkOpsAdsApi_;
+function postOpsAdsApi_(path, body){
+  return fetch(OPS_ADS_API_URL + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(j){
+        if(!r.ok) throw new Error(j.error || ('연결 오류 ' + r.status));
+        return j;
+      });
+    }, function(){
+      throw new Error(isOpsMobileDevice_()
+        ? OPS_ADS_DESKTOP_ONLY_MSG
+        : '광고 연결이 꺼져 있습니다. 네이버 박스가 연결된 이 데스크탑에서 코딩 폴더의 「광고연결켜기.bat」을 실행한 뒤 다시 눌러 주세요. (브라우저가 「로컬 네트워크 접근」을 물으면 허용)');
+    });
+}
+/** 미리보기 → 「이대로 적용」 → 결과. 계정은 「이대로 적용」 때만 바뀐다.
+ *  opts.runOnly: 미리보기 없이 한 번 실행 (분석하기) · opts.onResult(res) · opts.busyText */
+function openOpsAdsApplyDialog_(title, path, body, opts){
+  opts = opts || {};
+  var old = document.getElementById('ops-ads-apply-dialog');
+  if(old) old.remove();
+  var wrap = document.createElement('div');
+  wrap.id = 'ops-ads-apply-dialog';
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+  wrap.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:720px;width:100%;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)">' +
+    '<div style="padding:14px 16px;border-bottom:1px solid #e2e8f0;font-weight:700">' + escapeHtml(title) + '</div>' +
+    '<pre data-ops-ads-out style="margin:0;padding:14px 16px;overflow:auto;flex:1;font-size:12.5px;line-height:1.55;white-space:pre-wrap;font-family:inherit">' +
+      escapeHtml(isOpsMobileDevice_() ? OPS_ADS_DESKTOP_ONLY_MSG : (opts.busyText || '바뀔 내용을 확인하는 중입니다… (30초쯤 걸릴 수 있습니다)')) + '</pre>' +
+    '<div style="padding:12px 16px;border-top:1px solid #e2e8f0;display:flex;gap:8px;justify-content:flex-end">' +
+      '<button type="button" class="ops-kw-btn" data-ops-ads-close>닫기</button>' +
+      (opts.runOnly ? '' : '<button type="button" class="ops-kw-btn ops-kw-btn-primary" data-ops-ads-go disabled>이대로 적용</button>') +
+    '</div></div>';
+  document.body.appendChild(wrap);
+  var out = wrap.querySelector('[data-ops-ads-out]');
+  var go = wrap.querySelector('[data-ops-ads-go]') || document.createElement('button');
+  var busy = false;
+  wrap.querySelector('[data-ops-ads-close]').onclick = function(){ if(!busy) wrap.remove(); };
+  if(isOpsMobileDevice_()) return;
+  function send(apply){
+    busy = true;
+    go.disabled = true;
+    var req = {};
+    Object.keys(body).forEach(function(k){ req[k] = body[k]; });
+    req.apply = apply;
+    return postOpsAdsApi_(path, req).then(function(res){
+      busy = false;
+      out.textContent = (res.lines || []).join('\n') || '(결과 없음)';
+      opsAdsApiOnline_ = true;
+      return res;
+    }, function(err){
+      busy = false;
+      out.textContent = String((err && err.message) || err);
+      return null;
+    });
+  }
+  send(false).then(function(res){
+    if(opts.onResult) opts.onResult(res);
+    if(opts.runOnly) return;
+    if(res && res.changes > 0 && res.ok !== false){
+      go.disabled = false;
+      go.onclick = function(){
+        out.textContent = '계정에 반영하는 중입니다… 창을 닫지 마세요.';
+        send(true).then(function(r2){
+          go.textContent = '적용 완료';
+          go.disabled = true;
+          if(r2 && typeof setAppToast === 'function') setAppToast(title + ' 반영 완료', { duration: 3000, variant: 'ok' });
+        });
+      };
+    }
+  });
+}
+window.openOpsAdsApplyDialog_ = openOpsAdsApplyDialog_;
 function buildOpsNaverKwCreativeGuideText_(branchKey){
   var c = buildOpsNaverKwCreativeSeed_(branchKey);
   var lines = [
@@ -26261,70 +26553,116 @@ window.copyOpsKwChip_ = copyOpsKwChip_;
 function buildOpsNaverKwCreativePanelHTML_(itemId){
   ensureOpsKwChipStyles_();
   var branchKey = opsPlaceBranchKey_(itemId);
-  var c = buildOpsNaverKwCreativeSeed_(branchKey);
-  var pack = getOpsNaverAdAssetPack_(branchKey);
-  var titleChips = c.titles.map(function(t){ return buildOpsKwCopyChipHTML_(t, { showLen: true }); }).join('');
-  var descChips = c.descriptions.map(function(d){ return buildOpsKwCopyChipHTML_(d, { showLen: true, wide: true }); }).join('');
+  var st = getOpsNaverKwState_(itemId);
+  var ad = getOpsNaverAdEdit_(st, branchKey);
+  var id = escapeHtml(itemId);
+  var badT = ad.titles.filter(function(t){ var s = sanitizeOpsNaverAdText_(t); return !s || s.length > 15; }).length;
+  var badD = ad.descriptions.filter(function(d){ var s = sanitizeOpsNaverAdText_(d); return s.length < 20 || s.length > 45; }).length;
+  var warn = function(n, what){ return n ? ' · <b style="color:#b91c1c">' + n + '개 ' + what + '</b>' : ''; };
   return '<div class="ops-review-group ops-kw-group ops-kw-creative" style="border:1px solid rgba(30,58,110,.16);background:rgba(30,58,110,.03);padding:12px 14px;border-radius:10px">' +
-    '<div class="ops-review-group-title"><strong>7. 소재</strong> <span class="ops-review-group-hint">클릭하면 복사 · CSV는 같은 문구</span></div>' +
-    '<div style="font-size:13px;line-height:1.55;margin-top:10px">' +
-      '<div><strong>유형</strong> 반응형 소재 <span style="opacity:.75">(의료 업종 제한 시 → 단일형)</span></div>' +
-      '<div style="margin-top:6px"><strong>사이트 이름</strong></div>' +
-      '<div class="ops-kw-chip-row">' + buildOpsKwCopyChipHTML_(c.siteName, { meta: true, showLen: true }) + '</div>' +
-      '<div style="margin-top:6px"><strong>표시 URL</strong> (대표 · 루트)</div>' +
-      '<div class="ops-kw-chip-row">' + buildOpsKwCopyChipHTML_(c.displayUrlPc, { meta: true, wide: true }) + '</div>' +
-      '<div style="margin-top:6px"><strong>연결 URL</strong></div>' +
-      '<div class="ops-kw-chip-row">' + buildOpsKwCopyChipHTML_(c.finalUrlPc, { meta: true, wide: true }) + '</div>' +
-      '<div style="margin-top:6px"><strong>검토 요청</strong> 아니오</div>' +
+    '<div class="ops-review-group-title"><strong>소재</strong> <span class="ops-review-group-hint">반응형 · 「일반」과 동네 그룹 공통' + (branchKey === 'jakjeon' ? ' · 「리얼페이스」 그룹은 전용 문구' : '') + '</span></div>' +
+    '<div class="ops-kw-meta-grid" style="margin-top:8px">' +
+      '<label class="ops-kw-meta ops-kw-meta-wide"><span>연결 URL (PC·모바일 같음)</span><input type="text" data-ops-kw-meta="pcUrl" value="' + escapeHtml(st.pcUrl || '') + '" placeholder="https://…" onchange="setOpsNaverKwMeta_(\'' + id + '\', \'pcUrl\', this.value); setOpsNaverKwMeta_(\'' + id + '\', \'mobileUrl\', this.value)" /></label>' +
     '</div>' +
-    '<div class="ops-kw-preview-head" style="margin-top:12px">등록팩 제목 ' + c.titles.length + '/15 <span>≤15자 · 화면=CSV</span></div>' +
-    '<div class="ops-kw-chip-row">' + titleChips + '</div>' +
-    '<div class="ops-kw-preview-head" style="margin-top:12px">등록팩 설명 ' + c.descriptions.length + '/4 <span>20~45자 · 화면=CSV</span></div>' +
-    '<div class="ops-kw-chip-row">' + descChips + '</div>' +
-    '<div class="ops-kw-actions ops-kw-dl-actions" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">' +
-      '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="downloadOpsNaverAdAssetCsv_(\'' + itemId + '\', \'unified\')">반응형 소재 대량등록 CSV</button>' +
+    '<div class="ops-kw-preview-head" style="margin-top:10px">제목 ' + ad.titles.length + '/15 <span>한 줄에 하나 · 15자 이내 · 3개 이상' + warn(badT, '15자 초과(빠짐)') + '</span></div>' +
+    '<textarea class="ops-review-input ops-kw-textarea" rows="8" data-ops-kw-ad="titles" onchange="setOpsNaverAdField_(\'' + id + '\', \'titles\', this.value)">' + escapeHtml(ad.titles.join('\n')) + '</textarea>' +
+    '<div class="ops-kw-preview-head" style="margin-top:10px">설명 ' + ad.descriptions.length + '/4 <span>한 줄에 하나 · 20~45자 · 2개 이상' + warn(badD, '길이 안 맞음(빠짐)') + '</span></div>' +
+    '<textarea class="ops-review-input ops-kw-textarea" rows="4" data-ops-kw-ad="descriptions" onchange="setOpsNaverAdField_(\'' + id + '\', \'descriptions\', this.value)">' + escapeHtml(ad.descriptions.join('\n')) + '</textarea>' +
+    '<div class="ops-kw-actions">' +
+      '<button type="button" class="ops-kw-btn ops-kw-btn-regen" onclick="resetOpsNaverAdField_(\'' + id + '\')">기본 문구로</button>' +
     '</div>' +
-    '<p class="ops-kw-chip-hint">체크한 광고그룹마다 제목 ' + c.titles.length + '개 · 설명 ' + c.descriptions.length + '개 한 줄. 「반응형 소재 등록」에 올립니다.</p>' +
+    '<p class="ops-kw-chip-hint">가운뎃점(·) 같은 특수문자는 적용할 때 쉼표로 바뀝니다. 치료·완치·시술 표현은 넣지 않습니다.</p>' +
+    buildOpsAdsApplyBarHTML_('applyOpsNaverAds_(\'' + id + '\', \'ads\')', '소재 적용하기',
+      '문구가 다른 그룹은 새 소재를 만들고 예전 소재는 끕니다. 그룹당 반응형 소재는 3개까지라, 꽉 찬 그룹은 미리보기에서 알려 드립니다.') +
   '</div>';
 }
+function getOpsNaverAdEdit_(st, branchKey){
+  var pack = getOpsNaverAdAssetPack_(branchKey);
+  return {
+    titles: Array.isArray(st.adTitles) && st.adTitles.length ? st.adTitles.slice() : pack.titles.slice(),
+    descriptions: Array.isArray(st.adDescriptions) && st.adDescriptions.length ? st.adDescriptions.slice() : pack.descriptions.slice()
+  };
+}
+function setOpsNaverAdField_(itemId, field, value){
+  syncOpsNaverKwPanelFromDom_(itemId);
+  var st = getOpsNaverKwState_(itemId);
+  var map = { titles: 'adTitles', descriptions: 'adDescriptions', phone: 'extPhone', subLinks: 'extSubLinks' };
+  if(field === 'place') st.extPlace = !!value;
+  else if(field === 'subLinks'){
+    st.extSubLinks = parseOpsAdTextLines_(value).map(function(line){
+      var m = line.split(/\s*\|\s*/);
+      return { name: m[0] || '', final: normalizeOpsNaverKwUrl_(m[1] || '') };
+    }).filter(function(x){ return x.name && x.final; });
+  }
+  else if(map[field]) st[map[field]] = field === 'phone' ? String(value || '').trim() : parseOpsAdTextLines_(value);
+  else return;
+  getOpsManualState_().updatedAt = new Date().toISOString();
+  save({ skipDriveUpload: true, skipGasPush: true });
+  refreshOpsNaverKwPanel_(itemId, { skipDomSync: true });
+}
+window.setOpsNaverAdField_ = setOpsNaverAdField_;
+function resetOpsNaverAdField_(itemId){
+  if(!window.confirm('소재 제목·설명을 플래너 기본 문구(등록팩)로 되돌릴까요?')) return;
+  var st = getOpsNaverKwState_(itemId);
+  delete st.adTitles;
+  delete st.adDescriptions;
+  getOpsManualState_().updatedAt = new Date().toISOString();
+  save({ skipDriveUpload: true, skipGasPush: true });
+  refreshOpsNaverKwPanel_(itemId, { skipDomSync: true });
+}
+window.resetOpsNaverAdField_ = resetOpsNaverAdField_;
+function getOpsNaverExtEdit_(st, branchKey){
+  var meta = opsBranchMeta_(branchKey) || {};
+  return {
+    phone: st.extPhone != null ? st.extPhone : (opsBranchPhone_(branchKey) || ''),
+    place: st.extPlace !== false,
+    placeId: meta.placeId || '',
+    subLinks: Array.isArray(st.extSubLinks) ? st.extSubLinks.slice() : []
+  };
+}
+function buildOpsNaverApplyPlan_(itemId){
+  syncOpsNaverKwPanelFromDom_(itemId);
+  var st = getOpsNaverKwState_(itemId);
+  var branchKey = opsPlaceBranchKey_(itemId);
+  var ad = getOpsNaverAdEdit_(st, branchKey);
+  var ext = getOpsNaverExtEdit_(st, branchKey);
+  return {
+    branch: branchKey,
+    keywords: (st.keywords || []).slice(),
+    neighborhoods: (st.neighborhoods || []).slice(),
+    hoodTerms: opsNaverKwHoodTerms_(st).slice(),
+    joinSpace: st.joinMode === 'space',
+    bid: parseInt(st.bid, 10) || 70,
+    ad: { titles: ad.titles, descriptions: ad.descriptions, final: st.pcUrl || '' },
+    extensions: { phone: ext.phone, placeId: ext.place ? ext.placeId : '', subLinks: ext.subLinks }
+  };
+}
+function applyOpsNaverAds_(itemId, scope){
+  var plan = buildOpsNaverApplyPlan_(itemId);
+  var label = { keywords: '키워드', ads: '소재', extensions: '확장소재' }[scope] || '전체';
+  openOpsAdsApplyDialog_('네이버 ' + label + ' · ' + (opsStoreName_(plan.branch) || ''), '/naver', { plan: plan, scope: scope ? [scope] : null });
+}
+window.applyOpsNaverAds_ = applyOpsNaverAds_;
 function buildOpsNaverKwRegisterManualHTML_(itemId){
-  var store = opsStoreName_(opsPlaceBranchKey_(itemId)) || '리얼무브먼트';
-  return '<div class="ops-review-group ops-kw-group ops-kw-manual" style="border:1px solid rgba(15,118,110,.18);background:rgba(15,118,110,.04);padding:12px 14px;border-radius:10px">' +
-    '<div class="ops-review-group-title"><strong>등록 순서</strong> <span class="ops-review-group-hint">파워링크 · 아래 작업과 같은 번호</span></div>' +
-    '<ol class="ops-kw-manual-steps" style="margin:8px 0 0;padding-left:1.25em;line-height:1.55;font-size:13px">' +
-      '<li><strong>+ 새 캠페인</strong> (예: ' + escapeHtml(store) + ')</li>' +
-      '<li><strong>+ 새 광고그룹</strong>. 이름은 아래 동네 목록과 같은 순서 (일반, 동네, 역)</li>' +
-      '<li>광고그룹을 다운로드하고 ID(grp-…)를 아래 칸에 붙입니다</li>' +
-      '<li>일반 키워드, 동네, 입찰가, 채널 URL을 확인합니다</li>' +
-      '<li><strong>선택 항목 다운로드</strong>. 1만 개를 넘으면 파일이 나뉩니다</li>' +
-      '<li>도구 → 대량 관리 → 「키워드 등록」에 CSV를 올립니다. 1~6행은 그대로 두고, 엑셀로 다시 저장하지 않습니다</li>' +
-      '<li>소재는 반응형. 아래 등록팩을 쓰거나 소재 CSV를 「반응형 소재 등록」에 올립니다. 의료 업종으로 막히면 단일형(제목 1번 + 설명 1번)</li>' +
-      '<li>캠페인 <strong>확장 소재</strong>에 아래 전화·플레이스·링크를 한 번 등록합니다</li>' +
-    '</ol>' +
-    '<p style="margin:10px 0 0;font-size:12px;line-height:1.45;color:#475569">비즈채널이 승인된 뒤에 노출됩니다. 그룹당 1,000개, 파일당 10,000개. 치료·완치·시술 표현은 넣지 않습니다.</p>' +
-  '</div>';
+  return buildOpsAdsApiGuideHTML_('naver');
 }
 function buildOpsNaverKwExtensionPanelHTML_(itemId){
   ensureOpsKwChipStyles_();
   var branchKey = opsPlaceBranchKey_(itemId);
-  var meta = opsBranchMeta_(branchKey);
-  var phone = opsBranchPhone_(branchKey);
-  var store = opsStoreName_(branchKey);
-  var placeUrl = (meta && (meta.placeUrl || meta.placeMapUrl)) || '';
-  var blog = (meta && meta.blogDirections) || '';
-  var creative = buildOpsNaverKwCreativeSeed_(branchKey);
+  var st = getOpsNaverKwState_(itemId);
+  var ext = getOpsNaverExtEdit_(st, branchKey);
+  var id = escapeHtml(itemId);
+  var linksText = ext.subLinks.map(function(x){ return x.name + ' | ' + x.final; }).join('\n');
   return '<div class="ops-review-group ops-kw-group" style="border:1px solid rgba(30,58,110,.16);background:rgba(30,58,110,.03);padding:12px 14px;border-radius:10px">' +
-    '<div class="ops-review-group-title"><strong>8. 확장소재</strong> <span class="ops-review-group-hint">캠페인에 한 번 · 클릭하면 복사</span></div>' +
-    '<div style="margin-top:8px;font-size:13px;line-height:1.5"><strong>전화</strong></div>' +
-    '<div class="ops-kw-chip-row">' + buildOpsKwCopyChipHTML_(phone, { meta: true }) + '</div>' +
-    '<div style="margin-top:8px;font-size:13px;line-height:1.5"><strong>위치 · 플레이스</strong></div>' +
-    '<div class="ops-kw-chip-row">' + buildOpsKwCopyChipHTML_(store, { meta: true }) + (placeUrl ? buildOpsKwCopyChipHTML_(placeUrl, { meta: true, wide: true }) : '') + '</div>' +
-    '<div style="margin-top:8px;font-size:13px;line-height:1.5"><strong>추가 링크</strong></div>' +
-    '<div class="ops-kw-chip-row">' +
-      buildOpsKwCopyChipHTML_(creative.displayUrlPc, { meta: true, wide: true }) +
-      buildOpsKwCopyChipHTML_(creative.finalUrlPc, { meta: true, wide: true }) +
-      (blog ? buildOpsKwCopyChipHTML_(blog, { meta: true, wide: true }) : '') +
+    '<div class="ops-review-group-title"><strong>확장소재</strong> <span class="ops-review-group-hint">캠페인 전체에 한 번 · 광고 아래 전화·플레이스·링크</span></div>' +
+    '<div class="ops-kw-meta-grid" style="margin-top:8px">' +
+      '<label class="ops-kw-meta"><span>전화번호 (비우면 끔)</span><input type="text" value="' + escapeHtml(ext.phone) + '" placeholder="0507-…" onchange="setOpsNaverAdField_(\'' + id + '\', \'phone\', this.value)" /></label>' +
+      '<label class="ops-kw-meta" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox"' + (ext.place ? ' checked' : '') + ' onchange="setOpsNaverAdField_(\'' + id + '\', \'place\', this.checked)" /><span>플레이스 정보 (' + escapeHtml(opsStoreName_(branchKey) || '') + ' · ' + escapeHtml(ext.placeId || '플레이스 ID 없음') + ')</span></label>' +
     '</div>' +
+    '<div class="ops-kw-preview-head" style="margin-top:10px">서브링크 <span>한 줄에 「이름 | URL」 · 비즈채널 사이트(realmovement.imweb.me) 안의 페이지 · 비우면 끔</span></div>' +
+    '<textarea class="ops-review-input ops-kw-textarea" rows="4" placeholder="프로그램 | https://realmovement.imweb.me/…&#10;오시는 길 | https://realmovement.imweb.me/…" onchange="setOpsNaverAdField_(\'' + id + '\', \'subLinks\', this.value)">' + escapeHtml(linksText) + '</textarea>' +
+    '<p class="ops-kw-chip-hint">전화·플레이스는 네이버에 등록된 비즈채널과 연결합니다. 번호가 비즈채널과 다르면 미리보기에서 알려 드립니다.</p>' +
+    buildOpsAdsApplyBarHTML_('applyOpsNaverAds_(\'' + id + '\', \'extensions\')', '확장소재 적용하기', '') +
   '</div>';
 }
 function buildOpsNaverKwExtensionGuideText_(branchKey){
@@ -26369,12 +26707,12 @@ function buildOpsNaverKwExtensionGuideText_(branchKey){
 function buildOpsNaverKwImproveTipsText_(){
   return [
     '【보완하면 좋은 점】',
-    '1) 파트 1(키워드)과 파트 2(소재·확장소재)를 나눠 진행하면 검수·오류 추적이 쉽습니다.',
-    '2) 광고그룹 이름 = 플래너 「일반·동네」 순서와 같게 만들면 ID 붙여넣기 실수가 줄어듭니다.',
+    '1) 키워드 → 소재 → 확장소재 순서로 적용하면 미리보기가 짧아 확인이 쉽습니다.',
+    '2) 동네 목록의 한 줄이 광고그룹 하나입니다. 동네를 빼면 그 그룹은 꺼지고, 다시 넣으면 다시 켜집니다.',
     '3) 비즈채널 검토중이면 키워드·소재가 안 나갈 수 있습니다. 채널 URL 승인을 먼저 확인하세요.',
-    '4) 소재는 반응형으로 여러 제목·설명을 넣고, 막히면 단일형(제목1+설명1)으로 전환하세요.',
-    '5) 확장소재(전화·위치·링크)를 소재와 같이 켜 두면 초기 CTR·신뢰에 도움이 됩니다.',
-    '6) 그룹당 1,000·파일당 10,000 한도 초과 시 플래너가 CSV를 나눕니다. 대량관리에 순서대로 업로드하세요.',
+    '4) 소재 제목은 15자, 설명은 20~45자. 길이가 안 맞는 줄은 적용할 때 빠집니다.',
+    '5) 확장소재(전화·플레이스·서브링크)를 켜 두면 초기 CTR·신뢰에 도움이 됩니다.',
+    '6) 그룹당 키워드는 1,000개까지입니다.',
     '7) 치료·완치·시술 보장 표현은 키워드·소재·확장소재·랜딩 모두에서 제외하세요.'
   ].join('\n');
 }
@@ -26389,56 +26727,15 @@ function renderOpsNaverKwPanelHTML_(itemId){
   var baseCount = (st.keywords || []).length;
   var hoods = st.neighborhoods || [];
   var hoodCount = hoods.length;
-  var comboHoodCount = hoods.filter(function(h){ return !isOpsNaverKwBaseLabel_(h); }).length;
   var comboCount = combo.length;
   var bothRows = buildOpsNaverKwCsvRows_(st, 'both');
   var bothCount = bothRows.length;
   var skippedLong = bothRows._skippedLong || 0;
   var seedCount = opsNaverKwSeedKeywords_(opsPlaceBranchKey_(itemId)).length;
-  var hoodAdIds = syncOpsNaverKwAdGroupIdsToHoods_(st);
-  var hoodSel = getOpsNaverKwHoodCsvSelected_(st);
-  var hoodFilled = hoodAdIds.filter(Boolean).length;
-  var hoodSelCount = hoodSel.filter(Boolean).length;
-  var fileParts = Math.max(1, Math.ceil(Math.max(bothCount, 1) / OPS_NAVER_KW_MAX_ROWS));
-  if(bothCount === 0) fileParts = 1;
-  var adGroupHint = hoodCount
-    ? ('항목 ' + hoodCount + '개(일반 포함) · 선택 ' + hoodSelCount + '/' + hoodCount +
-      ' · ID 입력 ' + hoodFilled + '/' + hoodCount +
-      ' · 조합 대상 동네 ' + comboHoodCount + '개 · 합산 ' + bothCount.toLocaleString() + '개' +
-      (bothCount > OPS_NAVER_KW_MAX_ROWS ? ' → CSV ' + Math.ceil(bothCount / OPS_NAVER_KW_MAX_ROWS) + '개로 분할' : '') +
-      ' · 그룹당 ≤' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개 · 체크한 항목만 다운로드')
-    : ('일반·동네를 입력하면 광고그룹ID 칸이 항목 수만큼 생깁니다.');
-  var allSel = hoodCount > 0 && hoodSelCount === hoodCount;
-  var hoodMapToolbar = hoodCount
-    ? ('<div class="ops-kw-hood-ad-toolbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 4px">' +
-        '<label class="ops-kw-hood-select-all" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;cursor:pointer">' +
-          '<input type="checkbox" data-ops-kw-hood-select-all' + (allSel ? ' checked' : '') +
-            ' onchange="setOpsNaverKwHoodCsvSelectedAll_(\'' + itemId + '\', this.checked)" />' +
-          '전체 선택</label>' +
-        '<span style="font-size:11px;opacity:.7">선택 ' + hoodSelCount + '/' + hoodCount + '</span>' +
-      '</div>')
-    : '';
-  var hoodMapRows = hoods.map(function(hood, idx){
-    var isBase = isOpsNaverKwBaseLabel_(hood);
-    var checked = hoodSel[idx] !== false;
-    return '<div class="ops-kw-hood-ad-row" style="display:grid;grid-template-columns:22px minmax(72px,96px) 1fr;gap:8px;align-items:center">' +
-      '<label style="display:flex;align-items:center;justify-content:center;margin:0;cursor:pointer" title="CSV에 포함">' +
-        '<input type="checkbox" data-ops-kw-hood-select="' + idx + '"' + (checked ? ' checked' : '') +
-          ' onchange="setOpsNaverKwHoodCsvSelected_(\'' + itemId + '\', ' + idx + ', this.checked)" />' +
-      '</label>' +
-      '<span class="ops-kw-hood-ad-label" style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' +
-        (isBase ? ';color:#0F766E' : '') + '" title="' + escapeHtml(hood) + (isBase ? ' (일반 키워드용 · 조합 안 함)' : '') + '">' +
-        escapeHtml(hood) + (isBase ? ' ·일반' : '') + '</span>' +
-      '<input type="text" class="ops-review-input ops-kw-hood-ad-input" data-ops-kw-hood-adgroup="' + idx + '" value="' + escapeHtml(hoodAdIds[idx] || '') + '" placeholder="grp-a001-… (수정 가능)" onchange="setOpsNaverKwHoodAdGroupId_(\'' + itemId + '\', ' + idx + ', this.value)" />' +
-    '</div>';
-  }).join('');
-  if(!hoodMapRows){
-    hoodMapRows = '<div class="ops-kw-hood-ad-empty" style="font-size:12px;opacity:.7">일반·동네를 위에 입력하면 여기에 광고그룹ID 입력칸이 생깁니다.</div>';
-  }
   return '<div class="ops-kw-panel" data-ops-kw="' + escapeHtml(itemId) + '">' +
     buildOpsNaverKwRegisterManualHTML_(itemId) +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>4. 일반 키워드</strong> <span class="ops-review-group-hint">한 줄에 하나 · 시드 ' + seedCount + '개 · 「일반」 그룹</span>' +
+      '<div class="ops-review-group-title"><strong>일반 키워드</strong> <span class="ops-review-group-hint">한 줄에 하나 · 기본 ' + seedCount + '개 · 「일반」 그룹</span>' +
         '<span class="ops-review-group-progress">' + baseCount + '개</span></div>' +
       '<textarea class="ops-review-input ops-kw-textarea" rows="8" data-ops-kw-field="keywords" placeholder="예: 허리통증&#10;거북목교정" onchange="setOpsNaverKwList_(\'' + itemId + '\', \'keywords\', this.value)">' + escapeHtml(kwText) + '</textarea>' +
       '<div class="ops-kw-actions">' +
@@ -26447,7 +26744,7 @@ function renderOpsNaverKwPanelHTML_(itemId){
       '</div>' +
     '</div>' +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>4. 동네</strong> <span class="ops-review-group-hint">한 줄에 하나 · 첫 줄 「일반」은 조합하지 않음</span>' +
+      '<div class="ops-review-group-title"><strong>동네</strong> <span class="ops-review-group-hint">한 줄에 하나 · 줄마다 광고그룹 하나 · 첫 줄 「일반」은 조합하지 않음</span>' +
         '<span class="ops-review-group-progress">' + hoodCount + '개</span></div>' +
       '<textarea class="ops-review-input ops-kw-textarea ops-kw-hood-textarea" rows="8" data-ops-kw-field="neighborhoods" placeholder="예: 일반&#10;약수&#10;약수역" onchange="setOpsNaverKwList_(\'' + itemId + '\', \'neighborhoods\', this.value)">' + escapeHtml(hoodText) + '</textarea>' +
       '<div class="ops-kw-actions">' +
@@ -26469,24 +26766,16 @@ function renderOpsNaverKwPanelHTML_(itemId){
       '<pre class="ops-kw-preview">' + escapeHtml(comboPreview || '(동네·키워드를 입력하면 여기에 표시됩니다. 「일반」은 조합하지 않습니다.)') + '</pre>' +
     '</div>' +
     '<div class="ops-review-group ops-kw-group">' +
-      '<div class="ops-review-group-title"><strong>5–6. 대량등록 CSV</strong> <span class="ops-review-group-hint">일반+동네 · 파일당 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString() + '개 · 그룹당 ' + OPS_NAVER_KW_PER_ADGROUP.toLocaleString() + '개</span></div>' +
+      '<div class="ops-review-group-title"><strong>키워드 적용</strong> <span class="ops-review-group-hint">광고그룹 = 동네 목록 (「일반」 포함 ' + hoodCount + '개)</span></div>' +
       '<div class="ops-kw-meta-grid">' +
-        '<div class="ops-kw-meta ops-kw-meta-wide">' +
-          '<span>광고그룹ID (기본값 · 수정 가능) <em class="ops-kw-id-note" style="font-style:normal;font-weight:500;opacity:.75">일반 포함 ' + hoodCount + '칸 · 체크한 항목만 다운로드</em></span>' +
-          hoodMapToolbar +
-          '<div class="ops-kw-hood-ad-map" style="display:flex;flex-direction:column;gap:6px;margin-top:4px">' + hoodMapRows + '</div>' +
-        '</div>' +
-        '<label class="ops-kw-meta"><span>입찰가 (70~100000 · 10원 단위)</span><input type="text" data-ops-kw-meta="bid" inputmode="numeric" value="' + escapeHtml(st.bid || '') + '" placeholder="70" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'bid\', this.value)" /></label>' +
-        '<label class="ops-kw-meta ops-kw-meta-wide"><span>PC URL (채널)</span><input type="text" data-ops-kw-meta="pcUrl" value="' + escapeHtml(st.pcUrl || '') + '" placeholder="https://…" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'pcUrl\', this.value)" /></label>' +
-        '<label class="ops-kw-meta ops-kw-meta-wide"><span>모바일 URL (채널)</span><input type="text" data-ops-kw-meta="mobileUrl" value="' + escapeHtml(st.mobileUrl || '') + '" placeholder="https://…" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'mobileUrl\', this.value)" /></label>' +
+        '<label class="ops-kw-meta"><span>새 키워드·새 그룹 입찰가 (70원부터 · 10원 단위)</span><input type="text" data-ops-kw-meta="bid" inputmode="numeric" value="' + escapeHtml(st.bid || '') + '" placeholder="70" onchange="setOpsNaverKwMeta_(\'' + itemId + '\', \'bid\', this.value)" /></label>' +
       '</div>' +
-      '<div class="ops-kw-dl-counts">일반 ' + baseCount.toLocaleString() + ' · 동네조합 ' + comboCount.toLocaleString() + ' · 합산(중복·' + OPS_NAVER_KW_MAX_CHARS + '자 초과 제외) ' + bothCount.toLocaleString() +
-        (bothCount > OPS_NAVER_KW_MAX_ROWS ? ' → <strong>' + Math.ceil(bothCount / OPS_NAVER_KW_MAX_ROWS) + '개 파일</strong>로 분할' : ' / 파일 최대 ' + OPS_NAVER_KW_MAX_ROWS.toLocaleString()) +
-        (skippedLong ? ' · <span class="ops-kw-warn">' + skippedLong + '개 길이초과 제외</span>' : '') +
-        '</div>' +
-      '<div class="ops-kw-actions ops-kw-dl-actions">' +
-        '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="downloadOpsNaverKwCsv_(\'' + itemId + '\', \'both\')">선택 항목 다운로드</button>' +
+      '<div class="ops-kw-dl-counts">일반 ' + baseCount.toLocaleString() + ' · 동네 조합 ' + comboCount.toLocaleString() + ' · 합계 ' + bothCount.toLocaleString() + '개' +
+        (skippedLong ? ' · <span class="ops-kw-warn">' + OPS_NAVER_KW_MAX_CHARS + '자 넘는 ' + skippedLong + '개 제외</span>' : '') +
+        (opsPlaceBranchKey_(itemId) === 'jakjeon' ? ' · 「리얼페이스」 그룹은 전용 키워드로 함께 맞춥니다' : '') +
       '</div>' +
+      buildOpsAdsApplyBarHTML_('applyOpsNaverAds_(\'' + itemId + '\', \'keywords\')', '키워드 적용하기',
+        '목록에 새로 넣은 키워드·동네는 추가하고(동네는 새 광고그룹 + 소재), 목록에서 뺀 키워드·동네 그룹은 끕니다. 기존 키워드 입찰가는 바꾸지 않습니다.') +
     '</div>' +
     buildOpsNaverKwCreativePanelHTML_(itemId) +
     buildOpsNaverKwExtensionPanelHTML_(itemId) +
@@ -26980,7 +27269,7 @@ function renderOpsManualMainHTML_(){
   '</div>';
 }
 var OPS_PROMO_TABS = [
-  { id: 'mikadoc', label: '미카닥', itemId: 'ops-m-26' },
+  { id: 'mikadoc', label: '브랜딩', itemId: 'ops-m-26' },
   { id: 'yaksu', label: '약수점', itemId: 'ops-y-26' },
   { id: 'jakjeon', label: '인천점', itemId: 'ops-j-26' }
 ];
@@ -26995,7 +27284,7 @@ function setOpsPromoTab_(tab){
   renderMain();
 }
 window.setOpsPromoTab_ = setOpsPromoTab_;
-/** 지점브랜딩 「홍보 현황」 — 미카닥 · 약수점 · 인천점 */
+/** 지점브랜딩 「홍보 현황」 — 브랜딩 · 약수점 · 인천점 */
 function renderOpsPromoMainHTML_(){
   ensureOpsKwChipStyles_();
   var tab = getOpsPromoTab_();
@@ -27021,7 +27310,17 @@ function countOpsPromoTodayTasks_(){
   OPS_PROMO_TABS.forEach(function(x){
     try { n += buildOpsMarketingReport_(x.itemId).tips.filter(function(t){ return t.level === 'high'; }).length; } catch(eCnt){}
   });
+  try {
+    var done = getOpsChannelReviewDone_();
+    n += (getOpsChannelReviewSeed_().items || []).filter(function(it){ return it.level === 'high' && !done[it.id]; }).length;
+  } catch(eRev){}
   return n;
+}
+/** 새로고침·처음 열 때는 「지점브랜딩 → 홍보 현황」 (초안 바로가기 링크로 열었을 때는 그대로) */
+function openOpsPromoOnBoot_(){
+  if(/^#open\//.test(location.hash || '')) return;
+  state.currentCat = 8;
+  try { getOpsManualState_().activeBranch = 'promo'; } catch(e){}
 }
 function selectOpsBranch_(branchId){
   selectOpsBranchFromNav_(branchId);
@@ -33845,8 +34144,7 @@ function renderThumbMakerCard_(content){
     html += '</div>';
   }
   html += '<div class="img-tool-actions thumb-maker-actions">';
-  html += '<button type="button" class="img-tool-main-btn thumb" onclick="downloadThumbMakerPng_(this)">' +
-    (typeof isPhoneOrTablet === 'function' && isPhoneOrTablet() ? '공유·저장' : (photoOnly ? 'JPEG 다운로드' : 'PNG 다운로드')) + '</button>';
+  html += '<button type="button" class="img-tool-main-btn thumb" onclick="downloadThumbMakerPng_(this)" title="기기에 저장하고, 인스타 탭에서 올릴 수 있게 Supabase에도 저장합니다">저장하기</button>';
   html += '<div class="thumb-maker-actions-row">';
   html += '<button type="button" class="img-tool-copy-btn" onclick="copyThumbMakerPng_(this)">클립보드 복사</button>';
   if(photoOnly && refCount > 1){
@@ -34821,8 +35119,17 @@ window.downloadThumbMakerPng_ = async function(btn){
     var blob = await exportThumbMakerPngBlob_();
     var copy = persistThumbMakerFieldsFromDom_();
     var fileName = thumbMakerExportFileName_(copy) + thumbMakerExportExt_();
+    var cloud = null;
+    var draftForCloud = state.selectedId;
+    if(draftForCloud && typeof PlannerSocial !== 'undefined' && isBlogInstaCategory(state.selectedCatId)){
+      cloud = PlannerSocial.saveThumb(draftForCloud, blob, fileName).then(function(){ return true; }, function(err){
+        setAppToast('Supabase 저장 실패: ' + ((err && err.message) || err), { duration: 6000, variant: 'err' });
+        return false;
+      });
+    }
     var result = await saveThumbMakerBlob_(blob, fileName);
     var savedOk = await persistThumbMakerToDraft_(copy);
+    if(cloud && await cloud) setAppToast('Supabase에 저장 · 인스타 첫 장으로 준비됐어요', { duration: 2400, variant: 'ok' });
     var jpegMode = isThumbPhotoOnlyMode_();
     if(result === 'aborted'){
       setAppToast('공유를 취소했어요.', { duration: 1800, variant: 'ok' });
@@ -34844,7 +35151,7 @@ window.downloadThumbMakerPng_ = async function(btn){
   } catch(err){
     setAppToast((err && err.message) || '다운로드에 실패했어요.', { duration: 2500, variant: 'err' });
   }
-  if(btn){ btn.disabled = false; btn.textContent = ios ? '공유·저장' : (isThumbPhotoOnlyMode_() ? 'JPEG 다운로드' : 'PNG 다운로드'); }
+  if(btn){ btn.disabled = false; btn.textContent = '저장하기'; }
   paintThumbMakerPreview_();
 };
 
@@ -35859,7 +36166,8 @@ function renderSheetContent(content) {
   let bodyHTML = '';
   if(tab==='images'){
     var colorBar = isDailyShareCategory(sheetCatId) ? '' : buildProgramColorPreviewBarHtml_(sheetCatId);
-    bodyHTML = tabsHTML + colorBar + addSourceHtml + buildImageTabBody(content);
+    var socialSlot = isBlogInstaCategory(sheetCatId) ? '<div class="img-tool-card" data-social-slot="images" style="margin-bottom:12px"></div>' : '';
+    bodyHTML = tabsHTML + socialSlot + colorBar + addSourceHtml + buildImageTabBody(content);
   } else if(tab==='thread'){
     const th = normalizeThreadBlock(content.thread);
     if(!th || !th.summary){
@@ -35928,7 +36236,8 @@ function renderSheetContent(content) {
         sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10, regen: 'insta.caption', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).map(function(h){ return String(h).replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
         instagramCollabSheetHtml_(state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId)) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 저장·복사 후 인스타 앱으로 이동하고, <strong>수정된 인스타 최종본</strong>으로 쓰레드 초안이 만들어져요. 하단 <strong>연결 계정</strong>은 발행·복사 시 캡션에 붙어요.</p>'
+        '<div data-social-slot="insta"></div>' +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>지금 올리기</strong>는 @dr.park_dc.pt에 바로 게시하고(연결 계정은 공동작업자로 초대), <strong>예약하기</strong>는 고른 시간에 클라우드가 올립니다. 올리면 <strong>수정된 인스타 최종본</strong>으로 쓰레드 초안이 만들어져요. 앱에서 직접 올렸다면 <strong>직접 올림</strong>을 누르세요.</p>'
       );
     }
   } else if(tab==='threads'){
@@ -35944,7 +36253,8 @@ function renderSheetContent(content) {
         sheetFullCopyBar_() +
         sheetEditField_('본문 (게시글)', 'sheet-threads-body', getThreadsBodyText_(ths), { rows: 5, regen: 'threads.body', copy: true, help: '통념 뒤집기·궁금증 훅 한 줄. 해설은 넣지 마세요.', paragraphs: true }) +
         sheetEditField_('댓글 (재게시)', 'sheet-threads-comment', getThreadsCommentText_(ths), { rows: 12, regen: 'threads.comment', copy: true, help: '본문에 대한 해설·근거·과정·철학. 게시 후 본인 댓글(재게시)로 올리세요.', paragraphs: true }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">먼저 <strong>본문</strong>을 게시한 뒤, <strong>댓글</strong> 박스 내용을 본인 댓글(재게시)로 붙여넣으세요. <strong>발행완료</strong>는 본문을 복사·저장합니다.</p>';
+        '<div data-social-slot="threads"></div>' +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;"><strong>지금 올리기·예약하기</strong>는 본문을 올리고 <strong>댓글</strong> 박스 내용을 바로 아래 내 댓글로 이어 올립니다. 앱에서 직접 올렸다면 <strong>직접 올림</strong>을 누르세요.</p>';
     }
   } else if(tab==='news'){
     ensureNewsBlock_(content);
@@ -36002,11 +36312,14 @@ function renderSheetContent(content) {
   // 이미 저장했어도 CTA는 항상「발행완료」—「저장됨」은 상태처럼 보여 버튼을 못 찾는 경우가 많음
   var pubTitle = tabSaved ? ' title="이미 저장됨 · 다시 누르면 수정본을 저장·복사합니다"' : '';
   var isDailyImages = isDailyShareCategory(state.selectedCatId) && tab === 'images';
-  setSheetActionsHtml_(
-    '<button type="button" class="btn-save-draft" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
-    '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
-    (isDailyImages ? '' : '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">발행완료</button>')
+  var socialTab = (tab === 'insta' || tab === 'threads') && isBlogInstaCategory(state.selectedCatId) && typeof PlannerSocial !== 'undefined';
+  setSheetActionsHtml_(socialTab
+    ? '<button type="button" class="btn-save-draft" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' + PlannerSocial.actionsHTML(tab)
+    : '<button type="button" class="btn-save-draft" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
+      '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
+      (isDailyImages ? '' : '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">발행완료</button>')
   );
+  if(typeof PlannerSocial !== 'undefined' && document.querySelector('#sheet-body [data-social-slot]')) PlannerSocial.hydrate();
   restoreTextFieldFocus_(focusSnap);
   scheduleWorkshopTextareaGrow_(document.getElementById('sheet-body'));
   renderAllSelfCareStepPreviews_();
@@ -38108,10 +38421,12 @@ function buildFinalTextForKey_(content, catId, key){
   return '';
 }
 
-function commitSheetTabPublish_(draftId, catId, tab){
+/** opts.skipDom: 시트가 열려 있지 않을 때(예약 게시 반영) · opts.at: 실제 게시 시각 */
+function commitSheetTabPublish_(draftId, catId, tab, opts){
+  opts = opts || {};
   var content = getDraftContent_(draftId);
   if(!content) throw new Error('초안이 없어요.');
-  applySheetEditsForTab_(content, tab);
+  if(!opts.skipDom) applySheetEditsForTab_(content, tab);
   var key = getPublishKeyForTab_(tab, catId);
   if(!key) throw new Error('이 탭은 저장할 수 없어요.');
   var tabText = buildFinalTextForKey_(content, catId, key).trim();
@@ -38125,7 +38440,7 @@ function commitSheetTabPublish_(draftId, catId, tab){
 
   var today = new Date().toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
   if(!pub.date) pub.date = today;
-  pub.savedAt = new Date().toISOString();
+  pub.savedAt = opts.at || new Date().toISOString();
   pub.catId = catId;
   alignDraftTopicToBlogTitle_(draftId, content);
   pub.topic = draft ? draft.topic : blogTitleOfContent_(content);
@@ -38374,7 +38689,10 @@ window.onSheetDraftSave_ = function(){
   setAppToast('초안을 저장하고 서버에 올렸어요. (발행 아님)', { duration: 3200, variant: 'ok' });
 };
 
-window.onSheetPublishComplete = async function(){
+/** opts.viaApi: PlannerSocial이 API로 이미 올린 뒤 — 발행 기록·다음 채널 초안만 만들고 복사·앱 이동은 하지 않는다 */
+window.onSheetPublishComplete = async function(opts){
+  opts = (opts && typeof opts === 'object' && !opts.target) ? opts : {};
+  var viaApi = !!opts.viaApi;
   var draftId = state.selectedId;
   if(!draftId){
     setAppToast('먼저 초안 카드를 선택해 주세요.', { duration: 3500, variant: 'err' });
@@ -38395,6 +38713,7 @@ window.onSheetPublishComplete = async function(){
       renderSheetContent(quickContent);
       renderTabs();
       renderMain();
+      if(viaApi) return;
       copyTextOnly_(quickText, function(){
         if(tab === 'blog') openExternalNaverBlog();
         setAppToast(tab === 'blog'
@@ -38471,7 +38790,7 @@ window.onSheetPublishComplete = async function(){
       setAppToast('후킹 또는 캡션을 입력해 주세요.', { duration: 4000, variant: 'err' });
       return;
     }
-    if(!state.apiKey){
+    if(!state.apiKey && !viaApi){
       openApiModal();
       return;
     }
@@ -38490,10 +38809,11 @@ window.onSheetPublishComplete = async function(){
       renderSheetContent(getDraftContent_(draftId) || igContent);
       renderTabs();
       renderMain();
-      copyAndOpenInstagram_(igContent && igContent.insta ? getInstaFullPasteText_(igContent.insta, catId) : '');
+      if(!viaApi) copyAndOpenInstagram_(igContent && igContent.insta ? getInstaFullPasteText_(igContent.insta, catId) : '');
       afterTabPublishSaved_(instaResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
       var collabToast = instagramCollabMentionForCat_(catId);
-      setAppToast('인스타 저장 · 복사 · @' + getInstagramUsernameForCat_(catId) + ' 이동' +
+      if(viaApi) setAppToast('인스타 게시 완료 · 발행 기록 저장\n수정본으로 쓰레드 초안을 만들고 있어요.', { duration: 5200, variant: 'ok' });
+      else setAppToast('인스타 저장 · 복사 · @' + getInstagramUsernameForCat_(catId) + ' 이동' +
         (collabToast ? '\n연결 계정 ' + collabToast : '') +
         '\n수정본으로 쓰레드 초안을 만들고 있어요.', { duration: 5200, variant: 'ok' });
     } catch(err){
@@ -38529,12 +38849,13 @@ window.onSheetPublishComplete = async function(){
     try {
       var threadsResult = commitSheetTabPublish_(draftId, catId, 'threads');
       var savedTh = getDraftContent_(draftId);
-      copyAndOpenThreads_(savedTh && savedTh.threads ? getThreadsBodyText_(savedTh.threads) : '');
+      if(!viaApi) copyAndOpenThreads_(savedTh && savedTh.threads ? getThreadsBodyText_(savedTh.threads) : '');
       closeSheet();
       renderTabs();
       renderMain();
       afterTabPublishSaved_(threadsResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
-      setAppToast('쓰레드 본문 저장 · 복사 · 앱 이동\n게시 후 댓글(재게시)란에 «댓글» 박스 내용을 붙여넣으세요.', { duration: 6500, variant: 'ok' });
+      setAppToast(viaApi ? '쓰레드 게시 완료 · 댓글도 이어서 올렸어요 · 발행 기록 저장'
+        : '쓰레드 본문 저장 · 복사 · 앱 이동\n게시 후 댓글(재게시)란에 «댓글» 박스 내용을 붙여넣으세요.', { duration: 6500, variant: 'ok' });
     } catch(err){
       setAppToast(((err && err.message) || String(err)), { duration: 8000, variant: 'err' });
     } finally {

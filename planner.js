@@ -6029,9 +6029,9 @@ function getDraftsForSubGoalStep_(catId, stepId, opts){
     if(!d || !d.id) return false;
     return getDraftRoadmapStepId_(d, catId, cat.drafts.indexOf(d)) === String(stepId);
   }).sort(function(a, b){
-    var ta = getDraftCreatedAtMs_(a) || userAddedDraftTimestamp_(a.id) || 0;
-    var tb = getDraftCreatedAtMs_(b) || userAddedDraftTimestamp_(b.id) || 0;
-    if(ta !== tb) return tb - ta; // 최근 생성일 상단
+    var ta = getDraftListActivityMs_(a);
+    var tb = getDraftListActivityMs_(b);
+    if(ta !== tb) return tb - ta;
     var ia = cat.drafts.indexOf(a);
     var ib = cat.drafts.indexOf(b);
     return ia - ib;
@@ -6382,11 +6382,11 @@ function applyTopicToStepSlot_(catId, stepId, slotNum, topicData){
     densifyStepSlotTotalsOnly_(catId, stepId);
     return true;
   }
-  if(existing){
+    if(existing){
     existing.topic = topicStr;
     if(topicData.angle != null) existing.angle = String(topicData.angle).trim();
     if(topicData.rationale) existing.rationale = stripTopicRationaleStepPrefix_(String(topicData.rationale).trim());
-    existing.updatedAt = new Date().toISOString();
+    stampDraftActivity_(existing);
     applyDraftRoadmapAssignment_(existing, catId, stepId, title, slot, totalSlots);
     ensurePendingAssignmentForDraft_(catId, stepId, slot, existing.id);
     densifyStepSlotTotalsOnly_(catId, stepId);
@@ -6474,8 +6474,8 @@ function getVisibleDraftsInMain_(catId){
     return (cat.drafts || []).filter(function(d){
       return d && d.id && !(state.deletedDraftIds && state.deletedDraftIds[d.id]);
     }).sort(function(a, b){
-      var ta = userAddedDraftTimestamp_(a.id) || (a.createdAt ? Date.parse(a.createdAt) : 0);
-      var tb = userAddedDraftTimestamp_(b.id) || (b.createdAt ? Date.parse(b.createdAt) : 0);
+      var ta = getDraftListActivityMs_(a);
+      var tb = getDraftListActivityMs_(b);
       if(ta !== tb) return tb - ta;
       return (cat.drafts.indexOf(b) - cat.drafts.indexOf(a));
     });
@@ -6938,9 +6938,6 @@ function applyDraftRoadmapAssignment_(draft, catId, stepId, stepTitle, order, to
       delete state.draftBrandOverrides[draft.id].previousSeries;
       state.draftBrandOverrides[draft.id].miscLocked = true;
     }
-  }
-  if(isUserAddedDraftId_(draft.id)){
-    draft.updatedAt = new Date().toISOString();
   }
 }
 /** 주제 기획안·수동 추가 초안의 단계 배정. 유효한 step이면 유지, 없으면 기타. */
@@ -10768,7 +10765,7 @@ window.updateTopicDraftField_ = function(draftId, field, value){
   if(!d) return;
   var raw = String(value || '');
   d[field] = field === 'rationale' ? stripTopicRationaleStepPrefix_(raw) : raw;
-  d.updatedAt = new Date().toISOString();
+  stampDraftActivity_(d);
   if(topicFieldSaveTimer_) clearTimeout(topicFieldSaveTimer_);
   topicFieldSaveTimer_ = setTimeout(function(){
     topicFieldSaveTimer_ = null;
@@ -11569,11 +11566,13 @@ function classifyTopicGap_(spec){
     seen[key] = true;
     upload.push(key);
   });
-  (spec.keepLocal || []).forEach(function(key){
-    if(!key || seen[key] || ask.indexOf(key) >= 0) return;
-    seen[key] = true;
-    upload.push(key);
-  });
+  if(spec.sessionEdited){
+    (spec.keepLocal || []).forEach(function(key){
+      if(!key || seen[key] || ask.indexOf(key) >= 0) return;
+      seen[key] = true;
+      upload.push(key);
+    });
+  }
   var listReceive = (spec.missingHere || []).length + (spec.missingContent || []).length + (spec.planMissingHere || []).length + (spec.stillDeleted || []).length + (spec.planStillDeleted || []).length;
   var localRev = spec.localRev || {};
   var serverAhead = false;
@@ -11612,6 +11611,7 @@ function applyTopicGapDecision_(detail, index){
     stillDeleted: detail.stillDeleted,
     planStillDeleted: detail.planStillDeleted,
     keepLocal: state._topicKeepLocalKeys || [],
+    sessionEdited: !!state._sessionUserEdit,
     surfaceDiff: !!detail.surfaceDiff,
     localRev: state.syncEntityRevisions || {}
   });
@@ -11646,9 +11646,13 @@ function applyTopicGapDecision_(detail, index){
   var attempts = state._topicReceiveAttempts || 0;
   if(decision.receive && !state._topicGapResolving && !plannerSyncConflictPending_){
     if(attempts >= 2){
-      if(state._topicGapAdoptServer && detail.surfaceDiff && !decision.uploadKeys.length && !decision.askKeys.length && !equalKeys.length){
+      var surfaceOnly = !!(detail.surfaceDiff && !decision.uploadKeys.length && !decision.askKeys.length && !equalKeys.length);
+      if(surfaceOnly){
         try { maybeQueueSurfaceDigest_(); } catch(eDig){}
         state._surfaceUnmatched = false;
+        state._topicReceiveAttempts = 0;
+        state._topicReceiveGaveUp = false;
+        try { schedulePlannerGasPush_(true); } catch(eDigPush){}
       } else if(detail.surfaceDiff || equalKeys.length){
         state._surfaceUnmatched = true;
       }
@@ -11831,6 +11835,19 @@ function surfaceMatchEntityKey_(key){
     key.indexOf('ops:review:') === 0 || key.indexOf('ops:newBranchMeta:') === 0 || key.indexOf('ops:keywordAds:') === 0 ||
     key === 'ops:root';
 }
+function draftsForSurfaceDigest_(catId, stepId){
+  var cat = CATEGORIES[catId];
+  if(!cat || !cat.drafts) return [];
+  return cat.drafts.filter(function(d){
+    if(!d || !d.id) return false;
+    return getDraftRoadmapStepId_(d, catId, cat.drafts.indexOf(d)) === String(stepId);
+  }).sort(function(a, b){
+    var ta = getDraftCreatedAtMs_(a) || userAddedDraftTimestamp_(a.id) || 0;
+    var tb = getDraftCreatedAtMs_(b) || userAddedDraftTimestamp_(b.id) || 0;
+    if(ta !== tb) return tb - ta;
+    return cat.drafts.indexOf(a) - cat.drafts.indexOf(b);
+  });
+}
 function programSurfaceDigest_(){
   var parts = [];
   CATEGORIES.forEach(function(cat, catId){
@@ -11840,7 +11857,7 @@ function programSurfaceDigest_(){
     var stepPart = steps.map(function(step, i){
       var id = step && step.id != null ? String(step.id) : '';
       var ordered = [];
-      try { ordered = id && typeof getDraftsForSubGoalStep_ === 'function' ? getDraftsForSubGoalStep_(catId, id) : []; } catch(eOrd){ ordered = []; }
+      try { ordered = id ? draftsForSurfaceDigest_(catId, id) : []; } catch(eOrd){ ordered = []; }
       return i + ':' + id + ':' + String((step && step.title) || '') + '>' + ordered.map(function(d){ return d && d.id; }).join(',');
     }).join('|');
     var topicCount = 0;
@@ -12238,11 +12255,13 @@ function applySupabaseEntityRows_(rows){
       try { sameBody = syncEntitiesEquivalent_(key, localEntities[key], serverVal); } catch(eSameBody){}
       if(!sameBody){
         var knownLocalRev = parseInt((payload.syncEntityRevisions || {})[key], 10) || 0;
-        var serverClearlyNewer = knownLocalRev > 0 && serverRev > knownLocalRev;
+        var serverAt = parseIsoMs_(row.updated_at);
+        var localAt = parseIsoMs_((payload.syncEntityUpdatedAt || {})[key]);
+        var serverClearlyNewer = (serverRev > knownLocalRev) || !!(serverAt && (!localAt || serverAt > localAt));
         var localSize = syncKeptTextSize_(key, localEntities[key]);
         var serverSize = syncKeptTextSize_(key, serverVal);
         if(!serverClearlyNewer && localSize > 0 && localSize > serverSize){
-          keepLocal.push(key);
+          if(state._sessionUserEdit) keepLocal.push(key);
           return;
         }
         if(!serverClearlyNewer && localSize > 0 && localSize === serverSize){
@@ -13202,32 +13221,18 @@ const REAL_MOVEMENT_PLACE_YAKSU_URL = 'https://naver.me/x2YstInq';
 const REAL_MOVEMENT_PLACE_INCHEON_URL = 'https://naver.me/xYNbHrY9';
 const REAL_MOVEMENT_IG_PARK_URL = 'https://www.instagram.com/dr.park_dc.pt/';
 const REAL_MOVEMENT_IG_CENTER_URL = 'https://www.instagram.com/re.al_movement_official/';
-/** 소식 탭 — 지점별 발행 바로가기 (당근·카카오채널은 앱, 네이버는 새 창) */
-const DAANGN_APP_OPEN_URL_ = 'https://www.daangn.com/';
-const DAANGN_PLAY_STORE_ = 'https://play.google.com/store/apps/details?id=com.towneers.www';
-const DAANGN_IOS_STORE_ = 'https://apps.apple.com/kr/app/id1018769995';
-const KAKAO_CHANNEL_ADMIN_WEB_ = 'https://center-pf.kakao.com/';
-const KAKAO_CHANNEL_ADMIN_PLAY_ = 'https://play.google.com/store/apps/details?id=com.kakao.yellowid';
-const KAKAO_CHANNEL_ADMIN_IOS_ = 'https://apps.apple.com/kr/app/id990571676';
-const NEWS_POST_LINKS_BY_BRANCH_ = {
-  yaksu: {
-    label: '약수',
-    naver: 'https://new.smartplace.naver.com/',
-    naverPlace: REAL_MOVEMENT_PLACE_YAKSU_URL,
-    kakao: KAKAO_CHANNEL_ADMIN_WEB_,
-    kakaoChat: 'https://pf.kakao.com/_nVSxdn/chat',
-    kakaoProfile: '_nVSxdn',
-    karrot: DAANGN_APP_OPEN_URL_
-  },
-  incheon: {
-    label: '인천',
-    naver: 'https://new.smartplace.naver.com/',
-    naverPlace: REAL_MOVEMENT_PLACE_INCHEON_URL,
-    kakao: KAKAO_CHANNEL_ADMIN_WEB_,
-    kakaoChat: 'https://pf.kakao.com/_unqbX/chat',
-    kakaoProfile: '_unqbX',
-    karrot: DAANGN_APP_OPEN_URL_
-  }
+/** 소식 탭 — 약수 작성창. 폰·태블릿은 앱, 데스크탑은 브라우저 */
+const YAKSU_NAVER_NEWS_WRITE_ = 'https://new.smartplace.naver.com/bizes/place/2018185163/feeds/new';
+const YAKSU_KAKAO_NEWS_WRITE_ = 'https://business.kakao.com/space/998814/channel/_nVSxdn/posts';
+const YAKSU_KARROT_BA_ID_ = '4104757';
+const YAKSU_KARROT_NEWS_WRITE_ = 'https://bizprofile.karrotwebview.com/biz_accounts/' + YAKSU_KARROT_BA_ID_ + '/manager/posts/new';
+const SMARTPLACE_ANDROID_PKG_ = 'com.naver.smartplace';
+const KAKAO_PARTNER_ANDROID_PKG_ = 'com.kakao.yellowid';
+const KARROT_ANDROID_PKG_ = 'com.towneers.www';
+const NEWS_POST_LINKS_ = {
+  naver: { label: '네이버 소식', href: YAKSU_NAVER_NEWS_WRITE_, title: '약수 스마트플레이스 새소식 작성' },
+  kakao: { label: '카카오 소식', href: YAKSU_KAKAO_NEWS_WRITE_, title: '약수 카카오 채널 소식 작성' },
+  karrot: { label: '당근 소식', href: YAKSU_KARROT_NEWS_WRITE_, title: '약수 당근 비즈프로필 소식 작성' }
 };
 function openNewsExternalWindow_(url){
   if(!url) return null;
@@ -13245,6 +13250,18 @@ function openNewsExternalWindow_(url){
     setTimeout(function(){ try { a.remove(); } catch(e2){} }, 0);
   } catch(e3){}
   return null;
+}
+function openNewsAndroidScheme_(schemeUrl, pkg, fallbackUrl){
+  try {
+    var raw = String(schemeUrl || '');
+    var cut = raw.indexOf('://');
+    if(cut < 1) throw new Error('scheme');
+    window.location.href = 'intent://' + raw.slice(cut + 3) +
+      '#Intent;scheme=' + raw.slice(0, cut) + ';package=' + pkg +
+      ';S.browser_fallback_url=' + encodeURIComponent(fallbackUrl || '') + ';end';
+  } catch(e){
+    openNewsAndroidPackage_(pkg, fallbackUrl, fallbackUrl);
+  }
 }
 function openNewsAndroidPackage_(pkg, webUrl, storeUrl){
   try {
@@ -13278,60 +13295,78 @@ function openNewsIosApp_(schemes, webUrl, storeUrl){
     if(storeUrl && storeUrl !== webUrl) openNewsExternalWindow_(storeUrl);
   }, 1400);
 }
+function newsComposerTarget_(kind){
+  kind = normalizeNewsChannel_(kind);
+  if(kind === 'kakao'){
+    return {
+      web: YAKSU_KAKAO_NEWS_WRITE_,
+      androidPkg: KAKAO_PARTNER_ANDROID_PKG_,
+      iosSchemes: ['kakaobiz://', 'yellowid://']
+    };
+  }
+  if(kind === 'karrot'){
+    var remote = encodeURIComponent(YAKSU_KARROT_NEWS_WRITE_);
+    var scheme = 'karrot://minikarrot/router?remote=' + remote + '&navbar=false&scrollable=true';
+    return {
+      web: YAKSU_KARROT_NEWS_WRITE_,
+      androidPkg: KARROT_ANDROID_PKG_,
+      androidScheme: scheme,
+      iosSchemes: [scheme, scheme.replace('karrot://', 'daangn://')]
+    };
+  }
+  return {
+    web: YAKSU_NAVER_NEWS_WRITE_,
+    androidPkg: SMARTPLACE_ANDROID_PKG_,
+    iosSchemes: []
+  };
+}
 window.openNewsPostTarget_ = function(kind, branchKey, ev){
   if(ev){
     ev.preventDefault();
     ev.stopPropagation();
   }
-  var b = NEWS_POST_LINKS_BY_BRANCH_[branchKey] || NEWS_POST_LINKS_BY_BRANCH_.yaksu;
-  kind = String(kind || '');
-  if(kind === 'naver'){
-    openNewsExternalWindow_(b.naver);
+  var target = newsComposerTarget_(kind);
+  if(!target || !target.web) return false;
+  if(isAndroidDevice() && target.androidPkg){
+    if(target.androidScheme) openNewsAndroidScheme_(target.androidScheme, target.androidPkg, target.web);
+    else openNewsAndroidPackage_(target.androidPkg, target.web, target.web);
     return false;
   }
-  if(kind === 'karrot'){
-    if(isAndroidDevice()){
-      openNewsAndroidPackage_('com.towneers.www', DAANGN_APP_OPEN_URL_, DAANGN_PLAY_STORE_);
-      return false;
+  if(isIOSLikeDevice()){
+    if(target.iosSchemes && target.iosSchemes.length){
+      openNewsIosApp_(target.iosSchemes, target.web, target.web);
+    } else {
+      openNewsExternalWindow_(target.web);
     }
-    if(isIOSLikeDevice()){
-      openNewsIosApp_(['karrot://', 'daangn://'], DAANGN_APP_OPEN_URL_, DAANGN_IOS_STORE_);
-      return false;
-    }
-    openNewsExternalWindow_(DAANGN_APP_OPEN_URL_);
     return false;
   }
-  if(kind === 'kakao'){
-    if(isAndroidDevice()){
-      openNewsAndroidPackage_('com.kakao.yellowid', KAKAO_CHANNEL_ADMIN_WEB_, KAKAO_CHANNEL_ADMIN_PLAY_);
-      return false;
-    }
-    if(isIOSLikeDevice()){
-      openNewsIosApp_(['kakaobiz://', 'yellowid://'], KAKAO_CHANNEL_ADMIN_WEB_, KAKAO_CHANNEL_ADMIN_IOS_);
-      return false;
-    }
-    openNewsExternalWindow_(b.kakao || KAKAO_CHANNEL_ADMIN_WEB_);
-    return false;
-  }
+  openNewsExternalWindow_(target.web);
   return false;
 };
+function renderNewsChannelOpenButtons_(){
+  return '<div class="sheet-news-open-btns">' +
+    NEWS_CHANNEL_DEFS_.map(function(d){
+      return '<button type="button" class="sheet-news-open-btn" onclick="return openNewsPostTarget_(\'' + d.id + '\',\'yaksu\',event)">' +
+        escapeHtml(d.label) + '</button>';
+    }).join('') +
+  '</div>';
+}
+function sheetNewsCopyBar_(){
+  return '<div class="sheet-fullcopy-bar sheet-news-copy-bar">' +
+    '<button type="button" class="sheet-fullcopy-btn" onclick="copyWholeTab_(this)">전체 복사</button>' +
+    renderNewsChannelOpenButtons_() +
+  '</div>';
+}
 function renderNewsPostLinksBarHTML_(){
-  function newsLink_(kind, branchKey, label, title, href){
-    return '<a class="sheet-news-post-link" href="' + escapeHtml(href) +
-      '" target="_blank" rel="noopener noreferrer" title="' + escapeHtml(title || label) +
-      '" onclick="return openNewsPostTarget_(\'' + kind + '\',\'' + branchKey + '\',event)">' +
-      escapeHtml(label) + '</a>';
-  }
-  var rows = ['yaksu', 'incheon'].map(function(key){
-    var b = NEWS_POST_LINKS_BY_BRANCH_[key];
-    return '<div class="sheet-news-post-row">' +
-      '<span class="sheet-news-post-branch">' + escapeHtml(b.label) + '</span>' +
-      newsLink_('naver', key, '네이버 소식', '새 창에서 스마트플레이스 소식 작성', b.naver) +
-      newsLink_('kakao', key, '카카오채널 소식', '카카오채널 관리자 앱 열기', b.kakao) +
-      newsLink_('karrot', key, '당근 소식', '당근 앱 열기', b.karrot) +
-    '</div>';
+  var links = ['naver', 'kakao', 'karrot'].map(function(kind){
+    var item = NEWS_POST_LINKS_[kind];
+    return '<a class="sheet-news-post-link" href="' + escapeHtml(item.href) +
+      '" target="_blank" rel="noopener noreferrer" title="' + escapeHtml(item.title) +
+      '" onclick="return openNewsPostTarget_(\'' + kind + '\',\'yaksu\',event)">' +
+      escapeHtml(item.label) + '</a>';
   }).join('');
-  return '<div class="sheet-news-post-links" aria-label="지점별 소식 발행 링크">' + rows + '</div>';
+  return '<div class="sheet-news-post-links" aria-label="약수 소식 작성">' +
+    '<div class="sheet-news-post-row">' + links + '</div></div>';
 }
 function getRealMovementBlogFooterText_(){
   return [
@@ -16321,7 +16356,7 @@ function normalizeDraftRowForSync_(draft){
   if(!draft || typeof draft !== 'object') return draft;
   var row = {};
   ['id','topic','angle','series','step','pillar','rationale','writingBrief','roadmapStepId',
-    'shareMonth','createdAt','sourceNote','youtubeAnalysis','updatedAt','dailyShareKind',
+    'shareMonth','createdAt','sourceNote','youtubeAnalysis','updatedAt','activityAt','dailyShareKind',
     'dailyThought','dailyWho','dailyWhat','dailyBody','articleKind','previousRoadmapStepId',
     'previousSeries','miscLocked','articleFlow'].forEach(function(k){
     var v = draft[k];
@@ -16435,6 +16470,7 @@ function draftEntityFingerprint_(val){
   if(norm && typeof norm === 'object'){
     norm = Object.assign({}, norm);
     delete norm.updatedAt;
+    delete norm.activityAt;
     if(norm.roadmapStepId) norm.roadmapStepId = canonicalizeStepIdForCompare_(norm.roadmapStepId);
     if(norm.previousRoadmapStepId) norm.previousRoadmapStepId = canonicalizeStepIdForCompare_(norm.previousRoadmapStepId);
   }
@@ -16996,7 +17032,14 @@ function hasUsableAiDraftContent_(val){
   if(c.community && (c.community.title || c.community.problem || c.community.selfCare ||
     c.community.explanation || c.community.empathy)) return true;
   if(c.insta && (c.insta.caption || c.insta.text)) return true;
-  if(c.threads && (c.threads.text || c.threads.body)) return true;
+  if(c.threads && (c.threads.text || c.threads.body || c.threads.comment)) return true;
+  if(c.news && typeof c.news === 'object'){
+    var newsOk = ['naver', 'kakao', 'karrot'].some(function(ch){
+      var item = c.news[ch];
+      return !!(item && (item.title || item.body || item.cta));
+    });
+    if(newsOk) return true;
+  }
   if(c.images && c.images.gptVisuals && c.images.gptVisuals.length) return true;
   return false;
 }
@@ -18960,12 +19003,17 @@ function formatSyncHeaderSub_(info){
   return String(info.localRev || '');
 }
 let _syncPendingKickAt_ = 0;
+let _stallRechecking_ = false;
+let _stallRecheckFails_ = 0;
 function kickPendingSyncIfIdle_(info){
-  if(!info || !info.serverOn || !info.pendingCount) return;
-  if(info.phase !== 'pending' && info.phase !== 'queued') return;
+  if(!info || !info.serverOn) return;
   if(_plannerSyncUiBusy || plannerGasPushTimer || plannerGasRetryTimer_) return;
   if(plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return;
   if(!plannerSyncBootstrapReady_ || !state._bootstrapChoiceDone) return;
+  var stalled = info.phase === 'pending' && !(info.pendingCount > 0);
+  if(!stalled && info.phase !== 'queued') return;
+  if(!stalled && !(info.pendingCount > 0)) return;
+  if(stalled && _stallRecheckFails_ >= 2) return;
   if(shouldBlockStaleFloodPush_()){
     requestServerAuthorityInsteadOfFlood_();
     return;
@@ -18973,6 +19021,28 @@ function kickPendingSyncIfIdle_(info){
   var now = Date.now();
   if(_syncPendingKickAt_ && (now - _syncPendingKickAt_) < 3000) return;
   _syncPendingKickAt_ = now;
+  if(stalled){
+    if(_stallRechecking_) return;
+    _stallRechecking_ = true;
+    state._topicReceiveAttempts = 0;
+    state._topicReceiveGaveUp = false;
+    var done = function(ok){
+      _stallRechecking_ = false;
+      var again = null;
+      try { again = getSyncStatusInfo_(); } catch(eAgain){}
+      if(ok && again && again.phase !== 'pending') _stallRecheckFails_ = 0;
+      else _stallRecheckFails_++;
+      try { updateSyncStatusUI_(); } catch(eUi){}
+    };
+    try {
+      var pull = syncAllSourcesIfNewer_('pending-stall');
+      if(pull && typeof pull.then === 'function') pull.then(function(){ done(true); }, function(){ done(false); });
+      else done(false);
+    } catch(eKick){
+      done(false);
+    }
+    return;
+  }
   try { schedulePlannerGasPush_(true); } catch(eKick){}
 }
 function armSyncProgressTicker_(info){
@@ -20938,6 +21008,47 @@ function contentSyncConflictKey_(key){
   key = String(key || '');
   return key.indexOf('generated:') === 0 || key.indexOf('published:') === 0 || key.indexOf('draft:') === 0;
 }
+function contentRecordOf_(val){
+  var row = unwrapSyncEntityValue_(val);
+  if(!row || typeof row !== 'object') return null;
+  if(row.content && typeof row.content === 'object') return row.content;
+  if(row.blog || row.insta || row.threads || row.news || row.community) return row;
+  return null;
+}
+function channelHasText_(content, ch){
+  var block = content && content[ch];
+  if(!block || typeof block !== 'object') return false;
+  if(ch === 'news'){
+    return ['naver', 'kakao', 'karrot'].some(function(name){
+      var item = block[name];
+      return !!(item && (item.title || item.body || item.cta));
+    });
+  }
+  try { return JSON.stringify(block).length > 12; } catch(e){ return false; }
+}
+function copyMissingContentChannels_(intoVal, fromVal){
+  var into = contentRecordOf_(intoVal);
+  var from = contentRecordOf_(fromVal);
+  if(!into || !from) return intoVal;
+  ['insta', 'threads', 'news', 'community'].forEach(function(ch){
+    if(!channelHasText_(into, ch) && channelHasText_(from, ch)) into[ch] = from[ch];
+  });
+  return intoVal;
+}
+function blogTitleOfContent_(content){
+  if(!content || !content.blog) return '';
+  return String(content.blog.title || '').trim();
+}
+function alignDraftTopicToBlogTitle_(draftId, content){
+  var title = blogTitleOfContent_(content);
+  if(!draftId || !title) return false;
+  var draft = findDraftByIdAnywhere_(draftId);
+  if(!draft) return false;
+  if(String(draft.topic || '').trim() === title) return false;
+  draft.topic = title;
+  if(state.published[draftId]) state.published[draftId].topic = title;
+  return true;
+}
 function settleContentConflictsByLatest_(conflicts){
   var upload = [];
   var kept = 0;
@@ -20951,9 +21062,11 @@ function settleContentConflictsByLatest_(conflicts){
     var remoteMs = parseIsoMs_(conflict.remoteAt);
     var key = String(conflict.key);
     if(localMs > remoteMs && localMs > 0){
+      copyMissingContentChannels_(conflict.local, conflict.remote);
       upload.push(conflict);
       return;
     }
+    copyMissingContentChannels_(conflict.remote, conflict.local);
     var payload = getPersistPayload();
     setSyncEntity_(payload, key, conflict.remote);
     var rev = parseInt(conflict.serverEntityRevision, 10) || 0;
@@ -21944,6 +22057,7 @@ function collectExtraDrafts(){
         roadmapStepId: d.roadmapStepId,
         shareMonth: d.shareMonth,
         createdAt: d.createdAt,
+        activityAt: d.activityAt || '',
         sourceNote: d.sourceNote,
         youtubeAnalysis: d.youtubeAnalysis,
         youtubeUrls: d.youtubeUrls,
@@ -21979,6 +22093,7 @@ function mergeExtraDrafts(byCat){
         roadmapStepId: d.roadmapStepId || '',
         shareMonth: d.shareMonth || '',
         createdAt: d.createdAt || '',
+        activityAt: d.activityAt || '',
         sourceNote: d.sourceNote || '',
         youtubeAnalysis: d.youtubeAnalysis || '',
         youtubeUrls: d.youtubeUrls || [],
@@ -24814,18 +24929,27 @@ function formatDraftMonthDayLabel_(ms) {
 function getDraftCreatedDateLabel_(d) {
   return formatDraftMonthDayLabel_(getDraftCreatedAtMs_(d));
 }
+function getDraftListActivityMs_(d){
+  if(!d) return 0;
+  var created = getDraftCreatedAtMs_(d) || 0;
+  var touch = 0;
+  if(d.activityAt){
+    var a = Date.parse(d.activityAt);
+    if(!isNaN(a)) touch = a;
+  } else if(typeof draftHasContent === 'function' && draftHasContent(d) && d.updatedAt){
+    var u = Date.parse(d.updatedAt);
+    if(!isNaN(u)) touch = u;
+  }
+  return touch > created ? touch : created;
+}
 function getDraftListDateInfo_(d) {
   var createdMs = getDraftCreatedAtMs_(d);
-  var editedMs = 0;
-  if (d && d.updatedAt) {
-    var parsed = Date.parse(d.updatedAt);
-    if (!isNaN(parsed)) editedMs = parsed;
-  }
+  var activityMs = getDraftListActivityMs_(d);
   var createdLabel = formatDraftMonthDayLabel_(createdMs);
-  var editedLabel = formatDraftMonthDayLabel_(editedMs);
-  var edited = !!(editedMs && createdMs && editedMs > createdMs && editedLabel !== '-' && editedLabel !== createdLabel);
+  var activityLabel = formatDraftMonthDayLabel_(activityMs);
+  var edited = !!(activityMs && createdMs && activityMs > createdMs && activityLabel !== '-' && activityLabel !== createdLabel);
   return {
-    label: edited ? editedLabel : createdLabel,
+    label: (activityLabel && activityLabel !== '-') ? activityLabel : createdLabel,
     edited: edited
   };
 }
@@ -26262,6 +26386,9 @@ function collectTopicSearchHits_(q){
     var aCurrent = a.cat.id === current ? 0 : 1;
     var bCurrent = b.cat.id === current ? 0 : 1;
     if(aCurrent !== bCurrent) return aCurrent - bCurrent;
+    var ta = getDraftListActivityMs_(a.d);
+    var tb = getDraftListActivityMs_(b.d);
+    if(ta !== tb) return tb - ta;
     return a.cat.id - b.cat.id;
   });
   return hits;
@@ -26375,7 +26502,7 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
   if(seriesLine) intentLines.push('<div class="card-intent-line muted">' + escapeHtml(oneLine_(seriesLine)) + '</div>');
   if(d.angle) intentLines.push('<div class="card-intent-line">' + escapeHtml(oneLine_(d.angle)) + '</div>');
   if(brandMeta.rationale) intentLines.push('<div class="card-intent-line">' + escapeHtml(oneLine_(stripTopicRationaleStepPrefix_(brandMeta.rationale))) + '</div>');
-  var lineTitle = oneLine_(d.topic) || '(제목 없음)';
+  var lineTitle = oneLine_(blogTitleOfContent_(getDraftContent_(d.id)) || d.topic) || '(제목 없음)';
   var orderBtns = '';
   try {
     var stepIdForOrder = getDraftRoadmapStepId_(d, cat.id, draftIndex);
@@ -33801,7 +33928,7 @@ function topicPhotoSpaceLine_(branch){
   if(branch === 'yaksu'){
     return '약수점. 검은 고무 타일 바닥, 도시가 보이는 창, 거울. 운동공이나 플라이오 박스는 고른 참고 사진에 있을 때만 남긴다. 사람은 한 명.';
   }
-  return '인천점. 점박이 테라조 바닥. 정원 쪽 큰 창이 있는 운동 공간, 또는 나무 리셉션이 있는 로비 중 참고 사진 한 구도. 흰 커튼·초록 공·자격증 선반은 그 사진에 있을 때만 남긴다.';
+  return '인천점. 점박이 테라조 바닥. 참고 사진 중 구도 하나만 고른다. 정원 창 운동실, 소도구 코너, 나무 리셉션 로비, 유리 칸막이 운동실 중 하나. 흰 커튼·자격증 선반은 그 사진에 있을 때만 남긴다.';
 }
 function topicPhotoModelLine_(model){
   if(model === 'f') return '모델은 여성. 얼굴과 체형은 함께 넣은 여성 모델 사진을 따른다.';
@@ -33950,7 +34077,10 @@ async function loadTopicPhotoRefList_(paths, role, maxCount){
 }
 async function loadTopicPhotoRefs_(branch, model){
   var place = branch === 'yaksu' ? '약수' : '인천';
-  var spacePaths = ['01','02','03','04','05'].map(function(n){ return '이미지참고/' + place + '/' + n + '.jpg'; });
+  var spaceNames = place === '약수'
+    ? ['01-운동실.jpg', '02-창가.jpg', '03-매트.jpg', '04-기둥.jpg', '05-거울.jpg']
+    : ['01-운동실.jpg', '02-정원창.jpg', '03-소도구코너.jpg', '04-로비.jpg', '05-유리실.jpg'];
+  var spacePaths = spaceNames.map(function(n){ return '이미지참고/' + place + '/' + n; });
   var space = await loadTopicPhotoRefList_(spacePaths, 'space', 5);
   if(!space.length) throw new Error(place + '점 참고 사진을 불러오지 못했어요. 이미지참고/' + place + ' 를 확인해 주세요.');
   var modelPaths = model === 'f'
@@ -34526,8 +34656,11 @@ function openDetail(draftId, catId, tab, opts) {
   if(tab !== undefined && tab !== null && tab !== ''){
     state.activeTab = normalizeSheetTabForCategory_(tab, catId) || state.activeTab;
   }
-  document.getElementById('sheet-title').textContent = draft.topic;
   const content = getDraftContent_(draftId);
+  if(content && alignDraftTopicToBlogTitle_(draftId, content)){
+    try { save({ gasImmediate: true }); } catch(eTopic){}
+  }
+  document.getElementById('sheet-title').textContent = draft.topic;
   if(content){
     var beforeLen = (content.images && content.images.gptVisuals) ? content.images.gptVisuals.length : 0;
     normalizeContentImages_(content, catId);
@@ -34742,11 +34875,11 @@ function renderSheetContent(content) {
     } else {
       var chLabel = ({ naver: '네이버 플레이스', kakao: '카카오 채널', karrot: '당근' })[newsCh] || '소식';
       bodyHTML = composeSheetTabLayout_(tab,
-        addSourceHtml + newsChips + sheetFullCopyBar_() +
+        addSourceHtml + newsChips + sheetNewsCopyBar_() +
         sheetEditField_('제목 · 첫 줄', 'sheet-news-title', newsItem.title || '', { rows: 2, title: true, regen: 'news.title', copy: true }) +
         sheetEditField_('본문', 'sheet-news-body', newsItem.body || '', { rows: 10, regen: 'news.body', copy: true, paragraphs: true, help: chLabel + ' 톤에 맞게 다듬으세요' }) +
         sheetEditField_('CTA', 'sheet-news-cta', newsItem.cta || '', { rows: 3, regen: 'news.cta', copy: true, paragraphs: true }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">위 칩으로 채널을 바꾼 뒤 수정·복사하세요. <strong>발행완료</strong>는 현재 채널만 저장·복사합니다. 아래 링크로 지점별 소식 화면에 바로 갈 수 있어요.</p>' +
+        '<div class="sheet-news-open-row">' + renderNewsChannelOpenButtons_() + '</div>' +
         renderNewsPostLinksBarHTML_()
       );
     }
@@ -36415,10 +36548,17 @@ function saveFocusedDraftChange_(draftId){
   try { save({ driveImmediate: true, gasImmediate: true }); }
   finally { state._syncFocusDraftIds = null; }
 }
+function stampDraftActivity_(draft){
+  if(!draft) return;
+  var now = new Date().toISOString();
+  draft.activityAt = now;
+  draft.updatedAt = now;
+}
 function persistDraftContent_(draftId, content){
   flushSheetTitleBackgroundWork_({ save: false });
   var editedDraft = findDraftByIdAnywhere_(draftId);
-  if(editedDraft) editedDraft.updatedAt = new Date().toISOString();
+  if(editedDraft) stampDraftActivity_(editedDraft);
+  alignDraftTopicToBlogTitle_(draftId, content);
   if(!state.published[draftId]) state.published[draftId] = {};
   state.published[draftId].content = content;
   state.generatedOnly[draftId] = content;
@@ -36560,7 +36700,7 @@ function syncDraftTopicFromTitle_(title, opts){
   if(titleEl) titleEl.textContent = next;
   if(prev === next) return false;
   draft.topic = next;
-  draft.updatedAt = new Date().toISOString();
+  stampDraftActivity_(draft);
   if(state.published[draftId]) state.published[draftId].topic = next;
   if(!isUserAddedDraftId_(draftId)){
     stampDraftBrandOverride_(draftId, {
@@ -36899,7 +37039,8 @@ function commitSheetTabPublish_(draftId, catId, tab){
   if(!pub.date) pub.date = today;
   pub.savedAt = new Date().toISOString();
   pub.catId = catId;
-  pub.topic = draft ? draft.topic : '';
+  alignDraftTopicToBlogTitle_(draftId, content);
+  pub.topic = draft ? draft.topic : blogTitleOfContent_(content);
   pub.content = content;
   if(!pub.tabPublished) pub.tabPublished = {};
   pub.tabPublished[key] = pub.savedAt;

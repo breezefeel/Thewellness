@@ -25100,14 +25100,25 @@ function opsNaverAdAssetVars_(branchKey){
     store: branchKey === 'jakjeon' ? '리얼무브먼트 인천점' : '리얼무브먼트 약수점'
   };
 }
-function fillOpsNaverAdAssetTemplate_(text, vars){
+/** 네이버 소재 문자 제한: 한글·영문·숫자·공백 + ASCII 문장부호 일부만 (· 등은 대량등록 전부 실패) */
+function sanitizeOpsNaverAdText_(text){
   return String(text || '')
+    .replace(/\s*[\u00B7\u318D\u2022\u2027\u2219\u30FB\u22C5]\s*/g, ', ')
+    .replace(/[\u2018\u2019\u201C\u201D"]/g, "'")
+    .replace(/[\uFF5E\u301C]/g, '~')
+    .replace(/[\u2013\u2014\u2015]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/[^0-9A-Za-z\uAC00-\uD7A3 .,!?:'()%+\-\/&~]/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([.,!?])/g, '$1')
+    .trim();
+}
+function fillOpsNaverAdAssetTemplate_(text, vars){
+  return sanitizeOpsNaverAdText_(String(text || '')
     .replace(/\{\{areaSt\}\}/g, vars.areaSt)
     .replace(/\{\{area\}\}/g, vars.area)
     .replace(/\{\{district\}\}/g, vars.district)
-    .replace(/\{\{store\}\}/g, vars.store)
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/\{\{store\}\}/g, vars.store));
 }
 /** 화면 칩 = 등록팩 = 일괄등록 CSV 본문 (동일 소스) */
 function getOpsNaverAdAssetPack_(branchKey){
@@ -33920,13 +33931,48 @@ window.downloadAllDailyPhotos_ = async function(btn){
   paintThumbMakerPreview_();
 };
 
-function topicPhotoBranchKey_(content){
-  var key = content && content.images && content.images.photoBranch;
-  return key === 'yaksu' ? 'yaksu' : 'incheon';
+function defaultTopicPhotoBranchForCat_(catId){
+  var id = parseInt(catId, 10);
+  return (id === 2 || id === 4) ? 'face' : 'incheon';
 }
-function topicPhotoModelKey_(content){
+function normalizeTopicPhotoBranch_(value){
+  return value === 'yaksu' || value === 'face' ? value : 'incheon';
+}
+function topicPhotoBranchKey_(content, catId){
+  var key = content && content.images && content.images.photoBranch;
+  if(key === 'yaksu' || key === 'face' || key === 'incheon') return key;
+  return defaultTopicPhotoBranchForCat_(catId != null ? catId : state.selectedCatId);
+}
+function applyDefaultTopicPhotoBranch_(content, catId){
+  if(!content) return 'incheon';
+  if(!content.images || typeof content.images !== 'object') content.images = { gptVisuals: [], mangoBrief: null };
+  var current = content.images.photoBranch;
+  if(content.images.photoBranchTouched && (current === 'yaksu' || current === 'face' || current === 'incheon')) return current;
+  var want = defaultTopicPhotoBranchForCat_(catId);
+  if(want === 'face') content.images.photoBranch = 'face';
+  else if(current !== 'yaksu' && current !== 'incheon') content.images.photoBranch = 'incheon';
+  return content.images.photoBranch;
+}
+function defaultTopicPhotoModelForCat_(catId){
+  var id = parseInt(catId, 10);
+  return (id === 2 || id === 4) ? 'f' : 'm';
+}
+function topicPhotoModelKey_(content, catId){
   var key = content && content.images && content.images.photoModel;
-  return key === 'f' ? 'f' : 'm';
+  if(key === 'f' || key === 'm') return key;
+  var id = catId != null ? catId : state.selectedCatId;
+  return defaultTopicPhotoModelForCat_(id);
+}
+function applyDefaultTopicPhotoModel_(content, catId){
+  if(!content) return 'm';
+  if(!content.images || typeof content.images !== 'object') content.images = { gptVisuals: [], mangoBrief: null };
+  var want = defaultTopicPhotoModelForCat_(catId);
+  var current = content.images.photoModel;
+  var faceCat = want === 'f';
+  if(content.images.photoModelTouched && (current === 'f' || current === 'm')) return current;
+  if(faceCat) content.images.photoModel = 'f';
+  else if(current !== 'f' && current !== 'm') content.images.photoModel = 'm';
+  return content.images.photoModel;
 }
 function topicPhotoActionLine_(content, catId){
   var blog = content && content.blog;
@@ -33946,27 +33992,74 @@ function topicPhotoActionLine_(content, catId){
 }
 function topicPhotoSpaceLine_(branch){
   if(branch === 'yaksu'){
-    return '약수점. 검은 고무 타일 바닥, 도시가 보이는 창, 거울. 운동공이나 플라이오 박스는 고른 참고 사진에 있을 때만 남긴다. 사람은 한 명.';
+    return '약수점. 검은 고무 타일 바닥, 도시가 보이는 창, 거울. 운동공이나 플라이오 박스는 고른 참고 사진에 있을 때만 남긴다.';
+  }
+  if(branch === 'face'){
+    return '리얼 페이스 공간. 참고 사진 중 구도 하나만 고른다. 펜던트 조명과 따뜻한 벽의 관리실, 흰 수건과 누빔 패드를 깐 관리 베드, 기기 옆 관리 베드, 책장과 모니터가 있는 상담실, 사진 액자가 걸린 세미나실, 통창 운동 스튜디오, 거울 스튜디오 중 하나. 참고 사진에 있는 다른 사람과 수건·기기·화면·제품 병의 글씨는 따라 넣지 않는다.';
   }
   return '인천점. 점박이 테라조 바닥. 참고 사진 중 구도 하나만 고른다. 정원 창 운동실, 소도구 코너, 나무 리셉션 로비, 유리 칸막이 운동실 중 하나. 흰 커튼·자격증 선반은 그 사진에 있을 때만 남긴다.';
 }
-function topicPhotoModelLine_(model){
-  if(model === 'f') return '모델은 여성. 얼굴과 체형은 함께 넣은 여성 모델 사진을 따른다.';
-  return '모델은 남성. 얼굴과 체형은 함께 넣은 남성 모델 사진을 따른다.';
+function topicPhotoPeopleSource_(content, catId, topic){
+  var blog = content && content.blog;
+  var bits = [topic || '', topicPhotoActionLine_(content, catId)];
+  if(blog) bits.push(blog.title || '', blog.selfCare || '', blog.explanation || '', blog.problem || '');
+  try {
+    var cat = CATEGORIES[catId];
+    var draft = cat && cat.drafts.find(function(d){ return d.id === state.selectedId; });
+    if(draft) bits.push(draft.topic || '', draft.angle || '');
+  } catch(ePeople){}
+  return bits.join('\n');
+}
+function topicPhotoPeopleKind_(text, catId){
+  var t = String(text || '');
+  var id = parseInt(catId, 10);
+  var solo = /셀프|혼자|스스로|셀카|따라\s*하기|따라하기/.test(t);
+  var stretchPair = /패시브|passive|억제\s*[-–]?\s*이완|역체|스트레칭을?\s*해\s*주|잡아\s*주|잡아주|어시스트|assisted/i.test(t);
+  var facePair = /수기|괄사|고주파|얼굴에\s*손/.test(t);
+  var manualPair = /도수|가동술|관절\s*가동|촉진|모빌/.test(t);
+  if(stretchPair && !solo) return 'pair-stretch';
+  if((id === 2 || id === 4) && facePair && !solo) return 'pair-face';
+  if((id === 0 || id === 3) && manualPair && !solo) return 'pair-manual';
+  if(id === 2 || id === 4) return 'solo-face';
+  return 'solo';
+}
+function topicPhotoPeopleLine_(content, catId, topic){
+  var kind = topicPhotoPeopleKind_(topicPhotoPeopleSource_(content, catId, topic), catId);
+  if(kind === 'pair-stretch'){
+    return '사람은 두 명. 한 명은 동작을 받는 사람, 한 명은 그 팔이나 다리를 잡아 스트레칭을 만들어 주는 사람. 두 사람의 손과 관절이 한 장에 보이게. 한 명만 클로즈업하지 않는다.';
+  }
+  if(kind === 'pair-face'){
+    return '사람은 두 명. 한 명은 받는 사람, 한 명은 얼굴에 손을 둔 사람. 손 위치가 보이게. 한 명만 클로즈업하지 않는다.';
+  }
+  if(kind === 'pair-manual'){
+    return '사람은 두 명. 한 명은 받는 사람, 한 명은 손을 얹어 동작을 잡아 주는 사람. 손과 몸의 위치가 보이게. 한 명만 클로즈업하지 않는다.';
+  }
+  if(kind === 'solo-face') return '사람은 한 명. 얼굴이 크게 보이게.';
+  return '사람은 한 명. 스스로 하는 동작이 보이게.';
+}
+function topicPhotoModelLine_(model, peopleKind){
+  var who = model === 'f' ? '여성' : '남성';
+  if(peopleKind && String(peopleKind).indexOf('pair') === 0){
+    return '받는 사람의 얼굴과 체형은 함께 넣은 ' + who + ' 모델 사진을 따른다. 동작을 잡아 주는 사람은 같은 복장이되, 얼굴은 그 모델과 다르게 한다.';
+  }
+  return '모델은 ' + who + '. 얼굴과 체형은 함께 넣은 ' + who + ' 모델 사진을 따른다.';
 }
 function buildTopicPhotoPrompt_(content, catId, topic){
-  var branch = topicPhotoBranchKey_(content);
+  var branch = topicPhotoBranchKey_(content, catId);
   var action = topicPhotoActionLine_(content, catId);
+  var peopleKind = topicPhotoPeopleKind_(topicPhotoPeopleSource_(content, catId, topic), catId);
+  var model = topicPhotoModelKey_(content, catId);
   return [
     '4:5 세로. 수업 중에 휴대폰으로 찍은 듯한 실사 한 장. 블로그에 넣고, 같은 사진을 4:5 썸네일 배경으로 쓴다.',
     '이 순간의 동작: ' + action + '. 한 장면으로 멈추고, 손과 몸의 위치가 보이게.',
     '공간: ' + topicPhotoSpaceLine_(branch),
-    topicPhotoModelLine_(topicPhotoModelKey_(content)),
+    topicPhotoModelLine_(model, peopleKind),
     '함께 넣은 공간 사진 여러 장 중 구도 하나만 따른다. 여러 공간을 한 화면에 섞지 않는다. 방에 원래 있는 소품은 치우지 않는다.',
     '복장: 남색 반팔 운동 티, 검은 반바지. 참고 사진의 스크럽·츄리닝·홈웨어는 따르지 않는다.',
     '카메라는 동작이 크게 보이게 가까이 둔다. 인물과 동작이 화면 너비의 대부분을 채운다. 멀리서 방 전체를 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통과 얼굴의 중심이 세로 가운데선에 온다. 머리가 왼쪽, 다리가 오른쪽으로 치우치지 않는다. 아래쪽 약 4분의 1만 바닥이나 매트로 비워 썸네일 글자 자리로 둔다. 얼굴, 손, 발은 그 글자 자리에 넣지 않는다. 가장자리에 붙이지 않는다.',
     '빛은 창으로 들어오는 낮 빛. 피부와 바닥은 실제처럼. 포스터처럼 한가운데 세우거나 윤곽을 깎지 않는다.',
-    '사진 안에는 한글, 영문, 숫자, 자막, 제목, 간판 글씨, 화살표, 도표, 해부 그림, 병원 침상, 로고, 워터마크를 그리지 않는다. 참고 사진의 자격증·창 글씨도 따라 적지 않는다. 사람은 한 명.'
+    '사진 안에는 한글, 영문, 숫자, 자막, 제목, 간판 글씨, 화살표, 도표, 해부 그림, 병원 침상, 로고, 워터마크를 그리지 않는다. 참고 사진의 자격증·창 글씨도 따라 적지 않는다.',
+    topicPhotoPeopleLine_(content, catId, topic)
   ].join('\n');
 }
 function ensureTopicPhotoPrompt_(content, topic, catId, force){
@@ -33974,25 +34067,34 @@ function ensureTopicPhotoPrompt_(content, topic, catId, force){
   catId = catId != null ? catId : (state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId));
   if(isDailyShareCategory(catId)) return content;
   if(!content.images || typeof content.images !== 'object') content.images = { gptVisuals: [], mangoBrief: null };
-  if(!content.images.photoBranch) content.images.photoBranch = 'incheon';
-  if(content.images.photoModel !== 'f') content.images.photoModel = 'm';
-  var current = (content.images.gptVisuals || [])[0];
-  if(!force && current && current.role === 'topicPhoto' && current.prompt && current.prompt.indexOf('9:16') < 0 && current.prompt.indexOf('화면 아래쪽') < 0 && current.prompt.indexOf('주제 「') < 0 && current.prompt.indexOf('화면 너비의 대부분') >= 0) return content;
+  applyDefaultTopicPhotoBranch_(content, catId);
+  applyDefaultTopicPhotoModel_(content, catId);
   var draft = null;
   try {
     var cat = CATEGORIES[catId];
     draft = cat && cat.drafts.find(function(d){ return d.id === state.selectedId; });
   } catch(eDraft){}
+  var topicLine = topic || (draft && draft.topic) || '';
+  var peopleLine = topicPhotoPeopleLine_(content, catId, topicLine);
+  var model = topicPhotoModelKey_(content, catId);
+  var current = (content.images.gptVisuals || [])[0];
+  var promptOk = current && current.role === 'topicPhoto' && current.prompt && current.prompt.indexOf('9:16') < 0 && current.prompt.indexOf('화면 아래쪽') < 0 && current.prompt.indexOf('주제 「') < 0 && current.prompt.indexOf('화면 너비의 대부분') >= 0;
+  var peopleOk = !!(current && current.prompt && current.prompt.indexOf(peopleLine) >= 0);
+  var modelOk = model === 'f'
+    ? !!(current && current.prompt && /여성/.test(current.prompt))
+    : !!(current && current.prompt && /남성/.test(current.prompt));
+  var spaceOk = !!(current && current.prompt && current.prompt.indexOf(topicPhotoSpaceLine_(topicPhotoBranchKey_(content, catId))) >= 0);
+  if(!force && promptOk && peopleOk && modelOk && spaceOk) return content;
   content.images.gptVisuals = [{
     title: '이미지 생성',
     role: 'topicPhoto',
-    prompt: buildTopicPhotoPrompt_(content, catId, topic || (draft && draft.topic) || '')
+    prompt: buildTopicPhotoPrompt_(content, catId, topicLine)
   }];
   return content;
 }
 function renderTopicPhotoCard_(content){
-  var branch = topicPhotoBranchKey_(content);
-  var model = topicPhotoModelKey_(content);
+  var branch = topicPhotoBranchKey_(content, state.selectedCatId);
+  var model = topicPhotoModelKey_(content, state.selectedCatId);
   var prompt = '';
   if(content && content.images && content.images.gptVisuals && content.images.gptVisuals[0]){
     prompt = String(content.images.gptVisuals[0].prompt || '');
@@ -34008,6 +34110,7 @@ function renderTopicPhotoCard_(content){
   html += '<select id="sheet-photo-branch" onchange="setTopicPhotoControls_()">';
   html += '<option value="incheon"' + (branch === 'incheon' ? ' selected' : '') + '>인천점</option>';
   html += '<option value="yaksu"' + (branch === 'yaksu' ? ' selected' : '') + '>약수점</option>';
+  html += '<option value="face"' + (branch === 'face' ? ' selected' : '') + '>페이스</option>';
   html += '</select>';
   html += '<label for="sheet-photo-model">모델</label>';
   html += '<select id="sheet-photo-model" onchange="setTopicPhotoControls_()">';
@@ -34040,8 +34143,12 @@ window.setTopicPhotoControls_ = function(){
   if(!content.images) content.images = { gptVisuals: [], mangoBrief: null };
   var branchEl = document.getElementById('sheet-photo-branch');
   var modelEl = document.getElementById('sheet-photo-model');
-  content.images.photoBranch = branchEl && branchEl.value === 'yaksu' ? 'yaksu' : 'incheon';
-  content.images.photoModel = modelEl && modelEl.value === 'f' ? 'f' : 'm';
+  var nextBranch = normalizeTopicPhotoBranch_(branchEl && branchEl.value);
+  var nextModel = modelEl && modelEl.value === 'f' ? 'f' : 'm';
+  if(nextBranch !== topicPhotoBranchKey_(content, state.selectedCatId)) content.images.photoBranchTouched = true;
+  if(nextModel !== topicPhotoModelKey_(content, state.selectedCatId)) content.images.photoModelTouched = true;
+  content.images.photoBranch = nextBranch;
+  content.images.photoModel = nextModel;
   ensureTopicPhotoPrompt_(content, null, state.selectedCatId, true);
   var ta = document.getElementById('sheet-image-prompt-0');
   var item = content.images.gptVisuals && content.images.gptVisuals[0];
@@ -34095,14 +34202,26 @@ async function loadTopicPhotoRefList_(paths, role, maxCount){
   }
   return out;
 }
-async function loadTopicPhotoRefs_(branch, model){
-  var place = branch === 'yaksu' ? '약수' : '인천';
+function faceTopicPhotoSpaceNames_(sceneText, peopleKind){
+  var t = String(sceneText || '');
+  if(/상담|평가|분석|설명|강의|교육|세미나|수강|비교|사진으로|화면/.test(t) && peopleKind !== 'pair-face'){
+    return ['06-상담실.jpg', '07-상담실모니터.jpg', '08-세미나실.jpg', '09-제품선반.jpg', '01-관리실.jpg'];
+  }
+  if(peopleKind === 'pair-face'){
+    return ['01-관리실.jpg', '03-관리베드.jpg', '10-기기베드.jpg', '02-관리실창가.jpg', '09-제품선반.jpg'];
+  }
+  return ['04-운동스튜디오.jpg', '05-거울스튜디오.jpg', '01-관리실.jpg', '02-관리실창가.jpg', '06-상담실.jpg'];
+}
+async function loadTopicPhotoRefs_(branch, model, sceneText, peopleKind){
+  var place = branch === 'yaksu' ? '약수' : (branch === 'face' ? '페이스' : '인천');
   var spaceNames = place === '약수'
     ? ['01-운동실.jpg', '02-창가.jpg', '03-매트.jpg', '04-기둥.jpg', '05-거울.jpg']
-    : ['01-운동실.jpg', '02-정원창.jpg', '03-소도구코너.jpg', '04-로비.jpg', '05-유리실.jpg'];
+    : place === '페이스'
+      ? faceTopicPhotoSpaceNames_(sceneText, peopleKind)
+      : ['01-운동실.jpg', '02-정원창.jpg', '03-소도구코너.jpg', '04-로비.jpg', '05-유리실.jpg'];
   var spacePaths = spaceNames.map(function(n){ return '이미지참고/' + place + '/' + n; });
   var space = await loadTopicPhotoRefList_(spacePaths, 'space', 5);
-  if(!space.length) throw new Error(place + '점 참고 사진을 불러오지 못했어요. 이미지참고/' + place + ' 를 확인해 주세요.');
+  if(!space.length) throw new Error((place === '페이스' ? '페이스' : place + '점') + ' 참고 사진을 불러오지 못했어요. 이미지참고/' + place + ' 를 확인해 주세요.');
   var modelPaths = model === 'f'
     ? ['이미지참고/모델/여/01.jpg', '이미지참고/모델/여/02.jpg']
     : ['이미지참고/모델/남/01.jpg', '이미지참고/모델/남/02.jpg'];
@@ -34163,8 +34282,12 @@ window.generateTopicPhoto_ = async function(btn){
   if(!content.images) content.images = { gptVisuals: [], mangoBrief: null };
   var branchEl = document.getElementById('sheet-photo-branch');
   var modelEl = document.getElementById('sheet-photo-model');
-  content.images.photoBranch = branchEl && branchEl.value === 'yaksu' ? 'yaksu' : 'incheon';
-  content.images.photoModel = modelEl && modelEl.value === 'f' ? 'f' : 'm';
+  var pickBranch = normalizeTopicPhotoBranch_(branchEl && branchEl.value);
+  var pickModel = modelEl && modelEl.value === 'f' ? 'f' : 'm';
+  if(pickBranch !== topicPhotoBranchKey_(content, state.selectedCatId)) content.images.photoBranchTouched = true;
+  if(pickModel !== topicPhotoModelKey_(content, state.selectedCatId)) content.images.photoModelTouched = true;
+  content.images.photoBranch = pickBranch;
+  content.images.photoModel = pickModel;
   var ta = document.getElementById('sheet-image-prompt-0');
   var prompt = ta ? String(ta.value || '').trim() : '';
   if(!prompt){
@@ -34174,14 +34297,15 @@ window.generateTopicPhoto_ = async function(btn){
   if(content.images && content.images.gptVisuals && content.images.gptVisuals[0]){
     content.images.gptVisuals[0].prompt = prompt;
   }
-  var branch = topicPhotoBranchKey_(content);
-  var model = topicPhotoModelKey_(content);
+  var branch = topicPhotoBranchKey_(content, state.selectedCatId);
+  var model = topicPhotoModelKey_(content, state.selectedCatId);
   var photoEstimateSec = 60;
   if(btn) startButtonCountdown_(btn, { estimateSec: photoEstimateSec, busyLabel: '만드는 중', idleText: '이미지 생성' });
   setAppToast('참고 사진으로 4:5 사진을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.', { duration: 4000, variant: 'ok' });
   try {
-    var refs = await loadTopicPhotoRefs_(branch, model);
-    var apiPrompt = prompt + '\n\n사진 안에 글자, 숫자, 자막, 제목, 로고를 그리지 않는다. 주제 문장을 사진에 적지 않는다. 카메라는 가까이. 인물과 동작이 화면 너비의 대부분을 채운다. 방 전체를 멀리서 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통 중심이 세로 가운데선에 온다. 아래쪽 약 4분의 1만 바닥으로 비워 썸네일 글자 자리로 둔다. 얼굴, 손, 발은 그 자리에 넣지 않는다. 첨부 사진 앞쪽은 공간, 마지막은 모델이다. 4:5 한 장. 사람은 한 명.';
+    var sceneText = topicPhotoPeopleSource_(content, state.selectedCatId, '');
+    var refs = await loadTopicPhotoRefs_(branch, model, sceneText, topicPhotoPeopleKind_(sceneText, state.selectedCatId));
+    var apiPrompt = prompt + '\n\n사진 안에 글자, 숫자, 자막, 제목, 로고를 그리지 않는다. 주제 문장을 사진에 적지 않는다. 카메라는 가까이. 인물과 동작이 화면 너비의 대부분을 채운다. 방 전체를 멀리서 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통 중심이 세로 가운데선에 온다. 아래쪽 약 4분의 1만 바닥으로 비워 썸네일 글자 자리로 둔다. 얼굴, 손, 발은 그 자리에 넣지 않는다. 첨부 사진 앞쪽은 공간, 마지막은 모델이다. 4:5 한 장. 위 프롬프트에 적힌 사람 수를 지킨다.';
     var data = await plannerGasJsonRequest_({
       action: 'plannerGenerateTopicPhoto',
       prompt: apiPrompt,

@@ -11620,7 +11620,7 @@ function applyTopicGapDecision_(detail, index){
   state._topicEqualDiffKeys = [];
   if(!detail.surfaceDiff && !equalKeys.length) state._surfaceUnmatched = false;
   if(equalKeys.length > 5){
-    state._surfaceUnmatched = true;
+    if(state._sessionUserEdit) state._surfaceUnmatched = true;
   } else if(equalKeys.length){
     equalKeys.forEach(function(key){
       if(decision.askKeys.indexOf(key) < 0) decision.askKeys.push(key);
@@ -11648,13 +11648,19 @@ function applyTopicGapDecision_(detail, index){
     if(attempts >= 2){
       var surfaceOnly = !!(detail.surfaceDiff && !decision.uploadKeys.length && !decision.askKeys.length && !equalKeys.length);
       if(surfaceOnly){
-        try { maybeQueueSurfaceDigest_(); } catch(eDig){}
         state._surfaceUnmatched = false;
         state._topicReceiveAttempts = 0;
         state._topicReceiveGaveUp = false;
-        try { schedulePlannerGasPush_(true); } catch(eDigPush){}
-      } else if(detail.surfaceDiff || equalKeys.length){
+        if(state._sessionUserEdit){
+          try { maybeQueueSurfaceDigest_(); } catch(eDig){}
+          try { schedulePlannerGasPush_(true); } catch(eDigPush){}
+        }
+      } else if((detail.surfaceDiff || equalKeys.length) && (state._sessionUserEdit || decision.uploadKeys.length)){
         state._surfaceUnmatched = true;
+      } else if(detail.surfaceDiff || equalKeys.length){
+        state._surfaceUnmatched = false;
+        state._topicReceiveAttempts = 0;
+        state._topicReceiveGaveUp = false;
       }
       if(!state._topicReceiveGaveUp && decision.receive && !decision.askKeys.length && state._surfaceUnmatched){
         state._topicReceiveGaveUp = true;
@@ -12265,8 +12271,10 @@ function applySupabaseEntityRows_(rows){
           return;
         }
         if(!serverClearlyNewer && localSize > 0 && localSize === serverSize){
-          equalDiff.push(key);
-          return;
+          if(state._sessionUserEdit){
+            keepLocal.push(key);
+            return;
+          }
         }
       }
     }
@@ -19013,7 +19021,14 @@ function kickPendingSyncIfIdle_(info){
   var stalled = info.phase === 'pending' && !(info.pendingCount > 0);
   if(!stalled && info.phase !== 'queued') return;
   if(!stalled && !(info.pendingCount > 0)) return;
-  if(stalled && _stallRecheckFails_ >= 2) return;
+  if(stalled && _stallRecheckFails_ >= 2){
+    if(!state._sessionUserEdit && !(info.pendingCount > 0)){
+      state._surfaceUnmatched = false;
+      state._topicReceiveAttempts = 0;
+      state._topicReceiveGaveUp = false;
+    }
+    return;
+  }
   if(shouldBlockStaleFloodPush_()){
     requestServerAuthorityInsteadOfFlood_();
     return;
@@ -19091,11 +19106,11 @@ function getSyncStatusInfo_(remoteMeta){
   var busy = isPlannerSyncBusy_();
   var serverOn = isServerSyncConfigured_();
   var driveOn = hasDriveValidToken_();
+  var pendingCount = countPendingSyncItems_();
   var localPending = hasPendingLocalSyncChanges_();
   var serverPending = serverOn && localPending;
   var drivePending = driveOn && localPending;
   var remoteNewer = remoteRev != null && remoteRev > localRev;
-  var pendingCount = countPendingSyncItems_();
   var sendingNow = _syncSendingNow_ || 0;
   var sendingSnapshot = !!_syncSendingSnapshot_;
   var retryInSec = syncRetryWaitSec_();
@@ -19127,7 +19142,7 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(remoteNewer && !serverPending && !drivePending){
     phase = 'pull';
     overall = 'pending';
-  } else if(serverPending || drivePending || (serverOn && !serverRev && localRev > 0)){
+  } else if(serverPending || drivePending || (serverOn && !serverRev && localRev > 0 && pendingCount > 0)){
     phase = 'pending';
     overall = 'pending';
   } else if(busy){
@@ -19139,9 +19154,14 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(state._topicListGap){
     phase = 'topic_gap';
     overall = 'pending';
-  } else if(state._surfaceUnmatched){
+  } else if(state._surfaceUnmatched && (state._sessionUserEdit || pendingCount > 0 || plannerOutboxHasTeamContent_())){
     phase = 'pending';
     overall = 'pending';
+  } else if(state._surfaceUnmatched){
+    state._surfaceUnmatched = false;
+    state._topicReceiveAttempts = 0;
+    state._topicReceiveGaveUp = false;
+    try { requestServerAuthorityInsteadOfFlood_(); } catch(eAdoptUi){}
   }
 
   var loginRequired = !!state._teamLoginRequired;

@@ -5033,6 +5033,28 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   padding: 5px 9px;
   cursor: pointer;
 }
+a.ops-kw-btn {
+  display: inline-block;
+  text-decoration: none;
+  line-height: 1.2;
+}
+.ops-review-draft {
+  margin-top: 8px;
+}
+.ops-review-draft textarea {
+  width: 100%;
+  min-height: 96px;
+  box-sizing: border-box;
+  border: 1px solid #d6deea;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #1e293b;
+  background: #f8fafc;
+  resize: vertical;
+}
 .ops-kw-btn-regen {
   border-color: #bfdbfe;
   background: #eff6ff;

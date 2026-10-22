@@ -26104,6 +26104,79 @@ function setOpsChannelReviewDone_(id, on){
 window.setOpsChannelReviewDone_ = setOpsChannelReviewDone_;
 var OPS_REVIEW_BRANCH_LABEL = { all: '약수·인천', yaksu: '약수점', jakjeon: '인천점' };
 var OPS_REVIEW_WHO_LABEL = { draft: '커서가 문구 초안', user: '직접 수정' };
+var opsReviewDraftOpen_ = {};
+function getOpsChannelReviewDrafts_(){
+  var st = getOpsMarketingState_('ops-m-26');
+  if(!st.reviewDraft || typeof st.reviewDraft !== 'object') st.reviewDraft = {};
+  return st.reviewDraft;
+}
+function opsReviewItem_(id){
+  return (getOpsChannelReviewSeed_().items || []).filter(function(x){ return x.id === id; })[0] || null;
+}
+function opsReviewDraftText_(it){
+  if(!it) return '';
+  var drafts = getOpsChannelReviewDrafts_();
+  if(typeof drafts[it.id] === 'string') return drafts[it.id];
+  return it.fix || '';
+}
+function opsReviewBranchKeys_(branch){
+  if(branch === 'yaksu' || branch === 'jakjeon') return [branch];
+  return ['yaksu', 'jakjeon'];
+}
+function opsReviewLinks_(it){
+  if(!it) return [];
+  var keys = opsReviewBranchKeys_(it.branch);
+  var links = [];
+  function add(label, href){
+    if(!href) return;
+    if(links.some(function(l){ return l.href === href; })) return;
+    links.push({ label: label, href: href });
+  }
+  function branchLinks(channel){
+    keys.forEach(function(k){
+      var meta = opsBranchMeta_(k);
+      if(!meta) return;
+      var name = meta.shortLabel || k;
+      if(channel === 'place' && meta.placeId) add(name + ' 플레이스', 'https://new.smartplace.naver.com/bizes/place/' + meta.placeId);
+      if(channel === 'kakao'){
+        var pf = String(meta.kakaoChannelUrl || '').split('/').filter(Boolean).pop();
+        add(name + ' 채널', pf ? ('https://center-pf.kakao.com/' + pf) : meta.kakaoChannelUrl);
+      }
+      if(channel === 'karrot') add(name + ' 당근', meta.karrotUrl);
+      if(channel === 'google') add(name + ' 구글', meta.googleBusinessUrl);
+    });
+  }
+  if(it.id === 'PL-06') branchLinks('kakao');
+  else if(it.id === 'ET-01') add('블로그', 'https://blog.naver.com/allenjoy');
+  else if(it.id === 'ET-02') branchLinks('google');
+  else if(it.id === 'ET-03') ['place', 'kakao', 'karrot'].forEach(branchLinks);
+  else branchLinks(it.channel);
+  return links;
+}
+function toggleOpsReviewDraft_(id){
+  opsReviewDraftOpen_[id] = !opsReviewDraftOpen_[id];
+  refreshOpsMarketingPanel_('ops-m-26');
+}
+function onOpsReviewDraftInput_(id, el){
+  var it = opsReviewItem_(id);
+  var drafts = getOpsChannelReviewDrafts_();
+  var text = String(el && el.value || '');
+  if(it && text === String(it.fix || '')) delete drafts[id];
+  else drafts[id] = text;
+  getOpsManualState_().updatedAt = new Date().toISOString();
+  scheduleOpsVisitSave_();
+}
+function copyOpsReviewDraft_(id){
+  var it = opsReviewItem_(id);
+  if(!it) return;
+  var text = opsReviewDraftText_(it);
+  var done = function(ok){ if(ok && typeof setAppToast === 'function') setAppToast(it.id + ' 문구를 복사했습니다.', { duration: 2200, variant: 'ok' }); };
+  if(typeof copyTextOnly_ === 'function') copyTextOnly_(text, done);
+  else if(navigator.clipboard) navigator.clipboard.writeText(text).then(function(){ done(true); });
+}
+window.toggleOpsReviewDraft_ = toggleOpsReviewDraft_;
+window.onOpsReviewDraftInput_ = onOpsReviewDraftInput_;
+window.copyOpsReviewDraft_ = copyOpsReviewDraft_;
 function opsChannelReviewItemMarkdown_(it, done, withReply){
   var ch = (getOpsChannelReviewSeed_().channels || []).filter(function(c){ return c.id === it.channel; })[0];
   var head = it.id + ' · ' + (OPS_REVIEW_BRANCH_LABEL[it.branch] || it.branch) + ' · ' + OPS_MKT_LEVEL_LABEL[it.level] + (done ? ' · 완료 ' + done : '') + ' · ' + it.title;
@@ -26137,6 +26210,25 @@ function copyOpsChannelReviewItem_(id){
   else if(navigator.clipboard) navigator.clipboard.writeText(text).then(function(){ done(true); });
 }
 window.copyOpsChannelReviewItem_ = copyOpsChannelReviewItem_;
+function copyOpsChannelReviewRefresh_(){
+  var seed = getOpsChannelReviewSeed_();
+  var sources = seed.sources || {};
+  var lines = [
+    '채널 프로필 다시 검토',
+    '',
+    '아래 공개 페이지를 다시 열고, 항목의 현재(now)를 고친 뒤 checkedAt·version을 올려 주세요.',
+    '계정 화면은 수정하지 않습니다.',
+    ''
+  ];
+  Object.keys(sources).forEach(function(k){ lines.push('- ' + k + ': ' + sources[k]); });
+  var text = lines.join('\n');
+  var done = function(ok){
+    if(ok && typeof setAppToast === 'function') setAppToast('다시 검토 요청을 복사했습니다.\n커서 채팅에 붙여 넣으세요.', { duration: 3200, variant: 'ok' });
+  };
+  if(typeof copyTextOnly_ === 'function') copyTextOnly_(text, done);
+  else if(navigator.clipboard) navigator.clipboard.writeText(text).then(function(){ done(true); });
+}
+window.copyOpsChannelReviewRefresh_ = copyOpsChannelReviewRefresh_;
 function buildOpsChannelReviewHTML_(){
   var seed = getOpsChannelReviewSeed_();
   var done = getOpsChannelReviewDone_();
@@ -26160,18 +26252,30 @@ function buildOpsChannelReviewHTML_(){
             '<strong style="font-size:13px">' + escapeHtml(it.title) + '</strong>' +
             '<span style="opacity:.65">' + escapeHtml(OPS_REVIEW_BRANCH_LABEL[it.branch] || '') + ' · ' + escapeHtml(OPS_REVIEW_WHO_LABEL[it.who] || '') + '</span>' +
           '</div>' +
-          row('위치', it.where) + row('현재', it.now) + row('제안', it.fix) + row('이유', it.why) +
+          row('위치', it.where) + row('현재', it.now) + row('이유', it.why) +
           '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
-            '<button type="button" class="ops-kw-btn" onclick="copyOpsChannelReviewItem_(\'' + escapeHtml(it.id) + '\')">커서 요청 복사</button>' +
+            '<button type="button" class="ops-kw-btn" onclick="toggleOpsReviewDraft_(\'' + escapeHtml(it.id) + '\')">' + (opsReviewDraftOpen_[it.id] ? '접기' : '제안') + '</button>' +
             '<label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px"><input type="checkbox"' + (d ? ' checked' : '') + ' onchange="setOpsChannelReviewDone_(\'' + escapeHtml(it.id) + '\', this.checked)" />완료' + (d ? ' (' + escapeHtml(d) + ')' : '') + '</label>' +
           '</div>' +
+          (opsReviewDraftOpen_[it.id] ? (function(){
+            var links = opsReviewLinks_(it).map(function(l){
+              return '<a class="ops-kw-btn" href="' + escapeHtml(l.href) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(l.label) + '</a>';
+            }).join('');
+            return '<div class="ops-review-draft">' +
+              '<textarea oninput="onOpsReviewDraftInput_(\'' + escapeHtml(it.id) + '\', this)">' + escapeHtml(opsReviewDraftText_(it)) + '</textarea>' +
+              '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
+                '<button type="button" class="ops-kw-btn" onclick="copyOpsReviewDraft_(\'' + escapeHtml(it.id) + '\')">문구 복사</button>' +
+                links +
+              '</div></div>';
+          })() : '') +
         '</div>';
       }).join('');
   }).join('');
   return '<div class="ops-review-group ops-kw-group">' +
     '<div class="ops-review-group-title"><strong>채널 프로필 검토</strong> <span class="ops-review-group-hint">네이버 플레이스 · 카카오 채널 · 당근 · 그 밖에 · ' + escapeHtml(seed.checkedAt || '') + ' 공개 페이지 확인</span>' +
       '<span class="ops-review-group-progress">' + open + '/' + items.length + '개 남음</span></div>' +
-    '<p class="ops-kw-chip-hint">항목마다 번호가 있습니다. 「커서 요청 복사」는 그 항목만 커서에 묻고, 위 「커서용 보고서 복사」는 제안마다 `->` 코멘트 칸이 있습니다. 계정 화면 수정은 직접 하시고, 끝나면 「완료」를 체크하세요.</p>' +
+    '<div class="ops-kw-actions" style="margin-top:8px"><button type="button" class="ops-kw-btn" onclick="copyOpsChannelReviewRefresh_()">채널 프로필 다시 검토</button></div>' +
+    '<p class="ops-kw-chip-hint">「채널 프로필 다시 검토」는 공개 페이지를 다시 봐 달라는 요청을 복사합니다. 분석하기와는 따로입니다. 「제안」을 누르면 붙여 넣을 문구가 열립니다. 고친 뒤 「문구 복사」와 채널 링크로 그 화면에서 직접 반영하고, 끝나면 「완료」를 체크하세요.</p>' +
     groups +
   '</div>';
 }

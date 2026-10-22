@@ -855,6 +855,25 @@ margin-left: 4px;
 .ch-dot-image { background: #1D4ED8; }
 .ch-dot-community { background: #B45309; }
 .ch-dot-thread { background: #0F766E; }
+.ops-plan-strip-wrap { margin: 0 0 12px; }
+.ops-plan-strip-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.ops-plan-strip-head strong { font-size: 14px; }
+.ops-plan-legend { font-size: 11px; opacity: .75; display: flex; gap: 8px; align-items: center; }
+.ops-plan-legend i { width: 8px; height: 8px; }
+.ops-plan-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
+.ops-plan-day {
+  flex: 0 0 54px; appearance: none; border: 1px solid rgba(30,58,110,.18); background: #fff; color: #1e3a6e;
+  border-radius: 12px; padding: 8px 4px 7px; cursor: pointer; font: inherit; text-align: center;
+}
+.ops-plan-day.is-today { background: #1e3a6e; color: #fff; border-color: #1e3a6e; }
+.ops-plan-dow { display: block; font-size: 11px; opacity: .7; }
+.ops-plan-num { display: block; font-size: 16px; font-weight: 800; line-height: 1.2; }
+.ops-plan-dots { display: flex; gap: 3px; justify-content: center; min-height: 8px; margin-top: 4px; }
+.ops-plan-day .card-ch-dot.is-plan { background: transparent; box-shadow: inset 0 0 0 2px currentColor; }
+.ops-plan-day .ch-dot-blog.is-plan { color: #047857; }
+.ops-plan-day .ch-dot-insta.is-plan { color: #BE185D; }
+.ops-plan-day .ch-dot-threads.is-plan { color: #6B7280; }
+.ops-plan-day.is-today .card-ch-dot.is-plan { box-shadow: inset 0 0 0 2px #fff; color: #fff; }
 .card-more-step-chips {
   display: flex;
   flex-wrap: wrap;

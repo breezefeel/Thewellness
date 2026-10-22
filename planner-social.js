@@ -143,7 +143,7 @@ var PlannerSocial = (function(){
         el.innerHTML = '<div class="ops-kw-preview-head" style="margin-top:4px">올릴 사진·릴스 <span>' + list.length + '개 · 이미지 탭에서 바꿉니다</span></div>' + mediaGridHTML(list, false) + postsHTML(mine);
       } else {
         el.innerHTML = '<label style="display:inline-flex;gap:6px;align-items:center;font-size:12px;margin-top:4px"><input type="checkbox" id="social-threads-media"' + (list.length ? '' : ' disabled') + '> 이미지 탭 사진·영상도 같이 올리기 (' + list.length + '개)</label>' +
-          '<div style="font-size:11.5px;opacity:.7;margin-top:2px">「댓글」 박스 내용은 본문 바로 아래 내 댓글로 자동으로 이어 올립니다.</div>' + postsHTML(mine);
+          '<div style="font-size:11.5px;opacity:.7;margin-top:2px">댓글 박스의 빈 줄마다 본문 아래 이어지는 댓글로 하나씩 올립니다.</div>' + postsHTML(mine);
       }
     });
   }
@@ -221,7 +221,7 @@ var PlannerSocial = (function(){
     if(!window.confirm(label + '에 지금 올릴까요?' + (platform === 'instagram' && row.collaborators.length ? '\n공동작업자: @' + row.collaborators.join(', @') : ''))) return;
     row.status = 'queued';
     row.scheduled_at = new Date().toISOString();
-    setBusy(true, label + '에 올리는 중… (영상은 1~2분)');
+    setBusy(true, label + '에 올리는 중…', postEstimateSec(row));
     var sb;
     client().then(function(c){ sb = c; return sb.from('social_posts').insert(row).select('id').single(); })
       .then(function(res){
@@ -252,12 +252,30 @@ var PlannerSocial = (function(){
   function schedule(platform){
     var row;
     try { row = buildPost(platform); } catch(e){ toast(e.message, 'err', 5000); return; }
-    openSchedulePicker(platform, function(when){
-      row.status = 'scheduled';
-      row.scheduled_at = when.toISOString();
-      client().then(function(sb){ return sb.from('social_posts').insert(row); }).then(function(res){
-        if(res.error) throw new Error(res.error.message);
-        toast((platform === 'instagram' ? '인스타' : '쓰레드') + ' 예약: ' + when.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) +
+    var key = platform === 'instagram' ? 'insta' : 'threads';
+    var label = platform === 'instagram' ? '인스타' : '쓰레드';
+    var cached = (postsCache[curDraft()] || []).filter(function(r){ return r.platform === platform && r.status === 'scheduled'; })[0];
+    var plan = typeof getChannelPlan_ === 'function' ? getChannelPlan_(curDraft(), key) : null;
+    var postId = (cached && cached.id) || (plan && plan.postId) || '';
+    var editing = !!postId || !!(plan && plan.at);
+    var openPicker = typeof openOpsSchedulePicker_ === 'function' ? openOpsSchedulePicker_ : openSchedulePicker.bind(null, platform);
+    if(typeof openOpsSchedulePicker_ !== 'function'){
+      openSchedulePicker(platform, function(when){ saveSchedule(when, ''); });
+      return;
+    }
+    openPicker({
+      title: (editing ? label + ' 예약 수정' : label + ' 예약'),
+      value: (cached && cached.scheduled_at) || (plan && plan.at) || '',
+      editing: editing,
+      hint: '그 시간이 지나면 1분 안에 클라우드가 올립니다. 날짜 칩에도 표시됩니다.',
+      onOk: function(when){ saveSchedule(when, postId); }
+    });
+    function saveSchedule(when, id){
+      var finish = function(savedId){
+        if(typeof setChannelPlan_ === 'function') setChannelPlan_(curDraft(), curCat(), key, when.toISOString(), savedId || id || '');
+        var btn = document.querySelector('[data-social-schedule]');
+        if(btn && typeof opsPlanChipLabel_ === 'function') btn.textContent = opsPlanChipLabel_(when.toISOString()) + ' 수정';
+        toast(label + ' 예약: ' + when.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) +
           '\n컴퓨터가 꺼져 있어도 그 시간에 올라갑니다.', 'ok', 5000);
         if(platform === 'instagram' && typeof enqueueThreadsFromInsta_ === 'function'){
           var content = getDraftContent_(curDraft());
@@ -268,13 +286,41 @@ var PlannerSocial = (function(){
           }
         }
         hydrate();
+      };
+      var write = {
+        scheduled_at: when.toISOString(),
+        caption: row.caption,
+        reply_text: row.reply_text || null,
+        media: row.media,
+        collaborators: row.collaborators || []
+      };
+      client().then(function(sb){
+        if(!id){
+          row.status = 'scheduled';
+          row.scheduled_at = when.toISOString();
+          return sb.from('social_posts').insert(row).select('id').single();
+        }
+        return sb.from('social_posts').update(write).eq('id', id).eq('status', 'scheduled').select('id').maybeSingle();
+      }).then(function(res){
+        if(res.error) throw new Error(res.error.message);
+        if(id && !res.data){
+          row.status = 'scheduled';
+          row.scheduled_at = when.toISOString();
+          return client().then(function(sb){ return sb.from('social_posts').insert(row).select('id').single(); });
+        }
+        return res;
+      }).then(function(res){
+        if(!res) return;
+        if(res.error) throw new Error(res.error.message);
+        finish(res.data && res.data.id);
       }).catch(function(err){ toast('예약 실패: ' + err.message, 'err', 8000); });
-    });
+    }
   }
   function cancel(id){
     if(!window.confirm('예약을 취소할까요?')) return;
     client().then(function(sb){ return sb.from('social_posts').update({ status: 'canceled' }).eq('id', id).eq('status', 'scheduled'); })
-      .then(hydrate).catch(function(err){ toast(err.message, 'err'); });
+      .then(function(){ if(typeof clearChannelPlanByPostId_ === 'function') clearChannelPlanByPostId_(id); hydrate(); })
+      .catch(function(err){ toast(err.message, 'err'); });
   }
   function openSchedulePicker(platform, done){
     var d = new Date(Date.now() + 60 * 60000);
@@ -297,16 +343,51 @@ var PlannerSocial = (function(){
       done(when);
     };
   }
-  function setBusy(on, text){
+  var postTick = null;
+  function stopPostTick(){
+    if(postTick){ clearInterval(postTick); postTick = null; }
+  }
+  function postEstimateSec(row){
+    var media = row.media || [];
+    var video = media.some(function(m){ return m.type === 'VIDEO' || /^video\//i.test(String(m.type || '')); });
+    if(video) return 90;
+    if(media.length > 1) return 45;
+    if(media.length) return 30;
+    var parts = String(row.reply_text || '').split(/\n\s*\n/).filter(function(s){ return String(s).trim(); }).length;
+    return Math.min(90, 15 + Math.max(1, parts) * 6);
+  }
+  function setBusy(on, text, estimateSec){
     document.querySelectorAll('.sheet-actions [data-social-btn]').forEach(function(b){ b.disabled = !!on; });
-    if(on) toast(text, 'ok', 120000);
+    stopPostTick();
+    if(!on) return;
+    var sec = estimateSec || 60;
+    var started = Date.now();
+    var dur = typeof opsFmtDur_ === 'function' ? opsFmtDur_ : function(n){ return n + '초'; };
+    function paint(){
+      var left = sec - Math.floor((Date.now() - started) / 1000);
+      var msg = left > 0
+        ? text + '\n예상 ' + dur(sec) + ' · 남은 시간 ' + dur(left)
+        : text + '\n예상 ' + dur(sec) + '을 넘겼습니다. 아직 올리는 중입니다.';
+      toast(msg, 'ok', 0);
+    }
+    paint();
+    postTick = setInterval(paint, 1000);
   }
 
-  /** 시트 하단 버튼 (인스타·쓰레드 탭) — 「직접 올림」은 앱에서 올렸을 때 발행 기록만 남긴다 */
+  function scheduleButtonLabel_(platform){
+    var key = platform === 'instagram' ? 'insta' : 'threads';
+    var plan = typeof getChannelPlan_ === 'function' ? getChannelPlan_(curDraft(), key) : null;
+    if(!plan || !plan.at) return '예약하기';
+    var when = new Date(plan.at);
+    if(isNaN(when.getTime())) return '예약하기';
+    var pub = state.published && state.published[curDraft()];
+    if(pub && pub.tabPublished && pub.tabPublished[key]) return '예약하기';
+    return (typeof opsPlanChipLabel_ === 'function' ? opsPlanChipLabel_(plan.at) : '') + ' 수정';
+  }
   function actionsHTML(tab){
     var platform = tab === 'insta' ? 'instagram' : 'threads';
     return '<button type="button" class="btn-sheet-close-action" onclick="onSheetPublishComplete()" title="앱에서 직접 올렸을 때: 저장·복사하고 발행 기록만 남깁니다">직접 올림</button>' +
-      '<button type="button" class="btn-save-draft" data-social-btn onclick="PlannerSocial.schedule(\'' + platform + '\')">예약하기</button>' +
+      '<button type="button" class="btn-save-draft" data-social-btn data-social-schedule onclick="PlannerSocial.schedule(\'' + platform + '\')">' + esc(scheduleButtonLabel_(platform)) + '</button>' +
       '<button type="button" class="btn-pub" data-social-btn onclick="PlannerSocial.publishNow(\'' + platform + '\')">지금 올리기</button>';
   }
 
@@ -332,6 +413,24 @@ var PlannerSocial = (function(){
         try { renderTabs(); renderMain(); } catch(e2){}
         toast('예약으로 올라간 게시물 ' + changed + '건을 발행완료로 표시했어요.', 'ok', 3500);
       }
+    }).catch(function(){});
+    PlannerSyncSupabase.client().then(function(sb){
+      return sb.from('social_posts').select('id,draft_id,cat_id,platform,scheduled_at,topic').eq('status', 'scheduled').gte('scheduled_at', new Date().toISOString()).limit(200);
+    }).then(function(res){
+      var rows = (res && res.data) || [];
+      var touched = false;
+      rows.forEach(function(r){
+        if(!r.draft_id || !r.scheduled_at || typeof setChannelPlan_ !== 'function') return;
+        var key = r.platform === 'instagram' ? 'insta' : 'threads';
+        var pub = state.published && state.published[r.draft_id];
+        if(pub && pub.tabPublished && pub.tabPublished[key]) return;
+        var cur = pub && pub.channelPlan && pub.channelPlan[key];
+        if(cur && cur.postId === r.id && cur.at && new Date(cur.at).getTime() === new Date(r.scheduled_at).getTime()) return;
+        setChannelPlan_(r.draft_id, r.cat_id, key, r.scheduled_at, r.id);
+        if(r.topic && state.published[r.draft_id] && !state.published[r.draft_id].topic) state.published[r.draft_id].topic = r.topic;
+        touched = true;
+      });
+      if(touched && typeof paintOpsPlanStrip_ === 'function') paintOpsPlanStrip_();
     }).catch(function(){});
   }
   setTimeout(syncPublished, 6000);

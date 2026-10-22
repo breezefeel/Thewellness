@@ -13612,7 +13612,22 @@ function renderReelQuikRedirectHTML_(){
   '</div>';
 }
 function openNaverBlogAppOnIOS_(){
+  openIOSAppScheme_('naverblog://write?blogId=allenjoy');
   openIOSAppScheme_('naverblog://write');
+}
+/** 사용자 클릭 안에서 연다. location을 바꾸지 않아 플래너와 인스타 초안 생성이 유지된다. */
+function openExternalLinkInGesture_(url){
+  if(!url) return;
+  try {
+    var a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0';
+    (document.body || document.documentElement).appendChild(a);
+    a.click();
+    setTimeout(function(){ try { if(a.parentNode) a.parentNode.removeChild(a); } catch(e){} }, 1500);
+  } catch(e){}
 }
 function getThreadsProfileUsername(){
   const m = String(EXT_THREADS).match(/@([^/?#]+)/);
@@ -13859,6 +13874,8 @@ const THREADS_BODY_COMMENT_RULES = `[Threads 2단 구조 — 필수]
 - 본문에서 던진 **궁금증·반전에 대한 답**.
 - **근거**: 현장 경험·짧은 메커니즘. (해당 시) 병원 진료 먼저 권고.
 - 본문과 **같은 문장 반복 금지**. 해시태그·"~하세요" 나열 금지.
+- **마침표(。!?)마다 빈 줄.** 문법과 상관없이 문장 하나가 댓글 하나다. 짧은 문장 둘은 한 댓글로 이어져도 된다.
+- 빈 줄로 나뉜 단락은 게시할 때 본문 아래 **이어지는 댓글**로 하나씩 올라간다.
 
 ${THREADS_UNIVERSAL_QUALITY_RULE}
 
@@ -15029,6 +15046,16 @@ const GEO_CONTENT_STRUCTURE_RULE = `[GEO · 인용 가능한 짧은 구조 — e
 ※ explanation·FAQ에 병원 진료 안내를 다시 쓰지 마세요. (병원 안내는 selfCare 한 줄만)
 ※ 전체 본문은 **짧게**. 같은 메시지를 서론·본문·FAQ·결론에 네 번 쓰지 마세요.`;
 
+/** 네이버 붙여넣기는 글자만 남는다. 굵게·구분선·인용 기호는 넣지 않는다. */
+const BLOG_PLAIN_READABILITY_MARKER = '[가독성 — 붙여넣기는 글자만]';
+const BLOG_PLAIN_READABILITY_RULE = `${BLOG_PLAIN_READABILITY_MARKER}
+- **, ---, > 인용 기호를 본문에 쓰지 마세요. 네이버에는 그 기호가 그대로 붙습니다.
+- 맨 앞 두 문장은 짧게, 문장 사이에 빈 줄. 나중에 인용으로 지정할 문장입니다.
+- 이어서 구체적인 장면 하나만. 어디를 보고 무엇이 달라 보이는지. 이 장면이 본문입니다.
+- 번호는 그 장면 다음에만, 한 줄에 하나, 각 줄은 짧게. 번호를 먼저 길게 쓰고 아래에서 같은 말을 다시 풀지 마세요.
+- 같은 결론을 칸마다 반복하지 마세요. 문제 제기와 원리, 또는 맥락·포인트·본문이 같은 문장이면 안 됩니다.
+- 마침표마다 빈 줄. 아주 짧은 문장은 다음 문장과 한 단락으로 이어져도 됩니다.`;
+
 const DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW = `**일반인 독자**용 블로그입니다. ${BLOG_CONTENT_VOICE_RULE}
 
 ${BLOG_INSTA_HONORIFIC_SPEECH_RULE}
@@ -15042,7 +15069,9 @@ ${GEO_CONTENT_STRUCTURE_RULE}
 [글 흐름 — 반드시 이 순서·필드]
 1. **문제 제기** (problem): 일상 장면에서 공감되는 불편·궁금증 2~4문장. 불릿·번호 나열 금지. 문장(문단) 사이에는 **빈 줄**로 띄워 가독성 확보. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스. **병원 안내 금지**. 교훈 결론으로 닫지 말 것.
 2. **셀프 케어** (selfCare): **👉 로 시작**. 동작·자세·**초·회·분**을 앞쪽에. "아 시원하다" 지점에서 멈추라는 뉘앙스. 무리·재통증 주의 한 줄. **병원 진료 권고는 여기에만 한 문장**(심한 통증·적신호 시 병원 먼저 — 영상검사 일률 권고 금지). 같은 글을 다른 필드에서 반복하지 마세요. 좌우 차이·자가 점검은 **관찰**이지 진단이 아님을 한 줄로만.
-3. **원리 설명** (explanation): **맨 앞 1~2문장 TL;DR** → 동작 **뒤에** 왜 도움이 되는지. GEO는 **새 정보만**. 비유 최대 1개(손상=숨은 화재 식 금지). **병원·진료 안내 반복 금지**. **문단 사이 빈 줄**. 분량보다 구체 장면 1개를 우선.
+3. **원리 설명** (explanation): **맨 앞 1~2문장 TL;DR** → 동작 **뒤에** 왜 도움이 되는지. GEO는 **새 정보만**. 비유 최대 1개(손상=숨은 화재 식 금지). **병원·진료 안내 반복 금지**. **문단 사이 빈 줄**. 분량보다 구체 장면 1개를 우선. 문제 제기의 장면을 여기서 다시 쓰지 마세요.
+
+${BLOG_PLAIN_READABILITY_RULE}
 
 [형식]
 - title: 호기심·질문형 한 줄 (35자 내외, 네이버 SEO 고려, 과장 금지)
@@ -15080,9 +15109,10 @@ function buildExpertCourseBlogPrompt_(opts){
     '- title: 무엇이 끝이 아닌지 한 줄 (35자 내외). 목적어가 안 열리는 표현 금지\n' +
     '- hook: 끝이 아니라는 점과, 누가 어디서 멈추는지 2~3문장. 자막 조각·제작 과정 금지\n' +
     '- outline: 읽을 항목을 한 줄에 하나씩. 각 줄은 완전한 문장. 위·아래·왼쪽·오른쪽·모양·방향을 "주변""한 세트"로 묶지 말 것\n' +
-    '- draft: 선택한 유형의 본문 (**650~1,000자**, 참고·영상·사진 범위 안만). 거기서 멈추면 어떤 정보가 빠지는지. **존댓말**. 말미에 「영상 보세요/댓글」 금지. hook·outline과 같은 문장 반복 금지\n' +
+    '- draft: 선택한 유형의 본문 (**650~1,000자**, 참고·영상·사진 범위 안만). 구체 장면 하나가 중심. outline을 다시 풀어 쓰지 말 것. **존댓말**. 말미에 「영상 보세요/댓글」 금지.\n' +
     '- cta: 수강·등록·시청·댓글 유도 금지. 원리·과정 핵심으로 **가볍게 닫기**만\n' +
     '- hashtags: 3~5개\n\n' +
+    BLOG_PLAIN_READABILITY_RULE + '\n\n' +
     PLAIN_DRAFT_SENTENCE_RULE +
     (programBlock ? '\n\n' + programBlock : '');
 }
@@ -15441,6 +15471,19 @@ function migratePlainDraftSentencePrompts_(){
       cat[type] = text.trim() + '\n\n' + PLAIN_DRAFT_SENTENCE_RULE;
       changed = true;
     });
+  });
+  return changed;
+}
+function migrateBlogPlainReadabilityPrompts_(){
+  if(!state.prompts || !state.prompts.categories) return false;
+  var changed = false;
+  Object.keys(state.prompts.categories).forEach(function(catId){
+    var cat = state.prompts.categories[catId];
+    if(!cat || !cat.blog) return;
+    var text = String(cat.blog);
+    if(text.indexOf(BLOG_PLAIN_READABILITY_MARKER) >= 0) return;
+    cat.blog = text.trim() + '\n\n' + BLOG_PLAIN_READABILITY_RULE;
+    changed = true;
   });
   return changed;
 }
@@ -22396,6 +22439,7 @@ function applyPersistPayload(s, opts){
   if(migrateHospitalGuidanceOnceInSelfCare_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrateAntiAiPainSafetyPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migratePlainDraftSentencePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateBlogPlainReadabilityPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrated){
     var desktopReceiveOnly = isPlannerDesktopBrowser_() && !state._sessionUserEdit;
@@ -23867,6 +23911,7 @@ function runDeferredBootMigrations_(){
     if(migrateHospitalGuidanceOnceInSelfCare_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrateAntiAiPainSafetyPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migratePlainDraftSentencePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateBlogPlainReadabilityPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrated){
       state.syncDirty = true;
@@ -25599,24 +25644,6 @@ function refreshOpsMarketingPanel_(itemId){
   if(old && next) old.replaceWith(next);
   else if(next) panel.insertBefore(next, panel.firstChild);
 }
-function importOpsMarketingReport_(itemId, input){
-  var file = input && input.files && input.files[0];
-  if(!file) return;
-  var reader = new FileReader();
-  reader.onload = function(){
-    var data = null;
-    try { data = JSON.parse(String(reader.result || '').replace(/^\ufeff/, '')); } catch(eParse){}
-    if(!applyOpsMarketingReportData_(data)){
-      if(typeof setAppToast === 'function') setAppToast('마케팅 현황 파일이 아닙니다.\ntools/marketing_report.py가 만든 marketing_status_날짜.json을 선택해 주세요.', { duration: 6000, variant: 'err' });
-      return;
-    }
-    refreshOpsMarketingPanel_(itemId);
-    if(typeof setAppToast === 'function') setAppToast('보고서를 불러왔습니다 (브랜딩·약수·인천 모두)', { duration: 4000, variant: 'ok' });
-  };
-  reader.readAsText(file, 'utf-8');
-  input.value = '';
-}
-window.importOpsMarketingReport_ = importOpsMarketingReport_;
 /** 보고서(marketing_report.py 결과)를 브랜딩·약수·인천 상태에 넣는다 → 동기화로 다른 기기에도 보인다 */
 function applyOpsMarketingReportData_(data){
   if(!data || data.kind !== 'realmovement-marketing-status' || !data.naver) return false;
@@ -25648,10 +25675,25 @@ function isOpsMobileDevice_(){
 }
 var OPS_ADS_DESKTOP_ONLY_MSG = '핸드폰에서는 실행할 수 없어요.\n네이버 박스가 연결된 데스크탑에서 실행하세요.\n(데스크탑에서 코딩 폴더의 「광고연결켜기.bat」을 켠 뒤 플래너에서 같은 버튼을 누르면 됩니다)';
 /** 「마케팅 현황 업데이트」와 같은 분석을 데스크탑 연결로 실행하고, 결과를 바로 홍보 현황에 넣는다 */
+function opsMktAnalyzedLabel_(iso){
+  var m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+  if(!m) return '분석하기';
+  return '분석하기 (' + Number(m[2]) + '/' + Number(m[3]) + ' ' + m[4] + ':' + m[5] + ')';
+}
+function opsFmtDur_(sec){
+  sec = Math.max(0, sec | 0);
+  var min = Math.floor(sec / 60);
+  var s = sec % 60;
+  if(min && s) return min + '분 ' + s + '초';
+  if(min) return min + '분';
+  return s + '초';
+}
 function runOpsMarketingAnalyze_(itemId){
   openOpsAdsApplyDialog_('홍보 현황 분석', '/analyze', {}, {
     runOnly: true,
-    busyText: '분석하는 중입니다… 네이버·구글 광고, 블로그, 플레이스·카카오·당근 소식을 확인합니다 (1~2분)',
+    autoStart: true,
+    estimateSec: 120,
+    busyText: '분석하는 중입니다. 네이버·구글 광고, 블로그, 플레이스·카카오·당근 소식을 확인합니다.',
     onResult: function(res){
       if(!res || !res.report) return;
       applyOpsMarketingReportData_(res.report);
@@ -26116,7 +26158,7 @@ function buildOpsChannelReviewHTML_(){
   return '<div class="ops-review-group ops-kw-group">' +
     '<div class="ops-review-group-title"><strong>채널 프로필 검토</strong> <span class="ops-review-group-hint">네이버 플레이스 · 카카오 채널 · 당근 · 그 밖에 · ' + escapeHtml(seed.checkedAt || '') + ' 공개 페이지 확인</span>' +
       '<span class="ops-review-group-progress">' + open + '/' + items.length + '개 남음</span></div>' +
-    '<p class="ops-kw-chip-hint">항목마다 번호가 있습니다. 「커서 요청 복사」를 눌러 커서에 붙여 넣으면 붙여 넣을 문구 초안을 만들어 드립니다. 계정 화면 수정은 직접 하시고, 끝나면 「완료」를 체크하세요. 전체는 위 「커서용 복사」에 같이 들어갑니다.</p>' +
+    '<p class="ops-kw-chip-hint">항목마다 번호가 있습니다. 「커서 요청 복사」를 눌러 커서에 붙여 넣으면 붙여 넣을 문구 초안을 만들어 드립니다. 계정 화면 수정은 직접 하시고, 끝나면 「완료」를 체크하세요. 전체는 위 「커서용 보고서 복사」에 같이 들어갑니다.</p>' +
     groups +
   '</div>';
 }
@@ -26128,6 +26170,7 @@ function copyOpsMarketingReport_(itemId){
 }
 window.copyOpsMarketingReport_ = copyOpsMarketingReport_;
 function renderOpsMarketingPanelHTML_(itemId){
+  if(!isOpsMobileDevice_()) setTimeout(checkOpsAdsApi_, 50);
   var r = buildOpsMarketingReport_(itemId);
   var seed = getOpsMarketingSeed_();
   var rep = r.report;
@@ -26215,12 +26258,10 @@ function renderOpsMarketingPanelHTML_(itemId){
   }).join('');
   var scope = (seed.promoScopes || {})[r.branchKey] || null;
   var reportButtons = '<div class="ops-kw-actions" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px">' +
-      '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="runOpsMarketingAnalyze_(\'' + itemId + '\')">분석하기 (업데이트)</button>' +
-      '<button type="button" class="ops-kw-btn" onclick="copyOpsMarketingReport_(\'' + itemId + '\')">커서용 복사</button>' +
-      '<label class="ops-kw-btn" style="cursor:pointer">파일 불러오기<input type="file" accept=".json,application/json" style="display:none" onchange="importOpsMarketingReport_(\'' + itemId + '\', this)" /></label>' +
+      '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="runOpsMarketingAnalyze_(\'' + itemId + '\')">' + escapeHtml(opsMktAnalyzedLabel_(rep && rep.generatedAt)) + '</button>' +
+      '<button type="button" class="ops-kw-btn" onclick="copyOpsMarketingReport_(\'' + itemId + '\')">커서용 보고서 복사</button>' +
     '</div>' +
-    '<p class="ops-kw-chip-hint">「분석하기」는 네이버 박스가 연결된 데스크탑에서 「광고연결켜기.bat」이 켜져 있을 때 동작합니다. 네이버·구글 광고, 블로그, 플레이스·카카오·당근 소식을 새로 확인해 브랜딩·약수·인천에 한 번에 넣고, 결과는 동기화로 핸드폰에서도 보입니다. 인스타·쓰레드는 플래너 「발행완료」로 셉니다. 「커서용 복사」는 항목마다 번호가 붙은 보고서입니다.' +
-      (rep && rep.generatedAt ? ' 마지막 보고서: ' + escapeHtml(String(rep.generatedAt).slice(0, 16).replace('T', ' ')) : '') + '</p>';
+    '<p class="ops-kw-chip-hint">「분석하기」는 이 데스크탑에 네이버 광고 연결이 있으면 광고 연결을 켜고 바로 분석을 시작합니다. 약수·인천 어디서 눌러도 네이버·구글 광고, 블로그, 플레이스·카카오·당근 소식을 새로 확인해 브랜딩·약수·인천에 한 번에 넣습니다. 결과는 동기화로 핸드폰에서도 보입니다. 인스타·쓰레드는 플래너 「발행완료」로 셉니다. 버튼의 날짜는 마지막 분석 시각입니다. 「커서용 보고서 복사」는 항목마다 번호가 붙은 보고서입니다.</p>';
   var faceHtml = (r.faceCandidates || []).length
     ? ('<div class="ops-kw-preview-head" style="margin-top:12px">리얼페이스 키워드 <span>네이버 월간 검색수 · 「리얼페이스」 광고그룹(계양·부평 지역)에 들어가 있음</span></div>' +
       '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr><th style="' + head + ';text-align:left">키워드</th><th style="' + head + '">월 검색</th><th style="' + head + ';text-align:left">메모</th></tr>' +
@@ -26358,6 +26399,16 @@ function parseOpsAdTextLines_(text){
   return out;
 }
 var OPS_ADS_API_URL = 'http://127.0.0.1:28765';
+/** 사용자 클릭 안에서 광고 연결 프로그램을 연다. 이미 켜져 있으면 바로 끝난다. */
+function launchOpsAdsServer_(){
+  try {
+    var frame = document.createElement('iframe');
+    frame.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;border:0;opacity:0';
+    frame.src = 'rmads://start';
+    (document.body || document.documentElement).appendChild(frame);
+    setTimeout(function(){ try { if(frame.parentNode) frame.parentNode.removeChild(frame); } catch(e){} }, 4000);
+  } catch(e){}
+}
 function buildOpsAdsApiGuideHTML_(kind, accountId){
   var isG = kind === 'google';
   var steps = isG
@@ -26420,14 +26471,20 @@ function postOpsAdsApi_(path, body){
 function openOpsAdsApplyDialog_(title, path, body, opts){
   opts = opts || {};
   var old = document.getElementById('ops-ads-apply-dialog');
-  if(old) old.remove();
+  if(old){
+    if(old._opsTimer) clearInterval(old._opsTimer);
+    old.remove();
+  }
+  var estimateSec = opts.estimateSec | 0;
+  var waitText = isOpsMobileDevice_() ? OPS_ADS_DESKTOP_ONLY_MSG : (opts.busyText || '바뀔 내용을 확인하는 중입니다… (30초쯤 걸릴 수 있습니다)');
+  if(!isOpsMobileDevice_() && estimateSec) waitText += '\n예상 ' + opsFmtDur_(estimateSec) + ' · 남은 시간 ' + opsFmtDur_(estimateSec);
   var wrap = document.createElement('div');
   wrap.id = 'ops-ads-apply-dialog';
   wrap.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:16px';
   wrap.innerHTML = '<div style="background:#fff;border-radius:14px;max-width:720px;width:100%;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.25)">' +
     '<div style="padding:14px 16px;border-bottom:1px solid #e2e8f0;font-weight:700">' + escapeHtml(title) + '</div>' +
     '<pre data-ops-ads-out style="margin:0;padding:14px 16px;overflow:auto;flex:1;font-size:12.5px;line-height:1.55;white-space:pre-wrap;font-family:inherit">' +
-      escapeHtml(isOpsMobileDevice_() ? OPS_ADS_DESKTOP_ONLY_MSG : (opts.busyText || '바뀔 내용을 확인하는 중입니다… (30초쯤 걸릴 수 있습니다)')) + '</pre>' +
+      escapeHtml(waitText) + '</pre>' +
     '<div style="padding:12px 16px;border-top:1px solid #e2e8f0;display:flex;gap:8px;justify-content:flex-end">' +
       '<button type="button" class="ops-kw-btn" data-ops-ads-close>닫기</button>' +
       (opts.runOnly ? '' : '<button type="button" class="ops-kw-btn ops-kw-btn-primary" data-ops-ads-go disabled>이대로 적용</button>') +
@@ -26436,7 +26493,19 @@ function openOpsAdsApplyDialog_(title, path, body, opts){
   var out = wrap.querySelector('[data-ops-ads-out]');
   var go = wrap.querySelector('[data-ops-ads-go]') || document.createElement('button');
   var busy = false;
-  wrap.querySelector('[data-ops-ads-close]').onclick = function(){ if(!busy) wrap.remove(); };
+  var started = Date.now();
+  function stopTimer(){
+    if(wrap._opsTimer){ clearInterval(wrap._opsTimer); wrap._opsTimer = null; }
+  }
+  function paintWait(){
+    if(!estimateSec || !out.isConnected){ stopTimer(); return; }
+    var left = estimateSec - Math.floor((Date.now() - started) / 1000);
+    var base = opts.busyText || '확인하는 중입니다…';
+    out.textContent = left > 0
+      ? (base + '\n예상 ' + opsFmtDur_(estimateSec) + ' · 남은 시간 ' + opsFmtDur_(left))
+      : (base + '\n예상 ' + opsFmtDur_(estimateSec) + '을 넘겼습니다. 아직 확인 중입니다.');
+  }
+  wrap.querySelector('[data-ops-ads-close]').onclick = function(){ if(!busy){ stopTimer(); wrap.remove(); } };
   if(isOpsMobileDevice_()) return;
   function send(apply){
     busy = true;
@@ -26446,16 +26515,18 @@ function openOpsAdsApplyDialog_(title, path, body, opts){
     req.apply = apply;
     return postOpsAdsApi_(path, req).then(function(res){
       busy = false;
+      stopTimer();
       out.textContent = (res.lines || []).join('\n') || '(결과 없음)';
       opsAdsApiOnline_ = true;
       return res;
     }, function(err){
       busy = false;
+      stopTimer();
       out.textContent = String((err && err.message) || err);
       return null;
     });
   }
-  send(false).then(function(res){
+  function afterPreview(res){
     if(opts.onResult) opts.onResult(res);
     if(opts.runOnly) return;
     if(res && res.changes > 0 && res.ok !== false){
@@ -26469,7 +26540,54 @@ function openOpsAdsApplyDialog_(title, path, body, opts){
         });
       };
     }
-  });
+  }
+  function beginRequest(){
+    started = Date.now();
+    if(estimateSec && !wrap._opsTimer) wrap._opsTimer = setInterval(paintWait, 1000);
+    paintWait();
+    send(false).then(afterPreview);
+  }
+  if(!opts.autoStart){
+    beginRequest();
+    return;
+  }
+  var launched = false;
+  if(opsAdsApiOnline_ !== true){
+    out.textContent = '광고 연결을 켜는 중입니다.\n브라우저가 프로그램 열기를 물으면 허용해 주세요.';
+    launchOpsAdsServer_();
+    launched = true;
+  }
+  var tries = 0;
+  function waitServer(){
+    if(!out.isConnected) return;
+    fetch(OPS_ADS_API_URL + '/status', { cache: 'no-store' }).then(function(r){ return r.json(); }).catch(function(){ return null; }).then(function(j){
+      if(!out.isConnected) return;
+      if(j && j.ok && j.naver){
+        opsAdsApiOnline_ = true;
+        beginRequest();
+        return;
+      }
+      if(j && j.ok && !j.naver){
+        stopTimer();
+        out.textContent = '이 컴퓨터에는 네이버 광고 연결이 없습니다.\n네이버 박스가 연결된 데스크탑에서 분석하기를 눌러 주세요.';
+        return;
+      }
+      if(!launched){
+        launched = true;
+        opsAdsApiOnline_ = false;
+        out.textContent = '광고 연결을 켜는 중입니다.\n브라우저가 프로그램 열기를 물으면 허용해 주세요.';
+        launchOpsAdsServer_();
+      }
+      tries += 1;
+      if(tries > 50){
+        stopTimer();
+        out.textContent = '광고 연결이 켜지지 않았습니다.\n브라우저에서 프로그램 열기를 허용하거나, 코딩 폴더의 「광고연결켜기.bat」을 실행한 뒤 다시 눌러 주세요.';
+        return;
+      }
+      setTimeout(waitServer, 500);
+    });
+  }
+  waitServer();
 }
 window.openOpsAdsApplyDialog_ = openOpsAdsApplyDialog_;
 function buildOpsNaverKwCreativeGuideText_(branchKey){
@@ -27301,9 +27419,236 @@ function renderOpsPromoMainHTML_(){
     '<p class="ops-manual-desc">' + escapeHtml(scope.desc || '') + ' — 오늘·이번 주 할 일을 정리합니다.</p>' +
   '</div>';
   return '<div class="ops-manual-wrap">' + tabs + intro +
+    (tab === 'mikadoc' ? renderOpsPlanStripHTML_() : '') +
     '<div class="ops-review-panel open ops-promo-status" data-item-id="' + cur.itemId + '">' + renderOpsMarketingPanelHTML_(cur.itemId) + '</div>' +
   '</div>';
 }
+function opsPlanYmd_(value){
+  var dt = value instanceof Date ? value : new Date(value);
+  if(isNaN(dt.getTime())) return '';
+  var p = function(n){ return String(n).padStart(2, '0'); };
+  return dt.getFullYear() + '-' + p(dt.getMonth() + 1) + '-' + p(dt.getDate());
+}
+function opsPlanChipLabel_(iso){
+  var dt = new Date(iso);
+  if(isNaN(dt.getTime())) return '예약';
+  return (dt.getMonth() + 1) + '/' + dt.getDate();
+}
+function getChannelPlan_(draftId, key){
+  var pub = draftId && state.published && state.published[draftId];
+  var plan = pub && pub.channelPlan && pub.channelPlan[key];
+  if(!plan || !plan.at) return null;
+  return plan;
+}
+function setChannelPlan_(draftId, catId, key, iso, postId){
+  if(!draftId || !key || !iso) return;
+  if(!state.published[draftId]) state.published[draftId] = {};
+  var pub = state.published[draftId];
+  if(!pub.channelPlan) pub.channelPlan = {};
+  var prev = pub.channelPlan[key] || {};
+  pub.channelPlan[key] = { at: iso, postId: postId || prev.postId || '' };
+  if(catId != null) pub.catId = catId;
+  if(!pub.topic){
+    var cat = CATEGORIES[catId != null ? catId : getCatIdFromDraftId_(draftId)];
+    var draft = cat && cat.drafts && cat.drafts.find(function(d){ return d.id === draftId; });
+    if(draft && draft.topic) pub.topic = draft.topic;
+  }
+  save({ skipDriveUpload: true, skipGasPush: true });
+  paintOpsPlanStrip_();
+}
+function clearChannelPlanByPostId_(postId){
+  if(!postId || !state.published) return;
+  var changed = false;
+  Object.keys(state.published).forEach(function(id){
+    var plan = state.published[id] && state.published[id].channelPlan;
+    if(!plan) return;
+    ['blog', 'insta', 'threads'].forEach(function(key){
+      if(plan[key] && plan[key].postId === postId){ delete plan[key]; changed = true; }
+    });
+  });
+  if(!changed) return;
+  save({ skipDriveUpload: true, skipGasPush: true });
+  paintOpsPlanStrip_();
+}
+window.getChannelPlan_ = getChannelPlan_;
+window.setChannelPlan_ = setChannelPlan_;
+window.clearChannelPlanByPostId_ = clearChannelPlanByPostId_;
+window.opsPlanChipLabel_ = opsPlanChipLabel_;
+function collectOpsPlanByDay_(){
+  var days = {};
+  var start = new Date();
+  start.setHours(0, 0, 0, 0);
+  var end = start.getTime() + 14 * 86400000;
+  function add(ms, item){
+    if(ms < start.getTime() || ms >= end) return;
+    var ymd = opsPlanYmd_(ms);
+    if(!days[ymd]) days[ymd] = [];
+    days[ymd].push(item);
+  }
+  Object.keys(state.published || {}).forEach(function(id){
+    var pub = state.published[id];
+    if(!pub) return;
+    var catId = pub.catId != null ? pub.catId : getCatIdFromDraftId_(id);
+    if(!isBlogInstaCategory(catId)) return;
+    var cat = CATEGORIES[catId];
+    var draft = cat && cat.drafts && cat.drafts.find(function(d){ return d.id === id; });
+    var topic = pub.topic || (draft && draft.topic) || '제목 없는 글';
+    ['blog', 'insta', 'threads'].forEach(function(key){
+      var doneAt = pub.tabPublished && pub.tabPublished[key];
+      var plan = pub.channelPlan && pub.channelPlan[key];
+      if(doneAt){
+        var doneMs = Date.parse(doneAt);
+        if(!isNaN(doneMs)) add(doneMs, { draftId: id, catId: catId, key: key, kind: 'done', topic: topic });
+        return;
+      }
+      if(plan && plan.at){
+        var planMs = Date.parse(plan.at);
+        if(!isNaN(planMs)) add(planMs, { draftId: id, catId: catId, key: key, kind: 'plan', topic: topic });
+      }
+    });
+  });
+  return days;
+}
+function renderOpsPlanStripHTML_(){
+  var days = collectOpsPlanByDay_();
+  var dows = ['일', '월', '화', '수', '목', '금', '토'];
+  var today = opsPlanYmd_(new Date());
+  var chips = '';
+  for(var i = 0; i < 14; i++){
+    var dt = new Date();
+    dt.setHours(12, 0, 0, 0);
+    dt.setDate(dt.getDate() + i);
+    var ymd = opsPlanYmd_(dt);
+    var items = days[ymd] || [];
+    var seen = {};
+    var dots = items.filter(function(it){
+      var mark = it.key + ':' + it.kind;
+      if(seen[mark]) return false;
+      seen[mark] = true;
+      return true;
+    }).map(function(it){
+      return '<i class="card-ch-dot ch-dot-' + it.key + (it.kind === 'plan' ? ' is-plan' : '') + '" title="' +
+        escapeHtml(getPublishChannelBadgeLabel_(it.key) + (it.kind === 'plan' ? ' 예약' : ' 완료')) + '"></i>';
+    }).join('');
+    chips += '<button type="button" class="ops-plan-day' + (ymd === today ? ' is-today' : '') + '" onclick="openOpsPlanDay_(\'' + ymd + '\')">' +
+      '<span class="ops-plan-dow">' + dows[dt.getDay()] + '</span>' +
+      '<span class="ops-plan-num">' + dt.getDate() + '</span>' +
+      '<span class="ops-plan-dots">' + dots + '</span></button>';
+  }
+  return '<div id="ops-plan-strip" class="ops-plan-strip-wrap">' +
+    '<div class="ops-plan-strip-head"><strong>올라갈 글 · 2주</strong>' +
+      '<span class="ops-plan-legend"><i class="card-ch-dot ch-dot-blog"></i>블로그 <i class="card-ch-dot ch-dot-insta"></i>인스타 <i class="card-ch-dot ch-dot-threads"></i>쓰레드</span></div>' +
+    '<div class="ops-plan-row">' + chips + '</div>' +
+    '<p class="ops-kw-chip-hint">색이 찬 점은 그 날 올린 글, 테두리만 있는 점은 예약입니다. 날짜를 누르면 그 글이 열립니다.</p></div>';
+}
+function paintOpsPlanStrip_(){
+  var el = document.getElementById('ops-plan-strip');
+  if(!el || !el.parentNode) return;
+  var wrap = document.createElement('div');
+  wrap.innerHTML = renderOpsPlanStripHTML_();
+  if(wrap.firstChild) el.replaceWith(wrap.firstChild);
+}
+window.paintOpsPlanStrip_ = paintOpsPlanStrip_;
+function openOpsPlanDay_(ymd){
+  var items = collectOpsPlanByDay_()[ymd] || [];
+  if(!items.length){
+    if(typeof setAppToast === 'function') setAppToast('이 날에는 완료되거나 예약된 글이 없어요.', { duration: 2500, variant: 'ok' });
+    return;
+  }
+  var byDraft = {};
+  items.forEach(function(it){
+    if(!byDraft[it.draftId]) byDraft[it.draftId] = { draftId: it.draftId, catId: it.catId, topic: it.topic, keys: [] };
+    if(byDraft[it.draftId].keys.indexOf(it.key) < 0) byDraft[it.draftId].keys.push(it.key);
+  });
+  var list = Object.keys(byDraft).map(function(id){ return byDraft[id]; });
+  function go(it){
+    var order = ['blog', 'insta', 'threads'];
+    var tab = 'blog';
+    order.forEach(function(key){ if(it.keys.indexOf(key) >= 0 && tab === 'blog' && key !== 'blog') tab = key; });
+    if(it.keys.indexOf('blog') >= 0) tab = 'blog';
+    else tab = it.keys[0];
+    openDetail(it.draftId, it.catId, tab);
+  }
+  if(list.length === 1){ go(list[0]); return; }
+  var old = document.getElementById('ops-plan-pick');
+  if(old) old.remove();
+  var box = document.createElement('div');
+  box.id = 'ops-plan-pick';
+  box.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+  box.innerHTML = '<div style="background:#fff;border-radius:14px;padding:16px;max-width:420px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25)">' +
+    '<div style="font-weight:700;margin-bottom:8px">이 날의 글</div>' +
+    list.map(function(it, i){
+      return '<button type="button" class="ops-kw-btn" data-i="' + i + '" style="display:block;width:100%;text-align:left;margin-top:8px">' +
+        escapeHtml(it.topic) + ' · ' + escapeHtml(it.keys.map(getPublishChannelBadgeLabel_).join(' · ')) + '</button>';
+    }).join('') +
+    '<div style="text-align:right;margin-top:12px"><button type="button" class="ops-kw-btn" data-x>닫기</button></div></div>';
+  document.body.appendChild(box);
+  box.querySelector('[data-x]').onclick = function(){ box.remove(); };
+  box.querySelectorAll('[data-i]').forEach(function(btn){
+    btn.onclick = function(){ var it = list[Number(btn.getAttribute('data-i'))]; box.remove(); go(it); };
+  });
+}
+window.openOpsPlanDay_ = openOpsPlanDay_;
+function openOpsSchedulePicker_(opts){
+  opts = opts || {};
+  var base = opts.value ? new Date(opts.value) : new Date(Date.now() + 86400000);
+  if(isNaN(base.getTime())) base = new Date(Date.now() + 86400000);
+  if(!opts.value) base.setHours(9, 0, 0, 0);
+  var pad = function(n){ return String(n).padStart(2, '0'); };
+  var val = base.getFullYear() + '-' + pad(base.getMonth() + 1) + '-' + pad(base.getDate()) + 'T' + pad(base.getHours()) + ':' + pad(base.getMinutes());
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+  wrap.innerHTML = '<div style="background:#fff;border-radius:14px;padding:16px;max-width:360px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25)">' +
+    '<div style="font-weight:700;margin-bottom:8px">' + escapeHtml(opts.title || '예약 날짜') + '</div>' +
+    '<input type="datetime-local" value="' + val + '" style="width:100%;font:inherit;padding:8px;border-radius:8px;border:1px solid #cbd5e1">' +
+    '<div style="font-size:12px;opacity:.7;margin-top:6px">' + escapeHtml(opts.hint || '고른 날짜 칩에 표시됩니다.') + '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button type="button" class="ops-kw-btn" data-x>취소</button><button type="button" class="ops-kw-btn ops-kw-btn-primary" data-ok>' + (opts.editing ? '날짜 수정' : '예약하기') + '</button></div></div>';
+  document.body.appendChild(wrap);
+  wrap.querySelector('[data-x]').onclick = function(){ wrap.remove(); };
+  wrap.querySelector('[data-ok]').onclick = function(){
+    var when = new Date(wrap.querySelector('input').value);
+    if(isNaN(when.getTime())){ if(typeof setAppToast === 'function') setAppToast('날짜를 골라 주세요.', { duration: 2500, variant: 'err' }); return; }
+    if(opts.dateOnly){
+      if(opsPlanYmd_(when) < opsPlanYmd_(new Date())){ if(typeof setAppToast === 'function') setAppToast('오늘 이후 날짜를 골라 주세요.', { duration: 2500, variant: 'err' }); return; }
+    } else if(when.getTime() < Date.now() + 60000){
+      if(typeof setAppToast === 'function') setAppToast('지금보다 1분 이상 뒤로 골라 주세요.', { duration: 2500, variant: 'err' }); return;
+    }
+    wrap.remove();
+    if(opts.onOk) opts.onOk(when);
+  };
+}
+window.openOpsSchedulePicker_ = openOpsSchedulePicker_;
+function blogScheduleButtonHTML_(){
+  var plan = getChannelPlan_(state.selectedId, 'blog');
+  var label = plan ? (opsPlanChipLabel_(plan.at) + ' 수정') : '예약하기';
+  var title = plan ? '예약 날짜를 바꿉니다' : '날짜를 고르고 블로그 글쓰기를 엽니다';
+  return '<button type="button" class="btn-save-draft" data-blog-schedule onclick="onBlogSchedule_()" title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
+}
+function onBlogSchedule_(){
+  var draftId = state.selectedId;
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  var existing = getChannelPlan_(draftId, 'blog');
+  openOpsSchedulePicker_({
+    title: existing ? '블로그 예약 수정' : '블로그 예약',
+    value: existing && existing.at,
+    editing: !!existing,
+    dateOnly: true,
+    hint: existing ? '고른 날짜 칩으로 블로그 점이 옮겨집니다.' : '고른 날짜 칩에 표시하고, 블로그 글쓰기를 엽니다.',
+    onOk: function(when){
+      var content = getDraftContent_(draftId);
+      if(!existing){
+        if(!content || !content.blog){ if(typeof setAppToast === 'function') setAppToast('블로그 초안이 없어요.', { duration: 3000, variant: 'err' }); return; }
+        try { applySheetEditsForTab_(content, 'blog'); persistDraftContent_(draftId, content); } catch(eEdit){}
+      }
+      setChannelPlan_(draftId, catId, 'blog', when.toISOString(), '');
+      var btn = document.querySelector('[data-blog-schedule]');
+      if(btn) btn.textContent = opsPlanChipLabel_(when.toISOString()) + ' 수정';
+      if(!existing && content && content.blog) copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId));
+      if(typeof setAppToast === 'function') setAppToast('블로그 예약 ' + opsPlanChipLabel_(when.toISOString()), { duration: 2500, variant: 'ok' });
+    }
+  });
+}
+window.onBlogSchedule_ = onBlogSchedule_;
 /** 상단 지점브랜딩 배지: 홍보 현황은 「오늘」 할 일 수 */
 function countOpsPromoTodayTasks_(){
   var n = 0;
@@ -35309,7 +35654,7 @@ function buildTopicPhotoPrompt_(content, catId, topic){
     '복장: 남색 반팔 운동 티, 검은 반바지. 참고 사진의 스크럽·츄리닝·홈웨어는 따르지 않는다.',
     '카메라는 동작이 크게 보이게 가까이 둔다. 인물과 동작이 화면 너비의 대부분을 채운다. 멀리서 방 전체를 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통과 얼굴의 중심이 세로 가운데선에 온다. 머리가 왼쪽, 다리가 오른쪽으로 치우치지 않는다. 아래쪽 약 4분의 1만 바닥이나 매트로 비워 썸네일 글자 자리로 둔다. 얼굴, 손, 발은 그 글자 자리에 넣지 않는다. 가장자리에 붙이지 않는다.',
     '빛은 창으로 들어오는 낮 빛. 피부와 바닥은 실제처럼. 포스터처럼 한가운데 세우거나 윤곽을 깎지 않는다.',
-    '사진 안에는 한글, 영문, 숫자, 자막, 제목, 간판 글씨, 화살표, 도표, 해부 그림, 병원 침상, 로고, 워터마크를 그리지 않는다. 참고 사진의 자격증·창 글씨도 따라 적지 않는다.',
+    '사진 안에는 한글, 영문, 숫자, 자막, 제목, 간판 글씨, 화살표, 도표, 해부 그림, 병원 침상, 로고, 워터마크를 새로 그리지 않는다. 벽에 걸린 자격증·약력은 참고 사진의 실제 약력이다. 모자이크나 블러로 가리지 않고 그 자리에 그대로 둔다.',
     topicPhotoPeopleLine_(content, catId, topic)
   ].join('\n');
 }
@@ -35335,7 +35680,8 @@ function ensureTopicPhotoPrompt_(content, topic, catId, force){
     ? !!(current && current.prompt && /여성/.test(current.prompt))
     : !!(current && current.prompt && /남성/.test(current.prompt));
   var spaceOk = !!(current && current.prompt && current.prompt.indexOf(topicPhotoSpaceLine_(topicPhotoBranchKey_(content, catId))) >= 0);
-  if(!force && promptOk && peopleOk && modelOk && spaceOk) return content;
+  var credOk = !(current && current.prompt && current.prompt.indexOf('자격증·창 글씨도 따라 적지') >= 0);
+  if(!force && promptOk && peopleOk && modelOk && spaceOk && credOk) return content;
   content.images.gptVisuals = [{
     title: '이미지 생성',
     role: 'topicPhoto',
@@ -36193,7 +36539,7 @@ function renderSheetContent(content) {
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         (isBranchBookingBlogCategory_(blogCatId) ? realMovementBlogFooterSheetHtml_(blogCatId) : expertCourseBlogFooterSheetHtml_(blogCatId)) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. <strong>수정된 블로그 최종본</strong>으로 인스타 캡션이 백그라운드에서 만들어져요.' +
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>지금 올리기·예약하기</strong>는 글을 복사하고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙고, 버튼으로 날짜를 바꿀 수 있어요. <strong>수정된 블로그 최종본</strong>으로 인스타 캡션이 백그라운드에서 만들어져요.' +
         ((isBranchBookingBlogCategory_(blogCatId) || isExpertCourseCategory(blogCatId)) ? ' 하단 <strong>말미 링크</strong>는 고정으로 붙어요.' : '') + '</p>'
       );
     } else if(isExpertCourseCategory(blogCatId)){
@@ -36206,7 +36552,7 @@ function renderSheetContent(content) {
         sheetEditField_('마무리', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분 · 3~5개 권장', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         expertCourseBlogFooterSheetHtml_(blogCatId) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>발행완료</strong>를 누르면 저장·복사되고 글쓰기로 이동해요. 하단 <strong>말미 링크</strong>는 해당 과정 안내로 고정해서 붙어요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다.</p>'
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>지금 올리기·예약하기</strong>는 저장·복사되고 글쓰기로 이동해요. 하단 <strong>말미 링크</strong>는 해당 과정 안내로 고정해서 붙어요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙습니다.</p>'
       );
     } else {
       bodyHTML = composeSheetTabLayout_(tab,
@@ -36217,7 +36563,7 @@ function renderSheetContent(content) {
         sheetEditField_('본문 초안', 'sheet-blog-draft', b.draft, { rows: 14, regen: 'blog.draft', copy: true, paragraphs: true }) +
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>발행완료</strong>를 누르면 블로그가 저장·복사되고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다.</p>'
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>지금 올리기·예약하기</strong>는 블로그가 저장·복사되고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙습니다.</p>'
       );
     }
   } else if(tab==='insta'){
@@ -36252,9 +36598,9 @@ function renderSheetContent(content) {
       bodyHTML = tabsHTML + addSourceHtml +
         sheetFullCopyBar_() +
         sheetEditField_('본문 (게시글)', 'sheet-threads-body', getThreadsBodyText_(ths), { rows: 5, regen: 'threads.body', copy: true, help: '통념 뒤집기·궁금증 훅 한 줄. 해설은 넣지 마세요.', paragraphs: true }) +
-        sheetEditField_('댓글 (재게시)', 'sheet-threads-comment', getThreadsCommentText_(ths), { rows: 12, regen: 'threads.comment', copy: true, help: '본문에 대한 해설·근거·과정·철학. 게시 후 본인 댓글(재게시)로 올리세요.', paragraphs: true }) +
+        sheetEditField_('댓글 (재게시)', 'sheet-threads-comment', getThreadsCommentText_(ths), { rows: 12, regen: 'threads.comment', copy: true, help: '빈 줄로 나뉜 단락이 본문 아래 이어지는 댓글이 됩니다. 마침표마다 한 줄 띄고, 짧은 문장 둘은 한 댓글로 이어져도 됩니다.', paragraphs: true }) +
         '<div data-social-slot="threads"></div>' +
-        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;"><strong>지금 올리기·예약하기</strong>는 본문을 올리고 <strong>댓글</strong> 박스 내용을 바로 아래 내 댓글로 이어 올립니다. 앱에서 직접 올렸다면 <strong>직접 올림</strong>을 누르세요.</p>';
+        '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;"><strong>지금 올리기·예약하기</strong>는 본문을 올리고, 댓글 박스의 <strong>빈 줄마다</strong> 바로 아래 내 댓글로 이어 올립니다. 앱에서 직접 올렸다면 <strong>직접 올림</strong>을 누르세요.</p>';
     }
   } else if(tab==='news'){
     ensureNewsBlock_(content);
@@ -36313,11 +36659,17 @@ function renderSheetContent(content) {
   var pubTitle = tabSaved ? ' title="이미 저장됨 · 다시 누르면 수정본을 저장·복사합니다"' : '';
   var isDailyImages = isDailyShareCategory(state.selectedCatId) && tab === 'images';
   var socialTab = (tab === 'insta' || tab === 'threads') && isBlogInstaCategory(state.selectedCatId) && typeof PlannerSocial !== 'undefined';
+  var blogPlanTab = tab === 'blog';
   setSheetActionsHtml_(socialTab
     ? '<button type="button" class="btn-save-draft" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' + PlannerSocial.actionsHTML(tab)
-    : '<button type="button" class="btn-save-draft" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
-      '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
-      (isDailyImages ? '' : '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">발행완료</button>')
+    : blogPlanTab
+      ? '<button type="button" class="btn-save-draft" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
+        '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
+        blogScheduleButtonHTML_() +
+        '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">지금 올리기</button>'
+      : '<button type="button" class="btn-save-draft" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
+        '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
+        (isDailyImages ? '' : '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">발행완료</button>')
   );
   if(typeof PlannerSocial !== 'undefined' && document.querySelector('#sheet-body [data-social-slot]')) PlannerSocial.hydrate();
   restoreTextFieldFocus_(focusSnap);
@@ -36380,7 +36732,7 @@ window.openExternalNaverBlog = function(){
     return;
   }
   if(isAndroidDevice()){
-    window.location.href = 'intent://write#Intent;scheme=naverblog;package=com.nhn.android.blog;S.browser_fallback_url=' + encodeURIComponent(writeUrl) + ';end';
+    openExternalLinkInGesture_('intent://write?blogId=allenjoy#Intent;scheme=naverblog;package=com.nhn.android.blog;S.browser_fallback_url=' + encodeURIComponent(writeUrl) + ';end');
     return;
   }
   if(isIOSLikeDevice()){
@@ -36388,7 +36740,7 @@ window.openExternalNaverBlog = function(){
     setTimeout(function(){
       if(document.hidden) return;
       window.open(writeUrl, '_blank', 'noopener,noreferrer');
-    }, 1000);
+    }, 900);
     return;
   }
   window.open(writeUrl, '_blank', 'noopener,noreferrer');
@@ -36425,13 +36777,18 @@ function ensureNotifyForInstaBg_(){
 }
 
 function copyAndOpenNaverBlog_(text){
-  var open = function(){ openExternalNaverBlog(); };
-  if(!text){ open(); return; }
+  openExternalNaverBlog();
+  if(!text) return;
   if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).then(open).catch(open);
-  } else {
-    open();
+    navigator.clipboard.writeText(text).catch(function(){});
   }
+}
+function startInstaDraftAfterBlogPublish_(draftId, catId, topic, content){
+  if(!isBlogInstaCategory(catId) || !content || !content.blog) return;
+  if(instaContentReady_(content)) return;
+  if(!state.apiKey) return;
+  ensureNotifyForInstaBg_();
+  enqueueInstaFromBlog_(draftId, catId, topic || '', content.blog);
 }
 
 function copyAndOpenInstagram_(text){
@@ -37304,27 +37661,30 @@ function sheetEditField_(label, id, value, opts){
 }
 
 /**
- * 긴 산문 가독성: 문단(문장) 사이에 빈 줄. 들여쓰기는 하지 않음.
- * 이미 문단 구분·목록·셀프케어(👉)가 있으면 문단 구분만 정리.
+ * 마침표마다 빈 줄. 짧은 문장(36자 미만)은 다음 문장과 한 단락으로 이어져도 된다.
+ * 목록·셀프케어(👉)는 그대로 둔다.
  */
 function ensureProseParagraphBreaks_(text){
   var t = String(text || '').replace(/\r\n/g, '\n').trim();
   if(!t) return '';
   if(/(^|\n)\s*👉/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
   if(/(^|\n)\s*(?:[-•*]|\d+[.)])\s/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
-  if(/\n[ \t]*\n/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
-  if(t.indexOf('\n') !== -1){
-    var lines = t.split(/\n+/).map(function(l){ return l.trim(); }).filter(Boolean);
-    if(lines.length >= 2){
-      var avg = lines.reduce(function(s, l){ return s + l.length; }, 0) / lines.length;
-      if(avg >= 24) return stripProseParagraphIndents_(lines.join('\n\n'));
+  var sentences = splitProseSentences_(t.replace(/\n+/g, ' '));
+  if(sentences.length < 2) return stripProseParagraphIndents_(sentences[0] || t);
+  var groups = [];
+  var i = 0;
+  while(i < sentences.length){
+    var cur = sentences[i];
+    var next = sentences[i + 1];
+    if(next && String(cur).length < 36){
+      groups.push(cur + ' ' + next);
+      i += 2;
+    } else {
+      groups.push(cur);
+      i += 1;
     }
-    return stripProseParagraphIndents_(t);
   }
-  if(t.length < 72) return stripProseParagraphIndents_(t);
-  var sentences = splitProseSentences_(t);
-  if(sentences.length < 2) return stripProseParagraphIndents_(t);
-  return stripProseParagraphIndents_(sentences.join('\n\n'));
+  return stripProseParagraphIndents_(groups.join('\n\n'));
 }
 /** 문단 시작 들여쓰기(앞 공백) 제거 — 목록·셀프케어·해시태그는 그대로 */
 function stripProseParagraphIndents_(text){
@@ -37444,14 +37804,14 @@ window.copyWholeTab_ = function(btn){
 
 var SHEET_FIELD_META_ = {
   'blog.title':       { block: 'blog', label: '제목', instr: '증상명과 지역/브랜드 키워드가 자연스럽게 들어간, 검색·AI 인용에 강한 제목 한 줄. 존댓말·질문형 권장.' },
-  'blog.problem':     { block: 'blog', label: '문제 제기', instr: '공감 질문으로 시작해 "일상에서 바로 풀 수 있다"는 한 줄까지. 독자의 상황을 구체적으로. 문장은 끝까지 쓰고, 무엇이 문제인지 목적어가 보이게. **존댓말(해요체)**. 한다체·반말 금지.' },
+  'blog.problem':     { block: 'blog', label: '문제 제기', instr: '맨 앞 두 문장은 짧게, 문장 사이 빈 줄. 이어서 구체 장면 하나만. 번호·불릿 금지. 원리 설명과 같은 결론을 반복하지 말 것. **존댓말(해요체)**. **, ---, > 금지.' },
   'blog.selfCare':    { block: 'blog', label: '셀프 케어', step: true, instr: '집에서 따라 할 수 있는 셀프 케어를 단계별로. 각 단계는 새 줄에서 "👉"로 시작하고 동작·초/회/세트를 앞쪽에. 단계 사이 빈 줄. **존댓말(해요체)**.' },
-  'blog.explanation': { block: 'blog', label: '원리 설명', instr: '왜 그런지 해부학적·기능적 원리를 쉬운 말로. 전문어는 처음 한 번 괄호로 풀고, 확인할 방향·순서가 있으면 위·아래·왼쪽·오른쪽처럼 문장 안에 적기. **존댓말(해요체)**. 한다체(~한다/~이다) 금지.' },
+  'blog.explanation': { block: 'blog', label: '원리 설명', instr: '문제 제기의 장면을 다시 쓰지 말 것. 맨 앞 1~2문장만 핵심, 그 뒤는 새 이유. 마침표마다 빈 줄. 아주 짧은 문장은 다음 문장과 한 단락 가능. **존댓말(해요체)**. **, ---, > 금지.' },
   'blog.cta':         { block: 'blog', label: '마무리 CTA', instr: '전문가 상담·프로필 페이지로 부드럽게 안내하는 마무리 2~3문장. **존댓말**.' },
   'blog.hashtags':    { block: 'blog', label: '해시태그', array: true, instr: '증상·지역·브랜드와 관련된 해시태그 5~8개.' },
-  'blog.hook':        { block: 'blog', label: '영상·사진 맥락', instr: '끝이 아니라는 점과, 누가 어디서 멈추는지 2~3문장. 문장은 끝까지. 자막 조각·「영상을 꺼냈어요」 같은 제작 과정 금지. 전문어는 처음 한 번 괄호로 풀기. **존댓말**.' },
-  'blog.outline':     { block: 'blog', label: '시연·핵심 포인트', arrayLines: true, instr: '읽을 항목을 한 줄에 하나씩. 각 줄은 완전한 문장. 위·아래·왼쪽·오른쪽·모양·이어지는 방향을 "주변"이나 "한 세트"로 묶지 말 것. **존댓말**.' },
-  'blog.draft':       { block: 'blog', label: '원리 설명(본문)', instr: '본문의 중심. 거기서 멈추면 어떤 정보가 빠지는지, 왜 다음 손 방향이 정해지는지. 문장은 끝까지. hook과 같은 문장 반복 금지. **존댓말(해요체)**.' },
+  'blog.hook':        { block: 'blog', label: '영상·사진 맥락', instr: '인용으로 쓸 두 문장. 문장 사이 빈 줄. 본문에서 같은 말을 길게 다시 풀지 말 것. 전문어는 처음 한 번 괄호로 풀기. **존댓말**. **, ---, > 금지.' },
+  'blog.outline':     { block: 'blog', label: '시연·핵심 포인트', arrayLines: true, instr: '본문 장면 다음에 둘 짧은 줄. 한 줄에 완전한 문장 하나. 본문과 같은 설명을 반복하지 말 것. **존댓말**.' },
+  'blog.draft':       { block: 'blog', label: '원리 설명(본문)', instr: '구체 장면 하나가 본문. 포인트를 다시 풀어 쓰지 말 것. 마침표마다 빈 줄. 아주 짧은 문장은 다음 문장과 한 단락 가능. **존댓말(해요체)**. **, ---, > 금지.' },
   'community.title':       { block: 'community', label: '제목', instr: '입주민이 클릭하고 싶은, 증상·상황이 드러나는 제목 한 줄.' },
   'community.problem':     { block: 'community', label: '문제 제기', instr: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지, 자연스러운 문장으로.' },
   'community.selfCare':    { block: 'community', label: '셀프 케어', step: true, instr: '집에서 따라 할 수 있는 셀프 케어를 단계별로. 각 단계는 새 줄에서 "👉"로 시작하고 동작·초/회/세트를 앞쪽에 명시하세요. 단계 사이에는 빈 줄을 넣으세요.' },
@@ -38447,6 +38807,7 @@ function commitSheetTabPublish_(draftId, catId, tab, opts){
   pub.content = content;
   if(!pub.tabPublished) pub.tabPublished = {};
   pub.tabPublished[key] = pub.savedAt;
+  if(pub.channelPlan && pub.channelPlan[key]) delete pub.channelPlan[key];
 
   pub.finalTexts = Object.assign({}, pub.finalTexts || {});
   pub.finalTexts[key] = tabText;
@@ -38713,9 +39074,10 @@ window.onSheetPublishComplete = async function(opts){
       renderSheetContent(quickContent);
       renderTabs();
       renderMain();
+      if(tab === 'blog') startInstaDraftAfterBlogPublish_(draftId, catId, (quickContent && quickContent.blog && quickContent.blog.title) || '', quickContent);
       if(viaApi) return;
+      if(tab === 'blog') openExternalNaverBlog();
       copyTextOnly_(quickText, function(){
-        if(tab === 'blog') openExternalNaverBlog();
         setAppToast(tab === 'blog'
           ? (isPhoneOrTablet() ? '수정본 저장 · 복사 · 글쓰기 앱으로 이동' : '수정본 저장 · 복사 · 글쓰기 페이지로 이동')
           : '수정본 저장 후 복사했어요.', { duration: 3600, variant: 'ok' });
@@ -38751,7 +39113,7 @@ window.onSheetPublishComplete = async function(opts){
       ensureNotifyForInstaBg_();
       state.activeTab = 'insta';
       setOpenDetailHash_(draftId, catId, 'insta');
-      enqueueInstaFromBlog_(draftId, catId, draft ? draft.topic : '', content.blog);
+      startInstaDraftAfterBlogPublish_(draftId, catId, draft ? draft.topic : '', content);
       renderSheetContent(getDraftContent_(draftId) || content);
       renderTabs();
       renderMain();

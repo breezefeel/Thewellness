@@ -26032,13 +26032,19 @@ function buildOpsMarketingReport_(itemId){
 }
 var OPS_MKT_LEVEL_LABEL = { high: '오늘', mid: '이번 주', low: '참고', good: '잘 되는 점' };
 var OPS_MKT_LEVEL_COLOR = { high: '#B91C1C', mid: '#B45309', low: '#475569', good: '#0F766E' };
-/** 커서에 붙여 넣는 보고서 (마크다운) — 할 일은 T1·T2…, 채널 검토는 PL-01 같은 고정 ID */
+/** 제안 하나 = 제목 · 본문 · 답 칸. 사용자는 `->` 뒤에 코멘트를 적는다. */
+function opsReportReplyBlock_(id, meta, body){
+  return ['### ' + id + (meta ? ' · ' + meta : ''), String(body || '').trim(), '->', ''].join('\n');
+}
+/** 커서에 붙여 넣는 보고서 (마크다운) — 할 일은 T1·T2…, 같이 볼 것은 E1…, 채널 검토는 PL-01 같은 고정 ID */
 function buildOpsMarketingReportText_(itemId){
   var r = buildOpsMarketingReport_(itemId);
   var p = r.report && r.report.period7;
   var md = function(s){ return String(s == null ? '' : s).replace(/\|/g, '/').replace(/\n+/g, ' '); };
   var lines = ['# ' + r.store + ' 홍보 현황' + (p ? ' (' + p.since + ' ~ ' + p.until + ')' : ''),
-    '> 플래너 「홍보 현황」에서 복사 · ' + new Date().toLocaleDateString('ko-KR') + ' · 커서에 「T2 개선해줘」「채널 검토 PL-01 반영해줘」처럼 번호로 요청하세요.', ''];
+    '> 플래너 「홍보 현황」에서 복사 · ' + new Date().toLocaleDateString('ko-KR'),
+    '> 각 제안 아래 `->` 뒤에 코멘트를 적고, 이 보고서 전체를 커서에 붙여 넣으세요.',
+    '> 예: `-> 그렇게 해줘` · `-> 일주일 더 지켜볼게` · `-> 70원으로 유지할게`', ''];
   if(r.adsOn){
     lines.push('## 광고 (최근 7일)', '| 채널 | 상태 | 노출 | 클릭 | 클릭률 | 비용 | 문의 |', '|---|---|---:|---:|---:|---:|---:|');
     r.rows.forEach(function(x){
@@ -26065,13 +26071,17 @@ function buildOpsMarketingReportText_(itemId){
       lines.push('| ' + md(c.label) + ' | ' + (c.last ? (c.days === 0 ? '오늘' : c.days + '일 전') : '기록 없음') + ' | ' + c.n7 + ' | ' + c.n30 + ' | ' + c.perWeek + ' | ' + md(c.source) + ' |');
     });
   }
-  lines.push('', '## ' + (r.adsOn ? '할 일' : '제안'));
-  r.tips.forEach(function(t, i){ lines.push('- [ ] **T' + (i + 1) + '** [' + OPS_MKT_LEVEL_LABEL[t.level] + '] ' + t.channel + ': ' + t.text); });
+  lines.push('', '## ' + (r.adsOn ? '할 일' : '제안'), '');
+  r.tips.forEach(function(t, i){
+    lines.push(opsReportReplyBlock_('T' + (i + 1), OPS_MKT_LEVEL_LABEL[t.level] + ' · ' + t.channel, t.text));
+  });
   if(!r.adsOn){
-    lines.push('', buildOpsChannelReviewMarkdown_(itemId));
+    lines.push(buildOpsChannelReviewMarkdown_(itemId));
   }
-  lines.push('', '## ' + (r.adsOn ? '광고와 같이 볼 것' : '같이 해볼 것'));
-  r.extras.forEach(function(x){ lines.push('- ' + x.title + ' (' + x.cost + ') — ' + x.why); });
+  lines.push('## ' + (r.adsOn ? '광고와 같이 볼 것' : '같이 해볼 것'), '');
+  r.extras.forEach(function(x, i){
+    lines.push(opsReportReplyBlock_('E' + (i + 1), x.title + ' (' + x.cost + ')', x.why));
+  });
   return lines.join('\n');
 }
 function getOpsChannelReviewSeed_(){
@@ -26094,24 +26104,27 @@ function setOpsChannelReviewDone_(id, on){
 window.setOpsChannelReviewDone_ = setOpsChannelReviewDone_;
 var OPS_REVIEW_BRANCH_LABEL = { all: '약수·인천', yaksu: '약수점', jakjeon: '인천점' };
 var OPS_REVIEW_WHO_LABEL = { draft: '커서가 문구 초안', user: '직접 수정' };
-function opsChannelReviewItemMarkdown_(it, done){
+function opsChannelReviewItemMarkdown_(it, done, withReply){
   var ch = (getOpsChannelReviewSeed_().channels || []).filter(function(c){ return c.id === it.channel; })[0];
-  return ['### ' + (done ? '~~' : '') + '[' + it.id + '] ' + it.title + (done ? '~~ (완료 ' + done + ')' : ''),
-    '- 채널: ' + (ch ? ch.label : it.channel) + ' · ' + (OPS_REVIEW_BRANCH_LABEL[it.branch] || it.branch) + ' · 우선: ' + OPS_MKT_LEVEL_LABEL[it.level] + ' · ' + (OPS_REVIEW_WHO_LABEL[it.who] || ''),
+  var head = it.id + ' · ' + (OPS_REVIEW_BRANCH_LABEL[it.branch] || it.branch) + ' · ' + OPS_MKT_LEVEL_LABEL[it.level] + (done ? ' · 완료 ' + done : '') + ' · ' + it.title;
+  var lines = ['### ' + head,
+    '- 채널: ' + (ch ? ch.label : it.channel) + ' · ' + (OPS_REVIEW_WHO_LABEL[it.who] || ''),
     '- 위치: ' + it.where,
     '- 현재: ' + it.now,
     '- 제안: ' + it.fix,
-    '- 이유: ' + it.why].join('\n');
+    '- 이유: ' + it.why];
+  if(withReply) lines.push('->');
+  return lines.join('\n');
 }
 function buildOpsChannelReviewMarkdown_(){
   var seed = getOpsChannelReviewSeed_();
   var done = getOpsChannelReviewDone_();
-  var lines = ['## 채널 프로필 검토 (' + (seed.checkedAt || '') + ' 확인 · 출처: 플래너/ops-channel-review-seed.js)'];
+  var lines = ['## 채널 프로필 검토 (' + (seed.checkedAt || '') + ' 확인)', ''];
   (seed.channels || []).forEach(function(c){
     var items = (seed.items || []).filter(function(it){ return it.channel === c.id; });
     if(!items.length) return;
-    lines.push('', '#### ' + c.label);
-    items.forEach(function(it){ lines.push('', opsChannelReviewItemMarkdown_(it, done[it.id])); });
+    lines.push('#### ' + c.label, '');
+    items.forEach(function(it){ lines.push(opsChannelReviewItemMarkdown_(it, done[it.id], true), ''); });
   });
   return lines.join('\n');
 }
@@ -26158,7 +26171,7 @@ function buildOpsChannelReviewHTML_(){
   return '<div class="ops-review-group ops-kw-group">' +
     '<div class="ops-review-group-title"><strong>채널 프로필 검토</strong> <span class="ops-review-group-hint">네이버 플레이스 · 카카오 채널 · 당근 · 그 밖에 · ' + escapeHtml(seed.checkedAt || '') + ' 공개 페이지 확인</span>' +
       '<span class="ops-review-group-progress">' + open + '/' + items.length + '개 남음</span></div>' +
-    '<p class="ops-kw-chip-hint">항목마다 번호가 있습니다. 「커서 요청 복사」를 눌러 커서에 붙여 넣으면 붙여 넣을 문구 초안을 만들어 드립니다. 계정 화면 수정은 직접 하시고, 끝나면 「완료」를 체크하세요. 전체는 위 「커서용 보고서 복사」에 같이 들어갑니다.</p>' +
+    '<p class="ops-kw-chip-hint">항목마다 번호가 있습니다. 「커서 요청 복사」는 그 항목만 커서에 묻고, 위 「커서용 보고서 복사」는 제안마다 `->` 코멘트 칸이 있습니다. 계정 화면 수정은 직접 하시고, 끝나면 「완료」를 체크하세요.</p>' +
     groups +
   '</div>';
 }
@@ -26261,7 +26274,7 @@ function renderOpsMarketingPanelHTML_(itemId){
       '<button type="button" class="ops-kw-btn ops-kw-btn-dl ops-kw-btn-primary" onclick="runOpsMarketingAnalyze_(\'' + itemId + '\')">' + escapeHtml(opsMktAnalyzedLabel_(rep && rep.generatedAt)) + '</button>' +
       '<button type="button" class="ops-kw-btn" onclick="copyOpsMarketingReport_(\'' + itemId + '\')">커서용 보고서 복사</button>' +
     '</div>' +
-    '<p class="ops-kw-chip-hint">「분석하기」는 이 데스크탑에 네이버 광고 연결이 있으면 광고 연결을 켜고 바로 분석을 시작합니다. 약수·인천 어디서 눌러도 네이버·구글 광고, 블로그, 플레이스·카카오·당근 소식을 새로 확인해 브랜딩·약수·인천에 한 번에 넣습니다. 결과는 동기화로 핸드폰에서도 보입니다. 인스타·쓰레드는 플래너 「발행완료」로 셉니다. 버튼의 날짜는 마지막 분석 시각입니다. 「커서용 보고서 복사」는 항목마다 번호가 붙은 보고서입니다.</p>';
+    '<p class="ops-kw-chip-hint">「분석하기」는 이 데스크탑에 네이버 광고 연결이 있으면 광고 연결을 켜고 바로 분석을 시작합니다. 약수·인천 어디서 눌러도 네이버·구글 광고, 블로그, 플레이스·카카오·당근 소식을 새로 확인해 브랜딩·약수·인천에 한 번에 넣습니다. 결과는 동기화로 핸드폰에서도 보입니다. 인스타·쓰레드는 플래너 「발행완료」로 셉니다. 버튼의 날짜는 마지막 분석 시각입니다. 「커서용 보고서 복사」는 제안마다 번호와 `->` 코멘트 칸이 있습니다. 칸에 답을 적고 커서에 붙여 넣으세요.</p>';
   var faceHtml = (r.faceCandidates || []).length
     ? ('<div class="ops-kw-preview-head" style="margin-top:12px">리얼페이스 키워드 <span>네이버 월간 검색수 · 「리얼페이스」 광고그룹(계양·부평 지역)에 들어가 있음</span></div>' +
       '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr><th style="' + head + ';text-align:left">키워드</th><th style="' + head + '">월 검색</th><th style="' + head + ';text-align:left">메모</th></tr>' +

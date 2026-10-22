@@ -95,7 +95,7 @@ const CAT_TAB_SHORT = {
   5: 'Re:Al 움직임 과정',
   4: 'IFC 과정',
   6: '일상 공유',
-  8: '지점브랜딩'
+  8: '블랜딩'
 };
 const CAT_GROUP_GENERAL = [0, 1, 2, 7];
 const LIFE_HEALTH_LABEL = '생활건강';
@@ -125,9 +125,9 @@ function resolveLifeHealthAddCat_(){
   return LIFE_HEALTH_HOST_CAT;
 }
 const CAT_GROUP_EXPERT = [3, 5, 4];
-/** 지점브랜딩 상단 드롭다운 — opsManual.activeBranch 와 연동 */
+/** 블랜딩 상단 드롭다운 — opsManual.activeBranch 와 연동 */
 const CAT_GROUP_OPS = [
-  { branch: 'promo', label: '홍보 현황' },
+  { branch: 'promo', label: '현황' },
   { branch: 'yaksu', label: '약수점' },
   { branch: 'jakjeon', label: '인천점' },
   { branch: 'new', label: '신규' }
@@ -181,7 +181,7 @@ function buildBlogHubCtaSamples_(){
 const OPS_BRANCH_IDS = ['promo', 'yaksu', 'jakjeon', 'new'];
 const OPS_BRANCH_DEFAULT = 'promo';
 const OPS_BRANCH_LABELS = {
-  promo: '홍보 현황',
+  promo: '현황',
   yaksu: '약수점',
   jakjeon: '인천점',
   new: '신규'
@@ -1095,7 +1095,7 @@ function buildOpsDeployFiles_(){
 }
 function buildOpsDeploySmokeTest_(){
   return '1) 프로필 홈 + 허브 5개 (?hub=back 등) 열림\n' +
-    '2) 플래너 지점브랜딩 탭 로드\n' +
+    '2) 플래너 블랜딩 탭 로드\n' +
     '3) 강사용 출석·회원 화면(해당 시)';
 }
 function buildOpsPlaceExtraForm_(branchKey){
@@ -1440,7 +1440,7 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
     return [
       { id:'kw-tips', title:'보완하면 좋은 점',
         brief: opsPurposeIntent_('키워드·소재 운영 팁입니다.', '체크리스트로 쓰고 완료 표시하세요.'),
-        text: opsProposalWithReason_(buildOpsNaverKwImproveTipsText_(), '노출·클릭은 「홍보 현황」 보고서에서 보고 입찰가·키워드를 고칩니다.') }
+        text: opsProposalWithReason_(buildOpsNaverKwImproveTipsText_(), '노출·클릭은 「현황」 보고서에서 보고 입찰가·키워드를 고칩니다.') }
     ];
   }
   if(byId === 'ops-y-17' || byId === 'ops-j-17'){
@@ -1598,7 +1598,7 @@ function buildOpsProposalItemsForId_(byId, item, branchId){
     return [
       { id:'clone', title:'체크리스트 복제·4주 점검',
         brief: opsPurposeIntent_('기존 지점 체크리스트를 복제합니다.', '오픈 후 4주 점검까지 이어지게 합니다.'),
-        text: opsProposalWithReason_('약수·인천 지점브랜딩 체크리스트를 복제한 뒤 일정에 맞게 조정하세요.\n오픈 4주 후 점검: 약수 ops-y-14 · 인천 ops-j-14 항목 참고\n스마트플레이스는 ops-n-6 → ops-n-15 순(약수·인천과 동일 1~15단계).', '런칭 후 누락 채널을 잡습니다.') }
+        text: opsProposalWithReason_('약수·인천 블랜딩 체크리스트를 복제한 뒤 일정에 맞게 조정하세요.\n오픈 4주 후 점검: 약수 ops-y-14 · 인천 ops-j-14 항목 참고\n스마트플레이스는 ops-n-6 → ops-n-15 순(약수·인천과 동일 1~15단계).', '런칭 후 누락 채널을 잡습니다.') }
     ];
   }
   if(byId === 'ops-y-10' || byId === 'ops-j-10'){
@@ -24587,8 +24587,8 @@ function renderTabs() {
     }).join('');
     return '<div class="cat-group-select-wrap cat-group-ops' + (isActive ? ' active' : '') + '" role="button" tabindex="0" onclick="activateCatGroup_(\'ops\', event)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();activateCatGroup_(\'ops\', event);}">' +
       '<span class="cat-group-dot' + (isActive ? ' on ops-dot' : '') + '" aria-hidden="true"></span>' +
-      '<span class="cat-group-label">지점브랜딩</span>' +
-      '<select class="cat-group-select" onclick="event.stopPropagation()" onchange="selectOpsBranchFromNav_(this.value)" aria-label="지점브랜딩 선택">' +
+      '<span class="cat-group-label">블랜딩</span>' +
+      '<select class="cat-group-select" onclick="event.stopPropagation()" onchange="selectOpsBranchFromNav_(this.value)" aria-label="블랜딩 선택">' +
       options +
       '</select>' +
       '<span class="cat-group-badge" title="현재 지점의 미완료 항목 수">' + activeCount + '</span>' +
@@ -25674,7 +25674,7 @@ function isOpsMobileDevice_(){
   return /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1);
 }
 var OPS_ADS_DESKTOP_ONLY_MSG = '핸드폰에서는 실행할 수 없어요.\n네이버 박스가 연결된 데스크탑에서 실행하세요.\n(데스크탑에서 코딩 폴더의 「광고연결켜기.bat」을 켠 뒤 플래너에서 같은 버튼을 누르면 됩니다)';
-/** 「마케팅 현황 업데이트」와 같은 분석을 데스크탑 연결로 실행하고, 결과를 바로 홍보 현황에 넣는다 */
+/** 「마케팅 현황 업데이트」와 같은 분석을 데스크탑 연결로 실행하고, 결과를 바로 현황에 넣는다 */
 function opsMktAnalyzedLabel_(iso){
   var m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
   if(!m) return '분석하기';
@@ -25689,7 +25689,7 @@ function opsFmtDur_(sec){
   return s + '초';
 }
 function runOpsMarketingAnalyze_(itemId){
-  openOpsAdsApplyDialog_('홍보 현황 분석', '/analyze', {}, {
+  openOpsAdsApplyDialog_('현황 분석', '/analyze', {}, {
     runOnly: true,
     autoStart: true,
     estimateSec: 120,
@@ -25699,7 +25699,7 @@ function runOpsMarketingAnalyze_(itemId){
       applyOpsMarketingReportData_(res.report);
       refreshOpsMarketingPanel_(itemId);
       try { renderTabs(); } catch(eTabs){}
-      if(typeof setAppToast === 'function') setAppToast('분석 결과를 홍보 현황에 반영했습니다 (브랜딩·약수·인천)', { duration: 4000, variant: 'ok' });
+      if(typeof setAppToast === 'function') setAppToast('분석 결과를 현황에 반영했습니다 (브랜딩·약수·인천)', { duration: 4000, variant: 'ok' });
     }
   });
 }
@@ -26041,8 +26041,8 @@ function buildOpsMarketingReportText_(itemId){
   var r = buildOpsMarketingReport_(itemId);
   var p = r.report && r.report.period7;
   var md = function(s){ return String(s == null ? '' : s).replace(/\|/g, '/').replace(/\n+/g, ' '); };
-  var lines = ['# ' + r.store + ' 홍보 현황' + (p ? ' (' + p.since + ' ~ ' + p.until + ')' : ''),
-    '> 플래너 「홍보 현황」에서 복사 · ' + new Date().toLocaleDateString('ko-KR'),
+  var lines = ['# ' + r.store + ' 현황' + (p ? ' (' + p.since + ' ~ ' + p.until + ')' : ''),
+    '> 플래너 「현황」에서 복사 · ' + new Date().toLocaleDateString('ko-KR'),
     '> 각 제안 아래 `->` 뒤에 코멘트를 적고, 이 보고서 전체를 커서에 붙여 넣으세요.',
     '> 예: `-> 그렇게 해줘` · `-> 일주일 더 지켜볼게` · `-> 70원으로 유지할게`', ''];
   if(r.adsOn){
@@ -26087,7 +26087,7 @@ function buildOpsMarketingReportText_(itemId){
 function getOpsChannelReviewSeed_(){
   return (typeof OPS_CHANNEL_REVIEW_SEED !== 'undefined' && OPS_CHANNEL_REVIEW_SEED) ? OPS_CHANNEL_REVIEW_SEED : { items: [], channels: [] };
 }
-/** 완료 체크는 홍보 현황(브랜딩) 상태에 둔다 → 기기 간 동기화 */
+/** 완료 체크는 현황(브랜딩) 상태에 둔다 → 기기 간 동기화 */
 function getOpsChannelReviewDone_(){
   var st = getOpsMarketingState_('ops-m-26');
   if(!st.reviewDone || typeof st.reviewDone !== 'object') st.reviewDone = {};
@@ -27399,7 +27399,7 @@ function renderOpsManualMainHTML_(){
   var prog = countOpsManualProgress_(branch);
   var branchLabel = (CAT_GROUP_OPS.find(function(o){ return o.branch === branch; }) || {}).label || OPS_BRANCH_LABELS[branch] || branch;
   var intro = '<div class="ops-manual-intro">' +
-    '<div class="ops-manual-title">지점 브랜딩 · 오픈 셋팅 · ' + escapeHtml(branchLabel) + '</div>' +
+    '<div class="ops-manual-title">블랜딩 · 오픈 셋팅 · ' + escapeHtml(branchLabel) + '</div>' +
     '<p class="ops-manual-desc">' + escapeHtml(OPS_BRANCH_HINTS[branch] || '') + '</p>' +
     '<div class="ops-manual-progress"><span class="ops-manual-progress-label">진행</span><span class="ops-manual-progress-num">' + prog.done + ' / ' + prog.total + '</span></div>' +
   '</div>';
@@ -27498,7 +27498,7 @@ function renderOpsManualMainHTML_(){
       '<ol class="ops-check-list">' + itemsHtml + '</ol>' +
     '</details>';
   }).join('');
-  var foot = '<p class="ops-manual-foot">체크와 작성 내용은 이 기기·Drive·서버 동기화에 저장됩니다. 지점은 상단 「지점브랜딩」에서 바꿀 수 있어요.</p>';
+  var foot = '<p class="ops-manual-foot">체크와 작성 내용은 이 기기·Drive·서버 동기화에 저장됩니다. 지점은 상단 「블랜딩」에서 바꿀 수 있어요.</p>';
   return '<div class="ops-manual-wrap">' + intro + newMeta +
     '<div class="ops-sections">' + sections + '</div>' + foot +
   '</div>';
@@ -27519,7 +27519,7 @@ function setOpsPromoTab_(tab){
   renderMain();
 }
 window.setOpsPromoTab_ = setOpsPromoTab_;
-/** 지점브랜딩 「홍보 현황」 — 브랜딩 · 약수점 · 인천점 */
+/** 블랜딩 「현황」 — 브랜딩 · 약수점 · 인천점 */
 function renderOpsPromoMainHTML_(){
   ensureOpsKwChipStyles_();
   var tab = getOpsPromoTab_();
@@ -27532,7 +27532,7 @@ function renderOpsPromoMainHTML_(){
         (on ? 'background:#1e3a6e;color:#fff;box-shadow:0 1px 3px rgba(15,23,42,.18)' : 'background:transparent;color:#1e3a6e') + '">' + x.label + '</button>';
     }).join('') + '</div>';
   var intro = '<div class="ops-manual-intro">' +
-    '<div class="ops-manual-title">지점 브랜딩 · 홍보 현황 · ' + escapeHtml(cur.label) + '</div>' +
+    '<div class="ops-manual-title">블랜딩 · 현황 · ' + escapeHtml(cur.label) + '</div>' +
     '<p class="ops-manual-desc">' + escapeHtml(scope.desc || '') + ' — 오늘·이번 주 할 일을 정리합니다.</p>' +
   '</div>';
   return '<div class="ops-manual-wrap">' + tabs + intro +
@@ -27766,7 +27766,7 @@ function onBlogSchedule_(){
   });
 }
 window.onBlogSchedule_ = onBlogSchedule_;
-/** 상단 지점브랜딩 배지: 홍보 현황은 「오늘」 할 일 수 */
+/** 상단 블랜딩 배지: 현황은 「오늘」 할 일 수 */
 function countOpsPromoTodayTasks_(){
   var n = 0;
   OPS_PROMO_TABS.forEach(function(x){
@@ -27778,7 +27778,7 @@ function countOpsPromoTodayTasks_(){
   } catch(eRev){}
   return n;
 }
-/** 새로고침·처음 열 때는 「지점브랜딩 → 홍보 현황」 (초안 바로가기 링크로 열었을 때는 그대로) */
+/** 새로고침·처음 열 때는 「블랜딩 → 현황」 (초안 바로가기 링크로 열었을 때는 그대로) */
 function openOpsPromoOnBoot_(){
   if(/^#open\//.test(location.hash || '')) return;
   state.currentCat = 8;
@@ -28048,7 +28048,7 @@ function getCatProgramSearchLabel_(catId){
   if(!cat) return '';
   var name = (catId === LIFE_HEALTH_HOST_CAT) ? LIFE_HEALTH_LABEL : (CAT_TAB_SHORT[catId] || cat.name);
   if(getCatGroupKeyForCat_(catId) === 'expert') return '전문가용 · ' + name;
-  if(getCatGroupKeyForCat_(catId) === 'ops') return '지점브랜딩 · ' + name;
+  if(getCatGroupKeyForCat_(catId) === 'ops') return '블랜딩 · ' + name;
   return '일반인용 · ' + name;
 }
 function draftSearchPlaceLabel_(d, catId){

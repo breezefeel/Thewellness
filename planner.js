@@ -12007,6 +12007,8 @@ function closeTopicGapChoice_(){
   else overlay.classList.remove('open');
 }
 function maybeQueueSurfaceDigest_(){
+  // 화면 지문은 새로고침만으로도 바뀌어 「남은 1건」이 다시 생겼다. 팀 동기화 항목으로 올리지 않는다.
+  return;
   var digest = '';
   try { digest = programSurfaceDigest_(); } catch(eDig){ return; }
   if(!digest || state._surfaceDigestQueued === digest) return;
@@ -16115,6 +16117,7 @@ function isDeviceLocalSyncEntityKey_(key){
   return key === 'setting:catGroupLast' ||
     key === 'setting:plannerSetupDismissed' ||
     key === 'setting:dailyAutoLast' ||
+    key === 'setting:surfaceDigest' ||
     key === 'ops:meta';
 }
 /** 비어 있는 기본 설정 — 서버에 키가 없어도 「남은 1건」으로 치지 않음 */
@@ -24146,7 +24149,6 @@ function suggestPlannerSwRefresh_(reason, opts){
   var editing = typeof isEditableTextFieldFocused_ === 'function' && isEditableTextFieldFocused_();
   if(opts.preferReload && !dirty && !editing && !plannerSyncConflictPending_){
     try { sessionStorage.setItem('ht_planner_sw_refresh_prompted', '1'); } catch(e1){}
-    location.reload();
     return;
   }
   try { sessionStorage.setItem('ht_planner_sw_refresh_prompted', '1'); } catch(e2){}
@@ -24177,9 +24179,8 @@ function maybeRefreshPlannerAfterOnline_(){
         sessionStorage.setItem('ht_planner_online_reloaded', '1');
       } catch(e1){}
       if(typeof setAppToast === 'function'){
-        setAppToast('온라인 연결됨 · 최신 앱으로 새로고침합니다…', { duration: 2200, variant: 'ok' });
+        setAppToast('온라인에 연결됐어요. 쓰던 화면은 그대로 둡니다.', { duration: 2800, variant: 'ok' });
       }
-      setTimeout(function(){ location.reload(); }, 700);
       return;
     }
     if(typeof setAppToast === 'function'){

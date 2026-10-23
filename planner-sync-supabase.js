@@ -5,6 +5,7 @@ var PlannerSyncSupabase = (function(){
   var FULL_GEN = '2';
   var clientPromise = null;
   var cachedEmail = '';
+  var activeAbort = null;
   var CAPS = {
     protocolVersion: 2,
     entitySchemaVersion: 3,
@@ -30,12 +31,28 @@ var PlannerSyncSupabase = (function(){
     });
   }
 
+  function abortActive(){
+    if(!activeAbort) return;
+    try { activeAbort.abort(); } catch(e){}
+    activeAbort = null;
+  }
+  function syncFetch(url, opts){
+    opts = Object.assign({}, opts || {});
+    if(activeAbort){
+      if(!opts.signal) opts.signal = activeAbort.signal;
+      else if(typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function'){
+        opts.signal = AbortSignal.any([opts.signal, activeAbort.signal]);
+      }
+    }
+    return fetch(url, opts);
+  }
   function getClient(){
     if(!configured()) return Promise.reject(new Error('planner-sync-config.js에 Supabase 주소와 공개 키를 넣어 주세요.'));
     if(!clientPromise){
       clientPromise = loadLibrary().then(function(){
         return window.supabase.createClient(PLANNER_SUPABASE_URL, PLANNER_SUPABASE_ANON_KEY, {
-          auth: { persistSession: true, autoRefreshToken: true }
+          auth: { persistSession: true, autoRefreshToken: true },
+          global: { fetch: syncFetch }
         });
       });
     }
@@ -68,10 +85,13 @@ var PlannerSyncSupabase = (function(){
 
   function shapeError(err){
     var auth = !!(err && err.authRequired);
+    var aborted = !!(err && (err.name === 'AbortError' || /aborted|abort/i.test(String(err.message || ''))));
     return {
       result: 'error',
-      message: (err && err.message) || 'Supabase 동기화에 실패했습니다.',
-      retry: false,
+      message: aborted
+        ? '서버 응답이 조금 오래 걸려요. 자동으로 다시 시도합니다.'
+        : ((err && err.message) || 'Supabase 동기화에 실패했습니다.'),
+      retry: aborted,
       authRequired: auth
     };
   }
@@ -378,6 +398,8 @@ var PlannerSyncSupabase = (function(){
       });
     }
     var action = request && request.action;
+    abortActive();
+    activeAbort = typeof AbortController !== 'undefined' ? new AbortController() : null;
     return sessionClient().then(function(client){
       if(action === 'plannerSyncPull') return pull(client);
       if(action === 'plannerSyncPatch') return patch(client, (request && request.mutations) || []);
@@ -408,6 +430,7 @@ var PlannerSyncSupabase = (function(){
     client: sessionClient,
     cachedEmail: function(){ return cachedEmail; },
     handle: handle,
+    abort: abortActive,
     signIn: signIn,
     importRows: importRows
   };

@@ -12351,7 +12351,30 @@ async function plannerGasJsonRequest_(requestPayload, timeoutMs){
     if(typeof PlannerSyncSupabase === 'undefined' || !PlannerSyncSupabase.handle){
       return { result: 'error', retry: false, message: 'Supabase 동기화 파일이 없습니다.' };
     }
-    return PlannerSyncSupabase.handle(requestPayload);
+    var supaWaitMs = timeoutMs || 20000;
+    var supaTimer = null;
+    var supaTimedOut = false;
+    var supaTimeout = new Promise(function(_, reject){
+      supaTimer = setTimeout(function(){
+        supaTimedOut = true;
+        reject(new Error('서버 응답이 조금 오래 걸려요. (약 ' + Math.round(supaWaitMs / 1000) + '초) 자동으로 다시 시도합니다.'));
+        if(PlannerSyncSupabase.abort) PlannerSyncSupabase.abort();
+      }, supaWaitMs);
+    });
+    try {
+      var supaData = await Promise.race([PlannerSyncSupabase.handle(requestPayload), supaTimeout]);
+      if(supaData && supaData.result === 'error' && supaData.retry){
+        throw new Error(supaData.message || '서버 응답이 조금 오래 걸려요. 자동으로 다시 시도합니다.');
+      }
+      return supaData;
+    } catch(supaErr){
+      if(supaTimedOut || (supaErr && supaErr.name === 'AbortError')){
+        throw new Error('서버 응답이 조금 오래 걸려요. (약 ' + Math.round(supaWaitMs / 1000) + '초) 자동으로 다시 시도합니다.');
+      }
+      throw supaErr;
+    } finally {
+      if(supaTimer) clearTimeout(supaTimer);
+    }
   }
   var url = getPlannerGasUrl_();
   if(!url || location.protocol === 'file:') throw new Error('서버 URL을 사용할 수 없습니다.');
@@ -12446,7 +12469,7 @@ const SYNC_FAIL_TOAST_COOLDOWN_MS_ = 90000;
 function isSyncTimeoutOrSlowError_(err){
   if(err && err.name === 'AbortError') return true;
   var msg = String((err && err.message) || err || '');
-  return /시간이 초과|응답 시간이|Timed out|timeout|AbortError|네트워크가 느리|시간이 더/i.test(msg);
+  return /시간이 초과|응답 시간이|Timed out|timeout|AbortError|네트워크가 느리|시간이 더|오래 걸/i.test(msg);
 }
 
 /** 자동 동기화 이슈 토스트 — 실패를 남발하지 않고, 지연은 ‘진행/재시도’로 안내 */

@@ -36,9 +36,22 @@ var PlannerSyncSupabase = (function(){
     try { activeAbort.abort(); } catch(e){}
     activeAbort = null;
   }
+  function fetchTarget_(url){
+    if(typeof url === 'string') return url;
+    if(url && typeof url.url === 'string') return url.url;
+    return '';
+  }
+  // 동기화 취소는 플래너 항목 읽기·쓰기에만 건다.
+  // 인스타·쓰레드 게시, 사진 업로드, 로그인은 끊지 않는다.
+  function useSyncAbort_(url){
+    var target = fetchTarget_(url);
+    return target.indexOf('/rest/v1/planner_entities') >= 0
+      || target.indexOf('/rest/v1/rpc/planner_apply_batch') >= 0
+      || target.indexOf('/rest/v1/rpc/planner_import_batch') >= 0;
+  }
   function syncFetch(url, opts){
     opts = Object.assign({}, opts || {});
-    if(activeAbort){
+    if(activeAbort && useSyncAbort_(url)){
       if(!opts.signal) opts.signal = activeAbort.signal;
       else if(typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function'){
         opts.signal = AbortSignal.any([opts.signal, activeAbort.signal]);

@@ -13336,31 +13336,20 @@ function openNewsAndroidScheme_(schemeUrl, pkg, fallbackUrl){
     var raw = String(schemeUrl || '');
     var cut = raw.indexOf('://');
     if(cut < 1) throw new Error('scheme');
-    window.location.href = 'intent://' + raw.slice(cut + 3) +
+    window.open('intent://' + raw.slice(cut + 3) +
       '#Intent;scheme=' + raw.slice(0, cut) + ';package=' + pkg +
-      ';S.browser_fallback_url=' + encodeURIComponent(fallbackUrl || '') + ';end';
+      ';S.browser_fallback_url=' + encodeURIComponent(fallbackUrl || '') + ';end', '_blank');
   } catch(e){
     openNewsAndroidPackage_(pkg, fallbackUrl, fallbackUrl);
   }
 }
 function openNewsAndroidPackage_(pkg, webUrl, storeUrl){
-  try {
-    window.location.href = 'intent:#Intent;package=' + pkg +
-      ';action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end';
-  } catch(e0){}
+  window.open('intent:#Intent;package=' + pkg +
+    ';action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end', '_blank');
   setTimeout(function(){
     if(document.hidden) return;
-    try {
-      var u = new URL(webUrl);
-      window.location.href = 'intent://' + u.host + u.pathname +
-        '#Intent;scheme=https;package=' + pkg +
-        ';S.browser_fallback_url=' + encodeURIComponent(storeUrl || webUrl) + ';end';
-    } catch(e1){}
-  }, 450);
-  setTimeout(function(){
-    if(document.hidden) return;
-    openNewsExternalWindow_(storeUrl || webUrl);
-  }, 1100);
+    openNewsExternalWindow_(webUrl || storeUrl);
+  }, 900);
 }
 function openNewsIosApp_(schemes, webUrl, storeUrl){
   (schemes || []).forEach(function(scheme){
@@ -13572,7 +13561,7 @@ function isAndroidDevice(){
 function isPhoneOrTablet(){
   return isIOSLikeDevice() || isAndroidDevice();
 }
-/** iOS: location.href 대신 iframe으로 scheme 호출 — 플래너 탭이 웹 URL로 바뀌지 않음 */
+/** iOS: iframe만으로는 앱이 안 열리는 경우가 있다. 블로그는 location으로 연다. */
 function openIOSAppScheme_(schemeUrl){
   if(!schemeUrl) return;
   try {
@@ -13595,31 +13584,19 @@ window.openGoProQuikApp_ = function(){
     );
   }
   if(isIOSLikeDevice()){
-    // 1) 커스텀 스킴·iframe (플래너 탭 유지) → 2) Universal Link(/app/studio) → 3) App Store
-    try { window.location.href = 'gopro://studio'; } catch(e0){}
-    openIOSAppScheme_('gopro://studio');
-    openIOSAppScheme_('quik://studio');
-    setTimeout(function(){
-      if(document.hidden) return;
-      openIOSAppScheme_('gopro://');
-      openIOSAppScheme_('quik://');
-    }, 400);
-    setTimeout(function(){
-      if(document.hidden) return;
-      // AASA: gopro.com/app/* → Quik. studio 경로를 우선 시도
-      try { window.location.href = GOPRO_QUIK_UNIVERSAL_STUDIO; } catch(e1){}
-    }, 900);
+    window.open('gopro://studio', '_blank');
     setTimeout(function(){
       if(document.hidden) return;
       window.open(GOPRO_QUIK_IOS_STORE, '_blank', 'noopener,noreferrer');
-    }, 1700);
+    }, 900);
     return;
   }
   if(isAndroidDevice()){
-    var intent =
+    window.open(
       'intent://studio#Intent;scheme=gopro;package=com.gopro.smarty;S.browser_fallback_url=' +
-      encodeURIComponent(GOPRO_QUIK_PLAY_STORE) + ';end';
-    try { window.location.href = intent; } catch(eA){}
+      encodeURIComponent(GOPRO_QUIK_PLAY_STORE) + ';end',
+      '_blank'
+    );
     setTimeout(function(){
       if(document.hidden) return;
       window.open(GOPRO_QUIK_PLAY_STORE, '_blank', 'noopener,noreferrer');
@@ -13755,8 +13732,8 @@ function getInstaCaptionBodyMerged_(ig){
 }
 function getInstaFullPasteText_(ig, catId){
   if(!ig) return '';
-  const hook = String(ig.hook || '').trim();
-  const body = getInstaCaptionBodyMerged_(ig);
+  const hook = ensureProseParagraphBreaks_(String(ig.hook || '').trim());
+  const body = ensureProseParagraphBreaks_(getInstaCaptionBodyMerged_(ig));
   const mid = hook ? hook + (body ? '\n\n' + body : '') : body;
   const cid = catId != null ? catId : getActiveInstagramCatId_();
   const withCollab = withInstagramCollabMention_(mid, cid);
@@ -24198,7 +24175,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=192').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=194').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -32123,13 +32100,21 @@ function getGeneralBlogProblemText_(b){
   if(b.hook && String(b.hook).trim()) return String(b.hook).trim();
   return '';
 }
+function withClinicBlogTitle_(title, catId){
+  var id = Number(catId);
+  if(id !== 0 && id !== 1 && id !== 2) return String(title || '').trim();
+  var t = String(title || '').replace(/\s+/g, ' ').trim();
+  if(!t) return '';
+  if(/^\[약수\/인천\]/.test(t)) return t;
+  return '[약수/인천] ' + t;
+}
 function normalizeBlogBlock(raw, catId){
   if(!raw || typeof raw !== 'object') return null;
   if(blogUsesStructuredGeneralFormat_(catId, raw)){
     var problem = raw.problem != null ? String(raw.problem).trim() : '';
     if(!problem) problem = getGeneralBlogProblemText_(raw);
     return {
-      title: raw.title != null ? String(raw.title).trim() : '',
+      title: withClinicBlogTitle_(raw.title, catId),
       problem: problem,
       selfCare: raw.selfCare != null ? String(raw.selfCare).trim() : '',
       explanation: raw.explanation != null ? String(raw.explanation).trim() : '',
@@ -32141,7 +32126,7 @@ function normalizeBlogBlock(raw, catId){
     };
   }
   return {
-    title: raw.title != null ? String(raw.title) : '',
+    title: withClinicBlogTitle_(raw.title, catId),
     hook: raw.hook != null ? String(raw.hook) : '',
     outline: Array.isArray(raw.outline) ? raw.outline : [],
     draft: raw.draft != null ? String(raw.draft) : '',
@@ -32153,7 +32138,7 @@ function formatGeneralBlogPostText(b, catId){
   if(!b) return '';
   var tags = (b.hashtags || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
   var body = [
-    (b.title || '').trim(),
+    withClinicBlogTitle_(b.title, catId),
     '',
     ensureProseParagraphBreaks_(getGeneralBlogProblemText_(b)),
     '',
@@ -35600,32 +35585,39 @@ window.downloadThumbMakerPng_ = async function(btn){
     var blob = await exportThumbMakerPngBlob_();
     var copy = persistThumbMakerFieldsFromDom_();
     var fileName = thumbMakerExportFileName_(copy) + thumbMakerExportExt_();
-    var cloud = null;
+    var cloudOk = false;
     var draftForCloud = state.selectedId;
     if(draftForCloud && typeof PlannerSocial !== 'undefined' && isBlogInstaCategory(state.selectedCatId)){
-      cloud = PlannerSocial.saveThumb(draftForCloud, blob, fileName).then(function(){ return true; }, function(err){
+      if(btn) btn.textContent = '클라우드 저장 중…';
+      try {
+        await PlannerSocial.saveThumb(draftForCloud, blob, fileName);
+        cloudOk = true;
+      } catch(err){
         setAppToast('Supabase 저장 실패: ' + ((err && err.message) || err), { duration: 6000, variant: 'err' });
-        return false;
-      });
+      }
     }
+    if(btn) btn.textContent = ios ? '준비 중…' : '저장 중…';
     var result = await saveThumbMakerBlob_(blob, fileName);
     var savedOk = await persistThumbMakerToDraft_(copy);
-    if(cloud && await cloud) setAppToast('Supabase에 저장 · 인스타 첫 장으로 준비됐어요', { duration: 2400, variant: 'ok' });
     var jpegMode = isThumbPhotoOnlyMode_();
     if(result === 'aborted'){
-      setAppToast('공유를 취소했어요.', { duration: 1800, variant: 'ok' });
+      setAppToast(cloudOk ? 'Supabase에는 저장했어요. 공유는 취소됐어요.' : '공유를 취소했어요.', { duration: 2200, variant: 'ok' });
     } else if(result === 'shared'){
       setAppToast(
-        savedOk
-          ? '공유 시트에서 저장 · 초안·최근 5개 갤러리에 보관했어요.'
-          : '공유 시트에서 「이미지 저장」을 선택하세요.',
+        cloudOk
+          ? 'Supabase에 저장했어요. 공유 시트에서 이미지 저장을 선택하세요.'
+          : (savedOk
+            ? '공유 시트에서 저장 · 초안·최근 5개 갤러리에 보관했어요.'
+            : '공유 시트에서 「이미지 저장」을 선택하세요.'),
         { duration: 2800, variant: 'ok' }
       );
     } else {
       setAppToast(
-        savedOk
-          ? ((jpegMode ? 'JPEG' : 'PNG') + ' 저장 · 초안·최근 5개 갤러리에 보관했어요.')
-          : ((jpegMode ? 'JPEG' : 'PNG') + '를 저장했어요.'),
+        cloudOk
+          ? 'Supabase에 저장 · 인스타 첫 장으로 준비됐어요'
+          : (savedOk
+            ? ((jpegMode ? 'JPEG' : 'PNG') + ' 저장 · 초안·최근 5개 갤러리에 보관했어요.')
+            : ((jpegMode ? 'JPEG' : 'PNG') + '를 저장했어요.')),
         { duration: 2400, variant: 'ok' }
       );
     }
@@ -37081,7 +37073,7 @@ function getTabCopyText(tab, content){
     const b = content.blog;
     if(!b) return '';
     if(blogUsesStructuredGeneralFormat_(catId, b)) return formatGeneralBlogPostText(b, catId);
-    const outline = (b.outline || []).map(function(o, i){ return (i + 1) + '. ' + o; }).join('\n');
+    const outline = (b.outline || []).map(function(o, i){ return (i + 1) + '. ' + o; }).join('\n\n');
     return withExpertCourseBlogFooter_(withRealMovementBlogFooter_('[블로그]\n제목: ' + b.title + '\n\n' + (b.hook || '') + '\n\n' + outline + '\n\n' + (b.draft || '') + '\n\n' + (b.cta || '') + '\n\n' + (b.hashtags || []).map(function(h){ return '#' + h; }).join(' '), catId), catId);
   }
   if(tab === 'insta'){
@@ -37124,12 +37116,17 @@ window.openExternalNaverBlog = function(){
     window.open(writeUrl, '_blank', 'noopener,noreferrer');
     return;
   }
+  // 현재 탭 주소를 바꾸면 뒤에서 만들던 인스타 캡션 요청이 끊긴다.
   if(isAndroidDevice()){
-    openExternalLinkInGesture_('intent://write?blogId=allenjoy#Intent;scheme=naverblog;package=com.nhn.android.blog;S.browser_fallback_url=' + encodeURIComponent(writeUrl) + ';end');
+    window.open('intent://write?blogId=allenjoy#Intent;scheme=naverblog;package=com.nhn.android.blog;S.browser_fallback_url=' + encodeURIComponent(writeUrl) + ';end', '_blank');
+    setTimeout(function(){
+      if(document.hidden) return;
+      window.open(writeUrl, '_blank', 'noopener,noreferrer');
+    }, 900);
     return;
   }
   if(isIOSLikeDevice()){
-    openNaverBlogAppOnIOS_();
+    window.open('naverblog://write?blogId=allenjoy', '_blank');
     setTimeout(function(){
       if(document.hidden) return;
       window.open(writeUrl, '_blank', 'noopener,noreferrer');
@@ -37141,8 +37138,9 @@ window.openExternalNaverBlog = function(){
 
 function buildBlogPasteTextForPublish_(b, catId){
   if(!b) return '';
+  b = Object.assign({}, b, { title: withClinicBlogTitle_(b.title, catId) });
   if(blogUsesStructuredGeneralFormat_(catId, b)) return formatGeneralBlogPostText(b, catId);
-  var outline = (b.outline || []).map(function(o, i){ return (i + 1) + '. ' + o; }).join('\n');
+  var outline = (b.outline || []).map(function(o, i){ return (i + 1) + '. ' + o; }).join('\n\n');
   var tags = (b.hashtags || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
   if(isExpertCourseCategory(catId)){
     var expertParts = [b.title, b.hook, outline, b.draft, b.cta];
@@ -37170,11 +37168,10 @@ function ensureNotifyForInstaBg_(){
 }
 
 function copyAndOpenNaverBlog_(text){
-  openExternalNaverBlog();
-  if(!text) return;
-  if(navigator.clipboard && navigator.clipboard.writeText){
+  if(text && navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(text).catch(function(){});
   }
+  openExternalNaverBlog();
 }
 function startInstaDraftAfterBlogPublish_(draftId, catId, topic, content){
   if(!isBlogInstaCategory(catId) || !content || !content.blog) return;
@@ -37185,13 +37182,10 @@ function startInstaDraftAfterBlogPublish_(draftId, catId, topic, content){
 }
 
 function copyAndOpenInstagram_(text){
-  var open = function(){ openExternalInstagramForPost_(); };
-  if(!text){ open(); return; }
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).then(open).catch(open);
-  } else {
-    open();
+  if(text && navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(function(){});
   }
+  openExternalInstagramForPost_();
 }
 
 function copyTextOnly_(text, done){
@@ -37237,37 +37231,26 @@ window.openExternalInstagramForPost_ = function(){
     return;
   }
   if(isAndroidDevice()){
-    window.location.href =
-      'intent:#Intent;package=com.instagram.android;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end';
-    setTimeout(function(){
-      if(document.hidden) return;
-      window.location.href =
-        'intent://www.instagram.com/#Intent;scheme=https;package=com.instagram.android;S.browser_fallback_url=' +
-        encodeURIComponent(u) + ';end';
-    }, 450);
+    window.open(
+      'intent://www.instagram.com/#Intent;scheme=https;package=com.instagram.android;S.browser_fallback_url=' +
+      encodeURIComponent(u) + ';end',
+      '_blank'
+    );
     setTimeout(function(){
       if(document.hidden) return;
       window.open(u, '_blank', 'noopener,noreferrer');
-    }, 1100);
+    }, 900);
     return;
   }
   if(isIOSLikeDevice()){
-    window.location.href = 'instagram://camera';
-    setTimeout(function(){
-      if(document.hidden) return;
-      window.location.href = 'instagram://app';
-    }, 400);
-    setTimeout(function(){
-      if(document.hidden) return;
-      window.location.href = u;
-    }, 900);
+    window.open('instagram://app', '_blank');
     setTimeout(function(){
       if(document.hidden) return;
       window.open(u, '_blank', 'noopener,noreferrer');
-    }, 1400);
+    }, 900);
     return;
   }
-  openExternalInstagram();
+  window.open(u, '_blank', 'noopener,noreferrer');
 };
 
 function tryNotifyInstaReady_(topic, draftId, catId, ok, errMsg){
@@ -37524,7 +37507,7 @@ function enqueueInstaFromBlog_(draftId, catId, topic, blog, opts){
     } catch(err){
       console.warn('[인스타 백그라운드]', err);
       var msg = (err && err.message) ? err.message : String(err);
-      var retryable = /응답 시간이|Failed to fetch|NetworkError|Load failed|network/i.test(msg);
+      var retryable = /응답 시간이|Failed to fetch|NetworkError|Load failed|network|abort/i.test(msg);
       var shouldRetry = !opts.resume && retryCount < 1 && retryable;
       var failContent = getDraftContent_(draftId);
       if(failContent){
@@ -37833,7 +37816,7 @@ function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
     } catch(err){
       console.warn('[쓰레드 백그라운드]', err);
       var msg = (err && err.message) ? err.message : String(err);
-      var retryable = /응답 시간이|Failed to fetch|NetworkError|Load failed|network/i.test(msg);
+      var retryable = /응답 시간이|Failed to fetch|NetworkError|Load failed|network|abort/i.test(msg);
       var shouldRetry = !opts.resume && retryCount < 1 && retryable;
       var failContent = getDraftContent_(draftId);
       if(failContent){
@@ -37920,23 +37903,17 @@ function reconcileThreadsPendingJobs_(reason){
 
 // planner-detail-actions.js — 브랜딩 플래너 detail
 function copyAndOpenThreads_(text){
-  var open = function(){ openExternalThreads(); };
-  if(!text){ open(); return; }
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).then(open).catch(open);
-  } else {
-    open();
+  if(text && navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(function(){});
   }
+  openExternalThreads();
 }
 
 function copyAndOpenApartner_(text){
-  var open = function(){ openApartnerApp(); };
-  if(!text){ open(); return; }
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).then(open).catch(open);
-  } else {
-    open();
+  if(text && navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(function(){});
   }
+  openApartnerApp();
 }
 
 window.openExternalInstagram = function(){
@@ -37948,50 +37925,41 @@ window.openExternalInstagram = function(){
     return;
   }
   if(isAndroidDevice()){
-    window.location.href =
-      'intent://www.instagram.com/' +
-      user +
+    window.open(
+      'intent://www.instagram.com/' + user +
       '/#Intent;scheme=https;package=com.instagram.android;S.browser_fallback_url=' +
-      encodeURIComponent(u) +
-      ';end';
+      encodeURIComponent(u) + ';end',
+      '_blank'
+    );
     setTimeout(function(){
       if(document.hidden) return;
       window.open(u, '_blank', 'noopener,noreferrer');
     }, 900);
     return;
   }
-  window.location.href = 'instagram://user?username=' + encodeURIComponent(user);
-  setTimeout(function(){
-    if(document.hidden) return;
-    window.location.href = u;
-  }, 450);
+  window.open('instagram://user?username=' + encodeURIComponent(user), '_blank');
   setTimeout(function(){
     if(document.hidden) return;
     window.open(u, '_blank', 'noopener,noreferrer');
-  }, 1100);
+  }, 900);
 };
 
 window.openExternalThreads = function(){
   const u = EXT_THREADS;
   const uname = getThreadsProfileUsername();
-  const threadsNet = 'https://www.threads.net/@' + encodeURIComponent(uname);
   if(!isPhoneOrTablet()){
     window.open(u, '_blank', 'noopener,noreferrer');
     return;
   }
   if(isIOSLikeDevice()){
-    window.location.href = 'barcelona://user?username=' + encodeURIComponent(uname);
-    setTimeout(function(){
-      if(document.hidden) return;
-      window.location.href = threadsNet;
-    }, 450);
+    window.open('barcelona://user?username=' + encodeURIComponent(uname), '_blank');
     setTimeout(function(){
       if(document.hidden) return;
       window.open(u, '_blank', 'noopener,noreferrer');
-    }, 1100);
+    }, 900);
     return;
   }
-  window.location.href = 'intent:#Intent;action=android.intent.action.VIEW;data=' + encodeURIComponent(u) + ';package=com.instagram.barcelona;S.browser_fallback_url=' + encodeURIComponent(u) + ';end';
+  window.open('intent:#Intent;action=android.intent.action.VIEW;data=' + encodeURIComponent(u) + ';package=com.instagram.barcelona;S.browser_fallback_url=' + encodeURIComponent(u) + ';end', '_blank');
   setTimeout(function(){
     if(document.hidden) return;
     window.open(u, '_blank', 'noopener,noreferrer');
@@ -38003,14 +37971,10 @@ window.openApartnerApp = function(){
     window.open(APARTNER_WEB, '_blank', 'noopener,noreferrer');
     return;
   }
-  window.location.href = 'apartner://';
+  window.open('apartner://', '_blank');
   setTimeout(function(){
     if(document.hidden) return;
-    if(isAndroidDevice()){
-      window.open(APARTNER_PLAY_STORE, '_blank', 'noopener,noreferrer');
-    } else {
-      window.open(APARTNER_IOS_STORE, '_blank', 'noopener,noreferrer');
-    }
+    window.open(isAndroidDevice() ? APARTNER_PLAY_STORE : APARTNER_IOS_STORE, '_blank', 'noopener,noreferrer');
   }, 900);
 };
 
@@ -38061,7 +38025,7 @@ function ensureProseParagraphBreaks_(text){
   var t = String(text || '').replace(/\r\n/g, '\n').trim();
   if(!t) return '';
   if(/(^|\n)\s*👉/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
-  if(/(^|\n)\s*(?:[-•*]|\d+[.)])\s/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
+  if(/(^|\n)\s*(?:[-•*]|\d+[.)])\s/.test(t)) return stripProseParagraphIndents_(separateListItems_(t));
   var sentences = splitProseSentences_(t.replace(/\n+/g, ' '));
   if(sentences.length < 2) return stripProseParagraphIndents_(sentences[0] || t);
   var groups = [];
@@ -38078,6 +38042,24 @@ function ensureProseParagraphBreaks_(text){
     }
   }
   return stripProseParagraphIndents_(groups.join('\n\n'));
+}
+function separateListItems_(text){
+  var lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+  var items = [];
+  var cur = '';
+  lines.forEach(function(ln){
+    var isItem = /^\s*(?:[-•*]|\d+[.)])\s/.test(ln);
+    if(isItem){
+      if(cur.trim()) items.push(cur.trim());
+      cur = ln.trim();
+    } else if(!ln.trim()){
+      return;
+    } else {
+      cur += (cur ? '\n' : '') + ln.trim();
+    }
+  });
+  if(cur.trim()) items.push(cur.trim());
+  return items.join('\n\n');
 }
 /** 문단 시작 들여쓰기(앞 공백) 제거 — 목록·셀프케어·해시태그는 그대로 */
 function stripProseParagraphIndents_(text){
@@ -39481,12 +39463,18 @@ window.onSheetPublishComplete = async function(opts){
       var quickResult = commitSheetTabPublish_(draftId, catId, tab);
       var quickContent = getDraftContent_(draftId);
       var quickText = buildFinalTextForKey_(quickContent, catId, quickResult.key);
+      if(tab === 'blog') startInstaDraftAfterBlogPublish_(draftId, catId, (quickContent && quickContent.blog && quickContent.blog.title) || '', quickContent);
+      if(!viaApi && tab === 'blog'){
+        copyAndOpenNaverBlog_(quickText);
+        setAppToast(isPhoneOrTablet()
+          ? '수정본 저장 · 복사 · 글쓰기 앱으로 이동'
+          : '수정본 저장 · 복사 · 글쓰기 페이지로 이동', { duration: 3600, variant: 'ok' });
+      }
       renderSheetContent(quickContent);
       renderTabs();
       renderMain();
-      if(tab === 'blog') startInstaDraftAfterBlogPublish_(draftId, catId, (quickContent && quickContent.blog && quickContent.blog.title) || '', quickContent);
       if(viaApi) return;
-      if(tab === 'blog') openExternalNaverBlog();
+      if(tab === 'blog') return;
       copyTextOnly_(quickText, function(){
         setAppToast(tab === 'blog'
           ? (isPhoneOrTablet() ? '수정본 저장 · 복사 · 글쓰기 앱으로 이동' : '수정본 저장 · 복사 · 글쓰기 페이지로 이동')
@@ -39524,10 +39512,10 @@ window.onSheetPublishComplete = async function(opts){
       state.activeTab = 'insta';
       setOpenDetailHash_(draftId, catId, 'insta');
       startInstaDraftAfterBlogPublish_(draftId, catId, draft ? draft.topic : '', content);
+      copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId));
       renderSheetContent(getDraftContent_(draftId) || content);
       renderTabs();
       renderMain();
-      copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId));
       afterTabPublishSaved_(saveResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
       setAppToast((isPhoneOrTablet()
         ? '블로그 저장 · 복사 · 글쓰기 앱으로 이동'
@@ -39572,6 +39560,7 @@ window.onSheetPublishComplete = async function(opts){
       var catIg = CATEGORIES[catId];
       var draftIg = catIg && catIg.drafts.find(function(d){ return d.id === draftId; });
       igContent = getDraftContent_(draftId) || igContent;
+      if(!viaApi) copyAndOpenInstagram_(igContent && igContent.insta ? getInstaFullPasteText_(igContent.insta, catId) : '');
       ensureNotifyForInstaBg_();
       state.activeTab = 'threads';
       setOpenDetailHash_(draftId, catId, 'threads');
@@ -39581,7 +39570,6 @@ window.onSheetPublishComplete = async function(opts){
       renderSheetContent(getDraftContent_(draftId) || igContent);
       renderTabs();
       renderMain();
-      if(!viaApi) copyAndOpenInstagram_(igContent && igContent.insta ? getInstaFullPasteText_(igContent.insta, catId) : '');
       afterTabPublishSaved_(instaResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
       var collabToast = instagramCollabMentionForCat_(catId);
       if(viaApi) setAppToast('인스타 게시 완료 · 발행 기록 저장\n수정본으로 쓰레드 초안을 만들고 있어요.', { duration: 5200, variant: 'ok' });

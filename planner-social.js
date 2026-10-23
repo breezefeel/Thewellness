@@ -214,6 +214,71 @@ var PlannerSocial = (function(){
     return row;
   }
 
+  function isAbortErr_(err){
+    var name = err && err.name ? String(err.name) : '';
+    var msg = String((err && err.message) || err || '');
+    return name === 'AbortError' || /abort/i.test(msg);
+  }
+  function waitMs_(ms){
+    return new Promise(function(resolve){ setTimeout(resolve, ms); });
+  }
+  function publishResultFromRow_(id, data){
+    var result = (data && data.result) || {};
+    if(data && data.status === 'published'){
+      return { data: Object.assign({ id: id, status: 'published' }, result), error: null };
+    }
+    if(data && data.status === 'processing'){
+      return { data: { id: id, status: 'processing' }, error: null };
+    }
+    if(data && data.status === 'failed'){
+      return { data: { id: id, status: 'failed', error: data.error || '게시에 실패했어요.' }, error: null };
+    }
+    return null;
+  }
+  // 응답만 끊긴 경우 바로 다시 올리면 같은 글이 두 번 올라간다.
+  // 이미 게시 중이면 결과만 확인하고, 아직 시작 전일 때만 한 번 더 요청한다.
+  function recoverPublish_(sb, id, attempt, retried){
+    return waitMs_(1500).then(function(){
+      return sb.from('social_posts').select('status,result,error').eq('id', id).single();
+    }).then(function(row){
+      if(row && row.error){
+        if(isAbortErr_(row.error) && attempt < 6) return recoverPublish_(sb, id, attempt + 1, retried);
+        throw new Error(row.error.message || '게시 상태를 확인하지 못했어요.');
+      }
+      var data = row && row.data;
+      var settled = publishResultFromRow_(id, data);
+      if(settled) return settled;
+      var st = data && data.status;
+      if(st === 'publishing' && attempt < 6){
+        return recoverPublish_(sb, id, attempt + 1, retried);
+      }
+      if((!st || st === 'queued') && !retried){
+        return sb.functions.invoke('social-publish', { body: { action: 'publish', id: id } }).then(function(res){
+          if(res && res.error && isAbortErr_(res.error)) return recoverPublish_(sb, id, attempt + 1, true);
+          return res;
+        }).catch(function(err){
+          if(isAbortErr_(err)) return recoverPublish_(sb, id, attempt + 1, true);
+          throw err;
+        });
+      }
+      if(st === 'publishing'){
+        throw new Error('아직 올리는 중이에요. 잠시 후 게시 목록을 확인해 주세요.');
+      }
+      throw new Error('게시 요청이 끊겼어요. 잠시 후 게시 목록을 확인해 주세요.');
+    }).catch(function(err){
+      if(isAbortErr_(err) && attempt < 6) return recoverPublish_(sb, id, attempt + 1, retried);
+      throw err;
+    });
+  }
+  function invokePublish_(sb, id){
+    return sb.functions.invoke('social-publish', { body: { action: 'publish', id: id } }).then(function(res){
+      if(res && res.error && isAbortErr_(res.error)) return recoverPublish_(sb, id, 0);
+      return res;
+    }).catch(function(err){
+      if(isAbortErr_(err)) return recoverPublish_(sb, id, 0);
+      throw err;
+    });
+  }
   function publishNow(platform){
     var row;
     try { row = buildPost(platform); } catch(e){ toast(e.message, 'err', 5000); return; }
@@ -226,7 +291,7 @@ var PlannerSocial = (function(){
     client().then(function(c){ sb = c; return sb.from('social_posts').insert(row).select('id').single(); })
       .then(function(res){
         if(res.error) throw new Error(res.error.message);
-        return sb.functions.invoke('social-publish', { body: { action: 'publish', id: res.data.id } });
+        return invokePublish_(sb, res.data.id);
       })
       .then(function(res){
         setBusy(false);

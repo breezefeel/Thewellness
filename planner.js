@@ -21282,34 +21282,19 @@ function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
   }).filter(function(conflict){
     return !shouldSkipPlannerConflict_(conflict.key, conflict.local, conflict.remote);
   });
-  var settled = settleContentConflictsByLatest_(conflicts);
-  conflicts = settled.rest;
-  if(settled.upload || settled.kept){
-    try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true }); } catch(eSettleSave){}
-    if(settled.upload && hasPendingLocalSyncChanges_()) schedulePlannerGasPush_(true);
-    if(!conflicts.length && typeof setAppToast === 'function'){
-      setAppToast(settled.upload
-        ? '더 나중 내용을 서버에 올리고 있어요.'
-        : '서버의 더 나중 내용을 이 기기에 맞춰 두었어요.', { duration: 3200, variant: 'ok' });
+  // 이 창은 서버가 더 새로워서가 아니라, 이 기기 outbox의 출발 번호와 서버 번호가 다를 때 열렸다.
+  // 글을 쓰는 쪽은 이 기기이므로 내용을 유지하고 서버 번호만 맞춰 다시 올린다.
+  if(conflicts.length){
+    forceOutboxOverwriteBase_(conflicts);
+    state.syncDirty = true;
+    try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true }); } catch(eKeepLocal){}
+    if(hasPendingLocalSyncChanges_()) schedulePlannerGasPush_(true);
+    if(typeof setAppToast === 'function'){
+      setAppToast('이 기기에서 쓰던 내용을 유지하고 서버에 맞추는 중이에요.', { duration: 2800, variant: 'ok' });
     }
+    return false;
   }
   if(!conflicts.length) return false;
-  if(conflicts.length > 12){
-    var dropKeys = {};
-    conflicts.forEach(function(conflict){ if(conflict && conflict.key) dropKeys[conflict.key] = true; });
-    state.syncOutbox = (state.syncOutbox || []).filter(function(op){
-      return !(op && dropKeys[op.key]);
-    });
-    try { rebuildDirtyStateFromOutbox_(); } catch(eMany){}
-    state._topicGapAdoptServer = true;
-    setTimeout(function(){
-      var pull = plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_PULL_TIMEOUT_MS);
-      var clearAdopt = function(){ state._topicGapAdoptServer = false; };
-      if(pull && typeof pull.then === 'function') pull.then(clearAdopt, clearAdopt);
-      else clearAdopt();
-    }, 300);
-    return true;
-  }
   plannerSyncConflictPending_ = {
     mode: 'outbox',
     local: localPayload,
@@ -35952,12 +35937,45 @@ async function loadTopicPhotoRefList_(paths, role, maxCount){
 function faceTopicPhotoSpaceNames_(sceneText, peopleKind){
   var t = String(sceneText || '');
   if(/상담|평가|분석|설명|강의|교육|세미나|수강|비교|사진으로|화면/.test(t) && peopleKind !== 'pair-face'){
-    return ['06-상담실.jpg', '07-상담실모니터.jpg', '08-세미나실.jpg', '09-제품선반.jpg', '01-관리실.jpg'];
+    return ['02-관리실창가.jpg', '04-운동스튜디오.jpg', '08-세미나실.jpg', '05-거울스튜디오.jpg', '01-관리실.jpg', '06-상담실.jpg', '03-관리베드.jpg'];
   }
   if(peopleKind === 'pair-face'){
     return ['01-관리실.jpg', '03-관리베드.jpg', '10-기기베드.jpg', '02-관리실창가.jpg', '09-제품선반.jpg'];
   }
   return ['04-운동스튜디오.jpg', '05-거울스튜디오.jpg', '01-관리실.jpg', '02-관리실창가.jpg', '06-상담실.jpg'];
+}
+function topicPhotoRecentBag_(){
+  try { return JSON.parse(localStorage.getItem('planner-topic-photo-recent') || '{}') || {}; }
+  catch(eBag){ return {}; }
+}
+function topicPhotoRememberPick_(slot, name){
+  var bag = topicPhotoRecentBag_();
+  var list = Array.isArray(bag[slot]) ? bag[slot] : [];
+  list.push({ name: name, at: Date.now() });
+  var cutoff = Date.now() - 12 * 60 * 60 * 1000;
+  bag[slot] = list.filter(function(row){ return row && row.name && row.at >= cutoff; }).slice(-12);
+  try { localStorage.setItem('planner-topic-photo-recent', JSON.stringify(bag)); } catch(eSave){}
+}
+function topicPhotoBlockedNames_(slot){
+  var list = topicPhotoRecentBag_()[slot] || [];
+  var names = list.map(function(row){ return row.name; });
+  return names.slice(-3);
+}
+function topicPhotoPickFresh_(slot, names){
+  var blocked = topicPhotoBlockedNames_(slot);
+  var fresh = names.filter(function(n){ return blocked.indexOf(n) < 0; });
+  if(fresh.length) return fresh[Math.floor(Math.random() * fresh.length)];
+  var bag = topicPhotoRecentBag_()[slot] || [];
+  var oldest = null;
+  bag.forEach(function(row){
+    if(names.indexOf(row.name) < 0) return;
+    if(!oldest || row.at < oldest.at) oldest = row;
+  });
+  return oldest ? oldest.name : names[0];
+}
+async function topicPhotoLoadOne_(path, role){
+  var rows = await loadTopicPhotoRefList_([path], role, 1);
+  return rows[0] || null;
 }
 async function loadTopicPhotoRefs_(branch, model, sceneText, peopleKind){
   var place = branch === 'yaksu' ? '약수' : (branch === 'face' ? '페이스' : '인천');
@@ -35966,22 +35984,37 @@ async function loadTopicPhotoRefs_(branch, model, sceneText, peopleKind){
     : place === '페이스'
       ? faceTopicPhotoSpaceNames_(sceneText, peopleKind)
       : ['01-운동실.jpg', '02-정원창.jpg', '03-소도구코너.jpg', '04-로비.jpg', '05-유리실.jpg'];
-  var spacePaths = spaceNames.map(function(n){ return '이미지참고/' + place + '/' + n; });
-  var space = await loadTopicPhotoRefList_(spacePaths, 'space', 5);
-  if(!space.length) throw new Error((place === '페이스' ? '페이스' : place + '점') + ' 참고 사진을 불러오지 못했어요. 이미지참고/' + place + ' 를 확인해 주세요.');
-  var modelPaths = model === 'f'
-    ? ['이미지참고/모델/여/01.jpg', '이미지참고/모델/여/02.jpg']
-    : ['이미지참고/모델/남/01.jpg', '이미지참고/모델/남/02.jpg'];
-  var people = await loadTopicPhotoRefList_(modelPaths, 'model', 2);
-  if(!people.length && model !== 'f'){
-    people = await loadTopicPhotoRefList_(['이미지참고/모델/01.jpg', '이미지참고/모델/02.jpg'], 'model', 2);
+  var spaceSlot = 'space:' + place + ':' + (peopleKind || 'solo');
+  var spaceOrder = [topicPhotoPickFresh_(spaceSlot, spaceNames)].concat(spaceNames);
+  var space = null;
+  var spaceName = '';
+  for(var si = 0; si < spaceOrder.length && !space; si++){
+    spaceName = spaceOrder[si];
+    space = await topicPhotoLoadOne_('이미지참고/' + place + '/' + spaceName, 'space');
   }
-  if(!people.length){
+  if(!space) throw new Error((place === '페이스' ? '페이스' : place + '점') + ' 참고 사진을 불러오지 못했어요. 이미지참고/' + place + ' 를 확인해 주세요.');
+  topicPhotoRememberPick_(spaceSlot, spaceName);
+  var modelDir = model === 'f' ? '이미지참고/모델/여/' : '이미지참고/모델/남/';
+  var modelNames = ['01.jpg', '02.jpg', '03.jpg', '04.jpg', '05.jpg', '06.jpg'];
+  var modelSlot = 'model:' + (model === 'f' ? 'f' : 'm');
+  var modelOrder = [topicPhotoPickFresh_(modelSlot, modelNames)].concat(modelNames);
+  var person = null;
+  var modelName = '';
+  for(var mi = 0; mi < modelOrder.length && !person; mi++){
+    modelName = modelOrder[mi];
+    person = await topicPhotoLoadOne_(modelDir + modelName, 'model');
+  }
+  if(!person && model !== 'f'){
+    person = await topicPhotoLoadOne_('이미지참고/모델/01.jpg', 'model');
+    modelName = '01.jpg';
+  }
+  if(!person){
     throw new Error(model === 'f'
       ? '여 모델 사진이 없어요. 이미지참고/모델/여 폴더에 올린 뒤 다시 눌러 주세요.'
       : '모델 사진을 불러오지 못했어요. 이미지참고/모델 을 확인해 주세요.');
   }
-  return space.concat(people);
+  topicPhotoRememberPick_(modelSlot, modelName);
+  return [space, person];
 }
 async function cropDataUrlToFourFive_(dataUrl){
   var img = await loadBitmapForThumb_(dataUrl);
@@ -36052,7 +36085,7 @@ window.generateTopicPhoto_ = async function(btn){
   try {
     var sceneText = topicPhotoPeopleSource_(content, state.selectedCatId, '');
     var refs = await loadTopicPhotoRefs_(branch, model, sceneText, topicPhotoPeopleKind_(sceneText, state.selectedCatId));
-    var apiPrompt = prompt + '\n\n사진 안에 글자, 숫자, 자막, 제목, 로고를 그리지 않는다. 주제 문장을 사진에 적지 않는다. 카메라는 가까이. 인물과 동작이 화면 너비의 대부분을 채운다. 방 전체를 멀리서 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통 중심이 세로 가운데선에 온다. 아래쪽 약 4분의 1만 바닥으로 비워 썸네일 글자 자리로 둔다. 얼굴, 손, 발은 그 자리에 넣지 않는다. 첨부 사진 앞쪽은 공간, 마지막은 모델이다. 4:5 한 장. 위 프롬프트에 적힌 사람 수를 지킨다.';
+    var apiPrompt = prompt + '\n\n사진 안에 글자, 숫자, 자막, 제목, 로고를 그리지 않는다. 주제 문장을 사진에 적지 않는다. 카메라는 가까이. 인물과 동작이 화면 너비의 대부분을 채운다. 방 전체를 멀리서 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통 중심이 세로 가운데선에 온다. 아래쪽 약 4분의 1만 바닥으로 비워 썸네일 글자 자리로 둔다. 얼굴, 손, 발은 그 자리에 넣지 않는다. 첨부 사진은 공간 한 장과 모델 한 장이다. 두 방을 섞지 않는다. 모델의 얼굴은 유지하되 옷 색, 머리 정돈, 카메라 높이, 서 있는 방향은 참고 사진과 다르게 한다. 남색 티, 턱에 손을 댄 자세, 목 뒤를 짚는 자세를 기본으로 쓰지 않는다. 4:5 한 장. 위 프롬프트에 적힌 사람 수를 지킨다.';
     var data = await plannerGasJsonRequest_({
       action: 'plannerGenerateTopicPhoto',
       prompt: apiPrompt,

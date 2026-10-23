@@ -4236,7 +4236,7 @@ const PROGRAM_INITIAL_STEP_TOPICS = {
     ],
     '7': [
       { topic: '괄사, 방향은 평가가 정한다', angle: 'Practice · 괄사. 함께: 평가' },
-      { topic: '도구 압이 손의 소견을 지우기 전에', angle: 'Practice · 괄사. 함께: 얼굴 수기' },
+      { topic: '괄사로 누르기 전에, 손으로 본 것을 먼저 적는 이유', angle: 'Practice · 괄사. 함께: 얼굴 수기' },
       { topic: '괄사를 얼굴 운동과 같은 날에 두지 않는 경우', angle: 'Practice · 괄사. 함께: 얼굴 운동' }
     ]
   },
@@ -4401,8 +4401,8 @@ function expertPspHomeStepId_(catId, blob){
     if(has('괄사')) return 's7';
     if(has('고주파', 'indiba', '기기')) return 's6';
     if(has('얼굴 운동', '표정')) return 's5';
-    if(has('수기', '도수', '손으로', '경축')) return 's4';
     if(has('해부', '층', '심부', '저작')) return 's3';
+    if(has('수기', '도수', '손으로', '경축')) return 's4';
     if(has('history', 'inspection', 'palpation', '평가', '비대칭', '윤곽', '문진')) return 's2';
     if(has('마사지', '철학', '컨셉', '약속', '기대')) return 's1';
     return '';
@@ -5937,7 +5937,8 @@ function buildTopicPlanPromptPrefix_(catId, stepId){
   return (
     buildContentStrategyPromptPrefix_({ mainGoal: getCurrentMainGoal_(), program: getCategoryProgramLine_(catId) + (CATEGORIES[catId] ? ' · ' + CATEGORIES[catId].name : ''), catId: catId }) + '\n\n' +
     buildProgramPlanContextBlock_(catId, stepId) + '\n\n' +
-    '우선순위: 1) 이번 서랍(단계) 2) 이번 분기 의도 3) 프로그램 정체성 4) 1년 배경. 1년 문장을 그대로 주제로 쓰지 마세요.'
+    '우선순위: 1) 이번 서랍(단계) 2) 이번 분기 의도 3) 프로그램 정체성 4) 1년 배경. 1년 문장을 그대로 주제로 쓰지 마세요.\n' +
+    'topic은 이 칸을 처음 보는 사람도 한 번에 읽는 완결 문장입니다. 목적어와 결론이 문장 안에 있어야 합니다. 「~전에」「~후에」로만 끝내지 마세요. 수업 안 은어(손의 소견, 도구 압)는 풀어 쓰세요. 예: 괄사로 누르기 전에, 손으로 본 것을 먼저 적는 이유. 이미 있는 주제와 핵심이 같으면 만들지 마세요.'
   );
 }
 function renderIntentRefBlockHTML_(title, body, opts){
@@ -6374,16 +6375,27 @@ function dedupeSameTopicDraftsInCat_(catId){
       var ds = draftDuplicateKeepScore_(d, catId);
       if(ds > ks) keep = d;
       else if(ds === ks){
-        var kt = parseIsoMs_(keep.updatedAt || keep.createdAt);
-        var dt = parseIsoMs_(d.updatedAt || d.createdAt);
-        if(dt > kt) keep = d;
+        var kt = parseIsoMs_(keep.createdAt) || getDraftCreatedAtMs_(keep);
+        var dt = parseIsoMs_(d.createdAt) || getDraftCreatedAtMs_(d);
+        if(dt && kt && dt < kt) keep = d;
       }
     });
     list.forEach(function(d){
-      if(d && d.id && d.id !== keep.id){
-        absorbDraftKeyedMaps_(d.id, keep.id);
-        dropIds.push(d.id);
+      if(!d || !d.id || d.id === keep.id) return;
+      var loserHasWork = (typeof draftHasContent === 'function' && draftHasContent(d)) ||
+        (typeof draftIsPublished_ === 'function' && draftIsPublished_(d.id)) ||
+        (typeof draftShowsOnPublishedList_ === 'function' && draftShowsOnPublishedList_(d.id, catId));
+      var keepHasWork = (typeof draftHasContent === 'function' && draftHasContent(keep)) ||
+        (typeof draftIsPublished_ === 'function' && draftIsPublished_(keep.id));
+      if(loserHasWork && keepHasWork) return;
+      if(loserHasWork && !keepHasWork){
+        absorbDraftKeyedMaps_(keep.id, d.id);
+        dropIds.push(keep.id);
+        keep = d;
+        return;
       }
+      absorbDraftKeyedMaps_(d.id, keep.id);
+      dropIds.push(d.id);
     });
   });
   if(!dropIds.length) return 0;
@@ -6393,6 +6405,7 @@ function dedupeSameTopicDraftsInCat_(catId){
 
 function applyTopicToStepSlot_(catId, stepId, slotNum, topicData){
   if(!topicData || !topicData.topic) return false;
+  if(!topicReadsClearly_(topicData.topic)) return false;
   var plan = getEffectiveSubGoalPlan_(catId);
   var cat = CATEGORIES[catId];
   if(!plan || !cat) return false;
@@ -6801,9 +6814,7 @@ function findPlanStepIdBySeedTopic_(catId, plan, topic){
     for(j = 0; j < topics.length; j++){
       var tk = normalizeTopicMatchKey_(topics[j].topic);
       if(!tk) continue;
-      if(tk === key || (tk.length >= 12 && key.indexOf(tk.slice(0, 12)) >= 0) || (key.length >= 12 && tk.indexOf(key.slice(0, 12)) >= 0)){
-        return String(plan.steps[i].id);
-      }
+      if(tk === key) return String(plan.steps[i].id);
     }
   }
   return '';
@@ -21193,15 +21204,9 @@ function blogTitleOfContent_(content){
   if(!content || !content.blog) return '';
   return String(content.blog.title || '').trim();
 }
-function alignDraftTopicToBlogTitle_(draftId, content){
-  var title = blogTitleOfContent_(content);
-  if(!draftId || !title) return false;
-  var draft = findDraftByIdAnywhere_(draftId);
-  if(!draft) return false;
-  if(String(draft.topic || '').trim() === title) return false;
-  draft.topic = title;
-  if(state.published[draftId]) state.published[draftId].topic = title;
-  return true;
+function alignDraftTopicToBlogTitle_(){
+  // 블로그 제목으로 카드 주제를 바꾸면, 초안 생성 직후 다른 글이 생긴 것처럼 보인다.
+  return false;
 }
 function settleContentConflictsByLatest_(conflicts){
   var upload = [];
@@ -22516,6 +22521,10 @@ function runPlannerStepIntegrityPass_(opts){
       try { ensureUserAddedDraftsInMisc_(i); } catch(eCat){}
     });
     try { ensurePublishedDraftCards_(); } catch(ePubCards){}
+    try { if(rewriteOpaqueTopicsInPlace_()) changed = true; } catch(eOpaque){}
+    CATEGORIES.forEach(function(cat, i){
+      try { if(dedupeSameTopicDraftsInCat_(i)) changed = true; } catch(eDup){}
+    });
   } catch(eRep){ console.warn('[plan integrity]', eRep); }
   state._pendingHeavyRepair = false;
   state._forceStepIntegrityPass = false;
@@ -29055,8 +29064,9 @@ function appendDraftVoiceLocks_(prompt, draft){
 }
 function flowJsonTitleHint_(draft, fallback){
   var title = draft && draft.articleFlow && String(draft.articleFlow.title || '').trim();
+  if(!title && draft && draft.topic) title = String(draft.topic).trim();
   if(!title) return fallback;
-  return '선택한 글 흐름 제목을 최대한 그대로: 「' + title.replace(/"/g, "'") + '」. 다른 후킹으로 바꾸지 말 것';
+  return '카드 주제를 제목으로 그대로: 「' + title.replace(/"/g, "'") + '」. 다른 주장·다른 후킹으로 바꾸지 말 것';
 }
 
 function appendDraftReferenceToPrompt_(prompt, draft, catId){
@@ -39797,7 +39807,34 @@ function shouldRefinePromptsAfterPublish_(catId){
 }
 
 function normalizeTopicKey_(topic){
-  return String(topic || '').replace(/\s+/g, '').toLowerCase();
+  return String(topic || '')
+    .replace(/[\s"""''「」『』.,，.!?？~·:：;；\-–—]/g, '')
+    .toLowerCase();
+}
+/** 주제를 읽었을 때 주장 끝까지 보이는지. 새 주제만 거르고, 이미 있는 카드는 지우지 않는다. */
+function topicReadsClearly_(topic){
+  var t = String(topic || '').trim();
+  if(t.length < 12) return false;
+  if(/[을를이가은는]\s*$/.test(t)) return false;
+  if(/(전에|후에|뒤에)$/.test(t)) return false;
+  if(/[?？]$/.test(t)) return true;
+  return /(다|요|까|나|이유|기준|순서|방법|경우|것|법|점|때)$/.test(t);
+}
+var OPAQUE_TOPIC_REWRITES_ = {
+  '도구 압이 손의 소견을 지우기 전에': '괄사로 누르기 전에, 손으로 본 것을 먼저 적는 이유'
+};
+function rewriteOpaqueTopicsInPlace_(){
+  var n = 0;
+  CATEGORIES.forEach(function(cat){
+    (cat && cat.drafts || []).forEach(function(d){
+      if(!d || !d.topic) return;
+      var next = OPAQUE_TOPIC_REWRITES_[String(d.topic).trim()];
+      if(!next || next === d.topic) return;
+      d.topic = next;
+      n++;
+    });
+  });
+  return n;
 }
 
 function makeExtraDraftId_(catId, offset){
@@ -39838,7 +39875,7 @@ buildBrandContextForPrompt_(catId, sourceDraft) + '\n\n' +
 '[이미 있는 주제 — 중복 금지]\n' + avoidTopics.map(function(t){ return ' - ' + t; }).join('\n') + '\n\n' +
 '[요청]\n' +
 '- 새 주제 정확히 ' + count + '개\n' +
-'- topic: 한국어 제목 한 줄. 기존 주제와 표현·핵심 소재가 겹치지 않게\n' +
+'- topic: 한국어 완결 문장. 목적어와 결론이 안에 있게. 「~전에」로만 끝내지 말 것. 은어는 풀어 쓸 것. 기존 주제와 표현·핵심 소재가 겹치지 않게\n' +
 '- angle: 이 주제를 어떤 관점으로 풀지 한 줄\n' +
 buildTopicBrandJsonGuide_(catId) +
 '- 방금 발행한 글을 본 독자가 다음으로 궁금해할 만한 **시리즈 순서**를 이어가세요\n' +
@@ -40764,17 +40801,19 @@ function updateGenIndicator() {
 /** 상단 상태바: 무엇이 생성·재생성 중인지 */
 function genStatusPrefixForJob_(job){
   var kind = job && job.kind;
-  if(kind === 'mango' || kind === 'images' || kind === 'image') return '망고보드 작성 중';
+  if(kind === 'mango') return '망고보드 작성 중';
+  if(kind === 'images' || kind === 'image') return '본문 사진 작성 중';
   if(kind === 'insta') return '인스타 작성 중';
   if(kind === 'threads') return '쓰레드 작성 중';
-  if(kind === 'blog') return '블로그·망고보드 작성 중';
+  if(kind === 'blog') return '블로그 작성 중';
   if(kind === 'community') return '게시판 작성 중';
   if(kind === 'thread') return '일상 공유 작성 중';
   return '초안 작성 중';
 }
 function genStatusBusyLabel_(job){
   var kind = job && job.kind;
-  if(kind === 'mango' || kind === 'images' || kind === 'image') return '망고보드 재생성 중';
+  if(kind === 'mango') return '망고보드 재생성 중';
+  if(kind === 'images' || kind === 'image') return '본문 사진 재생성 중';
   if(kind === 'insta') return '인스타 재생성 중';
   if(kind === 'threads') return '쓰레드 재생성 중';
   if(kind === 'blog') return '블로그 재생성 중';
@@ -40809,7 +40848,7 @@ var jobTopic = draft0.topic;
 
 if(opts.userInitiated){
   var toastLabel = '초안';
-  if(opts.statusKind === 'blog') toastLabel = '블로그·망고보드 초안';
+  if(opts.statusKind === 'blog') toastLabel = '블로그 초안';
   else if(opts.statusKind === 'community') toastLabel = '게시판 초안';
   else if(opts.statusKind === 'thread') toastLabel = '일상 공유 초안';
   setAppToast('백그라운드에서 ' + toastLabel + '을 만들고 있어요.\n다른 카드나 브라우저 탭에서도 순서대로 처리되며, 완료되면 알려드릴게요.', { duration: 3000 });
@@ -40942,7 +40981,7 @@ ${blogGuide}
 
 ${imagePromptGuide}
 
-이 카테고리는 **blog(3단 구조)**와 **images(mangoBrief만, gptVisuals는 [])** 만 만듭니다. insta, notebookLM, community, thread 키는 JSON에 넣지 마세요.
+이 카테고리는 **blog(3단 구조)**와 **본문 사이에 넣을 실사 사진 3장(images.gptVisuals)** 을 만듭니다. 망고보드 7장(mangoBrief)은 필요할 때만 두고, 토큰이 모자라면 null. insta, notebookLM, community, thread 키는 JSON에 넣지 마세요. blog.title은 카드 주제와 같은 주장이어야 합니다.
 
 2026년 봄/초여름 — 주제·각도에 맞을 때만 계절감을 자연스럽게. JSON만 응답:
 {
@@ -40961,7 +41000,7 @@ ${generalImgJsonTail}
 
 [증상 허브 CTA 참고] ${hubCtaHint}
 
-반드시 images.gptVisuals는 **빈 배열 []**. 영문 GPT 이미지 프롬프트 작성 금지. mangoBrief.productName·intro·mangoInputPaste는 **비우지 말 것**(intro=망고보드 소개란용 한글 7장 카피).`;
+images.gptVisuals는 **한글 실사 프롬프트 3장**. 영문만인 문장 금지. mangoBrief는 선택이며, 비우면 null. 채울 때만 소개란용 한글(장별 헤드+짧은 불릿, 블로그 원문 붙여넣기 금지).`;
 } else if(isExpertCourseCategory(catId)){
   const expertImgJsonTail = buildImageGptVisualsJsonExample_(catId, { expert: true });
   const refHint = getDraftReferenceText_(draft)
@@ -40985,7 +41024,7 @@ ${blogGuide}
 
 ${imagePromptGuide}
 
-이 카테고리는 **blog**와 **images(mangoBrief만, gptVisuals는 [])** 만 만듭니다. insta, notebookLM, community, thread 키는 JSON에 넣지 마세요.
+이 카테고리는 **blog**와 **본문 사이에 넣을 실사 사진 3장(images.gptVisuals)** 을 만듭니다. 망고보드 7장(mangoBrief)은 선택입니다. 토큰이 모자라면 null. insta, notebookLM, community, thread 키는 JSON에 넣지 마세요. blog.title은 카드 주제와 같은 주장이어야 합니다.
 
 글 흐름: **영상·사진 맥락(hook) → 시연·핵심 포인트(outline) → 원리 설명(draft, 본문 중심)**
 
@@ -41002,7 +41041,7 @@ JSON만 응답:
 ${expertImgJsonTail}
 }
 
-반드시 images.gptVisuals는 **빈 배열 []**. 영문 GPT 프롬프트 금지. mangoBrief.productName·intro·mangoInputPaste **필수**(intro=망고보드 소개란용 한글).`;
+images.gptVisuals는 **한글 실사 프롬프트 3장**. 영문만인 문장 금지. mangoBrief는 선택이며, 비우면 null. 채울 때만 소개란용 한글(장별 헤드+짧은 불릿).`;
 } else {
   throw new Error('이 카테고리는 자동 초안 생성을 지원하지 않아요.');
 }
@@ -41078,6 +41117,8 @@ if(isThreadCategory(catId)){
 if(!state.published[jobDraftId]) state.published[jobDraftId]={};
 state.published[jobDraftId].content = content;
 state.generatedOnly[jobDraftId] = content;
+var stamped = (cat.drafts || []).find(function(d){ return d && d.id === jobDraftId; }) || draft;
+stampDraftActivity_(stamped);
 clearRefImageFromDraft_(jobDraftId);
 save({ driveImmediate: true, gasImmediate: true });
 var nextTab = isThreadCategory(catId) ? 'thread' : (isHeiljagyaeCategory(catId) ? 'community' : 'blog');

@@ -35706,6 +35706,12 @@ function applyDefaultTopicPhotoModel_(content, catId){
   else if(current !== 'f' && current !== 'm') content.images.photoModel = 'm';
   return content.images.photoModel;
 }
+function topicPhotoCleanLine_(text){
+  return String(text || '')
+    .replace(/^(👉|✅|▶|Step\s*\d+[.:)]?|\d+[.)]|[①②③④⑤⑥⑦⑧⑨⑩]|[-·•])\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 function topicPhotoActionLine_(content, catId){
   var blog = content && content.blog;
   var community = content && content.community;
@@ -35716,11 +35722,31 @@ function topicPhotoActionLine_(content, catId){
     hints.title = String(community.title || hints.title || '');
     hints.problem = String(getCommunityProblemText_(community) || hints.problem || '');
   }
-  var stripRe = /^(👉|✅|▶|Step\s*\d+[.:)]?|\d+[.)]|[①②③④⑤⑥⑦⑧⑨⑩]|[-·•])\s*/i;
-  var steps = [];
-  try { steps = parseSelfCareSteps_(hints.care || ''); } catch(eSteps){ steps = []; }
-  var first = String(steps[0] || hints.expl || hints.problem || hints.title || '편한 범위에서 하는 동작 하나').replace(stripRe, '').replace(/\s+/g, ' ').trim();
-  return first.replace(/[\s.。…]+$/g, '').slice(0, 160);
+  var fromCare = '';
+  if((blog && String(blog.selfCare || '').trim()) || (community && String(community.selfCare || '').trim())){
+    var steps = [];
+    try { steps = parseSelfCareSteps_(hints.care || ''); } catch(eSteps){ steps = []; }
+    fromCare = topicPhotoCleanLine_(steps[0] || hints.care);
+  }
+  var fromOutline = '';
+  if(blog && Array.isArray(blog.outline) && blog.outline.length){
+    fromOutline = blog.outline.map(topicPhotoCleanLine_).filter(Boolean).slice(0, 3).join('. ');
+  }
+  var fromHook = blog ? topicPhotoCleanLine_(blog.hook) : '';
+  var first = fromCare || fromOutline || fromHook || topicPhotoCleanLine_(hints.expl || hints.problem || hints.title || '편한 범위에서 하는 동작 하나');
+  return first.replace(/[\s.。…]+$/g, '').slice(0, 220);
+}
+function topicPhotoSceneLine_(content){
+  var blog = content && content.blog;
+  var raw = '';
+  if(blog){
+    raw = String(blog.hook || '').trim();
+    if(!raw && typeof getGeneralBlogProblemText_ === 'function') raw = String(getGeneralBlogProblemText_(blog) || '').trim();
+    if(!raw) raw = String(blog.problem || '').trim();
+  } else if(content && content.community && typeof getCommunityProblemText_ === 'function'){
+    raw = String(getCommunityProblemText_(content.community) || '').trim();
+  }
+  return topicPhotoCleanLine_(raw).replace(/[\s.。…]+$/g, '').slice(0, 160);
 }
 function topicPhotoSpaceLine_(branch){
   if(branch === 'yaksu'){
@@ -35733,8 +35759,11 @@ function topicPhotoSpaceLine_(branch){
 }
 function topicPhotoPeopleSource_(content, catId, topic){
   var blog = content && content.blog;
-  var bits = [topic || '', topicPhotoActionLine_(content, catId)];
-  if(blog) bits.push(blog.title || '', blog.selfCare || '', blog.explanation || '', blog.problem || '');
+  var bits = [topic || '', topicPhotoActionLine_(content, catId), topicPhotoSceneLine_(content)];
+  if(blog){
+    bits.push(blog.title || '', blog.hook || '', blog.selfCare || '', blog.explanation || '', blog.problem || '', blog.draft || '');
+    if(Array.isArray(blog.outline)) bits.push(blog.outline.join('\n'));
+  }
   try {
     var cat = CATEGORIES[catId];
     var draft = cat && cat.drafts.find(function(d){ return d.id === state.selectedId; });
@@ -35769,6 +35798,60 @@ function topicPhotoPeopleLine_(content, catId, topic){
   if(kind === 'solo-face') return '사람은 한 명. 얼굴이 크게 보이게.';
   return '사람은 한 명. 스스로 하는 동작이 보이게.';
 }
+function topicPhotoIsHandsOn_(text){
+  return /손을|손으로|눌러|짚어|잡아|당겨|스트레칭|따라\s*하|시연|촉진하|가동술/.test(String(text || ''));
+}
+function topicPhotoWantsFigure_(content, catId){
+  var blog = content && content.blog;
+  var community = content && content.community;
+  if(blog && String(blog.selfCare || '').trim()) return false;
+  if(community && String(community.selfCare || '').trim()) return false;
+  var outline = blog && Array.isArray(blog.outline) ? blog.outline.join('\n') : '';
+  var explain = [
+    blog && blog.title,
+    blog && blog.hook,
+    blog && blog.draft,
+    blog && blog.explanation,
+    blog && blog.problem,
+    community && community.title,
+    community && community.explanation
+  ].join('\n');
+  var structural = /구조|해부|골격|메커니즘|정렬|곡선|위치가 달라|위치도 달라|포함해야/.test(explain) ||
+    (/평가/.test(explain) && /구조|자세|위치|포함|경추|골격/.test(explain));
+  if(structural) return true;
+  if(topicPhotoIsHandsOn_(outline)) return false;
+  if(topicPhotoIsHandsOn_(explain) && /따라\s*하|스트레칭|동작/.test(explain)) return false;
+  return false;
+}
+function topicPhotoFigureStyleLine_(catId){
+  var id = parseInt(catId, 10);
+  if(id === 3) return '스타일: 밝은 회백 바탕, 가는 남색 선. 관절이나 뼈는 글에 나온 것만 단순하게.';
+  if(id === 4) return '스타일: 크림 바탕, 가는 올리브 선. 옆얼굴 윤곽과 목의 곡선처럼 글에 나온 관계만.';
+  if(id === 5) return '스타일: 아이보리 바탕, 가는 차콜 선. 포인트는 와인색 선 하나. 몸통의 세로 정렬만.';
+  if(id === 2) return '스타일: 크림 바탕, 부드러운 실루엣, 세이지 선. 옆얼굴과 목만.';
+  if(id === 0) return '스타일: 옅은 회색 바탕, 남색 선. 글이 말하는 관절 하나의 위치만.';
+  return '스타일: 아이보리 바탕, 부드러운 차콜 실루엣. 머리·목·어깨처럼 글이 말하는 자세 하나만.';
+}
+function buildTopicFigurePrompt_(content, catId, topic){
+  var action = topicPhotoActionLine_(content, catId);
+  var scene = topicPhotoSceneLine_(content);
+  var lines = [
+    '4:5 세로. 인물 사진이 아니다. 블로그가 말하는 관계 하나만 보여주는 설명 그림. 같은 그림을 4:5 썸네일 배경으로 쓴다.',
+    '보여줄 관계: ' + (action || topic || '글이 말하는 구조') + '.'
+  ];
+  if(scene && scene !== action && action.indexOf(scene.slice(0, 40)) < 0){
+    lines.push('블로그에서 다루는 장면: ' + scene + '.');
+  }
+  lines.push(
+    topicPhotoFigureStyleLine_(catId),
+    '부위는 글에 나온 것만. 전신 골격, 근육 전부, 단면 해부도는 그리지 않는다.',
+    '글자, 숫자, 화살표 글, 라벨, 로고, 눈금, 자를 넣지 않는다. 설명은 형태만으로 한다.',
+    '그림은 화면 위쪽 절반 안에, 좌우 한가운데에 둔다. 가장자리에는 붙이지 않는다.',
+    '아래쪽 약 40%는 같은 색의 빈 바탕만 둔다. 썸네일이 그 자리에 흰 글자를 올린다. 큰 제목, 짧은 한 줄, 프로그램 이름, 본문이 아래에서 위로 쌓이고, 글 뒤는 프로그램 색의 어두운 그라데이션이다. 선, 뼈, 실루엣, 그림자를 그 구간에 넣지 않는다.',
+    '병원, 침상, 얼굴 클로즈업, 운동복 전신 사진은 넣지 않는다.'
+  );
+  return lines.join('\n');
+}
 function topicPhotoModelLine_(model, peopleKind){
   var who = model === 'f' ? '여성' : '남성';
   if(peopleKind && String(peopleKind).indexOf('pair') === 0){
@@ -35777,22 +35860,30 @@ function topicPhotoModelLine_(model, peopleKind){
   return '모델은 ' + who + '. 얼굴과 체형은 함께 넣은 ' + who + ' 모델 사진을 따른다.';
 }
 function buildTopicPhotoPrompt_(content, catId, topic){
+  if(topicPhotoWantsFigure_(content, catId)) return buildTopicFigurePrompt_(content, catId, topic);
   var branch = topicPhotoBranchKey_(content, catId);
   var action = topicPhotoActionLine_(content, catId);
   var peopleKind = topicPhotoPeopleKind_(topicPhotoPeopleSource_(content, catId, topic), catId);
   var model = topicPhotoModelKey_(content, catId);
-  return [
+  var scene = topicPhotoSceneLine_(content);
+  var lines = [
     '4:5 세로. 수업 중에 휴대폰으로 찍은 듯한 실사 한 장. 블로그에 넣고, 같은 사진을 4:5 썸네일 배경으로 쓴다.',
-    '이 순간의 동작: ' + action + '. 한 장면으로 멈추고, 손과 몸의 위치가 보이게.',
+    '이 순간의 동작: ' + action + '. 한 장면으로 멈추고, 손과 몸의 위치가 보이게.'
+  ];
+  if(scene && scene !== action && action.indexOf(scene.slice(0, 40)) < 0){
+    lines.push('블로그에서 다루는 장면: ' + scene + '.');
+  }
+  lines.push(
     '공간: ' + topicPhotoSpaceLine_(branch),
     topicPhotoModelLine_(model, peopleKind),
     '함께 넣은 공간 사진 여러 장 중 구도 하나만 따른다. 여러 공간을 한 화면에 섞지 않는다. 방에 원래 있는 소품은 치우지 않는다.',
     '복장: 남색 반팔 운동 티, 검은 반바지. 참고 사진의 스크럽·츄리닝·홈웨어는 따르지 않는다.',
-    '카메라는 동작이 크게 보이게 가까이 둔다. 인물과 동작이 화면 너비의 대부분을 채운다. 멀리서 방 전체를 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통과 얼굴의 중심이 세로 가운데선에 온다. 머리가 왼쪽, 다리가 오른쪽으로 치우치지 않는다. 아래쪽 약 4분의 1만 바닥이나 매트로 비워 썸네일 글자 자리로 둔다. 얼굴, 손, 발은 그 글자 자리에 넣지 않는다. 가장자리에 붙이지 않는다.',
+    '카메라는 동작이 크게 보이게 가까이 둔다. 인물과 동작이 화면 너비의 대부분을 채운다. 멀리서 방 전체를 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통과 얼굴의 중심이 세로 가운데선에 온다. 머리가 왼쪽, 다리가 오른쪽으로 치우치지 않는다. 아래쪽 약 40%는 바닥이나 매트만 남긴다. 썸네일이 그 자리에 큰 제목, 짧은 한 줄, 프로그램 이름, 본문과 어두운 그라데이션을 올린다. 얼굴, 손, 발은 그 자리에 넣지 않는다. 가장자리에 붙이지 않는다.',
     '빛은 창으로 들어오는 낮 빛. 피부와 바닥은 실제처럼. 포스터처럼 한가운데 세우거나 윤곽을 깎지 않는다.',
     '사진 안에는 한글, 영문, 숫자, 자막, 제목, 간판 글씨, 화살표, 도표, 해부 그림, 병원 침상, 로고, 워터마크를 새로 그리지 않는다. 벽에 걸린 자격증·약력은 참고 사진의 실제 약력이다. 모자이크나 블러로 가리지 않고 그 자리에 그대로 둔다.',
     topicPhotoPeopleLine_(content, catId, topic)
-  ].join('\n');
+  );
+  return lines.join('\n');
 }
 function ensureTopicPhotoPrompt_(content, topic, catId, force){
   if(!content) return content;
@@ -35809,15 +35900,25 @@ function ensureTopicPhotoPrompt_(content, topic, catId, force){
   var topicLine = topic || (draft && draft.topic) || '';
   var peopleLine = topicPhotoPeopleLine_(content, catId, topicLine);
   var model = topicPhotoModelKey_(content, catId);
+  var actionLine = topicPhotoActionLine_(content, catId);
+  var sceneLine = topicPhotoSceneLine_(content);
   var current = (content.images.gptVisuals || [])[0];
   var promptOk = current && current.role === 'topicPhoto' && current.prompt && current.prompt.indexOf('9:16') < 0 && current.prompt.indexOf('화면 아래쪽') < 0 && current.prompt.indexOf('주제 「') < 0 && current.prompt.indexOf('화면 너비의 대부분') >= 0;
   var peopleOk = !!(current && current.prompt && current.prompt.indexOf(peopleLine) >= 0);
+  var actionOk = !!(current && current.prompt && actionLine && current.prompt.indexOf(actionLine) >= 0);
+  var sceneHead = sceneLine ? sceneLine.slice(0, Math.min(80, sceneLine.length)) : '';
+  var sceneOk = !sceneLine || sceneLine === actionLine || actionLine.indexOf(sceneLine.slice(0, 40)) >= 0 ||
+    !!(current && current.prompt && sceneHead && current.prompt.indexOf(sceneHead) >= 0);
   var modelOk = model === 'f'
     ? !!(current && current.prompt && /여성/.test(current.prompt))
     : !!(current && current.prompt && /남성/.test(current.prompt));
   var spaceOk = !!(current && current.prompt && current.prompt.indexOf(topicPhotoSpaceLine_(topicPhotoBranchKey_(content, catId))) >= 0);
   var credOk = !(current && current.prompt && current.prompt.indexOf('자격증·창 글씨도 따라 적지') >= 0);
-  if(!force && promptOk && peopleOk && modelOk && spaceOk && credOk) return content;
+  var figure = topicPhotoWantsFigure_(content, catId);
+  var figureOk = !!(current && current.prompt && current.prompt.indexOf('설명 그림') >= 0);
+  if(figure){
+    if(!force && figureOk && actionOk && sceneOk) return content;
+  } else if(!force && promptOk && peopleOk && modelOk && spaceOk && credOk && actionOk && sceneOk && !figureOk) return content;
   content.images.gptVisuals = [{
     title: '이미지 생성',
     role: 'topicPhoto',
@@ -35834,8 +35935,12 @@ function renderTopicPhotoCard_(content){
   }
   var st = ensureThumbMakerState_();
   var preview = (st && st.bgDataUrl && st.draftId === state.selectedId && st.fileName === '주제 사진.jpg') ? st.bgDataUrl : '';
+  var figureCard = topicPhotoWantsFigure_(content, state.selectedCatId);
   var html = '';
   html += '<div class="img-section-title">이미지 생성</div>';
+  if(figureCard){
+    html += '<p class="empty-note" style="padding:0 0 8px;line-height:1.5;">이 글은 설명 그림입니다. 선과 바탕은 이미지참고/그림 폴더를 따르고, 아래 40%는 썸네일 제목·한 줄·프로그램·본문 자리로 비웁니다.</p>';
+  }
   html += '<div class="img-tool-card">';
   html += '<div class="topic-photo-bar">';
   html += '<div class="topic-photo-bar-side">';
@@ -35894,15 +35999,17 @@ window.rebuildTopicPhotoPrompt_ = function(){
 function topicPhotoRefUrl_(path){
   return encodeURI(String(path || ''));
 }
-async function topicPhotoBlobToJpegData_(blob, maxEdge){
+async function topicPhotoBlobToJpegData_(blob, maxEdge, maxChars){
   var bmp = await loadBitmapForThumb_(blob);
   var w = bmp.naturalWidth || bmp.width || 1;
   var h = bmp.naturalHeight || bmp.height || 1;
   var edge = maxEdge || 1280;
-  var quality = 0.9;
+  var limit = maxChars || 800000;
+  var quality = limit < 100000 ? 0.74 : 0.9;
   var data = '';
   var guard = 0;
-  while(guard < 4){
+  var guardMax = limit < 100000 ? 8 : 4;
+  while(guard < guardMax){
     var scale = Math.min(1, edge / Math.max(w, h));
     var c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(w * scale));
@@ -35914,22 +36021,23 @@ async function topicPhotoBlobToJpegData_(blob, maxEdge){
     var dataUrl = c.toDataURL('image/jpeg', quality);
     var m = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
     data = m ? m[1] : '';
-    if(!data || data.length <= 800000) break;
-    quality = Math.max(0.72, quality - 0.08);
-    edge = Math.round(edge * 0.85);
+    if(!data || data.length <= limit) break;
+    quality = Math.max(0.5, quality - 0.08);
+    edge = Math.max(160, Math.round(edge * 0.82));
     guard++;
   }
   if(bmp.close){ try { bmp.close(); } catch(eClose){} }
   return data;
 }
-async function loadTopicPhotoRefList_(paths, role, maxCount){
+async function loadTopicPhotoRefList_(paths, role, maxCount, limits){
+  limits = limits || {};
   var out = [];
   for(var i = 0; i < paths.length; i++){
     if(out.length >= maxCount) break;
     try {
       var res = await fetch(topicPhotoRefUrl_(paths[i]), { cache: 'force-cache' });
       if(!res.ok) continue;
-      var data = await topicPhotoBlobToJpegData_(await res.blob(), 1280);
+      var data = await topicPhotoBlobToJpegData_(await res.blob(), limits.edge || 1280, limits.maxChars || 800000);
       if(data) out.push({ mediaType: 'image/jpeg', data: data, role: role });
     } catch(eRef){}
   }
@@ -35974,11 +36082,12 @@ function topicPhotoPickFresh_(slot, names){
   });
   return oldest ? oldest.name : names[0];
 }
-async function topicPhotoLoadOne_(path, role){
-  var rows = await loadTopicPhotoRefList_([path], role, 1);
+async function topicPhotoLoadOne_(path, role, limits){
+  var rows = await loadTopicPhotoRefList_([path], role, 1, limits);
   return rows[0] || null;
 }
-async function loadTopicPhotoRefs_(branch, model, sceneText, peopleKind){
+async function loadTopicPhotoRefs_(branch, model, sceneText, peopleKind, limits){
+  limits = limits || {};
   var place = branch === 'yaksu' ? '약수' : (branch === 'face' ? '페이스' : '인천');
   var spaceNames = place === '약수'
     ? ['01-운동실.jpg', '02-창가.jpg', '03-매트.jpg', '04-기둥.jpg', '05-거울.jpg']
@@ -35989,35 +36098,96 @@ async function loadTopicPhotoRefs_(branch, model, sceneText, peopleKind){
   var spaceOrder = [topicPhotoPickFresh_(spaceSlot, spaceNames)].concat(spaceNames);
   var space = null;
   var spaceName = '';
-  for(var si = 0; si < spaceOrder.length && !space; si++){
-    spaceName = spaceOrder[si];
-    space = await topicPhotoLoadOne_('이미지참고/' + place + '/' + spaceName, 'space');
+  var spacePath = limits.spacePath || '';
+  if(spacePath){
+    spaceName = spacePath.split('/').pop();
+    space = await topicPhotoLoadOne_(spacePath, 'space', limits);
+  } else {
+    for(var si = 0; si < spaceOrder.length && !space; si++){
+      spaceName = spaceOrder[si];
+      spacePath = '이미지참고/' + place + '/' + spaceName;
+      space = await topicPhotoLoadOne_(spacePath, 'space', limits);
+    }
+    if(space) topicPhotoRememberPick_(spaceSlot, spaceName);
   }
   if(!space) throw new Error((place === '페이스' ? '페이스' : place + '점') + ' 참고 사진을 불러오지 못했어요. 이미지참고/' + place + ' 를 확인해 주세요.');
-  topicPhotoRememberPick_(spaceSlot, spaceName);
   var modelDir = model === 'f' ? '이미지참고/모델/여/' : '이미지참고/모델/남/';
   var modelNames = ['01.jpg', '02.jpg', '03.jpg', '04.jpg', '05.jpg', '06.jpg'];
   var modelSlot = 'model:' + (model === 'f' ? 'f' : 'm');
   var modelOrder = [topicPhotoPickFresh_(modelSlot, modelNames)].concat(modelNames);
   var person = null;
   var modelName = '';
-  for(var mi = 0; mi < modelOrder.length && !person; mi++){
-    modelName = modelOrder[mi];
-    person = await topicPhotoLoadOne_(modelDir + modelName, 'model');
-  }
-  if(!person && model !== 'f'){
-    person = await topicPhotoLoadOne_('이미지참고/모델/01.jpg', 'model');
-    modelName = '01.jpg';
+  var modelPath = limits.modelPath || '';
+  if(modelPath){
+    modelName = modelPath.split('/').pop();
+    person = await topicPhotoLoadOne_(modelPath, 'model', limits);
+  } else {
+    for(var mi = 0; mi < modelOrder.length && !person; mi++){
+      modelName = modelOrder[mi];
+      modelPath = modelDir + modelName;
+      person = await topicPhotoLoadOne_(modelPath, 'model', limits);
+    }
+    if(!person && model !== 'f'){
+      modelPath = '이미지참고/모델/01.jpg';
+      modelName = '01.jpg';
+      person = await topicPhotoLoadOne_(modelPath, 'model', limits);
+    }
+    if(person) topicPhotoRememberPick_(modelSlot, modelName);
   }
   if(!person){
     throw new Error(model === 'f'
       ? '여 모델 사진이 없어요. 이미지참고/모델/여 폴더에 올린 뒤 다시 눌러 주세요.'
       : '모델 사진을 불러오지 못했어요. 이미지참고/모델 을 확인해 주세요.');
   }
-  topicPhotoRememberPick_(modelSlot, modelName);
-  return [space, person];
+  return { refs: [space, person], spacePath: spacePath, modelPath: modelPath };
 }
-async function cropDataUrlToFourFive_(dataUrl){
+async function loadTopicFigureStyleRefs_(kind, limits){
+  limits = limits || {};
+  var folder = '이미지참고/그림/' + (kind === '과정' ? '과정' : '일반') + '/';
+  var names = ['01.jpg', '02.jpg', '03.jpg', '04.jpg'];
+  var slot = 'figure:' + (kind === '과정' ? '과정' : '일반');
+  if(limits.stylePath){
+    var fixed = await topicPhotoLoadOne_(limits.stylePath, 'style', limits);
+    return { refs: fixed ? [fixed] : [], stylePath: fixed ? limits.stylePath : '' };
+  }
+  var order = [topicPhotoPickFresh_(slot, names)].concat(names);
+  var hit = null;
+  var name = '';
+  var i;
+  for(i = 0; i < order.length && !hit; i++){
+    name = order[i];
+    hit = await topicPhotoLoadOne_(folder + name, 'style', limits);
+  }
+  if(hit) topicPhotoRememberPick_(slot, name);
+  return { refs: hit ? [hit] : [], stylePath: hit ? (folder + name) : '' };
+}
+function topicPhotoServerLost_(data){
+  return /UNSUPPORTED_ACTION|unknown planner action|unknown action/i.test(String((data && data.message) || ''));
+}
+function plannerGasPostXhr_(url, body, waitMs){
+  return new Promise(function(resolve, reject){
+    if(typeof XMLHttpRequest === 'undefined'){
+      reject(new Error('이 브라우저에서는 이미지 요청을 보내지 못해요.'));
+      return;
+    }
+    var xhr = new XMLHttpRequest();
+    var ms = waitMs || 120000;
+    xhr.open('POST', url, true);
+    xhr.timeout = ms;
+    xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8');
+    xhr.onload = function(){
+      var data = null;
+      try { data = JSON.parse(xhr.responseText || ''); } catch(parseErr){}
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, data: data });
+    };
+    xhr.onerror = function(){ reject(new Error('서버 연결 실패')); };
+    xhr.ontimeout = function(){
+      reject(new Error('서버 응답이 조금 오래 걸려요. (약 ' + Math.round(ms / 1000) + '초)'));
+    };
+    xhr.send(body);
+  });
+}
+async function cropDataUrlToFourFive_(dataUrl, keepBottom){
   var img = await loadBitmapForThumb_(dataUrl);
   var w = img.naturalWidth || img.width || 1;
   var h = img.naturalHeight || img.height || 1;
@@ -36032,7 +36202,7 @@ async function cropDataUrlToFourFive_(dataUrl){
   if(ratio > target + 0.02){
     sh = h; sw = h * target; sx = (w - sw) / 2; sy = 0;
   } else if(ratio < target - 0.02){
-    sw = w; sh = w / target; sx = 0; sy = 0;
+    sw = w; sh = w / target; sx = 0; sy = keepBottom ? Math.max(0, h - sh) : 0;
   }
   var outW = 1080;
   var outH = 1350;
@@ -36081,18 +36251,58 @@ window.generateTopicPhoto_ = async function(btn){
   var branch = topicPhotoBranchKey_(content, state.selectedCatId);
   var model = topicPhotoModelKey_(content, state.selectedCatId);
   var photoEstimateSec = 60;
+  var figure = topicPhotoWantsFigure_(content, state.selectedCatId);
   if(btn) startButtonCountdown_(btn, { estimateSec: photoEstimateSec, busyLabel: '만드는 중', idleText: '이미지 생성' });
-  setAppToast('참고 사진으로 4:5 사진을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.', { duration: 4000, variant: 'ok' });
+  setAppToast(figure
+    ? '블로그 내용으로 설명 그림을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'
+    : '참고 사진으로 4:5 사진을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.', { duration: 4000, variant: 'ok' });
   try {
     var sceneText = topicPhotoPeopleSource_(content, state.selectedCatId, '');
-    var refs = await loadTopicPhotoRefs_(branch, model, sceneText, topicPhotoPeopleKind_(sceneText, state.selectedCatId));
-    var apiPrompt = prompt + '\n\n사진 안에 글자, 숫자, 자막, 제목, 로고를 그리지 않는다. 주제 문장을 사진에 적지 않는다. 카메라는 가까이. 인물과 동작이 화면 너비의 대부분을 채운다. 방 전체를 멀리서 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통 중심이 세로 가운데선에 온다. 아래쪽 약 4분의 1만 바닥으로 비워 썸네일 글자 자리로 둔다. 얼굴, 손, 발은 그 자리에 넣지 않는다. 첨부 사진은 공간 한 장과 모델 한 장이다. 두 방을 섞지 않는다. 모델의 얼굴은 유지하되 옷 색, 머리 정돈, 카메라 높이, 서 있는 방향은 참고 사진과 다르게 한다. 남색 티, 턱에 손을 댄 자세, 목 뒤를 짚는 자세를 기본으로 쓰지 않는다. 4:5 한 장. 위 프롬프트에 적힌 사람 수를 지킨다.';
-    var data = await plannerGasJsonRequest_({
-      action: 'plannerGenerateTopicPhoto',
-      prompt: apiPrompt,
-      aspect: '4:5',
-      images: refs
-    }, 120000);
+    var peopleKind = topicPhotoPeopleKind_(sceneText, state.selectedCatId);
+    var styleKind = isExpertCourseCategory(state.selectedCatId) ? '과정' : '일반';
+    var apiPrompt = figure
+      ? prompt + '\n\n첨부 그림의 선 굵기, 바탕색, 여백만 따른다. 그 그림의 사람, 방, 글자는 따라 그리지 않는다. 인물 실사로 바꾸지 않는다. 글자, 숫자, 화살표, 라벨을 넣지 않는다. 그림은 위쪽 절반에 둔다. 아래쪽 40%는 빈 바탕으로 둔다. 그 자리에 제목·한 줄·프로그램·본문과 어두운 그라데이션이 올라간다.'
+      : prompt + '\n\n사진 안에 글자, 숫자, 자막, 제목, 로고를 그리지 않는다. 주제 문장을 사진에 적지 않는다. 카메라는 가까이. 인물과 동작이 화면 너비의 대부분을 채운다. 방 전체를 멀리서 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통 중심이 세로 가운데선에 온다. 아래쪽 약 40%는 바닥만 남긴다. 그 자리에 큰 제목, 짧은 한 줄, 프로그램 이름, 본문과 어두운 그라데이션이 올라간다. 얼굴, 손, 발은 그 자리에 넣지 않는다. 첨부 사진은 공간 한 장과 모델 한 장이다. 두 방을 섞지 않는다. 모델의 얼굴은 유지하되 옷 색, 머리 정돈, 카메라 높이, 서 있는 방향은 참고 사진과 다르게 한다. 남색 티, 턱에 손을 댄 자세, 목 뒤를 짚는 자세를 기본으로 쓰지 않는다. 4:5 한 장. 위 프롬프트에 적힌 사람 수를 지킨다.';
+    var passes = figure
+      ? [{ edge: 640, maxChars: 40000 }, { edge: 420, maxChars: 18000 }]
+      : [{ edge: 520, maxChars: 26000 }, { edge: 340, maxChars: 12000 }];
+    var data = null;
+    var hold = {};
+    var lost = false;
+    for(var pass = 0; pass < passes.length; pass++){
+      var loaded = figure
+        ? await loadTopicFigureStyleRefs_(styleKind, { edge: passes[pass].edge, maxChars: passes[pass].maxChars, stylePath: hold.stylePath || '' })
+        : await loadTopicPhotoRefs_(branch, model, sceneText, peopleKind, {
+          edge: passes[pass].edge,
+          maxChars: passes[pass].maxChars,
+          spacePath: hold.spacePath || '',
+          modelPath: hold.modelPath || ''
+        });
+      if(figure && (!loaded.refs || !loaded.refs.length)){
+        throw new Error('설명 그림은 스타일 참고가 필요해요. 이미지참고/그림/' + styleKind + ' 폴더에 글자 없는 그림을 넣어 주세요.');
+      }
+      hold.spacePath = loaded.spacePath;
+      hold.modelPath = loaded.modelPath;
+      hold.stylePath = loaded.stylePath;
+      var slim = (loaded.refs || []).map(function(row){
+        return { mediaType: (row && row.mediaType) || 'image/jpeg', data: row && row.data };
+      }).filter(function(row){ return row.data; });
+      var body = plannerGasRequestBody_({
+        action: 'plannerGenerateTopicPhoto',
+        prompt: apiPrompt,
+        aspect: '4:5',
+        images: slim
+      });
+      var pack = await plannerGasPostXhr_(getPlannerGasUrl_(), body, 120000);
+      if(!pack || !pack.data){
+        if(pass === 0) continue;
+        throw new Error(!pack || pack.ok ? '서버 응답 형식 오류' : ('서버 연결 실패 (HTTP ' + ((pack && pack.status) || '?') + ')'));
+      }
+      if(!pack.ok) throw new Error((pack.data && pack.data.message) || ('서버 연결 실패 (HTTP ' + pack.status + ')'));
+      data = pack.data;
+      lost = topicPhotoServerLost_(data);
+      if(!lost) break;
+    }
     applyPlannerServerCaps_(data);
     if(isPlannerAuthError_(data)){
       notifyPlannerAuthError_(data);
@@ -36100,17 +36310,16 @@ window.generateTopicPhoto_ = async function(btn){
     }
     if(!data || data.result !== 'success' || !data.imageBase64){
       var msg = (data && data.message) || '이미지 생성에 실패했어요.';
-      if(/UNSUPPORTED_ACTION|unknown planner action|unknown action/i.test(msg)){
-        msg = '서버 스크립트에 이미지 생성이 아직 없어요. Apps Script를 새로 배포해 주세요.';
-      }
+      if(lost) msg = '사진 요청이 서버까지 도착하지 않았어요. 한 번 더 눌러 주세요.';
       throw new Error(msg);
     }
     var rawUrl = 'data:' + (data.mediaType || 'image/jpeg') + ';base64,' + data.imageBase64;
-    var cropped = await cropDataUrlToFourFive_(rawUrl);
+    var cropped = await cropDataUrlToFourFive_(rawUrl, figure);
     var st = ensureThumbMakerState_();
     st.sizeKey = '4x5';
     st.focusX = 0.5;
-    st.focusY = 0.4;
+    st.focusY = figure ? 0.5 : 0.4;
+    if(figure) st.zoom = 1;
     var sizeEl = document.getElementById('thumb-size');
     if(sizeEl) sizeEl.value = '4x5';
     clearThumbAiUpscaleCache_();
@@ -38965,6 +39174,17 @@ function buildFinalTextForKey_(content, catId, key){
   return '';
 }
 
+function refreshTopicPhotoPromptFromBlog_(content, draftId, catId){
+  if(!content || !content.blog) return false;
+  if(catId == null) catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId || state.selectedId);
+  if(isDailyShareCategory(catId)) return false;
+  var cat = CATEGORIES[catId];
+  var draft = cat && cat.drafts && cat.drafts.find(function(d){ return d && d.id === (draftId || state.selectedId); });
+  var topic = (draft && draft.topic) || String(content.blog.title || '').trim();
+  ensureTopicPhotoPrompt_(content, topic, catId, true);
+  return true;
+}
+
 /** opts.skipDom: 시트가 열려 있지 않을 때(예약 게시 반영) · opts.at: 실제 게시 시각 */
 function commitSheetTabPublish_(draftId, catId, tab, opts){
   opts = opts || {};
@@ -38987,6 +39207,7 @@ function commitSheetTabPublish_(draftId, catId, tab, opts){
   pub.savedAt = opts.at || new Date().toISOString();
   pub.catId = catId;
   alignDraftTopicToBlogTitle_(draftId, content);
+  if(tab === 'blog') refreshTopicPhotoPromptFromBlog_(content, draftId, catId);
   pub.topic = draft ? draft.topic : blogTitleOfContent_(content);
   pub.content = content;
   if(!pub.tabPublished) pub.tabPublished = {};
@@ -39211,6 +39432,7 @@ window.onSheetDraftSave_ = function(){
     return;
   }
   applySheetEditsForTab_(content, tab);
+  var photoFromBlog = tab === 'blog' && refreshTopicPhotoPromptFromBlog_(content, draftId, state.selectedCatId);
   if(isDailyShareCategory(state.selectedCatId)) persistSheetDailyFactsToDraft_();
   persistDraftContent_(draftId, content);
   if(isDailyShareCategory(state.selectedCatId) && tab === 'images'){
@@ -39231,7 +39453,11 @@ window.onSheetDraftSave_ = function(){
       }
     }, 1400);
   }
-  setAppToast('초안을 저장하고 서버에 올렸어요. (발행 아님)', { duration: 3200, variant: 'ok' });
+  setAppToast(photoFromBlog
+    ? (topicPhotoWantsFigure_(content, state.selectedCatId)
+      ? '저장했어요. 이 글은 설명 그림 프롬프트로 다시 썼어요.'
+      : '저장했어요. 수정한 블로그에 맞춰 이미지 프롬프트를 다시 썼어요.')
+    : '초안을 저장하고 서버에 올렸어요. (발행 아님)', { duration: photoFromBlog ? 4200 : 3200, variant: 'ok' });
 };
 
 /** opts.viaApi: PlannerSocial이 API로 이미 올린 뒤 — 발행 기록·다음 채널 초안만 만들고 복사·앱 이동은 하지 않는다 */

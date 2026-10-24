@@ -2041,6 +2041,9 @@ background: linear-gradient(transparent, #F8F7F4);
   cursor: pointer; font-family: inherit;
 }
 .topic-photo-go:disabled { opacity: .55; cursor: default; }
+.topic-photo-nano {
+  background: #fff; color: #111827; border: 1px solid #111827;
+}
 .topic-photo-preview { margin-top: 12px; }
 .topic-photo-preview img {
   width: min(100%, 280px); aspect-ratio: 4 / 5; object-fit: cover;

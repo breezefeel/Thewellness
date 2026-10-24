@@ -36066,6 +36066,7 @@ function renderTopicPhotoCard_(content){
   html += '<div class="topic-photo-bar-side topic-photo-bar-actions">';
   html += '<button type="button" class="img-tool-copy-btn" id="topic-photo-download" onclick="downloadTopicPhoto_()"' + (preview ? '' : ' disabled') + '>다운로드</button>';
   html += '<button type="button" class="topic-photo-go" id="topic-photo-go" onclick="generateTopicPhoto_(this)">이미지 생성</button>';
+  html += '<button type="button" class="topic-photo-go topic-photo-nano" id="topic-photo-nano" data-image-model="gemini-3-pro-image" onclick="generateTopicPhoto_(this)">나노바나나</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="copyCommunityOrDailyImageSlot_(0, this)">프롬프트 복사</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="rebuildTopicPhotoPrompt_()">프롬프트 재생성</button>';
   html += '</div></div>';
@@ -36359,10 +36360,15 @@ window.generateTopicPhoto_ = async function(btn){
   var model = topicPhotoModelKey_(content, state.selectedCatId);
   var photoEstimateSec = 60;
   var figure = topicPhotoWantsFigure_(content, state.selectedCatId);
-  if(btn) startButtonCountdown_(btn, { estimateSec: photoEstimateSec, busyLabel: '만드는 중', idleText: '이미지 생성' });
-  setAppToast(figure
-    ? '블로그 내용으로 설명 그림을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'
-    : '참고 사진으로 4:5 사진을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.', { duration: 4000, variant: 'ok' });
+  var imageModel = btn && btn.getAttribute('data-image-model') || '';
+  var useNanoPro = imageModel === 'gemini-3-pro-image';
+  if(useNanoPro) photoEstimateSec = 70;
+  if(btn) startButtonCountdown_(btn, { estimateSec: photoEstimateSec, busyLabel: '만드는 중', idleText: useNanoPro ? '나노바나나' : '이미지 생성' });
+  setAppToast(useNanoPro
+    ? '나노바나나 프로로 4:5 그림을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'
+    : (figure
+      ? '블로그 내용으로 설명 그림을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'
+      : '참고 사진으로 4:5 사진을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'), { duration: 4000, variant: 'ok' });
   try {
     var sceneText = topicPhotoPeopleSource_(content, state.selectedCatId, '');
     var peopleKind = topicPhotoPeopleKind_(sceneText, state.selectedCatId);
@@ -36398,9 +36404,10 @@ window.generateTopicPhoto_ = async function(btn){
         action: 'plannerGenerateTopicPhoto',
         prompt: apiPrompt,
         aspect: '4:5',
-        images: slim
+        images: slim,
+        imageModel: imageModel
       });
-      var pack = await plannerGasPostXhr_(getPlannerGasUrl_(), body, 120000);
+      var pack = await plannerGasPostXhr_(getPlannerGasUrl_(), body, useNanoPro ? 180000 : 120000);
       if(!pack || !pack.data){
         if(pass === 0) continue;
         throw new Error(!pack || pack.ok ? '서버 응답 형식 오류' : ('서버 연결 실패 (HTTP ' + ((pack && pack.status) || '?') + ')'));

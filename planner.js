@@ -11601,6 +11601,55 @@ function listLocalUserDraftIds_(){
   });
   return ids;
 }
+var PLANNER_ACCEPTED_UPLOADS_KEY_ = 'ht_planner_accepted_uploads_v1';
+function readAcceptedUploadKeys_(){
+  var bag = {};
+  function merge(raw){
+    if(!raw) return;
+    try {
+      var parsed = JSON.parse(raw);
+      if(!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+      Object.keys(parsed).forEach(function(key){ if(key) bag[key] = parsed[key]; });
+    } catch(e){}
+  }
+  try { merge(localStorage.getItem(PLANNER_ACCEPTED_UPLOADS_KEY_)); } catch(eLs){}
+  try { merge(sessionStorage.getItem(PLANNER_ACCEPTED_UPLOADS_KEY_)); } catch(eSs){}
+  return bag;
+}
+function writeAcceptedUploadKeys_(bag){
+  var text = '';
+  try { text = JSON.stringify(bag || {}); } catch(eJson){ return; }
+  try { localStorage.setItem(PLANNER_ACCEPTED_UPLOADS_KEY_, text); } catch(eLs){}
+  try { sessionStorage.setItem(PLANNER_ACCEPTED_UPLOADS_KEY_, text); } catch(eSs){}
+}
+function rememberAcceptedUploadKeys_(keys){
+  if(!keys || !keys.length) return;
+  var bag = readAcceptedUploadKeys_();
+  var now = Date.now();
+  keys.forEach(function(key){ if(key) bag[String(key)] = now; });
+  var names = Object.keys(bag);
+  if(names.length > 500){
+    names.sort(function(a, b){ return (parseInt(bag[a], 10) || 0) - (parseInt(bag[b], 10) || 0); });
+    names.slice(0, names.length - 500).forEach(function(key){ delete bag[key]; });
+  }
+  writeAcceptedUploadKeys_(bag);
+}
+function forgetAcceptedUploadKeysOnServer_(index){
+  var bag = readAcceptedUploadKeys_();
+  var names = Object.keys(bag);
+  if(!names.length) return;
+  var live = {};
+  (index || []).forEach(function(row){
+    if(row && row.key && !row.deleted) live[String(row.key)] = true;
+  });
+  var changed = false;
+  names.forEach(function(key){
+    if(!live[key]) return;
+    delete bag[key];
+    changed = true;
+  });
+  if(changed) writeAcceptedUploadKeys_(bag);
+}
 function classifyTopicGap_(spec){
   spec = spec || {};
   var outbox = spec.outbox || [];
@@ -11712,6 +11761,14 @@ function applyTopicGapDecision_(detail, index){
     decision.receive = false;
     decision.adoptSurface = false;
   }
+  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerTopicGapUploadKeys){
+    decision.uploadKeys = PlannerSyncRules.plannerTopicGapUploadKeys({
+      uploadKeys: decision.uploadKeys,
+      outbox: state.syncOutbox || [],
+      serverRev: serverRev,
+      acceptedKeys: readAcceptedUploadKeys_()
+    });
+  }
   detail.ambiguousKeys = decision.askKeys;
   state._topicListGap = decision.askKeys.length > 0 && !plannerSyncConflictPending_;
   state._topicListGapCount = decision.askKeys.length;
@@ -11773,6 +11830,7 @@ function applyTopicGapDecision_(detail, index){
   return state._topicListGap;
 }
 function finishTopicListCheck_(index){
+  forgetAcceptedUploadKeysOnServer_(index);
   var local = listLocalUserDraftIds_();
   var serverLive = {};
   var serverDeleted = {};
@@ -12092,13 +12150,20 @@ function dropTopicGapDraftLocally_(id){
 function queueTopicGapEntity_(key, deleted, baseRev, explicitValue){
   if(!key) return;
   if(!Array.isArray(state.syncOutbox)) state.syncOutbox = [];
-  var entities = {};
-  try { entities = collectSyncEntities_(getPersistPayload(), { skipEnsureIds: true }) || {}; } catch(eEnt){}
-  var hasValue = Object.prototype.hasOwnProperty.call(entities, key);
   var existing = null;
   state.syncOutbox.forEach(function(op){
     if(op && op.key === key) existing = op;
   });
+  var requestedBase = parseInt(baseRev, 10) || 0;
+  var alreadyQueued = !deleted && explicitValue === undefined && existing && (
+    (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerQueuedTopicStable)
+      ? PlannerSyncRules.plannerQueuedTopicStable(existing, requestedBase)
+      : (!!existing.mutationId && (parseInt(existing.baseEntityRevision, 10) || 0) >= requestedBase)
+  );
+  if(alreadyQueued) return;
+  var entities = {};
+  try { entities = collectSyncEntities_(getPersistPayload(), { skipEnsureIds: true }) || {}; } catch(eEnt){}
+  var hasValue = Object.prototype.hasOwnProperty.call(entities, key);
   var op = existing || {
     mutationId: makePlannerMutationId_(),
     version: 1,
@@ -18052,7 +18117,9 @@ function enqueueSyncOutboxChanges_(changedKeys, payload){
   rebuildDirtyStateFromOutbox_();
 }
 function ensureOutboxFromLegacyDirty_(payload){
-  state.syncOutbox = normalizeSyncOutbox_(state.syncOutbox);
+  var raw = state.syncOutbox || [];
+  var alreadyShaped = raw.length > 0 && raw.every(function(op){ return op && op.key && op.mutationId; });
+  state.syncOutbox = normalizeSyncOutbox_(raw, alreadyShaped ? { skipClone: true } : null);
   if(Array.isArray(state.syncOutbox) && state.syncOutbox.length) return;
   var keys = Object.keys(state.syncDirtyEntityKeys || {});
   if(keys.length) enqueueSyncOutboxChanges_(keys, payload || getPersistPayload());
@@ -18145,6 +18212,15 @@ function replaceSyncDataUrl_(fromUrl, toUrl){
   } catch(eWalk){}
   return n;
 }
+function releaseCanvas_(canvas){
+  if(!canvas) return;
+  try { canvas.width = 0; canvas.height = 0; } catch(eCanvas){}
+}
+function releaseBitmap_(bmp){
+  if(!bmp) return;
+  if(typeof bmp.close === 'function'){ try { bmp.close(); } catch(eClose){} }
+  try { if(bmp.src) bmp.src = ''; } catch(eSrc){}
+}
 function compressDataUrlUnderLimit_(dataUrl, maxChars){
   maxChars = parseInt(maxChars, 10) || syncBlobMaxChars_();
   return new Promise(function(resolve, reject){
@@ -18153,14 +18229,26 @@ function compressDataUrlUnderLimit_(dataUrl, maxChars){
       return;
     }
     var img = new Image();
+    var settled = false;
+    function finish(err, url){
+      if(settled) return;
+      settled = true;
+      img.onload = null;
+      img.onerror = null;
+      releaseBitmap_(img);
+      if(err) reject(err);
+      else resolve(url || '');
+    }
     img.onload = function(){
       var w = img.naturalWidth || img.width || 1;
       var h = img.naturalHeight || img.height || 1;
       var scale = Math.min(1, 1600 / Math.max(w, h, 1));
       var quality = 0.82;
+      var best = '';
       function attempt(){
+        var canvas = null;
         try {
-          var canvas = document.createElement('canvas');
+          canvas = document.createElement('canvas');
           canvas.width = Math.max(1, Math.round(w * scale));
           canvas.height = Math.max(1, Math.round(h * scale));
           var ctx = canvas.getContext('2d');
@@ -18168,43 +18256,87 @@ function compressDataUrlUnderLimit_(dataUrl, maxChars){
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           var url = canvas.toDataURL('image/jpeg', quality);
-          if(url && url.length <= maxChars){ resolve(url); return; }
+          releaseCanvas_(canvas);
+          canvas = null;
+          if(url && (!best || url.length < best.length)) best = url;
+          if(url && url.length <= maxChars){
+            best = '';
+            finish(null, url);
+            return;
+          }
+          url = '';
           if(quality > 0.46){ quality -= 0.08; attempt(); return; }
           if(scale > 0.28){ scale *= 0.72; quality = 0.7; attempt(); return; }
-          resolve(url && url.length < dataUrl.length ? url : '');
+          var kept = best && best.length < dataUrl.length ? best : '';
+          best = '';
+          finish(null, kept);
         } catch(err){
-          reject(err);
+          releaseCanvas_(canvas);
+          best = '';
+          finish(err);
         }
       }
       attempt();
     };
-    img.onerror = function(){ reject(new Error('사진을 줄이지 못했어요')); };
+    img.onerror = function(){ finish(new Error('사진을 줄이지 못했어요')); };
     img.src = dataUrl;
   });
 }
+var _syncBlobCompressQueue_ = [];
+var _syncBlobCompressActive_ = null;
 function scheduleSyncBlobCompress_(blob){
+  if(state && state._plannerSafeMode) return;
   var hash = String((blob && blob.hash) || '');
-  if(!hash || _syncBlobCompressing_[hash]) return;
+  if(!hash || !blob || !blob.data || _syncBlobCompressing_[hash]) return;
   _syncBlobCompressing_[hash] = true;
-  var original = String(blob.data || '');
-  compressDataUrlUnderLimit_(original, syncBlobMaxChars_()).then(function(next){
-    if(!next || next.length > syncBlobMaxChars_()){
+  _syncBlobCompressQueue_.push({ hash: hash, data: blob.data });
+  pumpSyncBlobCompress_();
+}
+function pumpSyncBlobCompress_(){
+  if(state && state._plannerSafeMode){
+    _syncBlobCompressQueue_ = [];
+    _syncBlobCompressActive_ = null;
+    return;
+  }
+  if(_syncBlobCompressActive_) return;
+  var next = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerNextBlobCompress)
+    ? PlannerSyncRules.plannerNextBlobCompress(_syncBlobCompressQueue_, false)
+    : (_syncBlobCompressQueue_[0] || null);
+  if(!next) return;
+  var idx = _syncBlobCompressQueue_.indexOf(next);
+  if(idx >= 0) _syncBlobCompressQueue_.splice(idx, 1);
+  else _syncBlobCompressQueue_.shift();
+  var hash = String(next.hash || '');
+  var original = next.data;
+  next.data = '';
+  _syncBlobCompressActive_ = hash || true;
+  compressDataUrlUnderLimit_(original, syncBlobMaxChars_()).then(function(compressed){
+    _syncBlobCompressActive_ = null;
+    if(!compressed || compressed.length > syncBlobMaxChars_()){
       _syncBlobCompressing_[hash] = 'failed';
-      noteRejectedSyncBlob_(blob, '사진을 2.2MB 아래로 줄이지 못했어요. 더 작은 사진으로 다시 올려 주세요. 이 사진은 동기화에서 빠집니다.');
+      original = '';
+      noteRejectedSyncBlob_({ hash: hash }, '사진을 2.2MB 아래로 줄이지 못했어요. 더 작은 사진으로 다시 올려 주세요. 이 사진은 동기화에서 빠집니다.');
+      pumpSyncBlobCompress_();
       return;
     }
     _syncBlobCompressing_[hash] = false;
-    replaceSyncDataUrl_(original, next);
+    replaceSyncDataUrl_(original, compressed);
+    original = '';
+    compressed = '';
     try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true }); } catch(eSaveBlob){}
     if(typeof setAppToast === 'function'){
       setAppToast('큰 사진을 줄여 동기화 대기열에 넣었어요.', { duration: 4200, variant: 'ok' });
     }
-    if(plannerSyncBootstrapReady_ && !plannerSyncConflictPending_){
+    if(plannerSyncBootstrapReady_ && !plannerSyncConflictPending_ && !(state && state._plannerSafeMode)){
       try { schedulePlannerGasPush_(true); } catch(ePushBlob){}
     }
+    pumpSyncBlobCompress_();
   }).catch(function(){
+    _syncBlobCompressActive_ = null;
     _syncBlobCompressing_[hash] = 'failed';
-    noteRejectedSyncBlob_(blob, '사진을 줄이지 못했어요. 더 작은 사진으로 다시 올려 주세요. 이 사진은 동기화에서 빠집니다.');
+    original = '';
+    noteRejectedSyncBlob_({ hash: hash }, '사진을 줄이지 못했어요. 더 작은 사진으로 다시 올려 주세요. 이 사진은 동기화에서 빠집니다.');
+    pumpSyncBlobCompress_();
   });
 }
 function queueSyncBlobMutations_(blobs){
@@ -18280,6 +18412,7 @@ function buildPendingSyncMutations_(payload){
     if(!sorted[i] || !sorted[i].key) continue;
     var mut = toPlannerSyncMutation_(sorted[i]);
     if(!mut.deleted && String(mut.key).indexOf('blob:') !== 0 && syncMutationBytes_(mut) > SYNC_INLINE_BINARY_MAX_){
+      if(state && state._plannerSafeMode) continue;
       try {
         var splitBin = splitSyncBinaries_(mut.value);
         mut.value = splitBin.value;
@@ -18422,6 +18555,7 @@ function acknowledgeSyncOutbox_(accepted, sentMutations, holdKeys){
   var filter = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerFilterAckedOutbox)
     ? PlannerSyncRules.plannerFilterAckedOutbox
     : null;
+  var beforeOps = (state.syncOutbox || []).slice();
   if(filter){
     state.syncOutbox = filter(state.syncOutbox || [], {
       ack: ackVer,
@@ -18429,6 +18563,9 @@ function acknowledgeSyncOutbox_(accepted, sentMutations, holdKeys){
       holdKeys: holdKeys || {},
       isDeviceLocal: isDeviceLocalSyncEntityKey_
     });
+  }
+  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerAcceptedUploadKeys){
+    try { rememberAcceptedUploadKeys_(PlannerSyncRules.plannerAcceptedUploadKeys(beforeOps, state.syncOutbox, ackVer)); } catch(eAcc){}
   }
   rebuildDirtyStateFromOutbox_();
   _syncFastAckPending_ = false;
@@ -24937,7 +25074,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=401').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=402').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -24964,8 +25101,39 @@ function setupPlannerServiceWorker_(){
   }
 }
 
+var PLANNER_BOOT_CRASH_KEY_ = 'ht_planner_boot_crash_v1';
+function plannerReadBootCrashCount_(){
+  var n = 0;
+  try { n = Math.max(n, parseInt(sessionStorage.getItem(PLANNER_BOOT_CRASH_KEY_), 10) || 0); } catch(eSs){}
+  try { n = Math.max(n, parseInt(localStorage.getItem(PLANNER_BOOT_CRASH_KEY_), 10) || 0); } catch(eLs){}
+  return n;
+}
+function plannerWriteBootCrashCount_(n){
+  var s = String(parseInt(n, 10) || 0);
+  try { sessionStorage.setItem(PLANNER_BOOT_CRASH_KEY_, s); } catch(eSs){}
+  try { localStorage.setItem(PLANNER_BOOT_CRASH_KEY_, s); } catch(eLs){}
+}
+function armPlannerCrashGuard_(){
+  var prev = plannerReadBootCrashCount_();
+  var next = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerBootCrashState)
+    ? PlannerSyncRules.plannerBootCrashState(prev, { limit: 3 })
+    : { count: prev + 1, safeMode: (prev + 1) >= 3, clearAfterMs: 12000 };
+  plannerWriteBootCrashCount_(next.count);
+  state._plannerSafeMode = !!next.safeMode;
+  var wait = parseInt(next.clearAfterMs, 10) || 12000;
+  setTimeout(function(){ plannerWriteBootCrashCount_(0); }, wait);
+}
+function plannerSkipDeepLink_(){
+  return !!(state && state._plannerSafeMode);
+}
+function clearOpenDeepLinkHash_(){
+  var h = (location.hash || '').replace(/^#/, '');
+  if(!/^open\//.test(h)) return;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch(eHash){}
+}
 // ── Init ──
 window.onload = () => {
+  armPlannerCrashGuard_();
   consumePlannerTeamInvite_();
   if(readCachedDriveToken_()) hideDriveOAuthBusy_();
   var oauthHashEarly = readDriveOAuthHash_();
@@ -24998,6 +25166,9 @@ window.onload = () => {
         try { updateAddButtonVisibility_(); } catch(e5){}
         try { renderMain(); } catch(e6){}
         state._bootFirstPaintDone = true;
+        if(state._plannerSafeMode && typeof setAppToast === 'function'){
+          setAppToast('이 탭이 반복해서 다시 시작돼 이미지 화면과 큰 사진 줄이기를 잠시 건너뜁니다. 이 기기의 수정은 그대로 둡니다.', { duration: 6400, variant: 'ok' });
+        }
         try { document.documentElement.classList.add('planner-ready'); } catch(e7){}
         setTimeout(function(){ try { runDeferredBootMigrations_(); } catch(e){} }, 600);
         setTimeout(function(){ try { runPlannerBootstrapSync_(); } catch(e2){} }, 1200);
@@ -32571,6 +32742,10 @@ function closeSheetUiOnly_(){
   }, 280);
 }
 function onPlannerHashChange_(){
+  if(plannerSkipDeepLink_()){
+    clearOpenDeepLinkHash_();
+    return;
+  }
   if(detailHashSyncLock_) return;
   var h = (location.hash || '').replace(/^#/, '');
   var m = h.match(/^open\/([^/]+)\/(\d+)(?:\/([a-z]+))?$/);
@@ -32622,6 +32797,10 @@ function openNextPublishRecommendationFromEntry_(fallbackDraftId, fallbackCatId)
   return false;
 }
 function consumeDeepLinkFromHash_(){
+  if(plannerSkipDeepLink_()){
+    clearOpenDeepLinkHash_();
+    return;
+  }
   var h = (location.hash || '').replace(/^#/, '');
   var m = h.match(/^open\/([^/]+)\/(\d+)(?:\/([a-z]+))?$/);
   if(!m) return;
@@ -34050,6 +34229,10 @@ function paintDraftSavedThumbFallback_(list){
 function renderThumbGalleryStrip_(){
   var root = document.getElementById('thumb-gallery-strip');
   if(!root) return;
+  if(state && state._plannerSafeMode){
+    root.textContent = '반복 재시작을 감지해 최근 사진은 열지 않습니다.';
+    return;
+  }
   loadThumbGallery_().then(function(list){
     var st = ensureThumbMakerState_();
     var photoOnly = isThumbPhotoOnlyMode_();
@@ -35752,7 +35935,7 @@ function renderThumbMakerCard_(content){
   html += '<textarea id="thumb-body" rows="3" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'body\')" onblur="onThumbMakerFieldBlur_()">' + escapeHtml(copy.body) + '</textarea>';
   }
   var savedThumb = content && content.images && content.images.thumbMakerSaved;
-  if(savedThumb && savedThumb.dataUrl){
+  if(savedThumb && savedThumb.dataUrl && !(state && state._plannerSafeMode)){
     html += '<div class="thumb-maker-saved-box">';
     html += '<div class="thumb-maker-saved-hd">' + (photoOnly ? '초안에 저장된 4:5 JPEG' : '초안에 저장된 썸네일');
     if(savedThumb.savedAt){
@@ -35785,6 +35968,7 @@ function renderThumbMakerCard_(content){
 }
 
 function scheduleThumbMakerInit_(){
+  if(state && state._plannerSafeMode) return;
   if(!document.getElementById('thumb-preview-canvas')) return;
   syncStickyCatNavOffset_();
   setTimeout(function(){
@@ -36546,6 +36730,7 @@ window.refreshThumbMakerFromTopic_ = function(){
 };
 
 async function paintThumbMakerPreview_(){
+  if(state && state._plannerSafeMode) return;
   var canvas = document.getElementById('thumb-preview-canvas');
   if(!canvas) return;
   var st = ensureThumbMakerState_();
@@ -37136,6 +37321,7 @@ function renderTopicPhotoCard_(content){
   }
   var st = ensureThumbMakerState_();
   var preview = (st && st.bgDataUrl && st.draftId === state.selectedId && st.fileName === '주제 사진.jpg') ? st.bgDataUrl : '';
+  if(state && state._plannerSafeMode) preview = '';
   var html = '';
   html += '<div class="img-section-title">이미지 생성</div>';
   html += '<p class="empty-note" style="padding:0 0 8px;line-height:1.5;">1순위는 보관함 실사입니다. 해부 일러스트는 GPT, 인물은 나노바나나입니다. 인물은 앞의 둘이 안 맞을 때만.</p>';
@@ -37170,6 +37356,11 @@ function renderTopicPhotoCard_(content){
 function fillTopicPhotoPreview_(dataUrl){
   var box = document.getElementById('topic-photo-preview');
   var dl = document.getElementById('topic-photo-download');
+  if(state && state._plannerSafeMode){
+    if(dl) dl.disabled = true;
+    if(box) box.textContent = '반복 재시작을 감지해 사진은 열지 않습니다. 이 기기의 수정은 그대로 둡니다.';
+    return;
+  }
   if(dl) dl.disabled = !dataUrl;
   if(!box) return;
   if(!dataUrl){
@@ -37231,14 +37422,17 @@ async function topicPhotoBlobToJpegData_(blob, maxEdge, maxChars){
     if(ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(bmp, 0, 0, c.width, c.height);
     var dataUrl = c.toDataURL('image/jpeg', quality);
+    releaseCanvas_(c);
+    c = null;
     var m = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
+    dataUrl = '';
     data = m ? m[1] : '';
     if(!data || data.length <= limit) break;
     quality = Math.max(0.5, quality - 0.08);
     edge = Math.max(160, Math.round(edge * 0.82));
     guard++;
   }
-  if(bmp.close){ try { bmp.close(); } catch(eClose){} }
+  releaseBitmap_(bmp);
   return data;
 }
 async function loadTopicPhotoRefList_(paths, role, maxCount, limits){
@@ -37555,14 +37749,14 @@ function ensureTopicPhotoModelStatus_(){
   }).catch(function(){});
 }
 async function cropDataUrlToFourFive_(dataUrl){
-  if(!dataUrl) return dataUrl;
+  if(!dataUrl || (state && state._plannerSafeMode)) return dataUrl;
   var img = await loadBitmapForThumb_(dataUrl);
   var w = img.naturalWidth || img.width || 1;
   var h = img.naturalHeight || img.height || 1;
   var target = 4 / 5;
   var ratio = w / h;
   if(Math.abs(ratio - target) <= 0.02){
-    if(img.close){ try { img.close(); } catch(eClose){} }
+    releaseBitmap_(img);
     return dataUrl;
   }
   var sw = w, sh = h, sx = 0, sy = 0;
@@ -37586,8 +37780,10 @@ async function cropDataUrlToFourFive_(dataUrl){
   ctx.imageSmoothingEnabled = true;
   if(ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
-  if(img.close){ try { img.close(); } catch(eClose2){} }
-  return c.toDataURL('image/jpeg', 0.92);
+  releaseBitmap_(img);
+  var cropped = c.toDataURL('image/jpeg', 0.92);
+  releaseCanvas_(c);
+  return cropped;
 }
 window.generateTopicPhoto_ = async function(btn){
   if(btn && btn.disabled) return;

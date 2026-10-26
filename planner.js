@@ -13316,6 +13316,11 @@ function plannerOverlayIsOpen_(id){
 }
 /** Escape — z-index 높은 것부터 (누락 노드·순서 오류 방지) */
 function closeTopmostPlannerOverlay_(){
+  // 내 사진 고르기는 시트보다 위 (z=3600)
+  if(plannerOverlayIsOpen_('my-thumbs-overlay')){
+    if(typeof closeMyThumbsPicker_ === 'function') closeMyThumbsPicker_();
+    return true;
+  }
   // #api-modal z=360 (기획/프롬프트보다 위)
   if(plannerOverlayIsOpen_('api-modal')){
     closeApiModal();
@@ -35318,7 +35323,7 @@ function renderThumbMakerCard_(content){
         ? (thumbStep
           ? '릴스에서 고른 <strong>대표 장면</strong>으로 썸네일을 이어 만듭니다. 추천 컷을 바꾸거나 후킹·구도를 수정하세요.'
           : '키워드와 맞는 <strong>사진·영상 장면</strong>을 고른 뒤 후킹·슬로건·브랜드를 수정합니다. 폴더를 고르면 그 안 미디어를 훑습니다.')
-        : '사진 위에 <strong>주제 후킹</strong>을 크게 올립니다. 미리보기에서 드래그로 초점, 글자를 누르면 입력칸으로 이동합니다.')) +
+        : '사진 위에 <strong>주제 후킹</strong>을 크게 올립니다. 배경은 올리거나 <strong>내 사진</strong>에서 고릅니다. 미리보기에서 드래그로 초점, 글자를 누르면 입력칸으로 이동합니다.')) +
     '</p>';
   html += '<div class="img-tool-card thumb-maker-card">';
   html += '<div class="thumb-maker-grid">';
@@ -35343,6 +35348,7 @@ function renderThumbMakerCard_(content){
     html += '<label class="thumb-maker-photo-btn" for="thumb-photo-input">' + (photoOnly ? '사진 올리기' : '배경 사진 올리기') + '</label>';
     html += '<input type="file" id="thumb-photo-input" accept="image/jpeg,image/png,image/webp,image/*" style="display:none" onchange="onThumbMakerPhoto_(event)">';
   }
+  html += '<button type="button" class="thumb-maker-photo-btn" id="thumb-photo-mine" onclick="openMyThumbsPicker_()">내 사진</button>';
   if(refCount){
     html += '<button type="button" class="img-tool-copy-btn" onclick="useDraftRefPhotoForThumb_(0)">초안 사진 쓰기' + (refCount > 1 ? ' (' + refCount + ')' : '') + '</button>';
   }
@@ -36131,6 +36137,17 @@ window.onThumbMakerPhoto_ = async function(ev){
     setAppToast((err && err.message) || '사진 업로드에 실패했어요. JPEG/PNG를 권장합니다.', { duration: 3200, variant: 'err' });
   }
   if(input) input.value = '';
+};
+
+/** 동기화된 보관함 사진. 파일로 올린 배경과 같은 준비·미리보기·저장 경로 */
+window.applyLibraryPhotoToThumbMaker_ = async function(dataUrl, fileName){
+  if(!dataUrl) throw new Error('사진을 읽지 못했어요.');
+  var name = fileName || '내 사진.jpg';
+  var payload = await prepareThumbBackgroundPayload_(dataUrl, name);
+  var prepared = 'data:' + (payload.mediaType || 'image/jpeg') + ';base64,' + payload.data;
+  clearThumbAiUpscaleCache_();
+  await setThumbMakerBackgroundFromDataUrl_(prepared, payload.name || name);
+  setAppToast('배경 사진을 올렸어요.', { duration: 1800, variant: 'ok' });
 };
 
 window.useDraftRefPhotoForThumb_ = async function(index, opts){

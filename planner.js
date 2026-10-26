@@ -24638,7 +24638,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=396').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=397').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -36330,32 +36330,49 @@ function topicPhotoWantsFigure_(content, catId){
   if(topicPhotoIsHandsOn_(explain) && /따라\s*하|스트레칭|동작/.test(explain)) return false;
   return false;
 }
+function topicPhotoSceneExtra_(action, scene){
+  var a = String(action || '');
+  var s = String(scene || '');
+  if(!s || s === a) return '';
+  if(a.indexOf(s.slice(0, 40)) >= 0) return '';
+  return s;
+}
+function topicPhotoShortClause_(text, maxLen){
+  var line = String(text || '').split(/[.。\n]/)[0].replace(/[\s,，.。]+$/g, '').trim();
+  var cap = maxLen || 70;
+  if(line.length > cap) line = line.slice(0, cap).replace(/\s+\S*$/, '').trim();
+  return line;
+}
+function topicPhotoLibraryHint_(action, scene){
+  var move = topicPhotoShortClause_(action, 70) || '주제와 같은 동작';
+  var extra = topicPhotoSceneExtra_(action, scene);
+  var place = extra ? topicPhotoShortClause_(extra, 46) : '';
+  if(place && move.indexOf(place.slice(0, 12)) >= 0) place = '';
+  return place ? (move + ' · ' + place) : move;
+}
 function topicPhotoFigureStyleLine_(catId){
-  var id = parseInt(catId, 10);
-  if(id === 3) return '스타일: 밝은 회백 바탕, 가는 남색 선. 관절이나 뼈는 글에 나온 것만 단순하게.';
-  if(id === 4) return '스타일: 크림 바탕, 가는 올리브 선. 옆얼굴 윤곽과 목의 곡선처럼 글에 나온 관계만.';
-  if(id === 5) return '스타일: 아이보리 바탕, 가는 차콜 선. 포인트는 와인색 선 하나. 몸통의 세로 정렬만.';
-  if(id === 2) return '스타일: 크림 바탕, 부드러운 실루엣, 세이지 선. 옆얼굴과 목만.';
-  if(id === 0) return '스타일: 옅은 회색 바탕, 남색 선. 글이 말하는 관절 하나의 위치만.';
-  return '스타일: 아이보리 바탕, 부드러운 차콜 실루엣. 머리·목·어깨처럼 글이 말하는 자세 하나만.';
+  return '의학 도감. 뼈와 실루엣만. 아이보리 바탕. 근육·피·장기 없음. 세이지 안내선, 앰버 #b06d1a 포인트 하나.';
+}
+function topicPhotoPromptSection_(prompt, startMark, endMark){
+  var text = String(prompt || '');
+  var start = text.indexOf(startMark);
+  if(start < 0) return '';
+  var end = endMark ? text.indexOf(endMark, start + startMark.length) : -1;
+  return text.slice(start, end < 0 ? text.length : end).trim();
 }
 function buildTopicFigurePrompt_(content, catId, topic){
   var action = topicPhotoActionLine_(content, catId);
-  var scene = topicPhotoSceneLine_(content);
+  var scene = topicPhotoSceneExtra_(action, topicPhotoSceneLine_(content));
   var lines = [
-    '4:5 세로. 인물 사진이 아니다. 블로그가 말하는 관계 하나만 보여주는 설명 그림. 같은 그림을 4:5 썸네일 배경으로 쓴다.',
+    '4:5 세로. 인물 사진이 아니다. 관계 하나만 보여주는 설명 그림. 같은 그림을 4:5 썸네일 배경으로 쓴다.',
     '보여줄 관계: ' + (action || topic || '글이 말하는 구조') + '.'
   ];
-  if(scene && scene !== action && action.indexOf(scene.slice(0, 40)) < 0){
-    lines.push('블로그에서 다루는 장면: ' + scene + '.');
-  }
+  if(scene) lines.push('다루는 장면: ' + scene + '.');
   lines.push(
     topicPhotoFigureStyleLine_(catId),
     '부위는 글에 나온 것만. 전신 골격, 근육 전부, 단면 해부도는 그리지 않는다.',
-    '글자, 숫자, 화살표 글, 라벨, 로고, 눈금, 자를 넣지 않는다. 설명은 형태만으로 한다.',
-    '그림은 화면 위쪽 절반 안에, 좌우 한가운데에 둔다. 가장자리에는 붙이지 않는다.',
-    '아래쪽 약 40%는 같은 색의 빈 바탕만 둔다. 썸네일이 그 자리에 흰 글자를 올린다. 큰 제목, 짧은 한 줄, 프로그램 이름, 본문이 아래에서 위로 쌓이고, 글 뒤는 프로그램 색의 어두운 그라데이션이다. 선, 뼈, 실루엣, 그림자를 그 구간에 넣지 않는다.',
-    '병원, 침상, 얼굴 클로즈업, 운동복 전신 사진은 넣지 않는다.'
+    '글자, 숫자, 화살표, 라벨, 로고를 넣지 않는다.',
+    '그림은 위쪽 절반, 좌우 한가운데. 아래 약 40%는 빈 바탕. 그 자리에 썸네일 글자가 올라간다.'
   );
   return lines.join('\n');
 }
@@ -36366,31 +36383,42 @@ function topicPhotoModelLine_(model, peopleKind){
   }
   return '모델은 ' + who + '. 얼굴과 체형은 함께 넣은 ' + who + ' 모델 사진을 따른다.';
 }
-function buildTopicPhotoPrompt_(content, catId, topic){
-  if(topicPhotoWantsFigure_(content, catId)) return buildTopicFigurePrompt_(content, catId, topic);
+function buildTopicPersonPrompt_(content, catId, topic){
   var branch = topicPhotoBranchKey_(content, catId);
   var action = topicPhotoActionLine_(content, catId);
   var peopleKind = topicPhotoPeopleKind_(topicPhotoPeopleSource_(content, catId, topic), catId);
   var model = topicPhotoModelKey_(content, catId);
-  var scene = topicPhotoSceneLine_(content);
+  var scene = topicPhotoSceneExtra_(action, topicPhotoSceneLine_(content));
   var lines = [
-    '4:5 세로. 수업 중에 휴대폰으로 찍은 듯한 실사 한 장. 블로그에 넣고, 같은 사진을 4:5 썸네일 배경으로 쓴다.',
+    '4:5 세로. 수업 중에 휴대폰으로 찍은 듯한 실사 한 장. 타이트한 구도. 같은 사진을 4:5 썸네일 배경으로 쓴다.',
     '이 순간의 동작: ' + action + '. 한 장면으로 멈추고, 손과 몸의 위치가 보이게.'
   ];
-  if(scene && scene !== action && action.indexOf(scene.slice(0, 40)) < 0){
-    lines.push('블로그에서 다루는 장면: ' + scene + '.');
-  }
+  if(scene) lines.push('다루는 장면: ' + scene + '.');
   lines.push(
     '공간: ' + topicPhotoSpaceLine_(branch),
     topicPhotoModelLine_(model, peopleKind),
-    '함께 넣은 공간 사진 여러 장 중 구도 하나만 따른다. 여러 공간을 한 화면에 섞지 않는다. 방에 원래 있는 소품은 치우지 않는다.',
+    '공간 사진 여러 장 중 구도 하나만. 방을 섞지 않는다. 방에 원래 있는 소품은 치우지 않는다.',
     '복장: 남색 반팔 운동 티, 검은 반바지. 참고 사진의 스크럽·츄리닝·홈웨어는 따르지 않는다.',
-    '카메라는 동작이 크게 보이게 가까이 둔다. 인물과 동작이 화면 너비의 대부분을 채운다. 멀리서 방 전체를 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통과 얼굴의 중심이 세로 가운데선에 온다. 머리가 왼쪽, 다리가 오른쪽으로 치우치지 않는다. 아래쪽 약 40%는 바닥이나 매트만 남긴다. 썸네일이 그 자리에 큰 제목, 짧은 한 줄, 프로그램 이름, 본문과 어두운 그라데이션을 올린다. 얼굴, 손, 발은 그 자리에 넣지 않는다. 가장자리에 붙이지 않는다.',
-    '빛은 창으로 들어오는 낮 빛. 피부와 바닥은 실제처럼. 포스터처럼 한가운데 세우거나 윤곽을 깎지 않는다.',
-    '사진 안에는 한글, 영문, 숫자, 자막, 제목, 간판 글씨, 화살표, 도표, 해부 그림, 병원 침상, 로고, 워터마크를 새로 그리지 않는다. 벽에 걸린 자격증·약력은 참고 사진의 실제 약력이다. 모자이크나 블러로 가리지 않고 그 자리에 그대로 둔다.',
+    '카메라는 가까이. 인물과 동작이 화면 너비의 대부분을 채운다. 방 전체를 멀리서 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽. 몸통 중심이 세로 가운데선. 아래 약 40%는 바닥만. 얼굴, 손, 발은 그 자리에 넣지 않는다.',
+    '빛은 창으로 들어오는 낮 빛. 피부와 바닥은 실제처럼. 윤곽을 깎지 않는다.',
+    '사진 안에는 한글, 영문, 숫자, 자막, 제목, 화살표, 도표, 해부 그림, 병원 침상, 로고를 새로 그리지 않는다. 벽에 걸린 자격증·약력은 참고 사진의 실제 약력이다. 모자이크나 블러로 가리지 않는다.',
     topicPhotoPeopleLine_(content, catId, topic)
   );
   return lines.join('\n');
+}
+function buildTopicPhotoPrompt_(content, catId, topic){
+  var action = topicPhotoActionLine_(content, catId);
+  var scene = topicPhotoSceneLine_(content);
+  var hint = topicPhotoLibraryHint_(action, scene);
+  return [
+    '전문적이고 신뢰가 가는 한 장. AI가 만든 사람은 인공적으로 보인다.',
+    '1순위 실사. MYBOX 00.사진+영상, 특히 10. AI 썸네일에서 주제와 맞는 사진을 고른다.',
+    '찾을 장면: ' + hint + '.',
+    '2순위 해부 일러스트. GPT 생성.',
+    buildTopicFigurePrompt_(content, catId, topic),
+    '3순위 인물. 앞의 둘이 안 맞을 때만. 나노바나나.',
+    buildTopicPersonPrompt_(content, catId, topic)
+  ].join('\n');
 }
 function ensureTopicPhotoPrompt_(content, topic, catId, force){
   if(!content) return content;
@@ -36409,23 +36437,20 @@ function ensureTopicPhotoPrompt_(content, topic, catId, force){
   var model = topicPhotoModelKey_(content, catId);
   var actionLine = topicPhotoActionLine_(content, catId);
   var sceneLine = topicPhotoSceneLine_(content);
+  var hint = topicPhotoLibraryHint_(actionLine, sceneLine);
   var current = (content.images.gptVisuals || [])[0];
-  var promptOk = current && current.role === 'topicPhoto' && current.prompt && current.prompt.indexOf('9:16') < 0 && current.prompt.indexOf('화면 아래쪽') < 0 && current.prompt.indexOf('주제 「') < 0 && current.prompt.indexOf('화면 너비의 대부분') >= 0;
+  var promptOk = current && current.role === 'topicPhoto' && current.prompt && current.prompt.indexOf('9:16') < 0 && current.prompt.indexOf('화면 아래쪽') < 0 && current.prompt.indexOf('주제 「') < 0 && current.prompt.indexOf('화면 너비의 대부분') >= 0 && current.prompt.indexOf('1순위 실사') >= 0 && current.prompt.indexOf('2순위 해부 일러스트') >= 0 && current.prompt.indexOf('3순위 인물') >= 0 && current.prompt.indexOf('찾을 장면: ' + hint) >= 0;
   var peopleOk = !!(current && current.prompt && current.prompt.indexOf(peopleLine) >= 0);
   var actionOk = !!(current && current.prompt && actionLine && current.prompt.indexOf(actionLine) >= 0);
-  var sceneHead = sceneLine ? sceneLine.slice(0, Math.min(80, sceneLine.length)) : '';
-  var sceneOk = !sceneLine || sceneLine === actionLine || actionLine.indexOf(sceneLine.slice(0, 40)) >= 0 ||
-    !!(current && current.prompt && sceneHead && current.prompt.indexOf(sceneHead) >= 0);
+  var sceneExtra = topicPhotoSceneExtra_(actionLine, sceneLine);
+  var sceneHead = sceneExtra ? sceneExtra.slice(0, Math.min(80, sceneExtra.length)) : '';
+  var sceneOk = !sceneHead || !!(current && current.prompt && current.prompt.indexOf(sceneHead) >= 0);
   var modelOk = model === 'f'
     ? !!(current && current.prompt && /여성/.test(current.prompt))
     : !!(current && current.prompt && /남성/.test(current.prompt));
   var spaceOk = !!(current && current.prompt && current.prompt.indexOf(topicPhotoSpaceLine_(topicPhotoBranchKey_(content, catId))) >= 0);
   var credOk = !(current && current.prompt && current.prompt.indexOf('자격증·창 글씨도 따라 적지') >= 0);
-  var figure = topicPhotoWantsFigure_(content, catId);
-  var figureOk = !!(current && current.prompt && current.prompt.indexOf('설명 그림') >= 0);
-  if(figure){
-    if(!force && figureOk && actionOk && sceneOk) return content;
-  } else if(!force && promptOk && peopleOk && modelOk && spaceOk && credOk && actionOk && sceneOk && !figureOk) return content;
+  if(!force && promptOk && peopleOk && modelOk && spaceOk && credOk && actionOk && sceneOk) return content;
   content.images.gptVisuals = [{
     title: '이미지 생성',
     role: 'topicPhoto',
@@ -36442,12 +36467,9 @@ function renderTopicPhotoCard_(content){
   }
   var st = ensureThumbMakerState_();
   var preview = (st && st.bgDataUrl && st.draftId === state.selectedId && st.fileName === '주제 사진.jpg') ? st.bgDataUrl : '';
-  var figureCard = topicPhotoWantsFigure_(content, state.selectedCatId);
   var html = '';
   html += '<div class="img-section-title">이미지 생성</div>';
-  if(figureCard){
-    html += '<p class="empty-note" style="padding:0 0 8px;line-height:1.5;">이 글은 설명 그림입니다. 선과 바탕은 이미지참고/그림 폴더를 따르고, 아래 40%는 썸네일 제목·한 줄·프로그램·본문 자리로 비웁니다.</p>';
-  }
+  html += '<p class="empty-note" style="padding:0 0 8px;line-height:1.5;">1순위는 보관함 실사입니다. 해부 일러스트는 GPT, 인물은 나노바나나입니다. 인물은 앞의 둘이 안 맞을 때만.</p>';
   html += '<div class="img-tool-card">';
   html += '<div class="topic-photo-bar">';
   html += '<div class="topic-photo-bar-side">';
@@ -36915,23 +36937,27 @@ window.generateTopicPhoto_ = async function(btn){
   var branch = topicPhotoBranchKey_(content, state.selectedCatId);
   var model = topicPhotoModelKey_(content, state.selectedCatId);
   var photoEstimateSec = 60;
-  var figure = topicPhotoWantsFigure_(content, state.selectedCatId);
   var imageModel = topicPhotoImageModelFromButton_(btn);
   var useNano = topicPhotoIsNanoModel_(imageModel);
+  var atlasPrompt = topicPhotoPromptSection_(prompt, '2순위 해부 일러스트', '3순위 인물');
+  var personPrompt = topicPhotoPromptSection_(prompt, '3순위 인물', '');
+  var structured = !!(atlasPrompt && personPrompt);
+  var figure = structured ? !useNano : topicPhotoWantsFigure_(content, state.selectedCatId);
+  var apiBase = structured ? (figure ? atlasPrompt : personPrompt) : prompt;
   if(useNano) photoEstimateSec = 70;
   if(btn) startButtonCountdown_(btn, { estimateSec: photoEstimateSec, busyLabel: '만드는 중', idleText: useNano ? '나노바나나' : 'GPT 생성' });
   setAppToast(useNano
-    ? '나노바나나로 4:5 그림을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'
+    ? '나노바나나로 4:5 인물을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'
     : (figure
-      ? '블로그 내용으로 설명 그림을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'
+      ? 'GPT로 해부 일러스트를 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'
       : '참고 사진으로 4:5 사진을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'), { duration: 4000, variant: 'ok' });
   try {
     var sceneText = topicPhotoPeopleSource_(content, state.selectedCatId, '');
     var peopleKind = topicPhotoPeopleKind_(sceneText, state.selectedCatId);
     var styleKind = isExpertCourseCategory(state.selectedCatId) ? '과정' : '일반';
     var apiPrompt = figure
-      ? prompt + '\n\n첨부 그림의 선 굵기, 바탕색, 여백만 따른다. 그 그림의 사람, 방, 글자는 따라 그리지 않는다. 인물 실사로 바꾸지 않는다. 글자, 숫자, 화살표, 라벨을 넣지 않는다. 그림은 위쪽 절반에 둔다. 아래쪽 40%는 빈 바탕으로 둔다. 그 자리에 제목·한 줄·프로그램·본문과 어두운 그라데이션이 올라간다.'
-      : prompt + '\n\n사진 안에 글자, 숫자, 자막, 제목, 로고를 그리지 않는다. 주제 문장을 사진에 적지 않는다. 카메라는 가까이. 인물과 동작이 화면 너비의 대부분을 채운다. 방 전체를 멀리서 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통 중심이 세로 가운데선에 온다. 아래쪽 약 40%는 바닥만 남긴다. 그 자리에 큰 제목, 짧은 한 줄, 프로그램 이름, 본문과 어두운 그라데이션이 올라간다. 얼굴, 손, 발은 그 자리에 넣지 않는다. 첨부 사진은 공간 한 장과 모델 한 장이다. 두 방을 섞지 않는다. 모델의 얼굴은 유지하되 옷 색, 머리 정돈, 카메라 높이, 서 있는 방향은 참고 사진과 다르게 한다. 남색 티, 턱에 손을 댄 자세, 목 뒤를 짚는 자세를 기본으로 쓰지 않는다. 4:5 한 장. 위 프롬프트에 적힌 사람 수를 지킨다.';
+      ? apiBase + '\n\n첨부 그림의 선 굵기, 바탕색, 여백만 따른다. 그 그림의 사람, 방, 글자는 따라 그리지 않는다. 인물 실사로 바꾸지 않는다. 글자, 숫자, 화살표, 라벨을 넣지 않는다. 그림은 위쪽 절반에 둔다. 아래쪽 40%는 빈 바탕으로 둔다. 그 자리에 제목·한 줄·프로그램·본문과 어두운 그라데이션이 올라간다.'
+      : apiBase + '\n\n사진 안에 글자, 숫자, 자막, 제목, 로고를 그리지 않는다. 주제 문장을 사진에 적지 않는다. 카메라는 가까이. 인물과 동작이 화면 너비의 대부분을 채운다. 방 전체를 멀리서 찍어 인물을 작게 두지 않는다. 인물은 좌우 한가운데, 위쪽에 둔다. 몸통 중심이 세로 가운데선에 온다. 아래쪽 약 40%는 바닥만 남긴다. 그 자리에 큰 제목, 짧은 한 줄, 프로그램 이름, 본문과 어두운 그라데이션이 올라간다. 얼굴, 손, 발은 그 자리에 넣지 않는다. 첨부 사진은 공간 한 장과 모델 한 장이다. 두 방을 섞지 않는다. 모델의 얼굴은 유지하되 옷 색, 머리 정돈, 카메라 높이, 서 있는 방향은 참고 사진과 다르게 한다. 남색 티, 턱에 손을 댄 자세, 목 뒤를 짚는 자세를 기본으로 쓰지 않는다. 4:5 한 장. 위 프롬프트에 적힌 사람 수를 지킨다.';
     var passes = figure
       ? [{ edge: 640, maxChars: 40000 }, { edge: 420, maxChars: 18000 }]
       : [{ edge: 520, maxChars: 26000 }, { edge: 340, maxChars: 12000 }];
@@ -40173,9 +40199,7 @@ window.onSheetDraftSave_ = function(){
   var pendingAfterSave = 0;
   try { pendingAfterSave = countPendingSyncItems_(); } catch(ePendToast){ pendingAfterSave = (state.syncOutbox || []).length; }
   setAppToast(photoFromBlog
-    ? (topicPhotoWantsFigure_(content, state.selectedCatId)
-      ? '저장했어요. 이 글은 설명 그림 프롬프트로 다시 썼어요.'
-      : '저장했어요. 수정한 블로그에 맞춰 이미지 프롬프트를 다시 썼어요.')
+    ? '저장했어요. 수정한 블로그에 맞춰 이미지 안내를 다시 썼어요.'
     : ('이 기기에 초안을 저장했어요.' + (pendingAfterSave
       ? (' 서버 반영은 아직 ' + pendingAfterSave + '건 남았습니다.')
       : ' 서버 반영을 확인 중입니다.') + ' (발행 아님)'), { duration: photoFromBlog ? 4200 : 5200, variant: 'ok' });

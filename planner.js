@@ -6358,7 +6358,7 @@ function dedupeSameTopicDraftsInCat_(catId){
   if(!cat || !(cat.drafts || []).length) return 0;
   var groups = {};
   (cat.drafts || []).forEach(function(d){
-    if(!d || !d.id) return;
+    if(!d || !d.id || d._syncPlaceholder) return;
     var key = typeof normalizeTopicKey_ === 'function' ? normalizeTopicKey_(d.topic) : String(d.topic || '').replace(/\s+/g, '').toLowerCase();
     if(!key) return;
     if(!groups[key]) groups[key] = [];
@@ -11565,7 +11565,7 @@ function listLocalUserDraftIds_(){
   var deleted = state.deletedDraftIds || {};
   CATEGORIES.forEach(function(cat){
     (cat.drafts || []).forEach(function(d){
-      if(d && isUserAddedDraftId_(d.id) && !deleted[d.id]) ids[d.id] = true;
+      if(d && isUserAddedDraftId_(d.id) && !d._syncPlaceholder && !deleted[d.id]) ids[d.id] = true;
     });
   });
   return ids;
@@ -12308,9 +12308,17 @@ function applySupabaseEntityRows_(rows){
   var equalDiff = [];
   var localEntities = {};
   try { localEntities = collectSyncEntities_(payload, { skipEnsureIds: true }) || {}; } catch(eLocalEnt){}
+  var incomingBlobs = {};
   rows.forEach(function(row){
     if(!row || !row.key || isDeviceLocalSyncEntityKey_(row.key)) return;
     var key = String(row.key);
+    if(key.indexOf('blob:') === 0 && !row.deleted && typeof row.value === 'string'){
+      incomingBlobs[key.slice('blob:'.length)] = row.value;
+      var blobRev = parseInt(row.revision, 10) || 0;
+      if(!payload.syncEntityRevisions) payload.syncEntityRevisions = {};
+      payload.syncEntityRevisions[key] = blobRev;
+      return;
+    }
     if(state._topicGapForceKeys && (state._topicGapReceiveKeys || []).indexOf(key) < 0) return;
     if(!row.deleted && key.indexOf('plan:subgoal:') === 0 && isFixedGeneralProgramKey_(key) && !(localGeneralKeys && localGeneralKeys[key])){
       sawIncomingGeneralPlan = true;
@@ -12409,6 +12417,7 @@ function applySupabaseEntityRows_(rows){
     state.syncEntityRevisions = payload.syncEntityRevisions;
     state.syncEntityTombstones = payload.syncEntityTombstones;
     applyPersistPayload(payload, { skipRestorePending: true });
+    try { if(rehydrateSyncBlobs_(incomingBlobs)) changed = true; } catch(eBlob){}
     try {
       save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
     } catch(eSave){}
@@ -12416,6 +12425,11 @@ function applySupabaseEntityRows_(rows){
   } else {
     state.syncEntityRevisions = payload.syncEntityRevisions;
     state.syncEntityTombstones = payload.syncEntityTombstones;
+    try {
+      if(rehydrateSyncBlobs_(incomingBlobs)){
+        save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+      }
+    } catch(eBlob2){}
   }
   if(keepLocal.length) state._topicKeepLocalKeys = (state._topicKeepLocalKeys || []).concat(keepLocal);
   if(equalDiff.length) state._topicEqualDiffKeys = (state._topicEqualDiffKeys || []).concat(equalDiff);
@@ -13084,6 +13098,29 @@ function isOpsManualCategory(catId){ return catId === 8; }
 function isThreadCategory(catId){ return isDailyShareCategory(catId); }
 function isHeiljagyaeCategory(catId){ return catId === 7; }
 function isGeneralAudienceCategory(catId){ return catId === 0 || catId === 1 || catId === 2; }
+/** 도수치료(0)·CMT(3) 외 — 독자 문장의 메디컬·재활·치료·통증 금지 */
+function isNonManualBannedWordChannel_(catId){
+  var id = parseInt(catId, 10);
+  return id !== 0 && id !== 3;
+}
+function replaceNonManualBannedPainWord_(text){
+  return String(text == null ? '' : text).replace(/통증/g, '불편');
+}
+/** 생성 결과에서 「통증」만 「불편」으로 바꿉니다. 치료·재활·메디컬은 문맥이 갈려 프롬프트에만 둡니다. */
+function scrubNonManualPainWordInValue_(value, catId){
+  if(!isNonManualBannedWordChannel_(catId) || value == null) return value;
+  if(typeof value === 'string') return replaceNonManualBannedPainWord_(value);
+  if(Array.isArray(value)){
+    return value.map(function(item){ return scrubNonManualPainWordInValue_(item, catId); });
+  }
+  if(typeof value !== 'object') return value;
+  var skip = { images: 1, gptVisuals: 1, mangoBrief: 1, prompt: 1, refImages: 1, refImage: 1 };
+  Object.keys(value).forEach(function(k){
+    if(skip[k]) return;
+    value[k] = scrubNonManualPainWordInValue_(value[k], catId);
+  });
+  return value;
+}
 /** 일반 프로그램(도수·무브먼트·페이스·힐자계) — 분기·N단계 표기 없이 주제 서랍만 */
 function isFlatProgramRoadmapCategory_(catId){
   var id = Number(catId);
@@ -13926,7 +13963,7 @@ const BLOG_UNIVERSAL_QUALITY_RULE = `[블로그 공통 완성도 — 주제와 �
 - 문단마다 새 정보가 진행되어야 합니다. 같은 결론·가치·감정을 표현만 바꿔 반복하지 마세요.
 - **핵심 메시지는 글 전체에서 한 번만** 분명히 쓰고, problem·selfCare·explanation·FAQ·cta에서 같은 주장(“통증 없어도 문제다”, “구조를 먼저”, “좌우 차이를 보라”)을 되풀이하지 마세요.
 - 단락 끝마다 “이유가 여기 있어요 / 첫 순간이에요 / 시작점이에요” 식 **교훈 한 줄로 닫지 마세요.** 다음 정보로 이어지거나 그냥 끝내세요.
-- 비유는 가장 이해를 돕는 **한 번만** 사용하고, 이후에는 구체적인 장면·관찰·근거로 설명하세요.
+- 비유는 가장 이해를 돕는 **한 번만** 사용하고, 메커니즘을 직접 말하는 문장을 우선하세요. 이후에는 구체적인 장면·관찰·근거로 설명하세요.
 - 입력에 장소·대상·질문·현장 장면이 있으면 구체적으로 활용하되, 없는 사실·반응·성과를 만들지 마세요. **실제 관찰·숫자·손 느낌 1개**가 없으면 분위기 문장으로 채우지 마세요.
 - 정보형 글은 **독자 장면 → (필요 시) 오해 1개 → 구체 도움 → 짧은 원리 → 다음 행동**으로 전개하세요. 모든 템플릿 칸을 억지로 채우지 마세요.
 - 강의·연수·행사 후기라면 **왜 이 자리가 필요했는지 → 현장 장면 → 핵심 내용 2~3개 → 실제 질문·반응 → 역할의 경계 → 달라진 관점 → 자연스러운 문의**로 전개하세요.
@@ -13940,8 +13977,8 @@ const THREADS_UNIVERSAL_QUALITY_RULE = `[Threads 댓글 완성도 보강]
 - 핵심 메시지는 하나만 남기고, 같은 결론을 표현만 바꿔 반복하지 마세요.
 - 쉬운 비유는 최대 1개이며, 비유 뒤에는 반드시 실제 장면·관찰·원리를 붙이세요.
 - 독자 역할이 교사·기관 담당자·일반인이라면 진단·교정이 아닌 관찰·교육·연결의 범위를 분명히 하세요.
-- 마지막 질문은 본문과 직접 연결될 때만 1개 사용하고, 억지 공감 질문은 생략하세요.
-- 짧은 문단 5~8개, 대체로 500~1,000자. 긴 블로그 전체를 옮기지 마세요.`;
+- 본문이 자가 점검 질문으로 끝나면 그 질문을 유지하세요. 댓글에 억지 공감 질문을 더하지 마세요.
+- 댓글은 빈 줄로 나눈 3~4개(각 1~2문장)입니다. 긴 블로그 전체를 옮기지 마세요.`;
 
 const THREADS_BODY_COMMENT_RULES = `[Threads 2단 구조 — 필수]
 ■ **body(본문)**: 게시글 1포스트 — 궁금증·후킹만. 해설·답·근거는 넣지 마세요.
@@ -13950,15 +13987,20 @@ const THREADS_BODY_COMMENT_RULES = `[Threads 2단 구조 — 필수]
 [본문 body]
 - **1~3문장**, 줄바꿈 최소. **한 줄 핵심**이 반이어야 함.
 - **통념·익숙한 말 vs 실제 과정**: "보이는 결과는 ○○지만, 먼저 볼 것은 △△" 흐름.
-- **쉬운 비유** 1개. **의견이 갈리는** 주제 OK (의료법·과장 금지).
+- 비유는 없어도 됩니다. 쓴다면 댓글에 **최대 1개**. 메커니즘을 직접 말하는 문장을 우선하세요.
+- **의견이 갈리는** 주제 OK (의료법·과장 금지).
 - 통념 뒤집기·반전·궁금증 유발. **답·해설·리스트·근거는 본문에 쓰지 마세요.**
+- **일반인 글은 질문으로 끝내** 댓글을 유도하세요. 그 질문은 그 자리에서 해 보는 자가 점검 한 문장입니다. (예: 앉아 있을 때 좌골이 의자에 닿아 있어?)
+- 전문가 과정은 전제를 뒤집는 한 줄이면 됩니다. 자가 점검 질문을 억지로 넣지 마세요.
 
 [댓글 comment]
 - 본문에서 던진 **궁금증·반전에 대한 답**.
-- **근거**: 현장 경험·짧은 메커니즘. (해당 시) 병원 진료 먼저 권고.
+- **근거**: 현장 경험·짧은 메커니즘. 메모에 없는 일화·회원 사례·숫자는 만들지 마세요.
 - 본문과 **같은 문장 반복 금지**. 해시태그·"~하세요" 나열 금지.
-- **마침표(。!?)마다 빈 줄.** 문법과 상관없이 문장 하나가 댓글 하나다. 짧은 문장 둘은 한 댓글로 이어져도 된다.
-- 빈 줄로 나뉜 단락은 게시할 때 본문 아래 **이어지는 댓글**로 하나씩 올라간다.
+- **댓글은 빈 줄로 구분된 3~4개.** 각 댓글은 1~2문장. 마침표마다 댓글로 쪼개지 마세요.
+- 빈 줄로 나뉜 단락이 게시할 때 본문 아래 **이어지는 댓글** 하나다.
+- 일반인 건강 글의 **마지막 댓글**은 적신호(팔 저림·힘 빠짐 등)가 있으면 운동보다 병원 진료가 먼저라는 한 줄. 전문가 과정·교육 글에는 이 줄을 억지로 넣지 마세요.
+- [초안 형태 — 자가점검·단계·댓글] 이 댓글 구조가 「마침표마다 빈 줄」 이전 지시보다 우선합니다.
 
 ${THREADS_UNIVERSAL_QUALITY_RULE}
 
@@ -13979,6 +14021,7 @@ const COMPARISON_EXPERIENCE_HOOK_RULE = `${COMPARISON_EXPERIENCE_HOOK_MARKER}
 - hook은 **흔한 방법 vs 같은 자리에서 직접 비교한 장면** 한 줄. 제품을 설명하지 말고, 비교 조건이 보이게.
 - caption은 비교 조건(같은 불편·같은 자리) → 느껴진 차이 **1개**(초·회·호흡·손 느낌) → 짧은 CTA.
 - 입력에 없는 실험 숫자·직원 N명·환자 전후·완치·작아진 얼굴을 만들지 말 것.
+- 확인되지 않은 회원 사례·「오늘 세션에서 물어봤어요」·메모에 없는 숫자를 만들지 말 것.
 - 소비 테스트 문장("5개 사서 비교") 금지. 우리의 증거는 **현장 비교·기록**이다.
 - 썸네일·표지 큰 글씨에도 이 한 줄을 우선하세요. 「좋아요」형 헤드 금지.`;
 const MANGO_COVER_COMPARISON_HOOK_MARKER = '[표지 후킹 — 직접 경험 비교]';
@@ -15092,7 +15135,8 @@ const MEDICAL_COMPLIANCE_RULE = `[의료법·포지셔닝 — 필수]
   - **금지 예**: 「치료한 결과」「원인과 결과를 바꿔 치료한」「치료했어요」「시술하고 나니」— 치료·시술 수행 암시.
 - **도수·CMT 외 채널 컬러(필수)**: **보건의료 배경의 임상가**가 인체(근골격·움직임)를 바탕으로 지도하는 **기능재활·움직임 센터** 톤. 도수치료·카이로프랙틱·관절음·시술·병원 임상 장면을 **이 채널의 주인공처럼 부각하지 말 것**(마이너스). DC·PT·임상 경험은 「인체를 아는 임상가·지도자」로만 짧게 연결.
 - **병원 진료 안내는 셀프 케어(selfCare)에 한 문장만** 넣으세요. problem·explanation·cta·FAQ에는 병원·진료·병원 상담을 반복하지 마세요.
-- 적신호(마비, 대소변 장애, 발열·체중감소 동반, 사고 직후 급격한 악화 등)도 **그 한 문장**에만 녹이세요.`;
+- 적신호(마비, 대소변 장애, 발열·체중감소 동반, 사고 직후 급격한 악화 등)도 **그 한 문장**에만 녹이세요.
+- **[금지어 — 비도수 채널]** 도수치료·CMT Academy가 아니면, 독자 문장에 **메디컬·재활·치료·통증**을 쓰지 마세요. **불편·뻐근함**으로 쓰세요. 지침 속 「기능재활」은 채널 설명이지 본문에 베끼지 마세요. 적신호는 「병원 진료」로만 쓰세요.`;
 
 /** 도수·CMT 외 — 기능재활운동센터 컬러 */
 const FUNCTIONAL_REHAB_CENTER_POSITIONING_RULE = `[기능재활운동센터 컬러 — 도수치료·CMT Academy 제외 채널]
@@ -15137,7 +15181,7 @@ const BLOG_PLAIN_READABILITY_RULE = `${BLOG_PLAIN_READABILITY_MARKER}
 - 이어서 구체적인 장면 하나만. 어디를 보고 무엇이 달라 보이는지. 이 장면이 본문입니다.
 - 번호는 그 장면 다음에만, 한 줄에 하나, 각 줄은 짧게. 번호를 먼저 길게 쓰고 아래에서 같은 말을 다시 풀지 마세요.
 - 같은 결론을 칸마다 반복하지 마세요. 문제 제기와 원리, 또는 맥락·포인트·본문이 같은 문장이면 안 됩니다.
-- 마침표마다 빈 줄. 아주 짧은 문장은 다음 문장과 한 단락으로 이어져도 됩니다.`;
+- 마침표마다 빈 줄. 아주 짧은 문장은 다음 문장과 한 단락으로 이어져도 됩니다. 셀프 케어의 👉 단계 안에서는 문장을 쪼개지 말고, 빈 줄은 단계 사이에만 두세요.`;
 
 const DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW = `**일반인 독자**용 블로그입니다. ${BLOG_CONTENT_VOICE_RULE}
 
@@ -15151,8 +15195,14 @@ ${GEO_CONTENT_STRUCTURE_RULE}
 
 [글 흐름 — 반드시 이 순서·필드]
 1. **문제 제기** (problem): 일상 장면에서 공감되는 불편·궁금증 2~4문장. 불릿·번호 나열 금지. 문장(문단) 사이에는 **빈 줄**로 띄워 가독성 확보. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스. **병원 안내 금지**. 교훈 결론으로 닫지 말 것.
-2. **셀프 케어** (selfCare): **👉 로 시작**. 동작·자세·**초·회·분**을 앞쪽에. "아 시원하다" 지점에서 멈추라는 뉘앙스. 무리·재통증 주의 한 줄. **병원 진료 권고는 여기에만 한 문장**(심한 통증·적신호 시 병원 먼저 — 영상검사 일률 권고 금지). 같은 글을 다른 필드에서 반복하지 마세요. 좌우 차이·자가 점검은 **관찰**이지 진단이 아님을 한 줄로만.
-3. **원리 설명** (explanation): **맨 앞 1~2문장 TL;DR** → 동작 **뒤에** 왜 도움이 되는지. GEO는 **새 정보만**. 비유 최대 1개(손상=숨은 화재 식 금지). **병원·진료 안내 반복 금지**. **문단 사이 빈 줄**. 분량보다 구체 장면 1개를 우선. 문제 제기의 장면을 여기서 다시 쓰지 마세요.
+2. **셀프 케어** (selfCare): 동작 하나에서 끝내지 마세요. [초안 형태 — 자가점검·단계·댓글]
+   - 첫 줄 **👉 먼저 확인:** 그 자리에서 바로 해 보는 자가 점검 한 문장. (예: 손을 엉덩이 아래에 넣어 보세요. 뼈 끝이 닿나요?)
+   - 이어서 **👉 1. ~ 👉 4.** 번호 **3~4단계**. 감각은 자세 → 숨 → 목·머리 → 등. 각 단계에 **횟수 또는 시간**(초·회). 「1단계 —」같은 단계 이름 표기는 쓰지 마세요.
+   - 「아, 시원하다」 싶은 지점에서 멈추라는 한 줄.
+   - **혼자 할 때 자주 하는 실수** 2~3개(번호).
+   - **병원 진료 권고는 맨 끝 한 문장만**(적신호·팔 저림 등이 있으면 병원 먼저 — 영상검사 일률 권고 금지). 도수·CMT가 아니면 이 문장에 통증·치료·메디컬·재활을 쓰지 마세요.
+   - 같은 글을 다른 필드에서 반복하지 마세요. 자가 점검은 **관찰**이지 진단이 아님을 한 줄로만. 메모에 없는 일화·회원 사례·숫자를 만들지 마세요.
+3. **원리 설명** (explanation): **맨 앞 1~2문장 TL;DR** → 동작 **뒤에** 왜 도움이 되는지. GEO는 **새 정보만**. 메커니즘을 직접 말하는 문장을 우선하고, 비유는 글 전체 **1개**(손상=숨은 화재 식 금지). **병원·진료 안내 반복 금지**. **문단 사이 빈 줄**. 분량보다 구체 장면 1개를 우선. 문제 제기의 장면과 자가 점검을 여기서 다시 쓰지 마세요.
 
 ${BLOG_PLAIN_READABILITY_RULE}
 
@@ -15298,19 +15348,19 @@ ${MEDICAL_COMPLIANCE_RULE}
   categories: {
     0: { // 도수치료
       blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[도수치료 맥락] PSP·PAR 순서를 환자 언어로: 평가(증상·통증 질)→연부·관절 이해→Passive(P-ROM)→생활습관. problem에 공감·왜 아픈지 가볍게, selfCare는 집에서 할 수 있는 동작.`,
-      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n${buildComparisonExperienceHookRule_(0)}\n\n캐러셀(여러 장 슬라이드) 없이 **한 포스트 캡션**으로 끝내세요. 첫 줄 후킹에 이어, 본문 캡션 안에 통증→원인→해결 흐름의 **핵심 포인트**를 번호(1. 2.) 또는 • 불릿으로 넣어 한 번에 읽히게 하세요.`,
+      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n${buildComparisonExperienceHookRule_(0)}\n\n캐러셀(여러 장 슬라이드) 없이 **한 포스트 캡션**으로 끝내세요. 캡션 첫 줄은 그 자리에서 해 보는 자가 점검 한 문장. 이어서 핵심 포인트를 • 불릿 3개로. 끝 행동은 하나(프로필 링크 문진). 저장·공유·팔로우 유도 금지. 해시태그 6~8개, 약수역운동·작전역운동 포함.\n[초안 형태 — 자가점검·단계·댓글]`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     1: { // 리얼무브먼트
       blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[Movement 맥락] P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지. 프로그램명 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지, 영문 Re:Al 유지).\n[컬러] 보건의료 배경 임상가가 지도하는 **기능재활·움직임 센터**. 도수·카이로·시술 장면을 주인공처럼 부각하지 말 것.\n[치료행위] 우리가 치료했다는 내용 금지(치료한 결과·치료했어요 등). 「치료를 해도 반복=자세/움직임」 맥락은 허용.\n[말미 링크] 프로필·톡톡·인스타·예약/지도 URL은 시스템이 글 하단에 고정 삽입합니다. cta에는 URL을 넣지 말고 2~3문장만 쓰세요.`,
-      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n${buildComparisonExperienceHookRule_(1)}\n\n캐러셀 없이 **한 포스트 캡션**에 동작·포인트·주의사항을 단계적으로 적습니다. 마지막에 저장·팔로우 유도 문장을 캡션 끝에 자연스럽게 넣으세요. 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지). 주어는 「우리」「리얼무브먼트 전문가들」(박준규 1인 화자 금지). 기능재활·움직임 센터 톤. 도수·카이로 부각·치료행위 수행 암시 금지.`,
+      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n${buildComparisonExperienceHookRule_(1)}\n\n캐러셀 없이 **한 포스트 캡션**에 동작·포인트를 단계적으로 적습니다. 캡션 첫 줄은 자가 점검 한 문장. 끝 행동은 하나(프로필 링크 문진). 저장·공유·팔로우 유도 금지. 마지막 줄은 「약수역 3분 · 작전역 2분 · 1:1 예약제」. 해시태그 6~8개, 약수역운동·작전역운동 포함. 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지). 주어는 「우리」「리얼무브먼트 전문가들」(박준규 1인 화자 금지). 도수·카이로 부각·치료행위 수행 암시 금지. 독자 문장에 메디컬·재활·치료·통증을 쓰지 마세요.\n[초안 형태 — 자가점검·단계·댓글]`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     2: { // 리얼 페이스
       blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[얼굴·뷰티 맥락] 20~40대 여성 독자. 과학적 근거는 가볍게, 공감과 희망. selfCare는 부담 없는 가벼운 동작·습관. 프로그램명 표기: 「리얼 페이스」(「리:얼」 금지, 영문 Re:Al Face 유지).\n[컬러] 임상가가 구조를 아는 **기능·웰니스** 톤. 도수·카이로·시술 장면을 주인공처럼 부각하지 말 것.\n[치료행위] 우리가 치료했다는 내용 금지.`,
-      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n캐러셀 없이 **한 포스트 캡션**으로 스토리텔링하세요. "이런 고민 있으신가요?"에 이어 문제→원인→해결→CTA를 캡션 안에서 줄바꿈으로 구분해 읽기 쉽게. 표기: 「리얼 페이스」(「리:얼」 금지). 도수·카이로 부각·치료행위 수행 암시 금지.`,
+      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n캐러셀 없이 **한 포스트 캡션**으로 스토리텔링하세요. 캡션 첫 줄은 그 자리에서 해 보는 자가 점검 한 문장. 문제→원인→해결을 줄바꿈으로 구분. 끝 행동은 하나(프로필 링크 문진). 저장·공유·팔로우 유도 금지. 해시태그 6~8개. 지역 태그는 작전역운동 등 인천. 약수역 태그는 넣지 마세요. 표기: 「리얼 페이스」(「리:얼」 금지). 도수·카이로 부각·치료행위 수행 암시 금지. 독자 문장에 메디컬·재활·치료·통증을 쓰지 마세요.\n[초안 형태 — 자가점검·단계·댓글]`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
@@ -15666,6 +15716,67 @@ function migrateMangoImagePromptDefaults_(){
       /정확히 2장|정확히 3장|상단 20%|단색 밴드|overlayFixedLine|영문 한 덩어리|photorealistic editorial/i.test(cur);
     if(looksOldGptSlots){
       cat.image = def;
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+/** 저장 프롬프트에 초안 형태(자가 점검·셀프케어 단계·쓰레드 댓글)와 비도수 금지어를 붙인다 */
+function migrateDraftShapePrompts_(){
+  if(!state.prompts) return false;
+  var changed = false;
+  var shape = '[초안 형태 — 자가점검·단계·댓글]';
+  var ban = '[금지어 — 비도수 채널]';
+  var banBody =
+    ban + '\n' +
+    '- 도수치료·CMT Academy가 아니면 독자 문장에 메디컬·재활·치료·통증을 쓰지 마세요. 불편·뻐근함.\n' +
+    '- 지침 속 「기능재활」은 채널 설명이지 본문 단어가 아닙니다. 적신호는 「병원 진료」.';
+  if(state.prompts.base && String(state.prompts.base).indexOf(ban) < 0){
+    state.prompts.base = String(state.prompts.base).trim() + '\n\n' + banBody;
+    changed = true;
+  }
+  if(!state.prompts.categories) return changed;
+  Object.keys(state.prompts.categories).forEach(function(catId){
+    var id = parseInt(catId, 10);
+    var cat = state.prompts.categories[catId];
+    if(!cat || typeof cat !== 'object') return;
+    if((id === 0 || id === 1 || id === 2) && cat.blog && String(cat.blog).indexOf(shape) < 0){
+      var blogAdd = shape + '\n' +
+        '- selfCare는 동작 1개로 끝내지 마세요. 👉 먼저 확인(자가 점검 한 문장) → 👉 1.~4. 3~4단계(자세→숨→목·머리→등, 각 단계에 초·회) → 「아, 시원하다」에서 멈추기 → 혼자 할 때 자주 하는 실수 2~3개 → 적신호면 병원 한 문장.\n' +
+        '- 비유는 글 전체 1개. 메커니즘을 직접 말하는 문장 우선.\n' +
+        '- 메모에 없는 일화·회원 사례·숫자를 만들지 마세요.\n' +
+        '- 👉 단계 안의 문장은 마침표마다 나누지 마세요. 빈 줄은 단계 사이에만.\n' +
+        '- 이 블록이 셀프 케어를 한 동작으로 쓰라는 이전 문장보다 우선합니다.';
+      if(String(cat.blog).indexOf(ban) < 0 && id !== 0) blogAdd += '\n' + banBody;
+      cat.blog = String(cat.blog).trim() + '\n\n' + blogAdd;
+      changed = true;
+    }
+    if((id === 0 || id === 1 || id === 2) && cat.insta && String(cat.insta).indexOf(shape) < 0){
+      var instaAdd = shape + '\n' +
+        '- 캡션 첫 줄은 그 자리에서 하는 자가 점검 한 문장.\n' +
+        '- 메모·블로그에 없는 일화·회원 사례·숫자·「오늘 세션에서」를 만들지 마세요.\n' +
+        '- 끝 행동은 하나. 저장·공유·팔로우 유도 금지. 일반 신규는 프로필 링크 문진.\n' +
+        (id === 1 ? '- 마지막 줄: 약수역 3분 · 작전역 2분 · 1:1 예약제.\n' : '') +
+        (id === 2
+          ? '- 해시태그 6~8개. 지역 태그는 작전역운동 등 인천. 약수역 태그는 넣지 마세요.\n'
+          : '- 해시태그 6~8개. 약수역운동, 작전역운동을 포함하세요.\n') +
+        '- 비유는 1개 이내. 메커니즘 문장 우선.\n' +
+        '- 이 블록이 「저장·팔로우 유도」 이전 문장보다 우선합니다.';
+      if(String(cat.insta).indexOf(ban) < 0 && id !== 0) instaAdd += '\n' + banBody;
+      cat.insta = String(cat.insta).trim() + '\n\n' + instaAdd;
+      changed = true;
+    }
+    if(cat.threads && String(cat.threads).indexOf(shape) < 0 && id >= 0 && id <= 5){
+      var thAdd = shape + '\n' +
+        '- 일반인 글의 본문은 자가 점검 질문으로 끝냅니다. 전문가 과정은 전제를 뒤집는 한 줄.\n' +
+        '- 댓글은 빈 줄로 구분된 3~4개, 각 1~2문장. 마침표마다 쪼개지 마세요.\n' +
+        '- 일반인 글의 마지막 댓글만 적신호(팔 저림 등)면 병원 먼저. 교육 글에는 넣지 마세요.\n' +
+        '- 메모에 없는 일화·회원 사례·숫자를 만들지 마세요.\n' +
+        '- 비유는 1개 이내. 메커니즘 문장 우선.\n' +
+        '- 이 블록이 「마침표마다 빈 줄」「문단 5~8개」 이전 지시보다 우선합니다.';
+      if(String(cat.threads).indexOf(ban) < 0 && id !== 0 && id !== 3) thAdd += '\n' + banBody;
+      cat.threads = String(cat.threads).trim() + '\n\n' + thAdd;
       changed = true;
     }
   });
@@ -17772,8 +17883,57 @@ function syncMutationLightness_(op){
   if(key.indexOf('deleted:') === 0) return 0;
   if(key.indexOf('draft:') === 0 || key.indexOf('override:') === 0 || key.indexOf('pinned:') === 0) return 1;
   if(key.indexOf('generated:') === 0 || key.indexOf('published:') === 0) return 3;
+  if(key.indexOf('blob:') === 0) return 4;
   if(key.indexOf('plan:') === 0) return 2;
   return 2;
+}
+var SYNC_INLINE_BINARY_MAX_ = 450000;
+function splitSyncBinaries_(value){
+  var blobs = [];
+  var seen = {};
+  function walk(v){
+    if(typeof v === 'string'){
+      if((v.indexOf('data:image') === 0 || v.indexOf('data:video') === 0) && v.length > 800){
+        var hash = '';
+        try { hash = syncStringHash_(v); } catch(eHash){ hash = String(v.length); }
+        if(hash && !seen[hash]){
+          seen[hash] = true;
+          blobs.push({ hash: hash, data: v });
+        }
+        return OMITTED_BINARY_MARK_ + hash;
+      }
+      return v;
+    }
+    if(Array.isArray(v)) return v.map(walk);
+    if(v && typeof v === 'object'){
+      var out = {};
+      Object.keys(v).forEach(function(k){ out[k] = walk(v[k]); });
+      return out;
+    }
+    return v;
+  }
+  return { value: walk(value), blobs: blobs };
+}
+function queueSyncBlobMutations_(blobs){
+  if(!blobs || !blobs.length) return;
+  if(!Array.isArray(state.syncOutbox)) state.syncOutbox = [];
+  blobs.forEach(function(b){
+    if(!b || !b.hash || !b.data) return;
+    if(b.data.length > 2200000) return;
+    var key = 'blob:' + b.hash;
+    var existing = state.syncOutbox.some(function(op){ return op && op.key === key; });
+    if(existing) return;
+    if((state.syncEntityRevisions || {})[key]) return;
+    state.syncOutbox.push({
+      mutationId: makePlannerMutationId_(),
+      version: 1,
+      key: key,
+      value: b.data,
+      deleted: false,
+      baseEntityRevision: 0,
+      updatedAt: new Date().toISOString()
+    });
+  });
 }
 function toPlannerSyncMutation_(op){
   return {
@@ -17816,6 +17976,13 @@ function buildPendingSyncMutations_(payload){
   for(var i = 0; i < sorted.length; i++){
     if(!sorted[i] || !sorted[i].key) continue;
     var mut = toPlannerSyncMutation_(sorted[i]);
+    if(!mut.deleted && syncMutationBytes_(mut) > SYNC_INLINE_BINARY_MAX_){
+      try {
+        var splitBin = splitSyncBinaries_(mut.value);
+        mut.value = splitBin.value;
+        queueSyncBlobMutations_(splitBin.blobs);
+      } catch(eSplit){}
+    }
     var n = syncMutationBytes_(mut);
     if(out.length && (out.length >= maxItems || bytes + n > maxBytes)) break;
     out.push(mut);
@@ -18080,12 +18247,22 @@ function schedulePlannerGasPush_(immediate){
     return;
   }
   if(isPlannerDesktopBrowser_() && !state._sessionUserEdit && hasPendingLocalSyncChanges_() && !plannerOutboxHasTeamContent_()){
-    state.syncOutbox = [];
+    var keepNewTopics = (state.syncOutbox || []).filter(outboxOpNeverAckedTopic_);
+    if(!keepNewTopics.length){
+      state.syncOutbox = [];
+      state.syncDirtyEntityKeys = {};
+      state.syncNeedsSnapshot = false;
+      state.syncDirty = false;
+      requestServerAuthorityInsteadOfFlood_();
+      return;
+    }
+    state.syncOutbox = keepNewTopics;
     state.syncDirtyEntityKeys = {};
+    keepNewTopics.forEach(function(op){ if(op && op.key) state.syncDirtyEntityKeys[op.key] = true; });
     state.syncNeedsSnapshot = false;
-    state.syncDirty = false;
-    requestServerAuthorityInsteadOfFlood_();
-    return;
+    state.syncDirty = true;
+    state._sessionUserEdit = true;
+    try { rebuildDirtyStateFromOutbox_(); } catch(eKeepNew){}
   }
   if(shouldBlockStaleFloodPush_()){
     requestServerAuthorityInsteadOfFlood_();
@@ -18220,6 +18397,20 @@ async function plannerPullRemoteIntoStateCore_(){
 async function plannerPullRemoteIntoState_(){
   return withPlannerSyncMutex_(function(){ return plannerPullRemoteIntoStateCore_(); });
 }
+function outboxOpIsTopicPayload_(op){
+  if(!op || !op.key) return false;
+  var key = String(op.key);
+  return key.indexOf('draft:') === 0 || key.indexOf('generated:') === 0 ||
+    key.indexOf('published:') === 0 || key.indexOf('deleted:') === 0 || key.indexOf('blob:') === 0;
+}
+/** 서버에 한 번도 안 올라간 주제·초안·사진. 묶음이 길다고 버리면 다른 기기에서 카드가 사라진다. */
+function outboxOpNeverAckedTopic_(op){
+  if(!outboxOpIsTopicPayload_(op)) return false;
+  var key = String(op.key);
+  var base = parseInt(op.baseEntityRevision, 10) || 0;
+  var known = parseInt((state.syncEntityRevisions || {})[key], 10) || 0;
+  return base === 0 && known === 0;
+}
 function dropBulkOutboxUnlessChosen_(){
   if(state._gapUploadActive || state._generalUploadOnly) return 0;
   var before = (state.syncOutbox || []).length;
@@ -18232,6 +18423,7 @@ function dropBulkOutboxUnlessChosen_(){
   var kept = (state.syncOutbox || []).filter(function(op){
     if(!op || !op.key) return false;
     if(op.localOnly || op.key === 'setting:surfaceDigest') return true;
+    if(outboxOpNeverAckedTopic_(op)) return true;
     return !!(Object.keys(ids).length && syncKeyBelongsToDraftIds_(op.key, ids));
   });
   state.syncOutbox = kept;
@@ -18402,16 +18594,28 @@ async function plannerGasPushNow_(){
       var retryMissingDraft = false;
       data.conflicts.forEach(function(conflict){
         var conflictRev = parseInt(conflict && conflict.serverEntityRevision, 10) || 0;
-        if(!conflict || conflict.serverDeleted || conflictRev !== 0) return;
+        if(!conflict || conflict.serverDeleted) return;
         var conflictKey = String(conflict.key || '');
         if(conflictKey.indexOf('draft:') !== 0 && conflictKey.indexOf('generated:') !== 0 && conflictKey.indexOf('published:') !== 0) return;
-        (state.syncOutbox || []).forEach(function(op){
-          if(!op || op.key !== conflict.key) return;
-          if((parseInt(op.baseEntityRevision, 10) || 0) !== 0){
-            op.baseEntityRevision = 0;
-            retryMissingDraft = true;
-          }
-        });
+          var serverBlank = false;
+          try { serverBlank = syncServerValueBlank_(conflictKey, conflict.serverValue); } catch(eBlank){}
+          (state.syncOutbox || []).forEach(function(op){
+            if(!op || op.key !== conflict.key) return;
+            var base = parseInt(op.baseEntityRevision, 10) || 0;
+            if(conflictRev === 0 && base !== 0){
+              op.baseEntityRevision = 0;
+              retryMissingDraft = true;
+              return;
+            }
+            var localHas = conflictKey.indexOf('draft:') === 0
+              ? draftRowHasUserText_(op.value)
+              : !syncServerValueBlank_(conflictKey, op.value);
+            // 서버 칸이 비어 있고 이 기기에 제목·본문이 있으면 그 내용으로 채운다. 글이 있는 서버 값은 건드리지 않는다.
+            if(conflictRev > 0 && serverBlank && localHas){
+              op.baseEntityRevision = conflictRev;
+              retryMissingDraft = true;
+            }
+          });
       });
       if(retryMissingDraft){
         acknowledgeSyncOutbox_(data.accepted || [], mutations);
@@ -22244,7 +22448,7 @@ function collectExtraDrafts(){
   var deleted = state.deletedDraftIds || {};
   CATEGORIES.forEach(function(cat, i){
     out[i] = (cat.drafts || []).filter(function(d){
-      return d && isUserAddedDraftId_(d.id) && !deleted[d.id];
+      return d && isUserAddedDraftId_(d.id) && !d._syncPlaceholder && !deleted[d.id];
     }).map(function(d){
       return normalizeDraftRowForSync_({
         id: d.id,
@@ -22322,6 +22526,77 @@ function mergeExtraDrafts(byCat){
     });
   });
   purgeDeletedDraftsFromCatalog_();
+  try { ensureSyncedContentDraftCards_(); } catch(eCard){}
+}
+function topicFromSyncedContent_(row, fromPublished){
+  var content = fromPublished ? (row && row.content) : row;
+  if(fromPublished && row && row.topic){
+    var publishedTopic = String(row.topic).trim();
+    if(publishedTopic) return publishedTopic;
+  }
+  content = content && typeof content === 'object' ? content : {};
+  var blog = content.blog || {};
+  if(blog.title && String(blog.title).trim()) return String(blog.title).trim();
+  if(content.insta && content.insta.hook && String(content.insta.hook).trim()) return String(content.insta.hook).trim();
+  var threads = content.threads || {};
+  var body = String(threads.body || threads.text || '').trim();
+  if(body) return body.split('\n')[0].trim().slice(0, 80);
+  var news = content.news || {};
+  var channel = news.naver || news.kakao || news.karrot || {};
+  if(channel.title && String(channel.title).trim()) return String(channel.title).trim();
+  return '';
+}
+/** 본문만 서버에 있고 카드 행이 없으면 목록·딥링크에 빈칸이 된다. 카드만 화면에 만들고, 서버로는 올리지 않는다. */
+function ensureSyncedContentDraftCards_(){
+  var deleted = state.deletedDraftIds || {};
+  function consider(map, fromPublished){
+    Object.keys(map || {}).forEach(function(id){
+      if(!id || deleted[id] || !isUserAddedDraftId_(id)) return;
+      if(syncValueIsPruned_(map[id])) return;
+      if(publishedDraftCardExists_(id)) return;
+      var topic = topicFromSyncedContent_(map[id], fromPublished);
+      var content = fromPublished ? (map[id] && map[id].content) : map[id];
+      if(!topic && !(content && typeof content === 'object')) return;
+      var catId = getCatIdFromDraftId_(id);
+      var cat = CATEGORIES[catId];
+      if(!cat) return;
+      if(!cat.drafts) cat.drafts = [];
+      cat.drafts.push({
+        id: id,
+        topic: topic || '가져온 주제',
+        angle: '',
+        createdAt: (map[id] && (map[id].savedAt || map[id].updatedAt)) || new Date().toISOString(),
+        roadmapStepId: SUBGOAL_MISC_ID,
+        _syncPlaceholder: true
+      });
+    });
+  }
+  consider(state.generatedOnly, false);
+  consider(state.published, true);
+}
+function rehydrateSyncBlobs_(blobs){
+  blobs = blobs || {};
+  var hashes = Object.keys(blobs);
+  if(!hashes.length) return false;
+  var used = false;
+  function walk(v){
+    if(typeof v === 'string' && v.indexOf(OMITTED_BINARY_MARK_) === 0){
+      var hash = v.slice(OMITTED_BINARY_MARK_.length);
+      if(blobs[hash]){
+        used = true;
+        return blobs[hash];
+      }
+      return v;
+    }
+    if(Array.isArray(v)) return v.map(walk);
+    if(v && typeof v === 'object'){
+      Object.keys(v).forEach(function(k){ v[k] = walk(v[k]); });
+    }
+    return v;
+  }
+  Object.keys(state.generatedOnly || {}).forEach(function(id){ walk(state.generatedOnly[id]); });
+  Object.keys(state.published || {}).forEach(function(id){ walk(state.published[id]); });
+  return used;
 }
 var OMITTED_BINARY_MARK_ = '__OMITTED_BINARY__:';
 function restoreOmittedBinaries_(remote, local){
@@ -22513,6 +22788,7 @@ function applyPersistPayload(s, opts){
   if(migratePlainDraftSentencePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrateBlogPlainReadabilityPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateDraftShapePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrated){
     var desktopReceiveOnly = isPlannerDesktopBrowser_() && !state._sessionUserEdit;
     if(opts && opts.authoritativeAdopt){
@@ -23989,6 +24265,7 @@ function runDeferredBootMigrations_(){
   if(migratePlainDraftSentencePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrateBlogPlainReadabilityPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
+    if(migrateDraftShapePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrated){
       state.syncDirty = true;
       state.syncNeedsSnapshot = true;
@@ -24254,7 +24531,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=194').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=195').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -30915,6 +31192,7 @@ window.addDraft = async function(){
     renderTabs();
     renderMain();
     save();
+    try { ensureDraftSyncKeysQueued_(id); } catch(eNewSync){}
     var openTab = isThreadCategory(cat.id) ? 'thread' : (isHeiljagyaeCategory(cat.id) ? 'community' : 'blog');
     var genLabel = openTab === 'blog' ? '블로그 초안' : (openTab === 'thread' ? '일상 글' : '게시판·이미지 초안');
     if(btn) stopButtonCountdown_(btn);
@@ -37045,7 +37323,7 @@ function renderSheetContent(content) {
         addSourceHtml + sheetFullCopyBar_() +
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, syncTopic: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('문제 제기', 'sheet-blog-problem', getGeneralBlogProblemText_(b), { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지', regen: 'blog.problem', copy: true, paragraphs: true }) +
-        sheetEditField_('셀프 케어', 'sheet-blog-selfcare', b.selfCare || '', { rows: 8, help: '👉 로 시작 · 동작·초·회·분을 앞쪽에 · 단계 사이 빈 줄', regen: 'blog.selfCare', copy: true, stepPreview: true }) +
+        sheetEditField_('셀프 케어', 'sheet-blog-selfcare', b.selfCare || '', { rows: 8, help: '👉 먼저 확인 한 줄 · 👉 1.~4. 3~4단계(초·회) · 실수 2~3개 · 단계 사이 빈 줄', regen: 'blog.selfCare', copy: true, stepPreview: true }) +
         sheetEditField_('원리 설명', 'sheet-blog-explanation', b.explanation || '', { rows: 6, regen: 'blog.explanation', copy: true, paragraphs: true }) +
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
@@ -37108,8 +37386,8 @@ function renderSheetContent(content) {
     } else {
       bodyHTML = tabsHTML + addSourceHtml +
         sheetFullCopyBar_() +
-        sheetEditField_('본문 (게시글)', 'sheet-threads-body', getThreadsBodyText_(ths), { rows: 5, regen: 'threads.body', copy: true, help: '통념 뒤집기·궁금증 훅 한 줄. 해설은 넣지 마세요.', paragraphs: true }) +
-        sheetEditField_('댓글 (재게시)', 'sheet-threads-comment', getThreadsCommentText_(ths), { rows: 12, regen: 'threads.comment', copy: true, help: '빈 줄로 나뉜 단락이 본문 아래 이어지는 댓글이 됩니다. 마침표마다 한 줄 띄고, 짧은 문장 둘은 한 댓글로 이어져도 됩니다.', paragraphs: true }) +
+        sheetEditField_('본문 (게시글)', 'sheet-threads-body', getThreadsBodyText_(ths), { rows: 5, regen: 'threads.body', copy: true, help: '통념 뒤집기 훅. 일반인 글은 자가 점검 질문으로 끝내세요. 해설은 넣지 마세요.', paragraphs: true }) +
+        sheetEditField_('댓글 (재게시)', 'sheet-threads-comment', getThreadsCommentText_(ths), { rows: 12, regen: 'threads.comment', copy: true, help: '빈 줄로 나뉜 단락이 댓글 하나입니다. 빈 줄이 있으면 그 경계를 유지하고, 빈 줄이 없을 때만 마침표로 나눕니다.', paragraphs: true }) +
         '<div data-social-slot="threads"></div>' +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;"><strong>지금 올리기·예약하기</strong>는 본문을 올리고, 댓글 박스의 <strong>빈 줄마다</strong> 바로 아래 내 댓글로 이어 올립니다. 앱에서 직접 올렸다면 <strong>직접 올림</strong>을 누르세요.</p>';
     }
@@ -37870,20 +38148,20 @@ async function generateThreadsFromInsta_(catId, insta, topic){
     ? '\n- 전문가 과정: 인스타 캡션 범위 **밖** 내용 추가 금지. 본문 훅·댓글 해설 모두 인스타 근거 안에서.\n'
     : '';
   var generalHint = isGeneralAudienceCategory(catId)
-    ? '\n- 일반인 글: 인스타의 현장·셀프케어 메시지에서 통념 하나를 골라 본문 훅으로, 과정·근거는 댓글에서.\n'
+    ? '\n- 일반인 글: 본문은 통념 하나를 뒤집고, 자가 점검 질문으로 끝냅니다. 댓글은 빈 줄로 나눈 3~4개(각 1~2문장). 마지막 댓글만 적신호면 병원 먼저.\n'
     : '';
   var prompt = baseInfo + '\n\n' +
     '카테고리: ' + (CATEGORIES[catId] ? CATEGORIES[catId].name : '') + '\n' +
     '주제: "' + (topic || '') + '"\n\n' +
     '[쓰레드 작성 지침]\n' + threadsGuide + expertScope + generalHint + '\n' +
     '아래는 **확정·수정된 인스타 최종본**입니다. 인스타 문장을 그대로 옮기지 말고, **본문(훅)+댓글(해설)** 2단으로 **새로** 작성하세요.\n\n' +
-    'JSON만:\n{"threads":{"body":"본문(게시글 — 궁금증·통념 뒤집기 한 줄)","comment":"댓글(재게시용 — 해설·근거·과정·철학)"}}\n\n' +
+    'JSON만:\n{"threads":{"body":"본문 1~3문장. 일반인 글은 자가 점검 질문으로 끝","comment":"댓글1 1~2문장\\n\\n댓글2\\n\\n댓글3\\n\\n일반인 글이면 마지막은 적신호·병원 한 줄. 빈 줄로만 구분"}}\n\n' +
     '[인스타 최종본]\n' + buildInstaSourceText_(insta);
 
   var text = await callClaudePlanner_(prompt, { maxTokens: 2800, timeoutMs: THREADS_BG_TIMEOUT_MS });
   var parsed = parsePlannerAiJsonObject_(text);
   var block = parsed.threads || parsed;
-  return normalizeThreadsSnsBlock_(block);
+  return scrubNonManualPainWordInValue_(normalizeThreadsSnsBlock_(block), catId);
 }
 function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
   opts = opts || {};
@@ -38144,14 +38422,16 @@ function sheetEditField_(label, id, value, opts){
 }
 
 /**
- * 마침표마다 빈 줄. 짧은 문장(36자 미만)은 다음 문장과 한 단락으로 이어져도 된다.
- * 목록·셀프케어(👉)는 그대로 둔다.
+ * 빈 줄이 있으면 그 단락·댓글 경계와 줄바꿈을 유지한다.
+ * 마침표로 나누는 것은 빈 줄이 전혀 없을 때만. 짧은 문장(36자 미만)은 다음 문장과 한 단락.
+ * 이미 줄로 나뉜 목록은 불릿 사이에 빈 줄을 끼워 넣지 않는다. 👉 셀프케어는 그대로 둔다.
  */
 function ensureProseParagraphBreaks_(text){
   var t = String(text || '').replace(/\r\n/g, '\n').trim();
   if(!t) return '';
+  if(/\n[ \t]*\n/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
   if(/(^|\n)\s*👉/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
-  if(/(^|\n)\s*(?:[-•*]|\d+[.)])\s/.test(t)) return stripProseParagraphIndents_(separateListItems_(t));
+  if(/(^|\n)\s*(?:[-•*]|\d+[.)])\s/.test(t)) return stripProseParagraphIndents_(t);
   var sentences = splitProseSentences_(t.replace(/\n+/g, ' '));
   if(sentences.length < 2) return stripProseParagraphIndents_(sentences[0] || t);
   var groups = [];
@@ -38306,9 +38586,9 @@ window.copyWholeTab_ = function(btn){
 var SHEET_FIELD_META_ = {
   'blog.title':       { block: 'blog', label: '제목', instr: '증상명과 지역/브랜드 키워드가 자연스럽게 들어간, 검색·AI 인용에 강한 제목 한 줄. 존댓말·질문형 권장.' },
   'blog.problem':     { block: 'blog', label: '문제 제기', instr: '맨 앞 두 문장은 짧게, 문장 사이 빈 줄. 이어서 구체 장면 하나만. 번호·불릿 금지. 원리 설명과 같은 결론을 반복하지 말 것. **존댓말(해요체)**. **, ---, > 금지.' },
-  'blog.selfCare':    { block: 'blog', label: '셀프 케어', step: true, instr: '집에서 따라 할 수 있는 셀프 케어를 단계별로. 각 단계는 새 줄에서 "👉"로 시작하고 동작·초/회/세트를 앞쪽에. 단계 사이 빈 줄. **존댓말(해요체)**.' },
+  'blog.selfCare':    { block: 'blog', label: '셀프 케어', step: true, instr: '동작 하나로 끝내지 말 것. 👉 먼저 확인(자가 점검 한 문장) → 👉 1.~4. 3~4단계(자세→숨→목·머리→등, 각 단계에 초·회) → 아 시원하다에서 멈추기 → 혼자 할 때 자주 하는 실수 2~3개 → 적신호면 병원 한 문장. 단계 사이 빈 줄. 메모에 없는 일화·숫자 금지. **존댓말(해요체)**.' },
   'blog.explanation': { block: 'blog', label: '원리 설명', instr: '문제 제기의 장면을 다시 쓰지 말 것. 맨 앞 1~2문장만 핵심, 그 뒤는 새 이유. 마침표마다 빈 줄. 아주 짧은 문장은 다음 문장과 한 단락 가능. **존댓말(해요체)**. **, ---, > 금지.' },
-  'blog.cta':         { block: 'blog', label: '마무리 CTA', instr: '전문가 상담·프로필 페이지로 부드럽게 안내하는 마무리 2~3문장. **존댓말**.' },
+  'blog.cta':         { block: 'blog', label: '마무리 CTA', instr: '끝 행동은 하나. 저장·공유 금지. 일반 신규는 프로필 링크 문진. 병원 문구 금지. **존댓말** 2~3문장.' },
   'blog.hashtags':    { block: 'blog', label: '해시태그', array: true, instr: '증상·지역·브랜드와 관련된 해시태그 5~8개.' },
   'blog.hook':        { block: 'blog', label: '영상·사진 맥락', instr: '인용으로 쓸 두 문장. 문장 사이 빈 줄. 본문에서 같은 말을 길게 다시 풀지 말 것. 전문어는 처음 한 번 괄호로 풀기. **존댓말**. **, ---, > 금지.' },
   'blog.outline':     { block: 'blog', label: '시연·핵심 포인트', arrayLines: true, instr: '본문 장면 다음에 둘 짧은 줄. 한 줄에 완전한 문장 하나. 본문과 같은 설명을 반복하지 말 것. **존댓말**.' },
@@ -38318,10 +38598,10 @@ var SHEET_FIELD_META_ = {
   'community.selfCare':    { block: 'community', label: '셀프 케어', step: true, instr: '집에서 따라 할 수 있는 셀프 케어를 단계별로. 각 단계는 새 줄에서 "👉"로 시작하고 동작·초/회/세트를 앞쪽에 명시하세요. 단계 사이에는 빈 줄을 넣으세요.' },
   'community.explanation': { block: 'community', label: '원리 설명', instr: '왜 그런지 원리를 쉬운 말로, 단정적인 인과 문장으로 설명하세요.' },
   'insta.hook':     { block: 'insta', label: '첫 줄 후킹', instr: '스크롤을 멈추게 하는 인스타 첫 줄 후킹 한 문장. **존댓말(해요체)**.' },
-  'insta.caption':  { block: 'insta', label: '캡션', instr: '인스타 톤의 짧은 캡션 본문. 문단은 짧게, 이모지는 절제. **존댓말(해요체)**. 한다체·반말 금지.' },
-  'insta.hashtags': { block: 'insta', label: '해시태그', array: true, instr: '증상·지역·브랜드와 관련된 해시태그 8~12개.' },
-  'threads.body':    { block: 'threads', label: '본문 (게시글)', instr: '통념 뒤집기·궁금증 훅 한 줄(1~3문장). **반말(구어체)** 기본. 해설·근거는 쓰지 마세요.' },
-  'threads.comment': { block: 'threads', label: '댓글 (재게시)', instr: '**바로 위 수정된 본문**의 물음·반전에 대한 해설·근거·과정·철학. **반말(구어체)**. 본문과 같은 문장 반복 금지. 본문에 없는 새 주제로 바꾸지 말 것.' },
+  'insta.caption':  { block: 'insta', label: '캡션', instr: '첫 줄은 자가 점검 한 문장. • 불릿은 짧은 순서. 메모에 없는 일화·회원 사례·숫자·오늘 세션 장면 금지. 끝 행동은 하나(프로필 링크 문진). 저장·공유·팔로우 금지. 리얼무브먼트면 마지막 줄 「약수역 3분 · 작전역 2분 · 1:1 예약제」. 비유는 1개 이내. 사용자가 넣은 빈 줄은 유지. **존댓말(해요체)**.' },
+  'insta.hashtags': { block: 'insta', label: '해시태그', array: true, instr: '해시태그 6~8개. 리얼무브먼트·도수는 약수역운동·작전역운동 포함. 리얼페이스는 작전역운동 등 인천. 약수 태그는 넣지 말 것.' },
+  'threads.body':    { block: 'threads', label: '본문 (게시글)', instr: '통념 뒤집기 1~3문장. 일반인 글은 자가 점검 질문으로 끝내 댓글을 유도. 해설·근거는 쓰지 마세요. **반말(구어체)**.' },
+  'threads.comment': { block: 'threads', label: '댓글 (재게시)', instr: '빈 줄로 구분된 3~4개 댓글. 각 1~2문장. 마침표마다 쪼개지 말 것. 일반인 글의 마지막 댓글은 적신호(팔 저림 등)면 병원 먼저. 메모에 없는 일화·숫자 금지. **반말**. 본문 문장 반복 금지.' },
   'thread.topicTitle': { block: 'thread', label: '오늘의 한 줄', threadNorm: true, instr: '담백한 관찰·장면 한 줄. 짧은 감탄 가능. 따뜻한 위로·과한 감성 금지.' },
   'thread.summary':    { block: 'thread', label: '본문 (일상 나눔)', threadNorm: true, instr: '관찰 → 핵심 한 가지 → (선택) 짧은 감탄·철학 1문장. 담백·구어체. 과한 감성·설교 금지.' },
   'news.title': { block: 'news', label: '제목 · 첫 줄', instr: '소식용 제목 한 줄. 존댓말·질문형 권장. 과장 금지. 원데이면 일정 힌트, 정규면 적합성·변화 힌트.' },
@@ -38502,6 +38782,10 @@ window.regenSheetField_ = async function(key, btn){
     } else {
       block[meta.__field] = String(val || '').trim();
     }
+    if(isNonManualBannedWordChannel_(catId)){
+      block[meta.__field] = scrubNonManualPainWordInValue_(block[meta.__field], catId);
+      if(meta.block === 'threads' && meta.__field === 'body') block.text = block.body || '';
+    }
     if(meta.block === 'news' && newsCh){
       ensureNewsBlock_(content);
       content.news[newsCh] = block;
@@ -38597,6 +38881,9 @@ window.polishSheetField_ = async function(key, btn){
     } else {
       block[meta.__field] = String(val || '').trim();
     }
+    if(isNonManualBannedWordChannel_(catId)){
+      block[meta.__field] = scrubNonManualPainWordInValue_(block[meta.__field], catId);
+    }
     if(meta.block === 'news' && newsCh){
       ensureNewsBlock_(content);
       content.news[newsCh] = block;
@@ -38640,10 +38927,17 @@ function parseSelfCareSteps_(text){
   return steps.length ? steps : [t];
 }
 
+/** 👉 와 빈 줄로 이미 짜인 셀프 케어는 번호를 다시 매기지 않는다 */
+function selfCareKeepsAuthorBreaks_(text){
+  var t = String(text || '');
+  return /(^|\n)\s*👉/.test(t) && /\n\s*\n/.test(t);
+}
+
 /** 미리보기처럼 번호 + 단계 사이 빈 줄 — 아파트너·블로그 붙여넣기용 */
 function formatSelfCareStepsForCopy_(text){
-  var t = String(text || '').trim();
+  var t = String(text || '').replace(/\r\n/g, '\n').trim();
   if(!t) return '';
+  if(selfCareKeepsAuthorBreaks_(t)) return t.replace(/\n{3,}/g, '\n\n');
   var steps = parseSelfCareSteps_(t);
   if(steps.length <= 1){
     var one = String(steps[0] || t).replace(SELFCARE_STEP_STRIP_RE_, '').trim();
@@ -38656,8 +38950,12 @@ function formatSelfCareStepsForCopy_(text){
 
 /** 리치 에디터 붙여넣기용 — 따라하기 미리보기 카드와 비슷한 HTML */
 function formatSelfCareStepsHtmlForCopy_(text){
-  var t = String(text || '').trim();
+  var t = String(text || '').replace(/\r\n/g, '\n').trim();
   if(!t) return '';
+  if(selfCareKeepsAuthorBreaks_(t)){
+    return '<div style="white-space:pre-wrap;line-height:1.7;font-size:14px;color:#1F2937;word-break:keep-all;">' +
+      escapeHtml(t.replace(/\n{3,}/g, '\n\n')).replace(/\n/g, '<br/>') + '</div>';
+  }
   var steps = parseSelfCareSteps_(t);
   function bodyHtml(s){
     return escapeHtml(String(s || '').replace(SELFCARE_STEP_STRIP_RE_, '').trim()).replace(/\n/g, '<br/>');
@@ -38797,18 +39095,43 @@ function focusSyncOutboxOnDraft_(draftId){
   ids[draftId] = true;
   state._syncFocusDraftIds = ids;
   state.syncOutbox = (state.syncOutbox || []).filter(function(op){
-    return !!(op && (syncKeyBelongsToDraftIds_(op.key, ids) || op.key === 'setting:surfaceDigest'));
+    if(!op || !op.key) return false;
+    if(op.key === 'setting:surfaceDigest') return true;
+    if(syncKeyBelongsToDraftIds_(op.key, ids)) return true;
+    return outboxOpNeverAckedTopic_(op);
   });
   Object.keys(state.syncDirtyEntityKeys || {}).forEach(function(key){
-    if(!syncKeyBelongsToDraftIds_(key, ids) && key !== 'setting:surfaceDigest') delete state.syncDirtyEntityKeys[key];
+    if(syncKeyBelongsToDraftIds_(key, ids) || key === 'setting:surfaceDigest') return;
+    if(key.indexOf('blob:') === 0) return;
+    var kept = (state.syncOutbox || []).some(function(op){ return op && op.key === key; });
+    if(!kept) delete state.syncDirtyEntityKeys[key];
   });
   state.syncNeedsSnapshot = false;
   rebuildDirtyStateFromOutbox_();
 }
+function ensureDraftSyncKeysQueued_(draftId){
+  if(!draftId) return;
+  var payload = getPersistPayload();
+  var entities = {};
+  try { entities = collectSyncEntities_(payload, { skipEnsureIds: true }) || {}; } catch(eEnt){}
+  var keys = ['draft:' + draftId, 'generated:' + draftId, 'published:' + draftId].filter(function(key){
+    return Object.prototype.hasOwnProperty.call(entities, key);
+  });
+  if(!keys.length) return;
+  enqueueSyncOutboxChanges_(keys, payload);
+  state.syncDirty = true;
+  state._sessionUserEdit = true;
+  if(plannerSyncBootstrapReady_ && !plannerSyncConflictPending_ && !plannerBootstrapChoicePending_){
+    try { schedulePlannerGasPush_(true); } catch(ePush){}
+  }
+}
 function saveFocusedDraftChange_(draftId){
   focusSyncOutboxOnDraft_(draftId);
   try { save({ driveImmediate: true, gasImmediate: true }); }
-  finally { state._syncFocusDraftIds = null; }
+  finally {
+    try { ensureDraftSyncKeysQueued_(draftId); } catch(eQueue){}
+    state._syncFocusDraftIds = null;
+  }
 }
 function stampDraftActivity_(draft){
   if(!draft) return;
@@ -39405,7 +39728,7 @@ async function generateInstaFromBlog_(catId, blog, topic){
     ? '\n- 전문가 과정: 블로그에 없는 내용을 **새로 추가하지 말고**, 블로그·참고·영상·사진 범위 안에서만 압축하세요. **원리 설명** 한 줄이 드러나게.\n'
     : '';
   var generalHint = isGeneralAudienceCategory(catId)
-    ? '\n- 일반인 글: 블로그의 **문제 제기→셀프 케어→원리** 흐름을 유지하되, 캡션은 **셀프 케어 핵심 1개**에 집중하세요.\n'
+    ? '\n- 일반인 글: 캡션 첫 줄은 자가 점검 한 문장. 셀프 케어는 • 불릿 3개(자세·숨·목 또는 머리, 횟수·시간). 세션·회원 사례를 지어내지 마세요.\n'
     : '';
   var expertHint = isExpertCourseCategory(catId)
     ? '\n- 전문가 글: **영상·사진 맥락 → 시연 포인트 → 원리** 흐름. 캡션은 시연 포인트 2~3개 + 원리 한두 문장.\n'
@@ -39420,19 +39743,30 @@ async function generateInstaFromBlog_(catId, blog, topic){
     '[인스타 작성 지침]\n' + instaGuide + '\n\n' +
     '아래는 **확정·수정된 블로그 글**입니다. 블로그 전체를 옮기지 말고, **현장 리포트** 톤의 짧은 인스타 한 포스트로 만드세요.\n' + expertScope + generalHint + expertHint + '\n' +
     '요구사항:\n' +
-    '- hook: 블로그 제목·후킹에서 **기억에 남는 한 줄** (이모지 1개 전후, 25자 내외 권장)\n' +
-    '- caption: **"오늘 ○○ 했더니 △△"** 현장·시연·결과 중심. 공감 한 줄 → 핵심 포인트 **2~3개만**(번호 또는 •) → 변화·포인트 1개 → 짧은 CTA. hook 제외 **180~380자** 목표\n' +
+    (isGeneralAudienceCategory(catId)
+      ? '- hook: 흔한 방법 vs 같은 자리 비교 한 줄 (이모지 1개 전후, 25자 내외). 회원·세션 일화 금지\n' +
+        '- caption: 첫 줄은 그 자리에서 해 보는 자가 점검 한 문장. 이어서 메커니즘 1~2문장(비유는 없어도 되고, 쓴다면 1개). • 불릿 3개(자세·숨·목 또는 머리, 횟수·시간). 변화 한 줄. 끝 행동은 하나 — 프로필 링크 문진. 저장·공유·팔로우 유도 금지.' +
+        (parseInt(catId, 10) === 1 ? ' 마지막 줄은 「약수역 3분 · 작전역 2분 · 1:1 예약제」.' : '') +
+        ' hook 제외 **180~380자**. 사용자가 둔 줄바꿈 감각을 유지하고, 불릿 사이에 빈 줄을 끼워 넣지 마세요\n'
+      : '- hook: 블로그 제목·후킹에서 **기억에 남는 한 줄** (이모지 1개 전후, 25자 내외 권장)\n' +
+        '- caption: 블로그·영상 범위의 시연 포인트 2~3개와 원리 한 줄. hook 제외 **200~400자**. 없는 성과·사례·숫자 금지\n') +
+    '- 입력·블로그·메모에 없는 일화·회원 사례·숫자·「오늘 세션에서 물어봤어요」 장면을 만들지 마세요\n' +
     '- 과정·철학·통념 뒤집기는 인스타가 아니라 쓰레드용 — 인스타는 **결과·장면**에 집중\n' +
     '- 블로그 700자대 본문·목차 전체 나열 금지. 읽고 나서도 떠오르는 **한 가지 메시지**에 집중\n' +
+    '- 위 요구사항이 작성 지침의 「저장·팔로우」「핵심 1개」「오늘 했더니」보다 우선합니다\n' +
     '- carousel: 반드시 빈 배열 []\n' +
-    '- hashtags: 8~10개 (# 없이)\n\n' +
+    (isGeneralAudienceCategory(catId)
+      ? (parseInt(catId, 10) === 2
+        ? '- hashtags: 6~8개 (# 없이). 지역 태그는 작전역운동 등 인천. 약수역 태그는 넣지 마세요.\n\n'
+        : '- hashtags: 6~8개 (# 없이). 지역 태그 약수역운동, 작전역운동을 포함하세요.\n\n')
+      : '- hashtags: 8~10개 (# 없이)\n\n') +
     'JSON만:\n{"insta":{"hook":"...","caption":"...","carousel":[],"hashtags":["t1","t2"]}}\n\n' +
     '[블로그 원문]\n' + buildBlogSourceText_(blog, catId);
 
   var text = await callClaudePlanner_(prompt, { maxTokens: 2200, timeoutMs: INSTA_BG_TIMEOUT_MS });
   var parsed = parsePlannerAiJsonObject_(text);
   var ig = parsed.insta || parsed;
-  return normalizeInstaBlock_(ig);
+  return scrubNonManualPainWordInValue_(normalizeInstaBlock_(ig), catId);
 }
 
 async function generateMangoBriefFromBlog_(catId, blog, topic, draft){
@@ -41357,7 +41691,7 @@ ${briefPromptLines}
 
 [블로그 작성 지침]
 ${blogGuide}
-
+${(parseInt(catId, 10) === 1 || parseInt(catId, 10) === 2) ? '\n[금지어 — 이 채널] 독자 문장에 메디컬·재활·치료·통증을 쓰지 마세요. 불편·뻐근함. 지침의 「기능재활」은 본문에 베끼지 마세요. 적신호는 「병원 진료」.\n' : ''}
 ${imagePromptGuide}
 
 이 카테고리는 **blog(3단 구조)**와 **본문 사이에 넣을 실사 사진 3장(images.gptVisuals)** 을 만듭니다. 망고보드 7장(mangoBrief)은 필요할 때만 두고, 토큰이 모자라면 null. insta, notebookLM, community, thread 키는 JSON에 넣지 마세요. blog.title은 카드 주제와 같은 주장이어야 합니다.
@@ -41366,16 +41700,16 @@ ${imagePromptGuide}
 {
 "blog": {
 "title": "${flowJsonTitleHint_(draft, '호기심·질문형 한 줄. 증상형이면 증상+지역·프로그램 키워드를 자연스럽게 (35자 내외, 과장 금지)')}",
-"problem": "문제 제기 2~4문장. 불릿·번호 없이. 문장(문단) 사이 빈 줄. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스",
-"selfCare": "👉 로 시작. 동작·자세·초·회·분을 앞쪽에. '시원한 지점에서 멈추기' 뉘앙스",
-"explanation": "맨 앞 2~3문장 TL;DR(핵심 결론) → 원리 설명+GEO 구조. 문단 사이 빈 줄. 왜 도움이 되는지+비유+복잡하지 않다는 마무리",
-"cta": "마무리 행동 유도 (미카닥 박준규·블로그/상담·증상 허브 URL 자연스럽게 언급)",
+"problem": "문제 제기 2~4문장. 불릿·번호 없이. 문장(문단) 사이 빈 줄. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스. 자가 점검 문장은 넣지 말 것",
+"selfCare": "👉 먼저 확인: 자가 점검 한 문장. 빈 줄. 👉 1.~👉 4. 3~4단계(자세→숨→목·머리→등, 각 단계에 초·회, 단계 사이 빈 줄). 아 시원하다에서 멈추는 한 줄. 혼자 할 때 자주 하는 실수 2~3개. 적신호면 병원 한 문장. 동작 1개로 끝내지 말 것",
+"explanation": "맨 앞 1~2문장 TL;DR → 왜 도움이 되는지. 메커니즘 문장 우선, 비유는 글 전체 1개. 문단 사이 빈 줄. 병원 안내·자가 점검 반복 금지",
+"cta": "끝 행동 하나. 저장·공유 금지. 일반 신규는 프로필 문진. 병원 문구 금지. 증상 허브 URL은 압박 없이",
 "hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6"]
 },
 ${generalImgJsonTail}
 }
 
-글 흐름은 **문제 제기 → selfCare → explanation** 순. selfCare는 👉로 시작. "N단계 —" 표기 금지.
+글 흐름은 **문제 제기 → selfCare → explanation** 순. selfCare는 👉 먼저 확인으로 시작하고, 👉 1.~4. 3~4단계(각 단계 초·회)와 실수 2~3개를 넣으세요. 동작 1개로 끝내지 마세요. "N단계 —" 표기 금지.
 
 [증상 허브 CTA 참고] ${hubCtaHint}
 
@@ -41493,6 +41827,8 @@ if(isThreadCategory(catId)){
   delete content.threads;
 }
 
+scrubNonManualPainWordInValue_(content, catId);
+
 if(!state.published[jobDraftId]) state.published[jobDraftId]={};
 state.published[jobDraftId].content = content;
 state.generatedOnly[jobDraftId] = content;
@@ -41576,6 +41912,9 @@ window.genContent = async function(ev){
       DEFAULT_NEWS_CHANNELS_PROMPT,
       '',
       blogSrc ? ('[참고 블로그 초안 — 같은 소재를 소식용으로 압축·변형]\n' + blogSrc + '\n') : '',
+      (parseInt(catId, 10) !== 0 && parseInt(catId, 10) !== 3)
+        ? '도수·CMT가 아닌 채널입니다. 본문에 메디컬·재활·치료·통증을 쓰지 마세요. 불편·뻐근함으로 쓰세요. 길이·지점 규칙은 그대로입니다.'
+        : '',
       'JSON만 출력:',
       '{',
       '  "news": {',
@@ -41594,11 +41933,11 @@ window.genContent = async function(ev){
       var srcNews = (objN && objN.news) || objN || {};
       NEWS_CHANNEL_DEFS_.forEach(function(d){
         var it = srcNews[d.id] || {};
-        newsContent.news[d.id] = {
+        newsContent.news[d.id] = scrubNonManualPainWordInValue_({
           title: String(it.title || '').trim(),
           body: String(it.body || '').trim(),
           cta: String(it.cta || '').trim()
-        };
+        }, catId);
       });
       persistDraftContent_(draftId, newsContent);
       renderSheetContent(newsContent);

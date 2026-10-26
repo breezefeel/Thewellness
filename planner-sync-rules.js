@@ -149,6 +149,95 @@ var PlannerSyncRules = (function(){
     return hold;
   }
 
+  function plannerCopyOutboxOp(op){
+    var copy = {};
+    Object.keys(op || {}).forEach(function(name){ copy[name] = op[name]; });
+    return copy;
+  }
+
+  function plannerOutboxBase(op){
+    if(!op) return 0;
+    if(op.baseEntityRevision != null && op.baseEntityRevision !== '') return parseInt(op.baseEntityRevision, 10) || 0;
+    return parseInt(op.base, 10) || 0;
+  }
+
+  // 사용자가 고른 뒤의 대기열. 서버를 고르면 그 키를 빼고, 이 기기를 고르면 서버 리비전에 다시 얹고 값을 남긴다.
+  function plannerApplyConflictResolution(outbox, choices){
+    var byKey = {};
+    (choices || []).forEach(function(choice){
+      if(!choice || !choice.key) return;
+      byKey[String(choice.key)] = choice;
+    });
+    var next = [];
+    var resolvedKeys = [];
+    (outbox || []).forEach(function(op){
+      if(!op || !op.key) return;
+      var key = String(op.key);
+      var choice = byKey[key];
+      if(!choice){
+        next.push(plannerCopyOutboxOp(op));
+        return;
+      }
+      if(resolvedKeys.indexOf(key) < 0) resolvedKeys.push(key);
+      if(!choice.useLocal) return;
+      var copy = plannerCopyOutboxOp(op);
+      var serverRev = parseInt(choice.serverRevision, 10) || 0;
+      copy.baseEntityRevision = Math.max(plannerOutboxBase(op), serverRev);
+      copy.conflictResolved = 'local';
+      next.push(copy);
+    });
+    Object.keys(byKey).forEach(function(key){
+      if(resolvedKeys.indexOf(key) < 0) resolvedKeys.push(key);
+    });
+    return { outbox: next, resolvedKeys: resolvedKeys };
+  }
+
+  // 이미 고른 키, 또는 서버 리비전 위에 다시 얹은 키는 다음 동기화에서 다시 묻지 않는다.
+  function plannerTopicGapAsks(outbox, serverRevByKey, excludeKeys){
+    var skip = {};
+    (excludeKeys || []).forEach(function(key){ if(key) skip[String(key)] = true; });
+    var asks = [];
+    (outbox || []).forEach(function(op){
+      if(!op || !op.key || String(op.key) === 'setting:surfaceDigest') return;
+      var key = String(op.key);
+      if(skip[key]) return;
+      if(op.conflictResolved === 'local' || op.conflictResolved === 'server') return;
+      var rev = parseInt((serverRevByKey || {})[key], 10) || 0;
+      var base = plannerOutboxBase(op);
+      if(rev > base && asks.indexOf(key) < 0) asks.push(key);
+    });
+    return asks;
+  }
+
+  // v400이 옛 base로 붙잡아 둔 줄. 값은 지우지 않고 서버 리비전에 다시 얹어 배지가 다시 뜨지 않게 한다.
+  function plannerHealStaleConflictRows(outbox, serverRevByKey, excludeKeys){
+    var skip = {};
+    (excludeKeys || []).forEach(function(key){ if(key) skip[String(key)] = true; });
+    var healed = [];
+    var next = [];
+    (outbox || []).forEach(function(op){
+      if(!op || !op.key) return;
+      var key = String(op.key);
+      if(skip[key]){
+        next.push(plannerCopyOutboxOp(op));
+        return;
+      }
+      if(op.conflictResolved === 'server') return;
+      var rev = parseInt((serverRevByKey || {})[key], 10) || 0;
+      var base = plannerOutboxBase(op);
+      if(!(rev > base)){
+        next.push(plannerCopyOutboxOp(op));
+        return;
+      }
+      var copy = plannerCopyOutboxOp(op);
+      copy.baseEntityRevision = rev;
+      copy.conflictResolved = 'local';
+      next.push(copy);
+      if(healed.indexOf(key) < 0) healed.push(key);
+    });
+    return { outbox: next, healed: healed };
+  }
+
   // 서버가 수락한 키만 「보낸 것」으로 친다. 충돌로 돌아온 키는 사용자가 고르기 전까지 대기열에 남긴다.
   function plannerAcceptedSentByKey(sentMutations, accepted){
     var ack = {};
@@ -259,6 +348,9 @@ var PlannerSyncRules = (function(){
     plannerServerRevHigher: plannerServerRevHigher,
     plannerTrimOutbox: plannerTrimOutbox,
     plannerConflictHoldKeys: plannerConflictHoldKeys,
+    plannerApplyConflictResolution: plannerApplyConflictResolution,
+    plannerTopicGapAsks: plannerTopicGapAsks,
+    plannerHealStaleConflictRows: plannerHealStaleConflictRows,
     plannerAcceptedSentByKey: plannerAcceptedSentByKey,
     plannerTopicSlot: plannerTopicSlot,
     plannerCompareTopicOrder: plannerCompareTopicOrder,

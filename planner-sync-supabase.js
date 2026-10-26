@@ -97,7 +97,9 @@ var PlannerSyncSupabase = (function(){
   }
 
   function shapeError(err){
-    var auth = !!(err && err.authRequired);
+    var auth = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerIsAuthFailure)
+      ? PlannerSyncRules.plannerIsAuthFailure(err)
+      : !!(err && err.authRequired);
     var aborted = !!(err && (err.name === 'AbortError' || /aborted|abort/i.test(String(err.message || ''))));
     return {
       result: 'error',
@@ -109,6 +111,17 @@ var PlannerSyncSupabase = (function(){
     };
   }
 
+  function raiseIfSupabaseError(error, fallback){
+    if(!error) return;
+    var err = new Error(error.message || fallback || 'Supabase 동기화에 실패했습니다.');
+    err.code = error.code || '';
+    if(error.status) err.status = error.status;
+    if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerIsAuthFailure && PlannerSyncRules.plannerIsAuthFailure(err)){
+      err.authRequired = true;
+    }
+    throw err;
+  }
+
   function pull(client){
     var replay = false;
     try { replay = localStorage.getItem(FULL_KEY) !== FULL_GEN; } catch(eFull){ replay = true; }
@@ -117,38 +130,48 @@ var PlannerSyncSupabase = (function(){
     }
     var since = readSeq();
     var rows = [];
-    var from = 0;
+    var incrementalRows = [];
+    var freezeCursor = false;
     var page = 200;
     function next(){
-      return client.from('planner_entities')
-        .select('key,value,revision,deleted,updated_at,change_seq')
-        .gt('change_seq', since)
-        .order('change_seq', { ascending: true })
-        .range(from, from + page - 1)
-        .then(function(res){
-          if(res.error) throw new Error(res.error.message || '항목을 읽지 못했습니다.');
-          var chunk = res.data || [];
-          rows = rows.concat(chunk);
-          if(chunk.length < page) return rows;
-          from += page;
-          return next();
-        });
+      var cursor = since;
+      function step(){
+        return client.from('planner_entities')
+          .select('key,value,revision,deleted,updated_at,change_seq')
+          .gt('change_seq', cursor)
+          .order('change_seq', { ascending: true })
+          .limit(page)
+          .then(function(res){
+            raiseIfSupabaseError(res.error, '항목을 읽지 못했습니다.');
+            var chunk = res.data || [];
+            rows = rows.concat(chunk);
+            incrementalRows = incrementalRows.concat(chunk);
+            if(chunk.length < page) return rows;
+            var lastSeq = parseInt(chunk[chunk.length - 1] && chunk[chunk.length - 1].change_seq, 10) || 0;
+            if(lastSeq <= cursor) return rows;
+            cursor = lastSeq;
+            return step();
+          });
+      }
+      return step();
     }
     function loadPrefixIndex(prefix){
       var index = [];
-      var indexFrom = 0;
+      var cursorKey = '';
       function nextIndex(){
-        return client.from('planner_entities')
+        var q = client.from('planner_entities')
           .select('key,revision,deleted,updated_at,change_seq')
-          .like('key', prefix + '%')
-          .order('key', { ascending: true })
-          .range(indexFrom, indexFrom + page - 1)
+          .like('key', prefix + '%');
+        if(cursorKey) q = q.gt('key', cursorKey);
+        return q.order('key', { ascending: true }).limit(page)
           .then(function(res){
-            if(res.error) throw new Error(res.error.message || '주제와 초안 목록을 읽지 못했습니다.');
+            raiseIfSupabaseError(res.error, '주제와 초안 목록을 읽지 못했습니다.');
             var chunk = res.data || [];
             index = index.concat(chunk);
             if(chunk.length < page) return index;
-            indexFrom += page;
+            var lastKey = chunk[chunk.length - 1] && chunk[chunk.length - 1].key;
+            if(!lastKey || lastKey === cursorKey) return index;
+            cursorKey = lastKey;
             return nextIndex();
           });
       }
@@ -156,19 +179,21 @@ var PlannerSyncSupabase = (function(){
     }
     function loadPrefixRows(prefix){
       var loaded = [];
-      var rowFrom = 0;
+      var cursorKey = '';
       function nextRows(){
-        return client.from('planner_entities')
+        var q = client.from('planner_entities')
           .select('key,value,revision,deleted,updated_at,change_seq')
-          .like('key', prefix + '%')
-          .order('key', { ascending: true })
-          .range(rowFrom, rowFrom + page - 1)
+          .like('key', prefix + '%');
+        if(cursorKey) q = q.gt('key', cursorKey);
+        return q.order('key', { ascending: true }).limit(page)
           .then(function(res){
-            if(res.error) throw new Error(res.error.message || '서버 항목을 읽지 못했습니다.');
+            raiseIfSupabaseError(res.error, '서버 항목을 읽지 못했습니다.');
             var chunk = res.data || [];
             loaded = loaded.concat(chunk);
             if(chunk.length < page) return loaded;
-            rowFrom += page;
+            var lastKey = chunk[chunk.length - 1] && chunk[chunk.length - 1].key;
+            if(!lastKey || lastKey === cursorKey) return loaded;
+            cursorKey = lastKey;
             return nextRows();
           });
       }
@@ -184,7 +209,7 @@ var PlannerSyncSupabase = (function(){
             .select('key,value,revision,deleted,updated_at,change_seq')
             .eq('key', 'setting:surfaceDigest')
             .then(function(res){
-              if(res.error) throw new Error(res.error.message || '비교 기록을 읽지 못했습니다.');
+              raiseIfSupabaseError(res.error, '비교 기록을 읽지 못했습니다.');
               return acc.concat(res.data || []);
             });
         }
@@ -205,6 +230,7 @@ var PlannerSyncSupabase = (function(){
                 .select('key,value,revision,deleted,updated_at,change_seq')
                 .eq('key', 'setting:surfaceDigest')
                 .then(function(res){
+                  raiseIfSupabaseError(res && res.error, '비교 기록을 읽지 못했습니다.');
                   var digestRows = (res && res.data) || [];
                   return drafts.concat(generated).concat(published).concat(plans).concat(digestRows);
                 });
@@ -224,7 +250,7 @@ var PlannerSyncSupabase = (function(){
           .select('key,value,revision,deleted,updated_at,change_seq')
           .in('key', batch)
           .then(function(res){
-            if(res.error) throw new Error(res.error.message || '빠진 주제를 읽지 못했습니다.');
+            raiseIfSupabaseError(res.error, '빠진 주제를 읽지 못했습니다.');
             extra = extra.concat(res.data || []);
             return nextKeys();
           });
@@ -245,14 +271,16 @@ var PlannerSyncSupabase = (function(){
         topicGap = !!finishTopicListCheck_(index);
       }
       var maxSeq = since;
-      rows.forEach(function(row){
-        var seq = parseInt(row.change_seq, 10) || 0;
-        if(seq > maxSeq) maxSeq = seq;
-      });
-      (index || []).forEach(function(row){
-        var seq = parseInt(row.change_seq, 10) || 0;
-        if(seq > maxSeq) maxSeq = seq;
-      });
+      if(!freezeCursor){
+        if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerIncrementalCursor){
+          maxSeq = PlannerSyncRules.plannerIncrementalCursor(since, incrementalRows);
+        } else {
+          incrementalRows.forEach(function(row){
+            var seq = parseInt(row && row.change_seq, 10) || 0;
+            if(seq > maxSeq) maxSeq = seq;
+          });
+        }
+      }
       writeSeq(maxSeq);
       if(replay && applied && applied.appliedGeneration === 2){
         try { localStorage.setItem(FULL_KEY, FULL_GEN); } catch(eMark){}
@@ -271,12 +299,14 @@ var PlannerSyncSupabase = (function(){
     }
     if(typeof state !== 'undefined' && state._topicGapForceKeys && state._topicGapReceiveKeys && state._topicGapReceiveKeys.length && !state._topicGapForceServer && !state._topicGapAdoptServer){
       var want = state._topicGapReceiveKeys.slice();
+      freezeCursor = true;
       return loadDraftRows(want).then(function(extra){
         rows = extra || [];
         return finishPull(rows);
       });
     }
     if(typeof state !== 'undefined' && (state._topicGapForceServer || state._topicGapAdoptServer)){
+      freezeCursor = true;
       return loadSurfaceRows().then(function(surfaceRows){
         var seen = {};
         rows = [];
@@ -323,25 +353,38 @@ var PlannerSyncSupabase = (function(){
         mutationId: mut.mutationId || ''
       };
     });
+    var sentById = {};
+    (mutations || []).forEach(function(mut){
+      if(mut && mut.mutationId) sentById[mut.mutationId] = mut;
+    });
     return client.rpc('planner_apply_batch', { p_rows: body }).then(function(res){
-      if(res.error) throw new Error(res.error.message || '항목을 저장하지 못했습니다.');
+      raiseIfSupabaseError(res.error, '항목을 저장하지 못했습니다.');
       var data = res.data || {};
       if(data.result === 'error'){
-        return { result: 'error', message: data.message || '저장 실패', retry: false };
+        var failed = { result: 'error', message: data.message || '저장 실패', retry: false };
+        if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerIsAuthFailure && PlannerSyncRules.plannerIsAuthFailure(failed)){
+          failed.authRequired = true;
+        }
+        return failed;
       }
       var accepted = (data.accepted || []).map(function(item){
+        var id = item.mutationId || '';
+        var sent = sentById[id];
         return {
-          mutationId: item.mutationId || '',
-          key: item.key,
+          mutationId: id,
+          key: item.key || (sent && sent.key) || '',
           entityRevision: parseInt(item.revision, 10) || 0,
-          version: 1
+          version: sent ? (parseInt(sent.version, 10) || 1) : 1,
+          status: item.status || 'ok'
         };
       });
       var conflicts = (data.conflicts || []).map(function(item){
+        var id = item.mutationId || '';
+        var sent = sentById[id];
         return {
           key: item.key,
-          mutationId: item.mutationId || '',
-          version: 1,
+          mutationId: id,
+          version: sent ? (parseInt(sent.version, 10) || 1) : 1,
           serverValue: item.value,
           serverDeleted: !!item.deleted,
           serverEntityRevision: parseInt(item.revision, 10) || 0,
@@ -349,7 +392,7 @@ var PlannerSyncSupabase = (function(){
         };
       });
       if(typeof noteSupabaseAcceptedRevisions_ === 'function'){
-        noteSupabaseAcceptedRevisions_(accepted);
+        noteSupabaseAcceptedRevisions_(accepted.filter(function(item){ return item.status !== 'idempotent'; }));
       }
       var result = conflicts.length ? (accepted.length ? 'partial' : 'conflict') : 'success';
       return {
@@ -378,7 +421,7 @@ var PlannerSyncSupabase = (function(){
           var cont = started;
           started = true;
           return client.rpc('planner_import_batch', { p_rows: chunk, p_continue: cont }).then(function(res){
-            if(res.error) throw new Error(res.error.message || '넣기 실패');
+            raiseIfSupabaseError(res.error, '넣기 실패');
             var data = res.data || {};
             if(data.result === 'error') throw new Error(data.message || '넣기 실패');
             seq = parseInt(data.changeSeq, 10) || seq;

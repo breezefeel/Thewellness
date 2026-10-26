@@ -11572,16 +11572,9 @@ function listLocalUserDraftIds_(){
 function classifyTopicGap_(spec){
   spec = spec || {};
   var outbox = spec.outbox || [];
-  var ids = {};
-  if(spec.selectedId) ids[String(spec.selectedId)] = true;
-  if(spec.focusIds){
-    Object.keys(spec.focusIds).forEach(function(id){ if(id) ids[String(id)] = true; });
-  }
-  var hasIds = Object.keys(ids).length > 0;
   var real = [];
   outbox.forEach(function(op){
     if(!op || !op.key || op.key === 'setting:surfaceDigest') return;
-    if(outbox.length > 12 && !(op.localOnly || (hasIds && syncKeyBelongsToDraftIds_(op.key, ids)))) return;
     real.push(op);
   });
   var serverRev = spec.serverRev || {};
@@ -12074,7 +12067,7 @@ function queueTopicGapEntity_(key, deleted, baseRev, explicitValue){
   }
   op.baseEntityRevision = parseInt(baseRev, 10) || 0;
   op.updatedAt = new Date().toISOString();
-  op.version = (parseInt(op.version, 10) || 1) + (existing ? 1 : 0);
+  if(existing) bumpOutboxOpVersion_(op);
   if(!existing) state.syncOutbox.push(op);
   if(!state.syncDirtyEntityKeys) state.syncDirtyEntityKeys = {};
   state.syncDirtyEntityKeys[key] = true;
@@ -12378,20 +12371,13 @@ function applySupabaseEntityRows_(rows){
       }
       if(!sameBody){
         var knownLocalRev = parseInt((payload.syncEntityRevisions || {})[key], 10) || 0;
-        var serverAt = parseIsoMs_(row.updated_at);
-        var localAt = parseIsoMs_((payload.syncEntityUpdatedAt || {})[key]);
-        var serverClearlyNewer = (serverRev > knownLocalRev) || !!(serverAt && (!localAt || serverAt > localAt));
+        var serverRevHigher = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerServerRevHigher)
+          ? PlannerSyncRules.plannerServerRevHigher(serverRev, knownLocalRev)
+          : (serverRev > knownLocalRev);
         var localSize = syncKeptTextSize_(key, localEntities[key]);
-        var serverSize = syncKeptTextSize_(key, serverVal);
-        if(!serverClearlyNewer && localSize > 0 && localSize > serverSize){
-          if(state._sessionUserEdit) keepLocal.push(key);
+        if(!serverRevHigher){
+          if(state._sessionUserEdit && localSize > 0) keepLocal.push(key);
           return;
-        }
-        if(!serverClearlyNewer && localSize > 0 && localSize === serverSize){
-          if(state._sessionUserEdit){
-            keepLocal.push(key);
-            return;
-          }
         }
       }
     }
@@ -12533,7 +12519,11 @@ async function plannerGasJsonRequest_(requestPayload, timeoutMs){
 }
 
 function isPlannerAuthError_(data){
-  return !!(data && data.authRequired);
+  if(data && data.authRequired) return true;
+  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerIsAuthFailure){
+    return PlannerSyncRules.plannerIsAuthFailure(data);
+  }
+  return false;
 }
 
 function notifyPlannerAuthError_(data){
@@ -16341,8 +16331,12 @@ function plannerTeamContentKey_(key){
     key.indexOf('plan:') === 0;
 }
 function plannerTeamContentOp_(op){
-  if(!op || !op.key || op.deleted || isDeviceLocalSyncEntityKey_(op.key)) return false;
+  if(!op || !op.key || isDeviceLocalSyncEntityKey_(op.key)) return false;
   var key = String(op.key);
+  if(op.deleted || key.indexOf('deleted:') === 0){
+    return key.indexOf('draft:') === 0 || key.indexOf('generated:') === 0 ||
+      key.indexOf('published:') === 0 || key.indexOf('deleted:') === 0;
+  }
   if(!plannerTeamContentKey_(key)) return false;
   if(isEmptyDefaultSyncEntity_(key, op.value)) return false;
   if(key.indexOf('draft:') === 0) return draftRowHasUserText_(op.value);
@@ -16889,16 +16883,6 @@ function listChangedSyncEntityKeys_(previousPayload, currentPayload){
     if(syncEntitiesEquivalent_(key, prev, next)) return;
     changed.push(key);
   });
-  var focus = state._syncFocusDraftIds;
-  if(focus && Object.keys(focus).length){
-    changed = changed.filter(function(key){
-      if(syncKeyBelongsToDraftIds_(key, focus)) return true;
-      if(String(key).indexOf('plan:subgoal:') === 0){
-        return entityMentionsDraftIds_(prevEntities[key], focus) || entityMentionsDraftIds_(nextEntities[key], focus);
-      }
-      return false;
-    });
-  }
   return changed;
 }
 function stampChangedSyncEntities_(previousPayload, currentPayload){
@@ -16959,6 +16943,8 @@ function draftRowHasUserText_(val){
 function isProtectedUserSyncKey_(key, op){
   key = String(key || '');
   if(!key || isDeviceLocalSyncEntityKey_(key)) return false;
+  if(op && op.deleted && (/^draft:/.test(key) || /^generated:/.test(key) || /^published:/.test(key) || /^deleted:/.test(key))) return true;
+  if(/^deleted:/.test(key)) return true;
   if(isEmptyDefaultSyncEntity_(key, op && op.value)) return false;
   if(/^plan:/.test(key) ||
     /^deleted:/.test(key) ||
@@ -17127,11 +17113,6 @@ function discardStaleUnpushedBeforeConnect_(){
   var n = countRealUnpushedMutations_();
   // 소수 실수정(기획·삭제)은 새로고침·모바일 백그라운드 뒤에도 지우지 않음
   if(n > 0 && n <= REAL_UNPUSHED_PUSH_MAX_){
-    // 데스크탑에 남아 있는 전송은 새로고침마다 「전체」로 다시 도는 잔재. 폰이 맞춘 서버를 받는다.
-    if(isPlannerDesktopBrowser_()){
-      keepPlannerTeamOutbox_();
-      return;
-    }
     state._sessionUserEdit = true;
     return;
   }
@@ -17526,8 +17507,8 @@ function forceOutboxOverwriteBase_(conflicts){
     }
     if(op){
       op.baseEntityRevision = serverRev;
-      op.version = (parseInt(op.version, 10) || 1) + 1;
       op.updatedAt = now;
+      bumpOutboxOpVersion_(op);
       return;
     }
     var localVal = unwrapSyncEntityValue_(conflict.local);
@@ -17838,6 +17819,15 @@ function getLocalStoragePayload(){
 function makePlannerMutationId_(){
   return getPlannerDeviceId_() + ':' + Date.now().toString(36) + ':' + Math.random().toString(36).slice(2, 9);
 }
+function bumpOutboxOpVersion_(op){
+  if(!op) return op;
+  var next = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerNextMutation)
+    ? PlannerSyncRules.plannerNextMutation(op, makePlannerMutationId_)
+    : { mutationId: makePlannerMutationId_(), version: (parseInt(op.version, 10) || 1) + 1 };
+  op.mutationId = next.mutationId;
+  op.version = next.version;
+  return op;
+}
 function ensureSyncEntityRevisions_(payload){
   payload = payload || {};
   var revisions = Object.assign({}, payload.syncEntityRevisions || {});
@@ -17878,7 +17868,8 @@ function isValidClientSyncEntityKey_(key){
     /^setting:.+$/.test(key) ||
     /^(?:milestone|deleted|pinned|override|draft|published|generated):.+$/.test(key) ||
     key === 'ops:root' ||
-    /^ops:(?:checked|note|collapsed|review|newBranchMeta|keywordAds):.+$/.test(key);
+    /^ops:(?:checked|note|collapsed|review|newBranchMeta|keywordAds):.+$/.test(key) ||
+    /^blob:.+$/.test(key);
 }
 function normalizeSyncOutbox_(raw, opts){
   var byKey = {};
@@ -17906,7 +17897,11 @@ function normalizeSyncOutbox_(raw, opts){
     if(previous){
       normalized.baseEntityRevision = previous.baseEntityRevision;
       if(!item.mutationId) normalized.mutationId = previous.mutationId;
-      normalized.version = Math.max(previous.version + 1, normalized.version);
+      var mergedVersion = Math.max(previous.version + 1, normalized.version);
+      if(mergedVersion > normalized.version && normalized.mutationId === previous.mutationId){
+        normalized.mutationId = makePlannerMutationId_();
+      }
+      normalized.version = mergedVersion;
     }
     byKey[key] = normalized;
   });
@@ -17927,7 +17922,7 @@ function enqueueSyncOutboxChanges_(changedKeys, payload){
       existing.value = hasValue ? cloneSyncValue_(entities[key]) : null;
       existing.deleted = !hasValue;
       existing.updatedAt = times[key] || new Date().toISOString();
-      existing.version = (parseInt(existing.version, 10) || 1) + 1;
+      bumpOutboxOpVersion_(existing);
     } else {
       state.syncOutbox.push({
         mutationId: makePlannerMutationId_(),
@@ -17967,10 +17962,10 @@ function syncMutationLightness_(op){
   var key = String((op && op.key) || '');
   if(op && op.deleted) return 0;
   if(key.indexOf('deleted:') === 0) return 0;
-  if(key.indexOf('draft:') === 0 || key.indexOf('override:') === 0 || key.indexOf('pinned:') === 0) return 1;
-  if(key.indexOf('generated:') === 0 || key.indexOf('published:') === 0) return 3;
-  if(key.indexOf('blob:') === 0) return 4;
+  if(key.indexOf('generated:') === 0 || key.indexOf('published:') === 0) return 1;
+  if(key.indexOf('blob:') === 0) return 1;
   if(key.indexOf('plan:') === 0) return 2;
+  if(key.indexOf('draft:') === 0 || key.indexOf('override:') === 0 || key.indexOf('pinned:') === 0) return 3;
   return 2;
 }
 var SYNC_INLINE_BINARY_MAX_ = 450000;
@@ -18058,23 +18053,34 @@ function buildPendingSyncMutations_(payload){
   var maxItems = first ? SYNC_OUTBOX_PATCH_FIRST_ITEMS_ : SYNC_OUTBOX_PATCH_MAX_ITEMS_;
   var maxBytes = first ? SYNC_OUTBOX_PATCH_FIRST_BYTES_ : SYNC_OUTBOX_PATCH_MAX_BYTES_;
   var out = [];
-  var bytes = 2;
   for(var i = 0; i < sorted.length; i++){
     if(!sorted[i] || !sorted[i].key) continue;
     var mut = toPlannerSyncMutation_(sorted[i]);
-    if(!mut.deleted && syncMutationBytes_(mut) > SYNC_INLINE_BINARY_MAX_){
+    if(!mut.deleted && String(mut.key).indexOf('blob:') !== 0 && syncMutationBytes_(mut) > SYNC_INLINE_BINARY_MAX_){
       try {
         var splitBin = splitSyncBinaries_(mut.value);
         mut.value = splitBin.value;
         queueSyncBlobMutations_(splitBin.blobs);
       } catch(eSplit){}
     }
-    var n = syncMutationBytes_(mut);
-    if(out.length && (out.length >= maxItems || bytes + n > maxBytes)) break;
     out.push(mut);
+  }
+  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerSelectSyncBatch){
+    return PlannerSyncRules.plannerSelectSyncBatch(out, {
+      maxItems: maxItems,
+      maxBytes: maxBytes,
+      bytesOf: syncMutationBytes_
+    });
+  }
+  var picked = [];
+  var bytes = 2;
+  for(var j = 0; j < out.length; j++){
+    var n = syncMutationBytes_(out[j]);
+    if(picked.length && (picked.length >= maxItems || bytes + n > maxBytes)) break;
+    picked.push(out[j]);
     bytes += n + 1;
   }
-  return out;
+  return picked;
 }
 function pruneOutboxAlreadyOnServer_(remote){
   if(!remote || typeof remote !== 'object') return 0;
@@ -18161,42 +18167,66 @@ async function recoverOutboxAfterSlowPush_(){
   }
   return false;
 }
+function syncOutboxProgressStamp_(){
+  return (state.syncOutbox || []).map(function(op){
+    if(!op) return '';
+    return String(op.mutationId || '') + ':' + String(parseInt(op.version, 10) || 1) + ':' + String(op.baseEntityRevision || 0);
+  }).join('|');
+}
 function acknowledgeSyncOutbox_(accepted, sentMutations){
   var ackVer = {};
-  var ackKeys = {};
-  function note_(item){
-    if(!item) return;
-    if(item.mutationId) ackVer[item.mutationId] = parseInt(item.version, 10) || 1;
-    if(item.key) ackKeys[String(item.key)] = true;
-  }
-  (accepted || []).forEach(note_);
-  if(!accepted && sentMutations){
-    sentMutations.forEach(note_);
-  }
-  state.syncOutbox = (state.syncOutbox || []).filter(function(op){
-    if(!op || !op.key) return false;
-    // 기기 로컬·깨진 항목은 서버 ack 없이 제거
-    if(isDeviceLocalSyncEntityKey_(op.key)) return false;
-    if(!op.mutationId) return false;
-    var key = String(op.key);
-    var opV = parseInt(op.version, 10) || 1;
-    if(ackVer[op.mutationId] != null){
-      // 전송 중 version이 올라간 경우에도, 같은 mutation이면 ack version 이하는 제거
-      if(opV <= ackVer[op.mutationId]) return false;
-      return true;
-    }
-    // mutationId 불일치여도 같은 key가 수락됐으면 제거 (재전송 루프 차단)
-    if(ackKeys[key] && sentMutations){
-      var sent = null;
-      for(var i = 0; i < sentMutations.length; i++){
-        if(sentMutations[i] && String(sentMutations[i].key) === key){ sent = sentMutations[i]; break; }
-      }
-      if(sent && (parseInt(sent.version, 10) || 1) >= opV) return false;
-    }
-    return true;
+  var sentByKey = {};
+  (accepted || []).forEach(function(item){
+    if(!item || !item.mutationId) return;
+    ackVer[item.mutationId] = parseInt(item.version, 10) || 1;
   });
+  if(!accepted && sentMutations){
+    sentMutations.forEach(function(item){
+      if(item && item.mutationId) ackVer[item.mutationId] = parseInt(item.version, 10) || 1;
+    });
+  }
+  (sentMutations || []).forEach(function(item){
+    if(item && item.key) sentByKey[String(item.key)] = { version: parseInt(item.version, 10) || 1 };
+  });
+  var filter = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerFilterAckedOutbox)
+    ? PlannerSyncRules.plannerFilterAckedOutbox
+    : null;
+  if(filter){
+    state.syncOutbox = filter(state.syncOutbox || [], {
+      ack: ackVer,
+      sentByKey: sentByKey,
+      isDeviceLocal: isDeviceLocalSyncEntityKey_
+    });
+  }
   rebuildDirtyStateFromOutbox_();
   _syncFastAckPending_ = false;
+}
+function rotateIdempotentOutbox_(accepted){
+  var byId = {};
+  (accepted || []).forEach(function(item){
+    if(item && item.status === 'idempotent' && item.mutationId) byId[item.mutationId] = item;
+  });
+  var ids = Object.keys(byId);
+  if(!ids.length) return 0;
+  var n = 0;
+  (state.syncOutbox || []).forEach(function(op){
+    if(!op || !op.mutationId || !byId[op.mutationId]) return;
+    var rev = parseInt(byId[op.mutationId].entityRevision, 10) || 0;
+    if(rev) op.baseEntityRevision = rev;
+    bumpOutboxOpVersion_(op);
+    n++;
+  });
+  if(n) rebuildDirtyStateFromOutbox_();
+  return n;
+}
+function acknowledgeSyncBatch_(accepted, sentMutations){
+  if(!accepted){
+    acknowledgeSyncOutbox_(null, sentMutations);
+    return;
+  }
+  var ok = accepted.filter(function(item){ return !item || item.status !== 'idempotent'; });
+  rotateIdempotentOutbox_(accepted);
+  acknowledgeSyncOutbox_(ok, sentMutations);
 }
 function overlayOutboxOnPayload_(payload){
   var ops = state.syncOutbox || [];
@@ -18331,24 +18361,6 @@ function schedulePlannerGasPush_(immediate){
       }, 1200);
     }
     return;
-  }
-  if(isPlannerDesktopBrowser_() && !state._sessionUserEdit && hasPendingLocalSyncChanges_() && !plannerOutboxHasTeamContent_()){
-    var keepNewTopics = (state.syncOutbox || []).filter(outboxOpNeverAckedTopic_);
-    if(!keepNewTopics.length){
-      state.syncOutbox = [];
-      state.syncDirtyEntityKeys = {};
-      state.syncNeedsSnapshot = false;
-      state.syncDirty = false;
-      requestServerAuthorityInsteadOfFlood_();
-      return;
-    }
-    state.syncOutbox = keepNewTopics;
-    state.syncDirtyEntityKeys = {};
-    keepNewTopics.forEach(function(op){ if(op && op.key) state.syncDirtyEntityKeys[op.key] = true; });
-    state.syncNeedsSnapshot = false;
-    state.syncDirty = true;
-    state._sessionUserEdit = true;
-    try { rebuildDirtyStateFromOutbox_(); } catch(eKeepNew){}
   }
   if(shouldBlockStaleFloodPush_()){
     requestServerAuthorityInsteadOfFlood_();
@@ -18498,27 +18510,7 @@ function outboxOpNeverAckedTopic_(op){
   return base === 0 && known === 0;
 }
 function dropBulkOutboxUnlessChosen_(){
-  if(state._gapUploadActive || state._generalUploadOnly) return 0;
-  var before = (state.syncOutbox || []).length;
-  if(before <= 12) return 0;
-  var ids = {};
-  if(state.selectedId) ids[state.selectedId] = true;
-  if(state._syncFocusDraftIds){
-    Object.keys(state._syncFocusDraftIds).forEach(function(id){ ids[id] = true; });
-  }
-  var kept = (state.syncOutbox || []).filter(function(op){
-    if(!op || !op.key) return false;
-    if(op.localOnly || op.key === 'setting:surfaceDigest') return true;
-    if(outboxOpNeverAckedTopic_(op)) return true;
-    return !!(Object.keys(ids).length && syncKeyBelongsToDraftIds_(op.key, ids));
-  });
-  state.syncOutbox = kept;
-  state.syncDirtyEntityKeys = {};
-  kept.forEach(function(op){ if(op && op.key) state.syncDirtyEntityKeys[op.key] = true; });
-  state.syncNeedsSnapshot = false;
-  state.syncDirty = kept.length > 0;
-  try { rebuildDirtyStateFromOutbox_(); } catch(eBulkReb){}
-  return before - kept.length;
+  return 0;
 }
 async function plannerGasPushNow_(){
   var url = getPlannerGasUrl_();
@@ -18584,13 +18576,14 @@ async function plannerGasPushNow_(){
     var round = 0;
     var lastOkRevision = state.syncRevision;
     var outboxPrevRound = (state.syncOutbox || []).length;
+    var outboxPrevStamp = syncOutboxProgressStamp_();
     while(round < maxPatchRounds){
       round++;
-      if(round > 1 && (state.syncOutbox || []).length >= outboxPrevRound && !state._gapUploadActive && !state._generalUploadOnly){
-        try { dropBulkOutboxUnlessChosen_(); } catch(eStall){}
-        if((state.syncOutbox || []).length >= outboxPrevRound) break;
+      if(round > 1 && (state.syncOutbox || []).length >= outboxPrevRound && syncOutboxProgressStamp_() === outboxPrevStamp){
+        break;
       }
       outboxPrevRound = (state.syncOutbox || []).length;
+      outboxPrevStamp = syncOutboxProgressStamp_();
       if(round > 1){
         if(plannerSyncConflictPending_ || !state.syncDirty) break;
         body = getPersistPayload();
@@ -18655,7 +18648,7 @@ async function plannerGasPushNow_(){
     }
     }
     if((state._generalUploadOnly || state._gapUploadActive) && Array.isArray(data.conflicts) && data.conflicts.length){
-      acknowledgeSyncOutbox_(data.accepted || [], mutations);
+      acknowledgeSyncBatch_(data.accepted || [], mutations);
       if(state._gapUploadActive){
         var gapConflicts = data.conflicts.filter(function(conflict){
           return conflict && conflict.key && !isDeviceLocalSyncEntityKey_(conflict.key);
@@ -18704,14 +18697,14 @@ async function plannerGasPushNow_(){
           });
       });
       if(retryMissingDraft){
-        acknowledgeSyncOutbox_(data.accepted || [], mutations);
+        acknowledgeSyncBatch_(data.accepted || [], mutations);
         save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
         schedulePlannerGasPush_(true);
         return { ok: true, retryMissing: true };
       }
     }
     if(data && data.supabaseApplied){
-      acknowledgeSyncOutbox_(data.accepted || [], mutations);
+      acknowledgeSyncBatch_(data.accepted || [], mutations);
       if(Array.isArray(data.conflicts) && data.conflicts.length && !state._gapUploadActive && !state._generalUploadOnly){
         if(openPlannerOutboxConflict_(data.conflicts, null, 0)){
           if(plannerSyncConflictPending_){
@@ -18738,7 +18731,7 @@ async function plannerGasPushNow_(){
       return { ok: true, revision: state.syncRevision, batches: round };
     }
     if(Array.isArray(data.conflicts) && data.conflicts.length && data.payload){
-      acknowledgeSyncOutbox_(data.accepted || [], mutations);
+      acknowledgeSyncBatch_(data.accepted || [], mutations);
       applyServerPayloadPreservingOutbox_(data.payload, data.serverRevision);
       save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
       if(Array.isArray(data.accepted) && data.accepted.length){
@@ -18813,7 +18806,7 @@ async function plannerGasPushNow_(){
     }
     if(data.result === 'success' && data.payload){
       if(usePatch){
-        acknowledgeSyncOutbox_(data.accepted, mutations);
+        acknowledgeSyncBatch_(data.accepted, mutations);
         applyServerPayloadPreservingOutbox_(data.payload, data.serverRevision);
         clearPlannerGasRetry_();
         lastOkRevision = state.syncRevision;
@@ -21433,14 +21426,14 @@ function renderPlannerConflictUi_(pending){
         '<div class="sync-conflict-name">' + escapeHtml(plannerConflictLabel_(conflict.key)) + '</div>' + hint +
         '<div class="sync-conflict-options">' +
           '<label class="sync-conflict-option"><input type="radio" name="sync-conflict-' + i + '" value="remote"' + remoteChecked + '>' +
-            '<span><strong>서버 내용' + escapeHtml(remoteBy) + '</strong><span class="sync-conflict-preview">' + escapeHtml(plannerConflictPreview_(conflict.remote)) + '</span></span></label>' +
+            '<span><strong>서버 기준' + escapeHtml(remoteBy) + '</strong><span class="sync-conflict-preview">' + escapeHtml(plannerConflictPreview_(conflict.remote)) + '</span></span></label>' +
           '<label class="sync-conflict-option"><input type="radio" name="sync-conflict-' + i + '" value="local"' + localChecked + '>' +
-            '<span><strong>이 기기 내용' + escapeHtml(localBy) + '</strong><span class="sync-conflict-preview">' + escapeHtml(plannerConflictPreview_(conflict.local)) + '</span></span></label>' +
+            '<span><strong>이 기기 기준' + escapeHtml(localBy) + '</strong><span class="sync-conflict-preview">' + escapeHtml(plannerConflictPreview_(conflict.local)) + '</span></span></label>' +
         '</div></div>';
     }).join('');
     if(hidden > 0){
       html += '<div style="font-size:12px;color:#92400E;padding:8px 4px;">외 ' + hidden +
-        '건은 목록에서 생략됐어요. 「전부 이 기기로 적용」을 누르면 함께 맞춥니다.</div>';
+        '건은 목록에서 생략됐어요. 「이 기기 기준으로 맞추기」를 누르면 함께 맞춥니다.</div>';
     }
     list.innerHTML = html;
   }
@@ -21448,7 +21441,7 @@ function renderPlannerConflictUi_(pending){
   var applyBtnReset = document.getElementById('sync-conflict-apply');
   if(applyBtnReset){
     applyBtnReset.disabled = false;
-    applyBtnReset.textContent = '선택 내용 적용 후 동기화';
+    applyBtnReset.textContent = '선택한 쪽으로 맞추기';
   }
   var keepBtn = document.getElementById('sync-conflict-keep-local');
   if(keepBtn) keepBtn.disabled = false;
@@ -21491,7 +21484,7 @@ window.applyAllConflictsKeepLocal_ = function(){
   // 즉시 피드백 후 가벼운 경로 (전체 merge 금지)
   setTimeout(function(){
     keepLocalConflictsWithoutMerge_(snap.remote, snap.serverRevision, snap.conflicts || [], { fromUser: true });
-    if(applyBtn){ applyBtn.disabled = false; applyBtn.textContent = '선택 내용 적용 후 동기화'; }
+    if(applyBtn){ applyBtn.disabled = false; applyBtn.textContent = '선택한 쪽으로 맞추기'; }
     if(keepBtn) keepBtn.disabled = false;
   }, 0);
 };
@@ -21565,38 +21558,32 @@ function settleContentConflictsByLatest_(conflicts){
   var upload = [];
   var kept = 0;
   var rest = [];
+  var serverChoices = [];
   (conflicts || []).forEach(function(conflict){
     if(!conflict || !contentSyncConflictKey_(conflict.key)){
       rest.push(conflict);
       return;
     }
-    var localMs = parseIsoMs_(conflict.localAt);
-    var remoteMs = parseIsoMs_(conflict.remoteAt);
     var key = String(conflict.key);
-    if(localMs > remoteMs && localMs > 0){
+    var localRev = parseInt((state.syncEntityRevisions || {})[key], 10) || 0;
+    var remoteRev = parseInt(conflict.serverEntityRevision, 10) || 0;
+    var serverHigher = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerServerRevHigher)
+      ? PlannerSyncRules.plannerServerRevHigher(remoteRev, localRev)
+      : remoteRev > localRev;
+    if(!serverHigher && !(localRev > remoteRev)){
+      rest.push(conflict);
+      return;
+    }
+    if(localRev > remoteRev){
       copyMissingContentChannels_(conflict.local, conflict.remote);
       upload.push(conflict);
       return;
     }
     copyMissingContentChannels_(conflict.remote, conflict.local);
-    var payload = getPersistPayload();
-    setSyncEntity_(payload, key, conflict.remote);
-    var rev = parseInt(conflict.serverEntityRevision, 10) || 0;
-    if(rev){
-      if(!state.syncEntityRevisions) state.syncEntityRevisions = {};
-      state.syncEntityRevisions[key] = rev;
-    }
-    if(conflict.remoteAt){
-      if(!state.syncEntityUpdatedAt) state.syncEntityUpdatedAt = {};
-      state.syncEntityUpdatedAt[key] = conflict.remoteAt;
-    }
-    state.syncOutbox = (state.syncOutbox || []).filter(function(op){
-      return !(op && op.key === key);
-    });
-    if(state.syncDirtyEntityKeys) delete state.syncDirtyEntityKeys[key];
-    delete _conflictAutoKeepCount_[key];
+    serverChoices.push({ conflict: conflict, useLocal: false });
     kept++;
   });
+  if(serverChoices.length) applyMixedConflictChoices_(serverChoices, {});
   if(upload.length){
     forceOutboxOverwriteBase_(upload);
     upload.forEach(function(conflict){
@@ -21628,6 +21615,7 @@ function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
       remote: conflict.serverDeleted ? undefined : conflict.serverValue,
       localAt: op ? op.updatedAt : '',
       remoteAt: conflict.serverUpdatedAt || '',
+      serverDeleted: !!conflict.serverDeleted,
       serverEntityRevision: parseInt(conflict.serverEntityRevision, 10) || 0,
       mutationId: conflict.mutationId || (op && op.mutationId) || '',
       version: parseInt(conflict.version, 10) || (op && parseInt(op.version, 10)) || 1
@@ -21635,18 +21623,6 @@ function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
   }).filter(function(conflict){
     return !shouldSkipPlannerConflict_(conflict.key, conflict.local, conflict.remote);
   });
-  // 이 창은 서버가 더 새로워서가 아니라, 이 기기 outbox의 출발 번호와 서버 번호가 다를 때 열렸다.
-  // 글을 쓰는 쪽은 이 기기이므로 내용을 유지하고 서버 번호만 맞춰 다시 올린다.
-  if(conflicts.length){
-    forceOutboxOverwriteBase_(conflicts);
-    state.syncDirty = true;
-    try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true }); } catch(eKeepLocal){}
-    if(hasPendingLocalSyncChanges_()) schedulePlannerGasPush_(true);
-    if(typeof setAppToast === 'function'){
-      setAppToast('이 기기에서 쓰던 내용을 유지하고 서버에 맞추는 중이에요.', { duration: 2800, variant: 'ok' });
-    }
-    return false;
-  }
   if(!conflicts.length) return false;
   plannerSyncConflictPending_ = {
     mode: 'outbox',
@@ -21658,6 +21634,54 @@ function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
   pauseSyncForConflictUi_();
   renderPlannerConflictUi_(plannerSyncConflictPending_);
   return true;
+}
+function applyMixedConflictChoices_(choices, snap){
+  var payload = getPersistPayload();
+  if(!payload.syncEntityRevisions) payload.syncEntityRevisions = {};
+  if(!payload.syncEntityTombstones) payload.syncEntityTombstones = {};
+  if(!payload.syncEntityUpdatedAt) payload.syncEntityUpdatedAt = {};
+  payload.deletedDraftIds = Object.assign({}, state.deletedDraftIds || {}, payload.deletedDraftIds || {});
+  var localChoices = [];
+  var dropKeys = {};
+  (choices || []).forEach(function(choice){
+    var conflict = choice && choice.conflict;
+    var key = String((conflict && conflict.key) || '');
+    if(!key) return;
+    if(choice.useLocal){
+      localChoices.push(conflict);
+      return;
+    }
+    var serverDeleted = !!(conflict.serverDeleted || conflict.remote === undefined);
+    setSyncEntity_(payload, key, serverDeleted ? undefined : conflict.remote);
+    if(serverDeleted && key.indexOf('draft:') === 0){
+      payload.deletedDraftIds[key.slice('draft:'.length)] = conflict.remoteAt || new Date().toISOString();
+    }
+    var rev = parseInt(conflict.serverEntityRevision, 10) || 0;
+    if(rev) payload.syncEntityRevisions[key] = rev;
+    if(serverDeleted){
+      payload.syncEntityTombstones[key] = { revision: rev, deletedAt: conflict.remoteAt || new Date().toISOString() };
+    } else if(payload.syncEntityTombstones[key]){
+      delete payload.syncEntityTombstones[key];
+    }
+    payload.syncEntityUpdatedAt[key] = conflict.remoteAt || new Date().toISOString();
+    dropKeys[key] = true;
+  });
+  state.syncOutbox = (state.syncOutbox || []).filter(function(op){
+    return !(op && dropKeys[op.key]);
+  });
+  Object.keys(dropKeys).forEach(function(key){
+    if(state.syncDirtyEntityKeys) delete state.syncDirtyEntityKeys[key];
+    delete _conflictAutoKeepCount_[key];
+  });
+  var revAll = parseInt(snap && snap.serverRevision, 10) || 0;
+  if(revAll > (parseInt(payload.syncRevision, 10) || 0)) payload.syncRevision = revAll;
+  state._sessionUserEdit = true;
+  applyPersistPayload(payload, { skipRestorePending: true, replaceDeletedDraftIds: true });
+  if(localChoices.length) forceOutboxOverwriteBase_(localChoices);
+  try { rebuildDirtyStateFromOutbox_(); } catch(eMix){}
+  if(!plannerSyncBootstrapReady_) plannerSyncBootstrapReady_ = true;
+  state.syncDirty = hasPendingLocalSyncChanges_();
+  save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
 }
 /** @deprecated dropSkippableOutboxConflicts_ 사용 */
 function bumpOutboxBaseForSkippedConflicts_(serverConflicts){
@@ -21682,12 +21706,6 @@ window.applyPlannerConflictChoices_ = async function(){
   var choices = (pending.conflicts || []).map(function(conflict, i){
     var picked = document.querySelector('input[name="sync-conflict-' + i + '"]:checked');
     var useLocal = pending._forceAllLocal || !picked || picked.value === 'local';
-    var key = String(conflict.key || '');
-    if(!useLocal && (key.indexOf('generated:') === 0 || key.indexOf('published:') === 0) &&
-      hasUsableAiDraftContent_(unwrapSyncEntityValue_(conflict.local)) &&
-      !hasUsableAiDraftContent_(unwrapSyncEntityValue_(conflict.remote))){
-      useLocal = true;
-    }
     return { conflict: conflict, useLocal: useLocal };
   });
   var snap = pending;
@@ -21695,44 +21713,16 @@ window.applyPlannerConflictChoices_ = async function(){
 
   await new Promise(function(resolve){ setTimeout(resolve, 0); });
   try {
-    var heavy = isPlannerLocalStoreHeavy_() || isPlannerPayloadHeavy_(snap.local) || isPlannerPayloadHeavy_(snap.remote);
     var allLocal = choices.every(function(c){ return c.useLocal; });
-    // 대용량·전부 이 기기 → 전체 merge/푸시 대기 없이 즉시 종료
-    if(heavy || allLocal || snap._forceAllLocal){
+    if(allLocal || snap._forceAllLocal){
       keepLocalConflictsWithoutMerge_(snap.remote, snap.serverRevision, snap.conflicts || [], { fromUser: true });
       return;
     }
-    // 소량 + 서버 선택 있음: 키만 반영 (전체 mergePlannerPayloads_ 금지)
-    choices.forEach(function(choice){
-      var conflict = choice.conflict;
-      var key = String(conflict.key || '');
-      if(choice.useLocal){
-        state.syncDirtyEntityKeys[key] = true;
-        return;
-      }
-      setSyncEntity_(getPersistPayload(), key, conflict.remote);
-      if(!state.syncEntityUpdatedAt) state.syncEntityUpdatedAt = {};
-      state.syncEntityUpdatedAt[key] = conflict.remoteAt || new Date().toISOString();
-      delete state.syncDirtyEntityKeys[key];
-      if(snap.mode === 'outbox'){
-        state.syncOutbox = (state.syncOutbox || []).filter(function(op){
-          return !(op && op.key === key);
-        });
-      }
-    });
-    var rev = parseInt(snap.serverRevision, 10) || state.syncRevision || 0;
-    if(rev > (parseInt(state.syncRevision, 10) || 0)) state.syncRevision = rev;
-    if(snap.remote && snap.remote.syncEntityUpdatedAt){
-      state.syncBaseEntityUpdatedAt = Object.assign({}, snap.remote.syncEntityUpdatedAt);
-    }
-    state.syncDirty = Object.keys(state.syncDirtyEntityKeys || {}).length > 0;
-    state.syncNeedsSnapshot = true;
-    if(!plannerSyncBootstrapReady_) plannerSyncBootstrapReady_ = true;
-    save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+    applyMixedConflictChoices_(choices, snap);
     if(typeof setAppToast === 'function'){
-      setAppToast('선택 내용을 이 기기에 반영했어요. 서버 저장은 백그라운드에서 이어갑니다.', { duration: 4500, variant: 'ok' });
+      setAppToast('선택한 쪽으로 맞췄어요. 이 기기에 남긴 항목은 이어서 올립니다.', { duration: 4500, variant: 'ok' });
     }
-    schedulePlannerGasPush_(true);
+    if(hasPendingLocalSyncChanges_()) schedulePlannerGasPush_(true);
   } catch(err){
     console.warn('[충돌 적용]', err);
     plannerSyncConflictPending_ = snap;
@@ -21740,12 +21730,12 @@ window.applyPlannerConflictChoices_ = async function(){
     openScrollLockedOverlayEl_(recoverOverlay);
     if(typeof setAppToast === 'function'){
       setAppToast('충돌 적용 중 오류가 났어요.\n' + ((err && err.message) || err) +
-        '\n「전부 이 기기로 적용」을 권장합니다.', { duration: 7000, variant: 'err' });
+        '\n「이 기기 기준으로 맞추기」를 권장합니다.', { duration: 7000, variant: 'err' });
     }
   } finally {
     if(applyBtn && document.body.contains(applyBtn)){
       applyBtn.disabled = false;
-      applyBtn.textContent = '선택 내용 적용 후 동기화';
+      applyBtn.textContent = '선택한 쪽으로 맞추기';
     }
   }
 };
@@ -24598,6 +24588,7 @@ function suggestPlannerSwRefresh_(reason, opts){
   var editing = typeof isEditableTextFieldFocused_ === 'function' && isEditableTextFieldFocused_();
   if(opts.preferReload && !dirty && !editing && !plannerSyncConflictPending_){
     try { sessionStorage.setItem('ht_planner_sw_refresh_prompted', '1'); } catch(e1){}
+    try { location.reload(); } catch(eReload){}
     return;
   }
   try { sessionStorage.setItem('ht_planner_sw_refresh_prompted', '1'); } catch(e2){}
@@ -24647,7 +24638,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=199').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=395').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -24669,7 +24660,7 @@ function setupPlannerServiceWorker_(){
   if(!window.__plannerSwControllerBound){
     window.__plannerSwControllerBound = true;
     navigator.serviceWorker.addEventListener('controllerchange', function(){
-      suggestPlannerSwRefresh_('controllerchange', { preferReload: false });
+      suggestPlannerSwRefresh_('controllerchange', { preferReload: true });
     });
   }
 }
@@ -39221,20 +39212,6 @@ function focusSyncOutboxOnDraft_(draftId){
   var ids = {};
   ids[draftId] = true;
   state._syncFocusDraftIds = ids;
-  state.syncOutbox = (state.syncOutbox || []).filter(function(op){
-    if(!op || !op.key) return false;
-    if(op.key === 'setting:surfaceDigest') return true;
-    if(syncKeyBelongsToDraftIds_(op.key, ids)) return true;
-    return outboxOpNeverAckedTopic_(op);
-  });
-  Object.keys(state.syncDirtyEntityKeys || {}).forEach(function(key){
-    if(syncKeyBelongsToDraftIds_(key, ids) || key === 'setting:surfaceDigest') return;
-    if(key.indexOf('blob:') === 0) return;
-    var kept = (state.syncOutbox || []).some(function(op){ return op && op.key === key; });
-    if(!kept) delete state.syncDirtyEntityKeys[key];
-  });
-  state.syncNeedsSnapshot = false;
-  rebuildDirtyStateFromOutbox_();
 }
 function ensureDraftSyncKeysQueued_(draftId){
   if(!draftId) return;

@@ -304,6 +304,68 @@ var PlannerSyncRules = (function(){
     return { count: n, safeMode: n >= limit, clearAfterMs: 12000 };
   }
 
+  function plannerParseDateMs(value){
+    if(value == null || value === '') return NaN;
+    if(typeof value === 'number') return isNaN(value) ? NaN : value;
+    var s = String(value).trim();
+    var day = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(day) return new Date(parseInt(day[1], 10), parseInt(day[2], 10) - 1, parseInt(day[3], 10)).getTime();
+    var t = Date.parse(s);
+    return isNaN(t) ? NaN : t;
+  }
+
+  function plannerMonthDayLabel(ms){
+    if(!ms) return '-';
+    var d = new Date(ms);
+    if(isNaN(d.getTime())) return '-';
+    return (d.getMonth() + 1) + '.' + d.getDate() + '.';
+  }
+
+  function plannerDraftCreatedMs(draft){
+    draft = draft || {};
+    var created = plannerParseDateMs(draft.createdAt);
+    if(!isNaN(created)) return created;
+    var m = String(draft.id || '').match(/-c(\d+)$/);
+    if(m){
+      var n = parseInt(m[1], 10);
+      if(!isNaN(n) && n > 1000000000000) return n;
+    }
+    var updated = plannerParseDateMs(draft.updatedAt);
+    if(!isNaN(updated)) return updated;
+    return 0;
+  }
+
+  // 목록에 보이는 날짜. 생성일보다 늦은 수정·활동이 있으면 그 날짜.
+  function plannerDraftListDate(draft){
+    draft = draft || {};
+    var created = plannerDraftCreatedMs(draft);
+    var touch = 0;
+    var activity = plannerParseDateMs(draft.activityAt);
+    var updated = plannerParseDateMs(draft.updatedAt);
+    if(!isNaN(activity)) touch = activity;
+    if(!isNaN(updated) && updated > touch) touch = updated;
+    var ms = touch > created ? touch : created;
+    var label = plannerMonthDayLabel(ms);
+    var createdLabel = plannerMonthDayLabel(created);
+    var edited = !!(touch && created && touch > created && label !== '-' && label !== createdLabel);
+    return { label: label, edited: edited, ms: ms || 0 };
+  }
+
+  function plannerNoteDraftActivity(draft, iso){
+    var next = {};
+    Object.keys(draft || {}).forEach(function(key){ next[key] = draft[key]; });
+    next.activityAt = iso;
+    next.updatedAt = iso;
+    return next;
+  }
+
+  function plannerDraftActivityDay(iso){
+    var ms = plannerParseDateMs(iso);
+    if(isNaN(ms)) return '';
+    var d = new Date(ms);
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
+
   // 이미 한 장을 줄이는 중이면 null. 아니면 대기열의 첫 장만.
   function plannerNextBlobCompress(queue, active){
     if(active) return null;
@@ -432,6 +494,9 @@ var PlannerSyncRules = (function(){
     plannerAcceptedUploadKeys: plannerAcceptedUploadKeys,
     plannerBootCrashState: plannerBootCrashState,
     plannerNextBlobCompress: plannerNextBlobCompress,
+    plannerDraftListDate: plannerDraftListDate,
+    plannerNoteDraftActivity: plannerNoteDraftActivity,
+    plannerDraftActivityDay: plannerDraftActivityDay,
     plannerAcceptedSentByKey: plannerAcceptedSentByKey,
     plannerTopicSlot: plannerTopicSlot,
     plannerCompareTopicOrder: plannerCompareTopicOrder,

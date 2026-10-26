@@ -281,6 +281,20 @@ assert(boot3.count === 3 && boot3.safeMode === true && boot3.clearAfterMs === 12
 assert(R.plannerNextBlobCompress(['h1', 'h2'], true) === null, 'compression waits while one image is running');
 assert(R.plannerNextBlobCompress(['h1', 'h2'], false) === 'h1', 'compression takes the first image only');
 
+var julyDraft = { id: 'd4-c1784719203187', topic: '목 설명', createdAt: '2026-07-24', activityAt: '2026-07-24' };
+var julyDate = R.plannerDraftListDate(julyDraft);
+assert(julyDate.label === '7.24.' && julyDate.edited === false, 'an untouched July draft still shows 7.24.');
+var editedDraft = R.plannerNoteDraftActivity(julyDraft, '2026-10-26T09:00:00');
+assert(editedDraft.topic === '목 설명' && editedDraft.activityAt === '2026-10-26T09:00:00', 'a content edit keeps the topic and stamps activity');
+var octoberDate = R.plannerDraftListDate(editedDraft);
+assert(octoberDate.label === '10.26.' && octoberDate.edited === true && octoberDate.ms > julyDate.ms, 'the list date moves to the edit day');
+var thumbDraft = R.plannerNoteDraftActivity(julyDraft, '2026-10-26');
+assert(R.plannerDraftListDate(thumbDraft).label === '10.26.', 'thumbnail creation uses the new activity day');
+assert(R.plannerDraftActivityDay(julyDraft.activityAt) !== R.plannerDraftActivityDay(editedDraft.activityAt), 'a new activity day is a sync change');
+assert(R.plannerDraftActivityDay('2026-10-26T01:00:00') === R.plannerDraftActivityDay('2026-10-26T20:00:00'), 'the same local day does not count as a new sync day');
+var newerUpdated = R.plannerDraftListDate({ id: 'd4-c1', createdAt: '2026-07-24', activityAt: '2026-07-24', updatedAt: '2026-10-26' });
+assert(newerUpdated.label === '10.26.' && newerUpdated.edited === true, 'a newer updatedAt is shown even when activityAt is still July');
+
 if(failed){
   console.error(failed + ' assertion(s) failed');
   process.exit(1);

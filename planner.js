@@ -8404,12 +8404,64 @@ function formatYearPeriodCreatedLabel_(iso){
     return d.getFullYear() + '.' + (d.getMonth() + 1) + '.' + d.getDate();
   } catch(e){ return '—'; }
 }
+function sheetScrollBox_(el){
+  var body = document.getElementById('sheet-body');
+  if(body && el && body.contains(el)) return body;
+  return null;
+}
+var _sheetScrollGuardUntil_ = 0;
+function armSheetScrollGuard_(box){
+  if(box && box.scrollTop > 8) box._plannerHoldScroll = box.scrollTop;
+  _sheetScrollGuardUntil_ = Date.now() + 420;
+}
+function restoreSheetScrollIfJumped_(){
+  if(Date.now() > _sheetScrollGuardUntil_) return;
+  var box = document.getElementById('sheet-body');
+  if(!box || !isSheetEditFocused_()) return;
+  var top = box._plannerHoldScroll || 0;
+  if(top > 24 && box.scrollTop < 8) box.scrollTop = top;
+}
+function holdSheetScroll_(box, top){
+  if(!box || !(top > 24)) return;
+  box._plannerHoldScroll = top;
+  armSheetScrollGuard_(box);
+  [0, 40, 120, 280].forEach(function(ms){
+    var run = function(){ restoreSheetScrollIfJumped_(); };
+    if(ms === 0) requestAnimationFrame(run);
+    else setTimeout(run, ms);
+  });
+}
+function bindSheetEditScrollGuard_(){
+  if(window.__sheetEditScrollGuard) return;
+  window.__sheetEditScrollGuard = true;
+  var box = document.getElementById('sheet-body');
+  if(box){
+    box.addEventListener('scroll', function(){
+      if(box.scrollTop > 8) box._plannerHoldScroll = box.scrollTop;
+    }, { passive: true });
+  }
+  document.addEventListener('focusin', function(ev){
+    var t = ev.target;
+    if(!t || !t.classList || !t.classList.contains('sheet-edit')) return;
+    var scroller = document.getElementById('sheet-body');
+    if(scroller && scroller.scrollTop > 8) scroller._plannerHoldScroll = scroller.scrollTop;
+    armSheetScrollGuard_(scroller);
+  });
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', restoreSheetScrollIfJumped_);
+    window.visualViewport.addEventListener('scroll', restoreSheetScrollIfJumped_);
+  }
+}
 function autoGrowTextarea_(ta){
   if(!ta || ta.nodeName !== 'TEXTAREA') return;
   if(ta._growRaf) return;
   ta._growRaf = requestAnimationFrame(function(){
     ta._growRaf = 0;
     if(!ta.isConnected) return;
+    var box = sheetScrollBox_(ta);
+    var top = box ? box.scrollTop : 0;
+    var anchor = 0;
+    if(box) anchor = ta.getBoundingClientRect().top - box.getBoundingClientRect().top;
     ta.style.height = 'auto';
     ta.style.overflowY = 'hidden';
     var style = window.getComputedStyle(ta);
@@ -8422,6 +8474,13 @@ function autoGrowTextarea_(ta){
     var minH = Math.ceil(lineH * minRows + pad + border);
     var next = Math.max(minH, ta.scrollHeight + 2);
     ta.style.height = next + 'px';
+    if(!box) return;
+    var nextAnchor = ta.getBoundingClientRect().top - box.getBoundingClientRect().top;
+    var restored = top + (nextAnchor - anchor);
+    if(restored < 0) restored = 0;
+    box.scrollTop = restored;
+    if(restored > 8) box._plannerHoldScroll = restored;
+    holdSheetScroll_(box, restored);
   });
 }
 function autoGrowTextareas_(rootEl){
@@ -25074,7 +25133,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=402').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=403').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -25212,6 +25271,7 @@ window.onload = () => {
   driveGsiWarmup_();
   driveSilentWarmup_();
   startDriveTokenRefreshLoop_();
+  bindSheetEditScrollGuard_();
   if(!oauthReturned) consumeDeepLinkFromHash_();
   else setTimeout(function(){ consumeDeepLinkFromHash_(); }, 300);
   setTimeout(function(){
@@ -26016,19 +26076,27 @@ function getDraftCreatedDateLabel_(d) {
   return formatDraftMonthDayLabel_(getDraftCreatedAtMs_(d));
 }
 function getDraftListActivityMs_(d){
+  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerDraftListDate){
+    return PlannerSyncRules.plannerDraftListDate(d || {}).ms || 0;
+  }
   if(!d) return 0;
   var created = getDraftCreatedAtMs_(d) || 0;
   var touch = 0;
   if(d.activityAt){
     var a = parsePlannerDateMs_(d.activityAt);
     if(!isNaN(a)) touch = a;
-  } else if(typeof draftHasContent === 'function' && draftHasContent(d) && d.updatedAt){
+  }
+  if(d.updatedAt){
     var u = parsePlannerDateMs_(d.updatedAt);
-    if(!isNaN(u)) touch = u;
+    if(!isNaN(u) && u > touch) touch = u;
   }
   return touch > created ? touch : created;
 }
 function getDraftListDateInfo_(d) {
+  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerDraftListDate){
+    var info = PlannerSyncRules.plannerDraftListDate(d || {});
+    return { label: info.label, edited: !!info.edited };
+  }
   var createdMs = getDraftCreatedAtMs_(d);
   var activityMs = getDraftListActivityMs_(d);
   var createdLabel = formatDraftMonthDayLabel_(createdMs);
@@ -32849,10 +32917,35 @@ function composeSheetTabLayout_(tab, restHtml){
 function scrollSheetBodyToStart_(){
   var body = document.getElementById('sheet-body');
   if(!body) return;
+  if(isSheetEditFocused_()) return;
   requestAnimationFrame(function(){
+    if(isSheetEditFocused_()) return;
     body.scrollTop = 0;
     scheduleWorkshopTextareaGrow_(body);
   });
+}
+function scrollSheetFieldHeaderIntoView_(fieldId){
+  var body = document.getElementById('sheet-body');
+  var ta = fieldId ? document.getElementById(fieldId) : null;
+  if(!body || !ta) return;
+  var header = ta.closest && ta.closest('.cb') && ta.closest('.cb').querySelector('.cb-label');
+  var target = header || ta;
+  function place(){
+    if(!body.isConnected || !target.isConnected) return;
+    var sticky = body.querySelector('.sheet-tabs-scroll');
+    var stickyH = sticky ? sticky.getBoundingClientRect().height : 0;
+    var delta = target.getBoundingClientRect().top - body.getBoundingClientRect().top - stickyH;
+    var next = body.scrollTop + delta;
+    if(next < 0) next = 0;
+    body.scrollTop = next;
+    body._plannerHoldScroll = next;
+  }
+  requestAnimationFrame(function(){
+    place();
+    requestAnimationFrame(place);
+  });
+  setTimeout(place, 60);
+  setTimeout(place, 320);
 }
 
 function clampMangoTitle_(s){
@@ -36876,9 +36969,13 @@ async function persistThumbMakerToDraft_(copy){
     state.published[draftId].content = content;
   }
   state.generatedOnly[draftId] = content;
+  var thumbDraft = getCurrentDraftForThumb_();
+  if(thumbDraft) stampDraftActivity_(thumbDraft);
+  try { paintDraftListDate_(draftId); } catch(eThumbDate){}
   try {
     save({ skipDriveUpload: true, gasImmediate: false });
   } catch(eSave){}
+  try { ensureDraftSyncKeysQueued_(draftId); } catch(eThumbSync){}
 
   schedulePersistThumbWorkspace_(true);
   try {
@@ -38467,8 +38564,11 @@ function renderSheetEmpty(draft, cat) {
 }
 
 
-function renderSheetContent(content) {
+function renderSheetContent(content, opts) {
+  opts = opts || {};
   const tab = state.activeTab;
+  var sheetBox = document.getElementById('sheet-body');
+  var keepScroll = sheetBox ? sheetBox.scrollTop : 0;
   var focusSnap = captureTextFieldFocus_();
   if(focusSnap && content){
     content = JSON.parse(JSON.stringify(content));
@@ -38653,7 +38753,18 @@ function renderSheetContent(content) {
     var topicPreviewSrc = topicPreview && (topicPreview.getAttribute('src') || '');
     if(topicPreviewSrc) fillTopicPhotoPreview_(topicPreviewSrc);
   }
-  scrollSheetBodyToStart_();
+  if(opts.scrollFieldId){
+    scrollSheetFieldHeaderIntoView_(opts.scrollFieldId);
+  } else if(focusSnap && keepScroll > 8){
+    var kept = document.getElementById('sheet-body');
+    if(kept){
+      kept.scrollTop = keepScroll;
+      kept._plannerHoldScroll = keepScroll;
+      holdSheetScroll_(kept, keepScroll);
+    }
+  } else {
+    scrollSheetBodyToStart_();
+  }
 }
 
 
@@ -39602,7 +39713,7 @@ function sheetEditField_(label, id, value, opts){
     (opts.regen ? ';onSheetFieldInput_(this)' : '') +
     (opts.stepPreview ? ';renderSelfCareStepsPreview_(this)' : '') +
     (opts.syncTopic ? ';onSheetTitleSyncTopic_(this)' : '');
-  var onblur = opts.syncTopic ? ' onblur="flushSheetTitleBackgroundWork_()"' : '';
+  var onblur = ' onblur="onSheetFieldBlur_(this)' + (opts.syncTopic ? ';flushSheetTitleBackgroundWork_()' : '') + '"';
   var previewAttr = opts.stepPreview ? ' data-selfcare-preview="1"' : '';
   var previewHost = opts.stepPreview ? '<div class="selfcare-steps" data-steps-for="' + id + '"></div>' : '';
   return '<div class="' + wrapCls + '"><div class="cb-label">' + escapeHtml(label) + tools + '</div>' + help +
@@ -39868,6 +39979,55 @@ function findSheetFieldTextarea_(btnOrKey){
 }
 window.onSheetFieldInput_ = function(ta){
   updateSheetFieldPolishBtn_(ta);
+  var box = sheetScrollBox_(ta);
+  if(box && box.scrollTop > 8) box._plannerHoldScroll = box.scrollTop;
+  armSheetScrollGuard_(box);
+  state._sheetDomDirty = true;
+  noteSheetDraftActivity_();
+  scheduleSheetQuietSave_();
+};
+var _sheetQuietSaveTimer_ = 0;
+function noteSheetDraftActivity_(){
+  var draftId = state.selectedId;
+  var draft = findDraftByIdAnywhere_(draftId);
+  if(!draft) return;
+  var before = getDraftListDateInfo_(draft);
+  stampDraftActivity_(draft);
+  var after = getDraftListDateInfo_(draft);
+  if(before.label !== after.label || before.edited !== after.edited) paintDraftListDate_(draftId);
+}
+function scheduleSheetQuietSave_(){
+  if(_sheetQuietSaveTimer_) clearTimeout(_sheetQuietSaveTimer_);
+  _sheetQuietSaveTimer_ = setTimeout(flushSheetQuietSave_, 1000);
+}
+function flushSheetQuietSave_(){
+  _sheetQuietSaveTimer_ = 0;
+  if(!state._sheetDomDirty) return;
+  var draftId = state.selectedId;
+  if(!draftId) return;
+  state._sheetDomDirty = false;
+  var content = getDraftContent_(draftId);
+  if(!content) return;
+  applySheetEditsForTab_(content, state.activeTab);
+  var draft = findDraftByIdAnywhere_(draftId);
+  if(draft) stampDraftActivity_(draft);
+  if(!state.published[draftId]) state.published[draftId] = {};
+  state.published[draftId].content = content;
+  state.generatedOnly[draftId] = content;
+  paintDraftListDate_(draftId);
+  focusSyncOutboxOnDraft_(draftId);
+  try { save({ gasImmediate: false, driveImmediate: false }); }
+  finally {
+    try { ensureDraftSyncKeysQueued_(draftId); } catch(eQuiet){}
+    state._syncFocusDraftIds = null;
+  }
+}
+window.onSheetFieldBlur_ = function(){
+  if(_sheetQuietSaveTimer_){
+    clearTimeout(_sheetQuietSaveTimer_);
+    _sheetQuietSaveTimer_ = 0;
+  }
+  flushSheetQuietSave_();
 };
 function updateSheetFieldPolishBtn_(ta){
   if(!ta || !ta.id) return;
@@ -40085,7 +40245,7 @@ window.polishSheetField_ = async function(key, btn){
       syncDraftTopicFromTitle_(block[meta.__field], { draftId: draftId, save: false });
     }
     persistDraftContent_(draftId, content);
-    renderSheetContent(content);
+    renderSheetContent(content, { scrollFieldId: ta && ta.id });
     setAppToast('「' + meta.label + '」을 다듬었어요.', { duration: 2800, variant: 'ok' });
   } catch(e){
     setAppToast('글 다듬기에 실패했어요: ' + ((e && e.message) || String(e)), { duration: 6000, variant: 'err' });
@@ -40217,13 +40377,20 @@ function renderSelfCareStepsPreview_(ta){
   if(!host) return;
   var raw = String(ta.value || '').trim();
   var steps = parseSelfCareSteps_(raw);
-  if(!raw || steps.length <= 1){ host.innerHTML = ''; return; }
+  var box = document.getElementById('sheet-body');
+  var top = box ? box.scrollTop : 0;
+  if(!raw || steps.length <= 1){
+    if(host.innerHTML) host.innerHTML = '';
+    if(box && top) box.scrollTop = top;
+    return;
+  }
   host.innerHTML = '<div class="selfcare-steps-title">따라하기 미리보기</div>' +
     steps.map(function(s, i){
       var body = escapeHtml(s.replace(SELFCARE_STEP_STRIP_RE_, '')).replace(/\n/g, '<br/>');
       return '<div class="selfcare-step"><span class="selfcare-step-no">' + (i + 1) + '</span>' +
         '<div class="selfcare-step-body">' + body + '</div></div>';
     }).join('');
+  if(box && top) box.scrollTop = top;
 }
 
 function renderAllSelfCareStepPreviews_(){
@@ -40310,8 +40477,35 @@ function saveFocusedDraftChange_(draftId){
 function stampDraftActivity_(draft){
   if(!draft) return;
   var now = new Date().toISOString();
+  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerNoteDraftActivity){
+    var noted = PlannerSyncRules.plannerNoteDraftActivity(draft, now);
+    draft.activityAt = noted.activityAt;
+    draft.updatedAt = noted.updatedAt;
+    return;
+  }
   draft.activityAt = now;
   draft.updatedAt = now;
+}
+function paintDraftListDate_(draftId){
+  if(!draftId) return;
+  var draft = findDraftByIdAnywhere_(draftId);
+  if(!draft) return;
+  var info = getDraftListDateInfo_(draft);
+  var cards = document.querySelectorAll('.draft-card[data-draft-id="' + draftId + '"]');
+  for(var i = 0; i < cards.length; i++){
+    var badge = cards[i].querySelector('.topic-line-created');
+    if(badge){
+      badge.textContent = info.label;
+      badge.title = info.edited ? '수정일' : '생성일';
+    }
+    var spans = cards[i].querySelectorAll('.card-intent-dates span');
+    for(var s = 0; s < spans.length; s++){
+      var text = spans[s].textContent || '';
+      if(text.indexOf('수정 ') === 0 || text.indexOf('생성 ') === 0){
+        spans[s].textContent = (info.edited ? '수정 ' : '생성 ') + info.label;
+      }
+    }
+  }
 }
 function persistDraftContent_(draftId, content){
   flushSheetTitleBackgroundWork_({ save: false });
@@ -40322,6 +40516,7 @@ function persistDraftContent_(draftId, content){
   state.published[draftId].content = content;
   state.generatedOnly[draftId] = content;
   saveFocusedDraftChange_(draftId);
+  try { paintDraftListDate_(draftId); } catch(eDate){}
 }
 
 var sheetTitleBgTimer_ = null;

@@ -13538,9 +13538,13 @@ function getBranchBookingDirectionsFooterText_(brand){
 }
 function getRealFaceBlogFooterText_(){
   return [
-    '👇리얼 페이스는 약수점·인천점 모두 박준규 원장이 직접 진행합니다',
+    '👇리얼 페이스는 인천점에서 박준규 원장이 직접 진행합니다',
     '',
-    getBranchBookingDirectionsFooterText_('리얼 페이스')
+    '👇리얼 페이스 인천점 네이버 예약',
+    REAL_MOVEMENT_BOOKING_INCHEON_URL,
+    '',
+    '👇인천점 오시는 길',
+    REAL_MOVEMENT_DIRECTIONS_INCHEON_URL
   ].join('\n');
 }
 /** 리얼무브먼트·리얼페이스 블로그 말미: 네이버 예약 + 오시는 길 */
@@ -13559,7 +13563,7 @@ function withRealMovementBlogFooter_(text, catId){
   if(!body || !isBranchBookingBlogCategory_(catId)) return body;
   var footer = getBranchBlogFooterText_(catId);
   if(!footer) return body;
-  if(body.indexOf(REAL_MOVEMENT_BOOKING_YAKSU_URL) !== -1) return body;
+  if(body.indexOf(REAL_MOVEMENT_BOOKING_YAKSU_URL) !== -1 || body.indexOf(REAL_MOVEMENT_BOOKING_INCHEON_URL) !== -1) return body;
   return body + '\n\n' + footer;
 }
 function getExpertCourseBlogFooterText_(catId){

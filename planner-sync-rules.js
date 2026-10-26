@@ -29,9 +29,12 @@ var PlannerSyncRules = (function(){
     ctx = ctx || {};
     var ack = ctx.ack || {};
     var sentByKey = ctx.sentByKey || {};
+    var holdKeys = ctx.holdKeys || {};
     var isDeviceLocal = ctx.isDeviceLocal || function(){ return false; };
     function wouldDrop(op){
       if(!op || !op.key) return true;
+      // 충돌 키는 사용자가 어느 쪽을 남길지 고르기 전까지 대기열에서 빼지 않는다.
+      if(holdKeys[String(op.key)]) return false;
       if(isDeviceLocal(op.key)) return true;
       if(!op.mutationId) return true;
       var opV = parseInt(op.version, 10) || 1;
@@ -132,6 +135,119 @@ var PlannerSyncRules = (function(){
     return (ops || []).slice();
   }
 
+  // 약 2.2MB(문자 수). 이보다 긴 data URL은 동기화 묶음에서 조용히 빠지던 한도.
+  var PLANNER_SYNC_BLOB_MAX_CHARS = 2200000;
+  // 한도 복구 때, 대기열에 없는 사본만 지울 큰 사진·영상 기준.
+  var PLANNER_QUOTA_IMAGE_CHARS = 180000;
+
+  function plannerConflictHoldKeys(conflicts){
+    var hold = {};
+    (conflicts || []).forEach(function(conflict){
+      var key = conflict && conflict.key;
+      if(key) hold[String(key)] = true;
+    });
+    return hold;
+  }
+
+  // 서버가 수락한 키만 「보낸 것」으로 친다. 충돌로 돌아온 키는 사용자가 고르기 전까지 대기열에 남긴다.
+  function plannerAcceptedSentByKey(sentMutations, accepted){
+    var ack = {};
+    (accepted || []).forEach(function(item){
+      if(item && item.mutationId) ack[String(item.mutationId)] = true;
+    });
+    var sentByKey = {};
+    (sentMutations || []).forEach(function(item){
+      if(!item || !item.key || !item.mutationId || !ack[String(item.mutationId)]) return;
+      var key = String(item.key);
+      var version = parseInt(item.version, 10) || 1;
+      var prev = sentByKey[key];
+      if(!prev || version >= prev.version) sentByKey[key] = { version: version };
+    });
+    return sentByKey;
+  }
+
+  function plannerTopicSlot(step){
+    if(step == null) return null;
+    var text = String(step).trim();
+    if(!text) return null;
+    var slashed = text.match(/^(\d+)\s*\/\s*(\d+)/);
+    if(slashed){
+      var n = parseInt(slashed[1], 10);
+      return n >= 1 ? n : null;
+    }
+    if(!/^\d+$/.test(text)) return null;
+    var plain = parseInt(text, 10);
+    return plain >= 1 ? plain : null;
+  }
+
+  // mode 'activity'일 때만 최근 활동이 먼저. 기본은 사용자가 둔 슬롯, 그다음 목록 순서.
+  function plannerCompareTopicOrder(a, b, mode){
+    a = a || {};
+    b = b || {};
+    if(mode === 'activity'){
+      var ta = parseInt(a.activityMs, 10) || 0;
+      var tb = parseInt(b.activityMs, 10) || 0;
+      if(ta !== tb) return tb - ta;
+    }
+    var sa = a.slot == null ? 1000000000 : a.slot;
+    var sb = b.slot == null ? 1000000000 : b.slot;
+    if(sa !== sb) return sa - sb;
+    var ia = parseInt(a.index, 10);
+    var ib = parseInt(b.index, 10);
+    if(isNaN(ia)) ia = 0;
+    if(isNaN(ib)) ib = 0;
+    return ia - ib;
+  }
+
+  function plannerQuotaTrimPlan(input){
+    input = input || {};
+    var queued = {};
+    var kept = [];
+    (input.outbox || []).forEach(function(op){
+      if(!op || !op.key) return;
+      queued[String(op.key)] = true;
+      kept.push(op);
+    });
+    var trimGeneratedIds = [];
+    (input.generatedIds || []).forEach(function(id){
+      id = String(id || '');
+      if(!id) return;
+      if(queued['generated:' + id] || queued['published:' + id] || queued['draft:' + id]) return;
+      trimGeneratedIds.push(id);
+    });
+    return {
+      keepOutbox: true,
+      outbox: kept,
+      trimGeneratedIds: trimGeneratedIds,
+      trimImages: true,
+      clearCaches: true
+    };
+  }
+
+  function plannerDataUrlOverLimit(url, maxChars){
+    url = String(url || '');
+    if(url.indexOf('data:image') !== 0 && url.indexOf('data:video') !== 0) return false;
+    return url.length > (parseInt(maxChars, 10) || PLANNER_QUOTA_IMAGE_CHARS);
+  }
+
+  function plannerBlobSyncAction(blob){
+    var data = String(blob && blob.data || '');
+    if(!blob || !blob.hash || !data) return { action: 'skip', notice: '' };
+    if(data.length <= PLANNER_SYNC_BLOB_MAX_CHARS) return { action: 'queue', notice: '' };
+    if(data.indexOf('data:image') === 0){
+      return {
+        action: 'compress',
+        notice: '사진이 약 2.2MB를 넘어요. 크기를 줄여 동기화 대기열에 넣습니다.'
+      };
+    }
+    return {
+      action: 'reject',
+      notice: data.indexOf('data:video') === 0
+        ? '영상이 약 2.2MB를 넘어 동기화에 올리지 못했어요. 더 짧은 영상으로 다시 올려 주세요.'
+        : '파일이 약 2.2MB를 넘어 동기화에 올리지 못했어요.'
+    };
+  }
+
   return {
     plannerIsAuthFailure: plannerIsAuthFailure,
     plannerNextMutation: plannerNextMutation,
@@ -141,6 +257,15 @@ var PlannerSyncRules = (function(){
     plannerIncrementalCursor: plannerIncrementalCursor,
     plannerKeysetAdvance: plannerKeysetAdvance,
     plannerServerRevHigher: plannerServerRevHigher,
-    plannerTrimOutbox: plannerTrimOutbox
+    plannerTrimOutbox: plannerTrimOutbox,
+    plannerConflictHoldKeys: plannerConflictHoldKeys,
+    plannerAcceptedSentByKey: plannerAcceptedSentByKey,
+    plannerTopicSlot: plannerTopicSlot,
+    plannerCompareTopicOrder: plannerCompareTopicOrder,
+    plannerQuotaTrimPlan: plannerQuotaTrimPlan,
+    plannerDataUrlOverLimit: plannerDataUrlOverLimit,
+    plannerBlobSyncAction: plannerBlobSyncAction,
+    PLANNER_SYNC_BLOB_MAX_CHARS: PLANNER_SYNC_BLOB_MAX_CHARS,
+    PLANNER_QUOTA_IMAGE_CHARS: PLANNER_QUOTA_IMAGE_CHARS
   };
 })();

@@ -238,6 +238,144 @@ var PlannerSyncRules = (function(){
     return { outbox: next, healed: healed };
   }
 
+  // 서버 리비전 위에 이미 얹힌 줄은 다시 올리지 않는다. id를 바꾸면 수락이 대기열과 어긋나 빠지지 않는다.
+  function plannerQueuedTopicStable(existingOp, serverRev){
+    if(!existingOp || !existingOp.key || !existingOp.mutationId) return false;
+    var rev = parseInt(serverRev, 10) || 0;
+    return plannerOutboxBase(existingOp) >= rev;
+  }
+
+  // 이미 대기열에 있거나 서버가 받은 키는 업로드 목록에서 뺀다. 대기열 값은 지우지 않는다.
+  function plannerTopicGapUploadKeys(spec){
+    spec = spec || {};
+    var accepted = {};
+    var acceptedList = spec.acceptedKeys || [];
+    if(Array.isArray(acceptedList)){
+      acceptedList.forEach(function(key){ if(key) accepted[String(key)] = true; });
+    } else if(acceptedList && typeof acceptedList === 'object'){
+      Object.keys(acceptedList).forEach(function(key){
+        if(acceptedList[key]) accepted[String(key)] = true;
+      });
+    }
+    var stable = {};
+    var serverRev = spec.serverRev || {};
+    (spec.outbox || []).forEach(function(op){
+      if(!op || !op.key) return;
+      if(plannerQueuedTopicStable(op, serverRev[op.key])) stable[String(op.key)] = true;
+    });
+    var upload = [];
+    var seen = {};
+    (spec.uploadKeys || []).forEach(function(key){
+      key = String(key || '');
+      if(!key || seen[key] || accepted[key] || stable[key]) return;
+      seen[key] = true;
+      upload.push(key);
+    });
+    return upload;
+  }
+
+  // 서버가 그 mutation을 받은 뒤에만 기억한다. 아직 대기열에 있거나 수락 기록이 없으면 올리지 않은 것으로 둔다.
+  function plannerAcceptedUploadKeys(beforeOps, afterOps, ack){
+    var still = {};
+    (afterOps || []).forEach(function(op){
+      if(op && op.key) still[String(op.key)] = true;
+    });
+    var accepted = [];
+    var seen = {};
+    (beforeOps || []).forEach(function(op){
+      if(!op || !op.key || !op.mutationId) return;
+      var key = String(op.key);
+      if(still[key] || seen[key]) return;
+      if(!ack || !Object.prototype.hasOwnProperty.call(ack, op.mutationId)) return;
+      seen[key] = true;
+      accepted.push(key);
+    });
+    return accepted;
+  }
+
+  // 짧은 시간에 부팅이 이어지면 무거운 이미지와 딥링크를 건너뛴다.
+  function plannerBootCrashState(prevCount, opts){
+    opts = opts || {};
+    var limit = parseInt(opts.limit, 10) || 3;
+    if(limit < 2) limit = 2;
+    var n = (parseInt(prevCount, 10) || 0) + 1;
+    if(n < 1) n = 1;
+    if(n > 99) n = 99;
+    return { count: n, safeMode: n >= limit, clearAfterMs: 12000 };
+  }
+
+  function plannerParseDateMs(value){
+    if(value == null || value === '') return NaN;
+    if(typeof value === 'number') return isNaN(value) ? NaN : value;
+    var s = String(value).trim();
+    var day = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(day) return new Date(parseInt(day[1], 10), parseInt(day[2], 10) - 1, parseInt(day[3], 10)).getTime();
+    var t = Date.parse(s);
+    return isNaN(t) ? NaN : t;
+  }
+
+  function plannerMonthDayLabel(ms){
+    if(!ms) return '-';
+    var d = new Date(ms);
+    if(isNaN(d.getTime())) return '-';
+    return (d.getMonth() + 1) + '.' + d.getDate() + '.';
+  }
+
+  function plannerDraftCreatedMs(draft){
+    draft = draft || {};
+    var created = plannerParseDateMs(draft.createdAt);
+    if(!isNaN(created)) return created;
+    var m = String(draft.id || '').match(/-c(\d+)$/);
+    if(m){
+      var n = parseInt(m[1], 10);
+      if(!isNaN(n) && n > 1000000000000) return n;
+    }
+    var updated = plannerParseDateMs(draft.updatedAt);
+    if(!isNaN(updated)) return updated;
+    return 0;
+  }
+
+  // 목록에 보이는 날짜. 생성일보다 늦은 수정·활동이 있으면 그 날짜.
+  function plannerDraftListDate(draft){
+    draft = draft || {};
+    var created = plannerDraftCreatedMs(draft);
+    var touch = 0;
+    var activity = plannerParseDateMs(draft.activityAt);
+    var updated = plannerParseDateMs(draft.updatedAt);
+    if(!isNaN(activity)) touch = activity;
+    if(!isNaN(updated) && updated > touch) touch = updated;
+    var ms = touch > created ? touch : created;
+    var label = plannerMonthDayLabel(ms);
+    var createdLabel = plannerMonthDayLabel(created);
+    var edited = !!(touch && created && touch > created && label !== '-' && label !== createdLabel);
+    return { label: label, edited: edited, ms: ms || 0 };
+  }
+
+  function plannerNoteDraftActivity(draft, iso){
+    var next = {};
+    Object.keys(draft || {}).forEach(function(key){ next[key] = draft[key]; });
+    next.activityAt = iso;
+    next.updatedAt = iso;
+    return next;
+  }
+
+  function plannerDraftActivityDay(iso){
+    var ms = plannerParseDateMs(iso);
+    if(isNaN(ms)) return '';
+    var d = new Date(ms);
+    return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  }
+
+  // 이미 한 장을 줄이는 중이면 null. 아니면 대기열의 첫 장만.
+  function plannerNextBlobCompress(queue, active){
+    if(active) return null;
+    var list = queue || [];
+    for(var i = 0; i < list.length; i++){
+      if(list[i]) return list[i];
+    }
+    return null;
+  }
+
   // 서버가 수락한 키만 「보낸 것」으로 친다. 충돌로 돌아온 키는 사용자가 고르기 전까지 대기열에 남긴다.
   function plannerAcceptedSentByKey(sentMutations, accepted){
     var ack = {};
@@ -351,6 +489,14 @@ var PlannerSyncRules = (function(){
     plannerApplyConflictResolution: plannerApplyConflictResolution,
     plannerTopicGapAsks: plannerTopicGapAsks,
     plannerHealStaleConflictRows: plannerHealStaleConflictRows,
+    plannerQueuedTopicStable: plannerQueuedTopicStable,
+    plannerTopicGapUploadKeys: plannerTopicGapUploadKeys,
+    plannerAcceptedUploadKeys: plannerAcceptedUploadKeys,
+    plannerBootCrashState: plannerBootCrashState,
+    plannerNextBlobCompress: plannerNextBlobCompress,
+    plannerDraftListDate: plannerDraftListDate,
+    plannerNoteDraftActivity: plannerNoteDraftActivity,
+    plannerDraftActivityDay: plannerDraftActivityDay,
     plannerAcceptedSentByKey: plannerAcceptedSentByKey,
     plannerTopicSlot: plannerTopicSlot,
     plannerCompareTopicOrder: plannerCompareTopicOrder,

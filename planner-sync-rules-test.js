@@ -226,6 +226,75 @@ assert(leftOpen.healed.length === 0 && leftOpen.outbox[0].baseEntityRevision ===
 assert(R.plannerTopicGapAsks(leftOpen.outbox, { 'draft:d9': 8 }).length === 1,
   'an unanswered conflict is still something to choose');
 
+var healedOnce = R.plannerHealStaleConflictRows(
+  [{ mutationId: 'm-phone', version: 1, key: 'draft:d9', value: 'phone edit', baseEntityRevision: 2 }],
+  { 'draft:d9': 8 }
+);
+var healedTwice = R.plannerHealStaleConflictRows(healedOnce.outbox, { 'draft:d9': 8 });
+assert(healedTwice.healed.length === 0 && healedTwice.outbox[0].baseEntityRevision === 8, 'heal does not rebase twice when the base already matches');
+assert(healedTwice.outbox[0].value === 'phone edit' && healedTwice.outbox[0].mutationId === 'm-phone', 'a second heal keeps the unsynced value and mutation id');
+assert(R.plannerQueuedTopicStable(healedOnce.outbox[0], 8), 'a row already based on the server revision is not requeued');
+assert(!R.plannerQueuedTopicStable(healedOnce.outbox[0], 9), 'a newer server revision is not treated as already based');
+var afterHealUpload = R.plannerTopicGapUploadKeys({
+  uploadKeys: ['draft:d9'],
+  outbox: healedOnce.outbox,
+  serverRev: { 'draft:d9': 8 },
+  acceptedKeys: []
+});
+assert(afterHealUpload.length === 0, 'a healed row is not uploaded again on the next list check');
+
+var nineteen = [];
+for(var n = 0; n < 19; n++){
+  nineteen.push({ mutationId: 'm' + n, version: 1, key: 'draft:local' + n, value: 'unsynced ' + n, baseEntityRevision: 0 });
+}
+var stablePlan = R.plannerTopicGapUploadKeys({
+  uploadKeys: nineteen.map(function(op){ return op.key; }).concat(['draft:brand-new']),
+  outbox: nineteen,
+  serverRev: {},
+  acceptedKeys: {}
+});
+assert(stablePlan.length === 1 && stablePlan[0] === 'draft:brand-new', 'queued local topics are not uploaded again');
+assert(nineteen.length === 19 && nineteen[0].value === 'unsynced 0' && nineteen[18].mutationId === 'm18', 'the 19 unsynced rows stay in the outbox');
+
+var acceptedRow = [{ mutationId: 'm19', version: 1, key: 'draft:d19', value: 'local topic', baseEntityRevision: 0 }];
+var afterAccept = R.plannerFilterAckedOutbox(acceptedRow, { ack: { m19: 1 }, sentByKey: {} });
+assert(afterAccept.length === 0, 'an accepted row leaves the outbox');
+var acceptedKeys = R.plannerAcceptedUploadKeys(acceptedRow, afterAccept, { m19: 1 });
+assert(acceptedKeys.join(',') === 'draft:d19', 'an accepted key is remembered');
+var reupload = R.plannerTopicGapUploadKeys({
+  uploadKeys: ['draft:d19'],
+  outbox: afterAccept,
+  serverRev: {},
+  acceptedKeys: acceptedKeys
+});
+assert(reupload.length === 0, 'an accepted key is not re-added as a local-only upload');
+assert(R.plannerAcceptedUploadKeys(acceptedRow, acceptedRow, { m19: 1 }).length === 0, 'a key that is still queued is not marked accepted');
+assert(R.plannerAcceptedUploadKeys([{ key: 'draft:d19', value: 'local topic' }], [], {}).length === 0, 'a row without an ack is not treated as accepted');
+
+var boot1 = R.plannerBootCrashState(0, { limit: 3 });
+var boot2 = R.plannerBootCrashState(boot1.count, { limit: 3 });
+var boot3 = R.plannerBootCrashState(boot2.count, { limit: 3 });
+assert(boot1.count === 1 && boot1.safeMode === false, 'the first boot is not safe mode');
+assert(boot2.count === 2 && boot2.safeMode === false, 'the second boot is not safe mode');
+assert(boot3.count === 3 && boot3.safeMode === true && boot3.clearAfterMs === 12000, 'a third quick boot starts safe mode');
+
+assert(R.plannerNextBlobCompress(['h1', 'h2'], true) === null, 'compression waits while one image is running');
+assert(R.plannerNextBlobCompress(['h1', 'h2'], false) === 'h1', 'compression takes the first image only');
+
+var julyDraft = { id: 'd4-c1784719203187', topic: '목 설명', createdAt: '2026-07-24', activityAt: '2026-07-24' };
+var julyDate = R.plannerDraftListDate(julyDraft);
+assert(julyDate.label === '7.24.' && julyDate.edited === false, 'an untouched July draft still shows 7.24.');
+var editedDraft = R.plannerNoteDraftActivity(julyDraft, '2026-10-26T09:00:00');
+assert(editedDraft.topic === '목 설명' && editedDraft.activityAt === '2026-10-26T09:00:00', 'a content edit keeps the topic and stamps activity');
+var octoberDate = R.plannerDraftListDate(editedDraft);
+assert(octoberDate.label === '10.26.' && octoberDate.edited === true && octoberDate.ms > julyDate.ms, 'the list date moves to the edit day');
+var thumbDraft = R.plannerNoteDraftActivity(julyDraft, '2026-10-26');
+assert(R.plannerDraftListDate(thumbDraft).label === '10.26.', 'thumbnail creation uses the new activity day');
+assert(R.plannerDraftActivityDay(julyDraft.activityAt) !== R.plannerDraftActivityDay(editedDraft.activityAt), 'a new activity day is a sync change');
+assert(R.plannerDraftActivityDay('2026-10-26T01:00:00') === R.plannerDraftActivityDay('2026-10-26T20:00:00'), 'the same local day does not count as a new sync day');
+var newerUpdated = R.plannerDraftListDate({ id: 'd4-c1', createdAt: '2026-07-24', activityAt: '2026-07-24', updatedAt: '2026-10-26' });
+assert(newerUpdated.label === '10.26.' && newerUpdated.edited === true, 'a newer updatedAt is shown even when activityAt is still July');
+
 if(failed){
   console.error(failed + ' assertion(s) failed');
   process.exit(1);

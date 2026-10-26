@@ -13316,6 +13316,11 @@ function plannerOverlayIsOpen_(id){
 }
 /** Escape — z-index 높은 것부터 (누락 노드·순서 오류 방지) */
 function closeTopmostPlannerOverlay_(){
+  // 내 사진 고르기는 시트보다 위 (z=3600)
+  if(plannerOverlayIsOpen_('my-thumbs-overlay')){
+    if(typeof closeMyThumbsPicker_ === 'function') closeMyThumbsPicker_();
+    return true;
+  }
   // #api-modal z=360 (기획/프롬프트보다 위)
   if(plannerOverlayIsOpen_('api-modal')){
     closeApiModal();
@@ -24638,7 +24643,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=397').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=398').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -36469,7 +36474,7 @@ function renderTopicPhotoCard_(content){
   var preview = (st && st.bgDataUrl && st.draftId === state.selectedId && st.fileName === '주제 사진.jpg') ? st.bgDataUrl : '';
   var html = '';
   html += '<div class="img-section-title">이미지 생성</div>';
-  html += '<p class="empty-note" style="padding:0 0 8px;line-height:1.5;">1순위는 보관함 실사입니다. 해부 일러스트는 GPT, 인물은 나노바나나입니다. 인물은 앞의 둘이 안 맞을 때만.</p>';
+  html += '<p class="empty-note" style="padding:0 0 8px;line-height:1.5;">1순위는 보관함 실사입니다. 「내 사진」에서 고르세요. 해부 일러스트는 GPT, 인물은 나노바나나입니다. 인물은 앞의 둘이 안 맞을 때만.</p>';
   html += '<div class="img-tool-card">';
   html += '<div class="topic-photo-bar">';
   html += '<div class="topic-photo-bar-side">';
@@ -36495,6 +36500,7 @@ function renderTopicPhotoCard_(content){
   html += '<button type="button" class="topic-photo-go topic-photo-nano" id="topic-photo-nano" data-image-model="gemini-nano-banana-2.1" onclick="generateTopicPhoto_(this)">나노바나나</button>';
   html += '<div class="topic-photo-model-meta" id="topic-photo-nano-meta"></div>';
   html += '</div>';
+  html += '<button type="button" class="topic-photo-go topic-photo-mine" id="topic-photo-mine" onclick="openMyThumbsPicker_()">내 사진</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="copyCommunityOrDailyImageSlot_(0, this)">프롬프트 복사</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="rebuildTopicPhotoPrompt_()">프롬프트 재생성</button>';
   html += '</div></div>';
@@ -36905,6 +36911,31 @@ async function cropDataUrlToFourFive_(dataUrl){
   if(img.close){ try { img.close(); } catch(eClose2){} }
   return c.toDataURL('image/jpeg', 0.92);
 }
+/** 만든 사진·내 사진 공통: 4:5 가운데 자르기 후 미리보기·썸네일 배경·이 기기 작업본 */
+async function applyTopicPhotoDataUrl_(dataUrl, opts){
+  opts = opts || {};
+  var content = opts.content || getDraftContent_(state.selectedId);
+  if(!content) throw new Error('초안이 없어요. 본문 탭에서 먼저 초안을 만들어 주세요.');
+  var cropped = await cropDataUrlToFourFive_(dataUrl);
+  var st = ensureThumbMakerState_();
+  if(state.selectedId){
+    st.draftId = state.selectedId;
+    st.catId = state.selectedCatId;
+  }
+  st.sizeKey = '4x5';
+  st.focusX = 0.5;
+  st.focusY = opts.focusY != null ? opts.focusY : 0.4;
+  if(opts.zoom != null) st.zoom = opts.zoom;
+  var sizeEl = document.getElementById('thumb-size');
+  if(sizeEl) sizeEl.value = '4x5';
+  clearThumbAiUpscaleCache_();
+  await setThumbMakerBackgroundFromDataUrl_(cropped, '주제 사진.jpg');
+  syncThumbFocusPresetButtons_();
+  fillTopicPhotoPreview_(cropped);
+  persistDraftContent_(state.selectedId, content);
+  return cropped;
+}
+window.applyTopicPhotoDataUrl_ = applyTopicPhotoDataUrl_;
 window.generateTopicPhoto_ = async function(btn){
   if(btn && btn.disabled) return;
   var content = getDraftContent_(state.selectedId);
@@ -37011,19 +37042,11 @@ window.generateTopicPhoto_ = async function(btn){
     }
     noteTopicPhotoGeneratedModel_(imageModel, data.imageModel);
     var rawUrl = 'data:' + (data.mediaType || 'image/jpeg') + ';base64,' + data.imageBase64;
-    var cropped = await cropDataUrlToFourFive_(rawUrl);
-    var st = ensureThumbMakerState_();
-    st.sizeKey = '4x5';
-    st.focusX = 0.5;
-    st.focusY = figure ? 0.5 : 0.4;
-    if(figure) st.zoom = 1;
-    var sizeEl = document.getElementById('thumb-size');
-    if(sizeEl) sizeEl.value = '4x5';
-    clearThumbAiUpscaleCache_();
-    await setThumbMakerBackgroundFromDataUrl_(cropped, '주제 사진.jpg');
-    syncThumbFocusPresetButtons_();
-    fillTopicPhotoPreview_(cropped);
-    persistDraftContent_(state.selectedId, content);
+    await applyTopicPhotoDataUrl_(rawUrl, {
+      content: content,
+      focusY: figure ? 0.5 : 0.4,
+      zoom: figure ? 1 : null
+    });
     setAppToast('4:5 사진을 만들었어요. 아래 썸네일 배경에 올려 두었어요.', { duration: 3200, variant: 'ok' });
   } catch(err){
     setAppToast((err && err.message) || '이미지 생성에 실패했어요.', { duration: 5200, variant: 'err' });

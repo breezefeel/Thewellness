@@ -63,7 +63,13 @@ begin
 
   select * into row from public.planner_entities where key = p_key for update;
 
-  if found and row.mutation_id is not null and row.mutation_id = p_mutation_id and length(p_mutation_id) > 0 then
+  if found
+    and row.mutation_id is not null
+    and row.mutation_id = p_mutation_id
+    and length(p_mutation_id) > 0
+    and row.deleted is not distinct from coalesce(p_deleted, false)
+    and row.value is not distinct from p_value
+  then
     return jsonb_build_object(
       'status', 'idempotent',
       'key', p_key,

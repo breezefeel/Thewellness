@@ -7692,8 +7692,7 @@ function buildBrandContextForPrompt_(catId, draft){
     lines.push('페이스·IFC 채널 한글 표기는 「리얼 페이스」로 하세요. (「리:얼」 금지). 영문 Re:Al / Re:Al Face는 그대로 둡니다.');
   }
   if(!allowsTreatmentActLanguage_(catId)){
-    lines.push(getNonClinicalTreatmentCopyRule_());
-    lines.push(FUNCTIONAL_REHAB_CENTER_POSITIONING_RULE);
+    lines.push('이 채널은 [목소리와 원칙]을 따른다. 독자 문장에 통증·메디컬·재활·치료와, 우리가 치료했다는 서술을 넣지 않는다.');
   }
   return lines.join('\n');
 }
@@ -13140,7 +13139,7 @@ function displaySubGoalStepTitle_(title, catId){
   }
   return t;
 }
-/** 리얼무브먼트·리얼페이스 블로그 — 말미에 예약 링크 두 개를 고정 삽입 */
+/** 리얼무브먼트 블로그 — 말미에 약수·인천 예약 링크를 고정 삽입. 리얼페이스는 인천만 */
 function isRealMovementBlogCategory_(catId){ return Number(catId) === 1; }
 /** 도수치료·CMT Academy만 치료·시술 행위 서술 허용 */
 function allowsTreatmentActLanguage_(catId){
@@ -13244,23 +13243,20 @@ function formatNewsChannelText_(item, ch){
   if(item.cta) parts.push('', String(item.cta).trim());
   return parts.join('\n').trim();
 }
-var DEFAULT_NEWS_CHANNELS_PROMPT = `[소식 공통 — 네이버 플레이스·카카오 채널·당근]
-같은 주제·각도를 세 채널용으로 쓰되, 길이·말투·CTA만 다르게 합니다.
-- 존댓말(해요체). 과장·즉효·기적 표현 금지.
-- 치료행위 수행 암시 금지(해당 채널이 도수 외인 경우).
-- URL은 cta에 넣지 말고, 방문·톡·예약 유도 문장만.
+var DEFAULT_NEWS_CHANNELS_PROMPT = `목소리는 기본 지침의 [목소리와 원칙]을 따른다. 여기에는 이 채널의 형식과 본보기만 둔다.
 
-【메시지 축 — 반드시 적용】
-- 신규 고객: CTA는 확신(맞는 사람·기대치·다음 행동 1개).
-- 기존 회원·학회원: CTA는 이어짐(다음 수업·멤버·연구모임·특별함).
-- 원데이·저관여·일정 공지: 앞부분 = 날짜·가격·오는 길(약수/인천).
-- 정규·고가·교육 모집: 앞부분 = 문제·적합성·변화 → 가격·신청은 말미.
-- 주제에서 축을 판단할 수 없으면, 일반인 대상이면 신규·저관여, 전문가 과정이면 정규·고가 규칙을 기본으로 합니다.
+[소식 형식]
+같은 소재를 세 채널로. 존댓말. URL은 넣지 않는다. 끝 행동은 예약 또는 「프로필 링크에서 온라인 문진」 하나.
+신규는 맞는 사람과 다음 행동. 기존은 다음 수업. 원데이는 날짜·가격·오는 길을 앞에. 정규·교육은 적합성을 앞에, 가격은 말미.
+1) naver: 제목 + 본문 4~7문장 + CTA
+2) kakao: 본문 3~5문장 + 톡으로 묻는 CTA
+3) karrot: 본문 3~6문장. 근처·이번. 판매 톤을 올리지 않음
+약수 소식은 약수역 3분. 인천 소식은 작전역 2분. 리얼페이스는 인천만 쓰고 약수역을 넣지 않는다.
 
-채널별 톤:
-1) naver(네이버 플레이스 소식): 정보·신뢰. 제목 한 줄 + 본문 4~7문장 + CTA 1~2문장. 일정·장소(약수/인천)를 자연스럽게.
-2) kakao(카카오 채널): 짧고 친근. 제목(또는 첫 줄) + 본문 3~5문장 + 「궁금하면 톡」형 CTA.
-3) karrot(당근): 동네·생활형. 제목 한 줄 + 본문 3~6문장. 「근처에서」「이번에」 뉘앙스. 과장 판매 톤 금지.`;
+[소식 본보기]
+제목: 같은 의자인데 목이 편한 앉기
+본문: 살만 느껴지면 좌골이 앞으로 빠진 상태예요. 숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완해 보세요. 약수역에서 3분, 작전역에서 2분입니다.
+cta: 프로필 링크에서 온라인 문진으로 지금 자세를 먼저 확인해 보세요.`;
 
 /** 본문 삽입용 사진 슬롯 수 (일반·전문가 3장 / 힐자계 2장 / 일상 0) */
 function getImageSlotCount(catId){
@@ -13560,7 +13556,10 @@ function getRealMovementBlogFooterText_(){
   return getBookingLinksFooterText_();
 }
 function getRealFaceBlogFooterText_(){
-  return getBookingLinksFooterText_();
+  return [
+    '👇리얼무브먼트 인천점',
+    REAL_MOVEMENT_BOOKING_INCHEON_URL
+  ].join('\n');
 }
 var BRANCH_BLOG_FOOTER_STARTS_ = [
   '👇더 궁금한 점이 있다면',
@@ -13585,7 +13584,7 @@ function stripTrailingBranchFooter_(body){
   if(cut < 0) return text.trim();
   return text.slice(0, cut).trim();
 }
-/** 리얼무브먼트·리얼페이스 블로그 말미: 예약 링크 두 개 */
+/** 리얼무브먼트는 예약 링크 두 개, 리얼페이스는 인천 링크 하나 */
 function isBranchBookingBlogCategory_(catId){
   var id = Number(catId);
   return id === 1 || id === 2;
@@ -13973,41 +13972,30 @@ const BLOG_UNIVERSAL_QUALITY_RULE = `[블로그 공통 완성도 — 주제와 �
 - 번호 목록을 쓰면 **1번 제목 다음에 바로 내용**이 오게 하고, 개요만 두고 2번부터 본문을 시작하지 마세요.`;
 
 const THREADS_UNIVERSAL_QUALITY_RULE = `[Threads 댓글 완성도 보강]
-- **맥락·과정 → 핵심 구분 → 구체적 장면·근거 → 관점·다음 행동** 순서로 전개하세요.
-- 핵심 메시지는 하나만 남기고, 같은 결론을 표현만 바꿔 반복하지 마세요.
-- 쉬운 비유는 최대 1개이며, 비유 뒤에는 반드시 실제 장면·관찰·원리를 붙이세요.
-- 독자 역할이 교사·기관 담당자·일반인이라면 진단·교정이 아닌 관찰·교육·연결의 범위를 분명히 하세요.
-- 본문이 자가 점검 질문으로 끝나면 그 질문을 유지하세요. 댓글에 억지 공감 질문을 더하지 마세요.
-- 댓글은 빈 줄로 나눈 3~4개(각 1~2문장)입니다. 긴 블로그 전체를 옮기지 마세요.`;
+목소리는 [목소리와 원칙]. 댓글은 빈 줄로 나눈 4개, 각 한 가지. 긴 글을 옮기지 않는다.`;
 
-const THREADS_BODY_COMMENT_RULES = `[Threads 2단 구조 — 필수]
-■ **body(본문)**: 게시글 1포스트 — 궁금증·후킹만. 해설·답·근거는 넣지 마세요.
-■ **comment(댓글)**: 본인 댓글(재게시용) — 본문의 물음·반전에 대한 해설·근거·과정·철학.
+const CHANNEL_THREADS_FEWSHOT = `[쓰레드 본보기 — 반말 4댓글. 모양만 따르고 주제의 사실만 바꾼다]
+body:
+목만 늘리면 자세가 돌아온다? 앉아 있을 때 좌골이 의자에 닿아 있어?
 
-[본문 body]
-- **1~3문장**, 줄바꿈 최소. **한 줄 핵심**이 반이어야 함.
-- **통념·익숙한 말 vs 실제 과정**: "보이는 결과는 ○○지만, 먼저 볼 것은 △△" 흐름.
-- 비유는 없어도 됩니다. 쓴다면 댓글에 **최대 1개**. 메커니즘을 직접 말하는 문장을 우선하세요.
-- **의견이 갈리는** 주제 OK (의료법·과장 금지).
-- 통념 뒤집기·반전·궁금증 유발. **답·해설·리스트·근거는 본문에 쓰지 마세요.**
-- **일반인 글은 질문으로 끝내** 댓글을 유도하세요. 그 질문은 그 자리에서 해 보는 자가 점검 한 문장입니다. (예: 앉아 있을 때 좌골이 의자에 닿아 있어?)
-- 전문가 과정은 전제를 뒤집는 한 줄이면 됩니다. 자가 점검 질문을 억지로 넣지 마세요.
+comment:
+살만 느껴지면 앞으로 빠진 거야.
 
-[댓글 comment]
-- 본문에서 던진 **궁금증·반전에 대한 답**.
-- **근거**: 현장 경험·짧은 메커니즘. 메모에 없는 일화·회원 사례·숫자는 만들지 마세요.
-- 본문과 **같은 문장 반복 금지**. 해시태그·"~하세요" 나열 금지.
-- **댓글은 빈 줄로 구분된 3~4개.** 각 댓글은 1~2문장. 마침표마다 댓글로 쪼개지 마세요.
-- 빈 줄로 나뉜 단락이 게시할 때 본문 아래 **이어지는 댓글** 하나다.
-- 일반인 건강 글의 **마지막 댓글**은 적신호(팔 저림·힘 빠짐 등)가 있으면 운동보다 병원 진료가 먼저라는 한 줄. 전문가 과정·교육 글에는 이 줄을 억지로 넣지 마세요.
-- [초안 형태 — 자가점검·단계·댓글] 이 댓글 구조가 「마침표마다 빈 줄」 이전 지시보다 우선합니다.
+구부정하게 앉으면 골반이 뒤로 기울고, 좌골은 앞으로 밀려.
 
-${THREADS_UNIVERSAL_QUALITY_RULE}
+바른 자세의 출발점은 밑에서 부터인 거지. 그래서 목만 늘리면 유지가 잘 안돼.
 
-[공통 금지]
-- 치료·완치·진단·처방·수술 대신·Doctor/닥터/원장님
-- 인스타 해시태그·불릿·번호 목록 그대로 복사
-- 본문에 긴 해설·리스트·해답 미리 공개`;
+의자 바닥에서 뼈 끝이 닿는지 먼저 확인해.`;
+
+const THREADS_BODY_COMMENT_RULES = `목소리는 기본 지침의 [목소리와 원칙]을 따른다. 여기에는 이 채널의 형식과 본보기만 둔다.
+
+[쓰레드 형식]
+반말. 인스타 문장을 베끼지 않는다.
+body: 1~3문장. 통념 하나를 뒤집고, 일반인 글은 자가 점검 질문으로 끝낸다. 해설은 넣지 않는다. 전문가 과정은 전제를 뒤집는 한 줄.
+comment: 빈 줄로 나눈 4개. 각 1~2문장, 아이디어 하나. 1 해부 방향 2 그 다음 한 가지 3 주어가 분명한 원리와 절제된 결과 4 자가 점검·행동으로 끝. 적신호·병원·「10초면 돼」 같은 시간 약속 댓글은 넣지 않는다. 그 안내는 블로그에만 있다.
+해시태그·불릿 없음.
+
+${CHANNEL_THREADS_FEWSHOT}`;
 
 /** 블로그·인스타 기본 말투 (존댓말). 저장본 마이그레이션 마커로도 사용 */
 const BLOG_INSTA_HONORIFIC_SPEECH_RULE = `[말투 — 블로그·인스타 존댓말]
@@ -14091,12 +14079,9 @@ function buildExpertCourseThreadsPrompt_(opts){
   var programBlock = opts.programBlock ? String(opts.programBlock).trim() : '';
   return DEFAULT_THREADS_SNS_PROMPT + '\n\n' +
     '[전문가 과정 맥락]\n' +
-    '- 변환 대상: **인스타 최종본(강의·시연 캡션)** → Threads 본문+댓글\n' +
     '- 독자: ' + roleReaders + '\n' +
-    '- 본문: 현장에서 흔히 틀리는 테크닉·전제 하나를 **한 줄**로 뒤집기\n' +
-    '- 댓글: 인스타·영상 범위의 테크닉 원리·손 느낌·주의를 완전한 문장으로 풀어 설명. 수강·등록 유도 금지\n' +
-    PLAIN_DRAFT_SENTENCE_RULE + '\n' +
-    '- 인스타에 없는 내용 추가 금지' +
+    '- 본문: 현장에서 흔히 틀리는 전제 하나를 한 줄로 뒤집기. 자가 점검 질문을 억지로 넣지 않는다\n' +
+    '- 댓글 4개도 인스타·영상 범위 안. 수강 유도 금지. 없는 내용 추가 금지. 일반인 앉기 본보기의 문장은 옮기지 않는다' +
     (programBlock ? '\n' + programBlock : '');
 }
 
@@ -15053,6 +15038,7 @@ const BLOG_INSERT_GPT_VISUALS_RULE = `[우선 — images.gptVisuals 정확히 3�
 **gptVisuals 3장 본문 삽입 컷이 최우선.**`;
 
 const DEFAULT_BLOG_INSTA_IMAGE_PROMPT = `블로그·인스타용 **본문 삽입 사진 프롬프트**를 작성합니다. 상세페이지 슬라이드가 아닙니다.
+장면에 넣을 문장이 있으면 [목소리와 원칙]을 따른다. 아래는 사진 형식만.
 
 ${BLOG_INSERT_GPT_VISUALS_RULE}
 
@@ -15123,7 +15109,25 @@ const PAIN_FUNCTION_LOAD_SAFETY_RULE = `[통증·기능·부하 — 안전 문�
 - 영상·병원: "저림이 퍼지면 영상검사 선행"처럼 일률 금지. 심한 통증·마비·대소변·급악화 등 **적신호면 병원 먼저** 한 줄. 일반 요통에 일상적 영상 권고처럼 쓰지 말 것.
 - 출처 없는 통계·일반화("요통의 N%", "초기에 통증 없이 시작") 금지. 입력에 없는 근거를 만들지 말 것.`;
 
-const BLOG_CONTENT_VOICE_RULE = '미카닥 박준규 톤 — 따뜻하고 신뢰감 있는 **설명하는 전문가**. **존댓말(해요체)**로 씀(~해요/~이에요/~습니다). 한다체·반말(~한다/~이다) 금지. 제목·서명·헤드라인에 Doctor·닥터·원장님을 쓰지 않음. 과장·즉효 약속 금지.\n\n' + MIKADOC_VOICE_CARD_RULE + '\n\n' + PAIN_FUNCTION_LOAD_SAFETY_RULE;
+const VOICE_CORE_MARKER = '[목소리와 원칙]';
+const VOICE_CORE_POINTER = '목소리는 기본 지침의 [목소리와 원칙]을 따른다. 여기에는 이 채널의 형식과 본보기만 둔다.';
+const VOICE_AND_PRINCIPLES = `${VOICE_CORE_MARKER}
+말하는 사람: 카이로프랙틱 닥터 박준규, 리얼무브먼트(서울 약수·인천 계양) 대표. 지금 병원 근무는 하지 않는다. 헤드라인에 Doctor·닥터·원장님을 내세우지 않는다. 리얼무브먼트 글의 주어는 「우리」「리얼무브먼트」.
+독자: 그 영상을 안 본 일반인. 한 문장에 누가·어디·어디까지. 전문어는 그 글에서 처음 한 번만 괄호.
+해부: 앞·뒤·위·아래를 추측하지 않는다. 구부정한 앉기에서 좌골(궁둥뼈)은 앞으로 빠진다.
+문장: 주어를 분명히 한다. 비유보다 메커니즘. 비유는 글에 하나. 「금방」「반드시」「완전히」 대신 「유지가 잘 안 된다」처럼 절제한다. 구조가 원인이라고 단정하지 않는다. 숨은 손상을 화재경보기에 비유하지 않는다. 자가 점검은 관찰이지 진단이 아니다.
+단계: 동작만 쓰지 않는다. 한 절에 하는 일과 이유를 같이 쓴다. 예: 숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완하는게 중요합니다.
+변화: 몸이 어떻게 달라지는지 쉬운 말로. 「엄청 편해집니다」처럼 느껴지는 변화. 「덜 애쓰는 느낌이 달라집니다」처럼 추상적으로 쓰지 않는다.
+서비스: 브랜드 이름을 넣고, 실제로 하는 일만. 불편이 반복되지 않게 생활습관과 바른 자세를 같이 코칭한다. 「10분 순서를 남겨 드립니다」처럼 없는 약속, 메모에 없는 일화·회원·숫자·오늘 세션은 만들지 않는다. 포스터 틀의 예시 문장을 초안에 가져오지 않는다.
+단어: 도수·CMT가 아니면 통증·메디컬·재활·치료를 쓰지 않는다. 불편·뻐근함. 우리가 치료했다는 서술 금지. 도수·CMT만 임상 서술이 가능하다. 「완치」「처방」「수술 대신」 금지.
+끝 행동: 하나. 저장·공유·팔로우 금지. 일반 신규는 「프로필 링크에서 온라인 문진」. 예약은 네이버 예약. 블로그 말미 링크는 시스템이 붙인다.
+지점: 약수역 3분, 작전역 2분, 1:1 예약제. 리얼무브먼트·도수는 두 지점. 리얼페이스는 인천만(작전역 2분). 없는 지점 태그를 만들지 않는다.
+적신호: 병원 안내는 블로그 셀프 케어 맨 끝 한 줄만. 인스타·쓰레드·릴스·소식에는 넣지 않는다.
+예외: 일상 공유와 힐자계는 홍보가 아니다. 예약·문진·센터 이름을 넣지 않는다.`;
+const BLOG_CONTENT_VOICE_RULE = VOICE_AND_PRINCIPLES;
+function promptHasVoiceCore_(text){
+  return String(text || '').indexOf(VOICE_CORE_MARKER) >= 0;
+}
 const MEDICAL_COMPLIANCE_RULE = `[의료법·포지셔닝 — 필수]
 - 작성자(미카닥 박준규)는 **현재 병원에서 근무하지 않습니다**. 진단·처방·치료행위를 하거나 암시하지 마세요(아래 채널 예외 참고).
 - 제공 범위는 **운동·재활·웰니스 프로그램**(리얼무브먼트, P-스트레칭, 기능운동 등)이며, 의료행위가 아님을 전제로 씁니다.
@@ -15183,45 +15187,47 @@ const BLOG_PLAIN_READABILITY_RULE = `${BLOG_PLAIN_READABILITY_MARKER}
 - 같은 결론을 칸마다 반복하지 마세요. 문제 제기와 원리, 또는 맥락·포인트·본문이 같은 문장이면 안 됩니다.
 - 마침표마다 빈 줄. 아주 짧은 문장은 다음 문장과 한 단락으로 이어져도 됩니다. 셀프 케어의 👉 단계 안에서는 문장을 쪼개지 말고, 빈 줄은 단계 사이에만 두세요.`;
 
-const DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW = `**일반인 독자**용 블로그입니다. ${BLOG_CONTENT_VOICE_RULE}
+const CHANNEL_BLOG_FEWSHOT = `[블로그 본보기 — 모양만 따르고, 주제의 사실만 바꾼다]
+problem:
+같은 의자인데 오후만 되면 목이 무거우신가요?
 
-${BLOG_INSTA_HONORIFIC_SPEECH_RULE}
+selfCare:
+👉 먼저 확인: 손을 엉덩이 아래에 넣어 보세요. 뼈 끝이 닿나요?
 
-${BLOG_UNIVERSAL_QUALITY_RULE}
+👉 1. 두 발을 바닥에 두고 골반을 세워, 좌골이 의자 가운데 오게 합니다.
+👉 2. 숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완하는게 중요합니다.
+👉 3. 정수리를 천장 쪽으로 보내 목이 어깨 위에 놓이게 합니다.
 
-${MEDICAL_COMPLIANCE_RULE}
+시원하다 싶으면 거기서 멈추세요.
+혼자 할 때 실수: 목만 당긴다. 숨을 참는다. 허리를 억지로 젖힌다.
+팔이 저리거나 힘이 빠지면 운동보다 병원 진료가 먼저입니다.
 
-${GEO_CONTENT_STRUCTURE_RULE}
+explanation:
+살만 느껴진다면 좌골이 앞으로 빠진 상태예요. 바른 자세의 출발점은 아래입니다. 그래서 목만 늘리면 유지가 잘 안 됩니다.
 
-[글 흐름 — 반드시 이 순서·필드]
-1. **문제 제기** (problem): 일상 장면에서 공감되는 불편·궁금증 2~4문장. 불릿·번호 나열 금지. 문장(문단) 사이에는 **빈 줄**로 띄워 가독성 확보. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스. **병원 안내 금지**. 교훈 결론으로 닫지 말 것.
-2. **셀프 케어** (selfCare): 동작 하나에서 끝내지 마세요. [초안 형태 — 자가점검·단계·댓글]
-   - 첫 줄 **👉 먼저 확인:** 그 자리에서 바로 해 보는 자가 점검 한 문장. (예: 손을 엉덩이 아래에 넣어 보세요. 뼈 끝이 닿나요?)
-   - 이어서 **👉 1. ~ 👉 4.** 번호 **3~4단계**. 감각은 자세 → 숨 → 목·머리 → 등. 각 단계에 **횟수 또는 시간**(초·회). 「1단계 —」같은 단계 이름 표기는 쓰지 마세요.
-   - 「아, 시원하다」 싶은 지점에서 멈추라는 한 줄.
-   - **혼자 할 때 자주 하는 실수** 2~3개(번호).
-   - **병원 진료 권고는 맨 끝 한 문장만**(적신호·팔 저림 등이 있으면 병원 먼저 — 영상검사 일률 권고 금지). 도수·CMT가 아니면 이 문장에 통증·치료·메디컬·재활을 쓰지 마세요.
-   - 같은 글을 다른 필드에서 반복하지 마세요. 자가 점검은 **관찰**이지 진단이 아님을 한 줄로만. 메모에 없는 일화·회원 사례·숫자를 만들지 마세요.
-3. **원리 설명** (explanation): **맨 앞 1~2문장 TL;DR** → 동작 **뒤에** 왜 도움이 되는지. GEO는 **새 정보만**. 메커니즘을 직접 말하는 문장을 우선하고, 비유는 글 전체 **1개**(손상=숨은 화재 식 금지). **병원·진료 안내 반복 금지**. **문단 사이 빈 줄**. 분량보다 구체 장면 1개를 우선. 문제 제기의 장면과 자가 점검을 여기서 다시 쓰지 마세요.
+cta:
+리얼무브먼트에서는 불편함이 반복되지 않도록, 생활습관 및 바른 자세도 함께 코칭해드리고 있습니다. 프로필 링크에서 온라인 문진으로 지금 자세를 먼저 확인해 보세요.`;
 
-${BLOG_PLAIN_READABILITY_RULE}
+const DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW = `${VOICE_CORE_POINTER}
 
-[형식]
-- title: 호기심·질문형 한 줄 (35자 내외, 네이버 SEO 고려, 과장 금지)
-- problem / selfCare / explanation: 위 순서대로 각각 별도 필드. "N단계 —" 같은 순서 표기 금지
-- cta: 리얼무브먼트·프로그램·프로필 안내 (과장·즉시 예약 압박 금지). **병원 상담 문구는 넣지 마세요.** 주제와 맞는 증상 허브 URL 1개 포함 권장 — 허리 ?hub=back · 목 ?hub=neck · 어깨 ?hub=shoulder · 무릎 ?hub=knee · 골반 ?hub=pelvis (기본 ${PROFILE_BRAND_URL})
-- hashtags: 6~8개 (# 없이)
+[블로그 형식]
+존댓말. **, ---, > 금지. 문단 사이 빈 줄. 같은 결론을 칸마다 반복하지 않는다.
+1. problem: 일상 장면 2~4문장. 자가 점검·병원 안내 없음.
+2. selfCare: 👉 먼저 확인(자가 점검 한 문장) → 👉 1.~4. 3~4단계(자세→숨→목·머리→등). 각 단계는 동작과 이유를 한 절에, 초·회를 포함한다. 단계 사이에만 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 맨 끝 한 줄만 적신호면 병원. 「1단계 —」 표기 금지.
+3. explanation: 맨 앞 1~2문장이 핵심. 그 뒤는 새 이유. 병원·자가 점검 반복 없음.
+4. cta: 「프로필 링크에서 온라인 문진」 하나. 병원 문구 없음. 허브 URL은 주제와 맞을 때 하나 — 허리 ?hub=back · 목 ?hub=neck · 어깨 ?hub=shoulder · 무릎 ?hub=knee · 골반 ?hub=pelvis (기본 ${PROFILE_BRAND_URL})
+5. title: 궁금증 한 줄, 35자 내외. hashtags 6~8개.
 
-${PLAIN_DRAFT_SENTENCE_RULE}`;
+${CHANNEL_BLOG_FEWSHOT}`;
 
 function buildExpertCourseBlogPrompt_(opts){
   opts = opts || {};
   var audienceIntro = opts.audienceIntro || '물리치료사·트레이너 등 **움직임 전문가**를 독자로 하는';
   var roleReaders = opts.roleReaders || 'PT, 트레이너, 움직임에 관심 있는 현장 전문가';
   var programBlock = opts.programBlock ? String(opts.programBlock).trim() : '';
-  return audienceIntro + ' SNS·블로그 글입니다.\n\n' +
+  return VOICE_CORE_POINTER + '\n\n' +
+    audienceIntro + ' SNS·블로그 글입니다.\n\n' +
     '**주 사용 방식**: 교육·강의 때 진행한 **영상 링크** 또는 **실습·시연 사진**을 첨부하고, 입력에 따라 **테크닉 원리** 또는 **교육 현장의 의미**를 중심으로 글을 씁니다.\n\n' +
-    BLOG_UNIVERSAL_QUALITY_RULE + '\n\n' +
     DEFAULT_EXPERT_COURSE_SCOPE_RULE + '\n\n' +
     '[역할]\n' +
     '- 독자: ' + roleReaders + '\n' +
@@ -15230,23 +15236,14 @@ function buildExpertCourseBlogPrompt_(opts){
     '- **테크닉·시연형**: 흔한 자세·실수·질문으로 공감(hook) → 손 위치·동작·주의사항 2~3개(outline) → 왜 그런지·메커니즘·현장 적용(draft)\n' +
     '- **강의·연수 후기형**: 교육이 필요했던 이유와 현장 장면(hook) → 다룬 관찰·학습 포인트 2~3개(outline) → 실제 질문·역할의 경계·달라진 관점(draft)\n' +
     '- 두 유형을 섞어 나열하지 말고, 입력의 중심에 더 가까운 하나를 선택하세요.\n\n' +
-    BLOG_INSTA_HONORIFIC_SPEECH_RULE + '\n\n' +
-    MIKADOC_VOICE_CARD_RULE + '\n\n' +
-    PAIN_FUNCTION_LOAD_SAFETY_RULE + '\n\n' +
-    '[톤 & 스타일]\n' +
-    '- 과장·낚시·"꼭 해야 한다" 압박 금지. **내용으로 말하는** 느낌\n' +
-    '- 전문 용어는 남기되, 처음 한 번은 괄호로 풀고 문장은 끝까지 쓰세요\n' +
-    '- 존댓말을 유지하되, 강의 중 말을 조각으로 붙이지 마세요\n' +
-    '- 해시태그 **최소화**(3~5개). 영문 브랜드 표기는 정확히 (예: Re:Al)\n\n' +
     '[형식 — JSON 필드]\n' +
-    '- title: 무엇이 끝이 아닌지 한 줄 (35자 내외). 목적어가 안 열리는 표현 금지\n' +
-    '- hook: 끝이 아니라는 점과, 누가 어디서 멈추는지 2~3문장. 자막 조각·제작 과정 금지\n' +
-    '- outline: 읽을 항목을 한 줄에 하나씩. 각 줄은 완전한 문장. 위·아래·왼쪽·오른쪽·모양·방향을 "주변""한 세트"로 묶지 말 것\n' +
-    '- draft: 선택한 유형의 본문 (**650~1,000자**, 참고·영상·사진 범위 안만). 구체 장면 하나가 중심. outline을 다시 풀어 쓰지 말 것. **존댓말**. 말미에 「영상 보세요/댓글」 금지.\n' +
-    '- cta: 수강·등록·시청·댓글 유도 금지. 원리·과정 핵심으로 **가볍게 닫기**만\n' +
-    '- hashtags: 3~5개\n\n' +
-    BLOG_PLAIN_READABILITY_RULE + '\n\n' +
-    PLAIN_DRAFT_SENTENCE_RULE +
+    '- 존댓말. **, ---, > 금지. 문단 사이 빈 줄.\n' +
+    '- title: 무엇이 끝이 아닌지 한 줄 (35자 내외)\n' +
+    '- hook: 누가 어디서 멈추는지 2~3문장. 자막 조각·제작 과정 금지\n' +
+    '- outline: 한 줄에 완전한 문장 하나. 방향과 모양을 문장 안에\n' +
+    '- draft: 650~1,000자. 참고·영상·사진 범위 안만. outline을 다시 풀지 말 것\n' +
+    '- cta: 수강·등록·시청·댓글 유도 없이 원리로 닫기\n' +
+    '- hashtags: 3~5개. 영문 브랜드는 정확히 (예: Re:Al)' +
     (programBlock ? '\n\n' + programBlock : '');
 }
 
@@ -15254,24 +15251,16 @@ function buildExpertCourseInstaPrompt_(opts){
   opts = opts || {};
   var roleReaders = opts.roleReaders || 'PT, 트레이너, 움직임 전문가 동료';
   var programBlock = opts.programBlock ? String(opts.programBlock).trim() : '';
-  return '전문가 과정 **강연·영상·사진 공유**용 인스타 캡션입니다. 블로그보다 짧고 밀도 있게.\n\n' +
+  return VOICE_CORE_POINTER + '\n\n' +
+    '전문가 과정 **강연·영상·사진 공유**용 인스타 캡션입니다. 블로그보다 짧고 밀도 있게.\n\n' +
     DEFAULT_EXPERT_COURSE_SCOPE_RULE + '\n\n' +
-    BLOG_INSTA_HONORIFIC_SPEECH_RULE + '\n\n' +
-    COMPARISON_EXPERIENCE_HOOK_RULE + '\n\n' +
     '[역할·독자]\n' +
-    '- ' + roleReaders + '에게 말하듯\n' +
-    '- 공유한 **영상·사진에서 다룬 테크닉**과 **원리 한 줄**이 드러나게\n\n' +
-    '[구성]\n' +
-    '- 영상·사진 맥락 한 줄 → 시연·핵심 포인트 2~3개 → **원리 설명** 한두 문장\n' +
-    '- 참고 메모·영상 분석·블로그 원문 **범위 안**에서만\n\n' +
-    '[톤]\n' +
-    '- 과장 없이, 내용으로 말하기. 전문 용어는 처음 한 번 괄호로 풀기\n' +
-    '- 존댓말. 문장은 끝까지. 말하다 만 인용 금지\n\n' +
-    PLAIN_DRAFT_SENTENCE_RULE + '\n\n' +
+    '- ' + roleReaders + '에게 말하듯. 존댓말\n' +
+    '- 공유한 **영상·사진에서 다룬 테크닉**과 **원리 한 줄**이 드러나게. 범위 밖 추가 금지\n\n' +
     '[형식]\n' +
-    '- hook: **흔한 방법 vs 같은 자리 비교** 한 줄 (25자 내외). 「좋아요/중요합니다」 금지\n' +
-    '- caption: 비교 조건 → 손 느낌·타이밍 차이 1개 → 원리 한 줄. hook 제외 **200~400자**. 수강·등록 유도 금지. **존댓말**\n' +
-    '- hashtags: **4~6개** 이내, 전문 키워드 위주' +
+    '- hook: 흔한 방법 vs 같은 자리 비교 한 줄. 「좋아요」 금지\n' +
+    '- caption: 비교 조건 → 손 느낌 하나 → 원리 한 줄. hook 제외 200~400자. 수강 유도 금지\n' +
+    '- hashtags: 4~6개' +
     (programBlock ? '\n\n' + programBlock : '');
 }
 
@@ -15329,6 +15318,31 @@ const DEFAULT_REAL_MOVEMENT_EXPERT_THREADS_PROMPT = buildExpertCourseThreadsProm
   programBlock: '[Re:Al] 강사/회원 호칭. 직군 좁히지 말 것. 기능재활·PAR·Position은 참고 범위 안만.'
 });
 
+const CHANNEL_INSTA_FEWSHOT = `[인스타 본보기 — 존댓말. 모양만 따르고 주제의 사실만 바꾼다. 불릿 사이에 빈 줄 없음. 닫는 네 블록 사이에는 빈 줄]
+의자에 앉아 손을 엉덩이 아래에 넣어 보세요. 살만 느껴진다면 좌골이 앞으로 빠진 상태예요.
+• 두 발을 바닥에 두고 골반을 세워, 좌골이 의자 가운데 오게 합니다
+• 숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완하는게 중요합니다
+• 정수리를 천장 쪽으로 보내 목이 어깨 위에 놓이게 합니다
+
+같은 의자에서 앉는 자세만 바꿨는데, 목과 어깨가 엄청 편해집니다
+
+리얼무브먼트에서는 불편함이 반복되지 않도록, 생활습관 및 바른 자세도 함께 코칭해드리고 있습니다
+
+프로필 링크에서 온라인 문진으로 지금 자세를 먼저 확인해 보세요
+
+약수역 3분 · 작전역 2분 · 1:1 예약제`;
+
+const CHANNEL_INSTA_FORMAT = `${VOICE_CORE_POINTER}
+
+[인스타 형식]
+존댓말. 캐러셀 없음.
+hook: 흔한 방법과 같은 자리 비교 한 줄.
+caption: 자가 점검으로 시작. • 3개(동작+이유). 불릿 사이에 빈 줄 없음. 그 다음 빈 줄로만 나눈 네 블록 — 느껴지는 변화 / 브랜드가 실제로 하는 코칭 / 프로필 링크에서 온라인 문진 / 지점 줄.
+지점 줄: 리얼무브먼트·도수는 「약수역 3분 · 작전역 2분 · 1:1 예약제」. 리얼페이스는 「작전역 2분 · 1:1 예약제」만.
+해시태그 6~8개. 리얼무브먼트·도수는 약수역운동, 작전역운동. 리얼페이스는 작전역운동 등 인천. 약수역 태그 없음. 적신호·병원 문장 없음.
+
+${CHANNEL_INSTA_FEWSHOT}`;
+
 // ── 기본 프롬프트 (카테고리별 블로그/인스타/쓰레드 등) ──
 const DEFAULT_PROMPTS = {
   base: `당신은 '미카닥 박준규'의 전담 콘텐츠 기획자입니다.
@@ -15338,29 +15352,25 @@ const DEFAULT_PROMPTS = {
 프로그램: Real Movement(P-스트레칭·기능운동·자세교정), 리얼 페이스(얼굴 교정·작은얼굴), CMT/IFC/Re:Al 전문가 교육
 프로필·약력: https://breezefeel.github.io/drpark · https://blog.naver.com/allenjoy/120205433765
 ${BLOG_CONTENT_VOICE_RULE}
-${MEDICAL_COMPLIANCE_RULE}
 인스타(프로그램별): 도수·CMT @dr.park_dc.pt · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트·움직임 @re.al_movement_official
 인스타 연결 계정(시스템이 캡션에 자동 삽입, 본문에 쓰지 말 것): CMT @cmt_academy · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트 @re.al_movement_official (도수치료·Re:Al 과정은 연결 계정 없음)
-※ 무브먼트·움직임 채널 블로그·이미지·캡션: 「리:얼」 대신 「리얼」 표기 (리얼무브먼트·리얼 움직임). 「리얼무브먼트」붙여 쓰기·한 줄 고정. 영문 Re:Al은 유지.
-※ 페이스 채널 한글 표기: 「리얼 페이스」(「리:얼」 금지). 영문 Re:Al Face는 유지.
-※ 도수·CMT 외 채널: 치료행위 수행 암시 금지(치료한 결과·치료했어요 등). 「치료를 해도 반복=자세/움직임」 맥락은 허용.
-※ 도수·CMT 외 채널 컬러: 보건의료 배경 임상가가 지도하는 **기능재활·움직임 센터**. 도수치료·카이로프랙틱을 주인공처럼 부각하지 말 것.` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
+표기: 「리얼무브먼트」붙여 쓰기. 「리얼 페이스」. 「리:얼」 금지. 영문 Re:Al / Re:Al Face는 유지.` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
   categories: {
     0: { // 도수치료
-      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[도수치료 맥락] PSP·PAR 순서를 환자 언어로: 평가(증상·통증 질)→연부·관절 이해→Passive(P-ROM)→생활습관. problem에 공감·왜 아픈지 가볍게, selfCare는 집에서 할 수 있는 동작.`,
-      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n${buildComparisonExperienceHookRule_(0)}\n\n캐러셀(여러 장 슬라이드) 없이 **한 포스트 캡션**으로 끝내세요. 캡션 첫 줄은 그 자리에서 해 보는 자가 점검 한 문장. 이어서 핵심 포인트를 • 불릿 3개로. 끝 행동은 하나(프로필 링크 문진). 저장·공유·팔로우 유도 금지. 해시태그 6~8개, 약수역운동·작전역운동 포함.\n[초안 형태 — 자가점검·단계·댓글]`,
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[도수치료] 평가 → 연부·관절 → 수동 움직임 → 생활습관. 이 채널만 임상·통증 단어를 쓸 수 있다. 지점 줄은 약수·인천.`,
+      insta: CHANNEL_INSTA_FORMAT + '\n\n[도수치료] 지점 줄은 약수역 3분 · 작전역 2분 · 1:1 예약제. 해시태그에 약수역운동, 작전역운동.',
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     1: { // 리얼무브먼트
-      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[Movement 맥락] P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지. 프로그램명 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지, 영문 Re:Al 유지).\n[컬러] 보건의료 배경 임상가가 지도하는 **기능재활·움직임 센터**. 도수·카이로·시술 장면을 주인공처럼 부각하지 말 것.\n[치료행위] 우리가 치료했다는 내용 금지(치료한 결과·치료했어요 등). 「치료를 해도 반복=자세/움직임」 맥락은 허용.\n[말미 링크] 약수·인천 예약 URL 두 개는 시스템이 글 하단에 고정 삽입합니다. cta에는 URL을 넣지 말고 2~3문장만 쓰세요.`,
-      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n${buildComparisonExperienceHookRule_(1)}\n\n캐러셀 없이 **한 포스트 캡션**에 동작·포인트를 단계적으로 적습니다. 캡션 첫 줄은 자가 점검 한 문장. 끝 행동은 하나(프로필 링크 문진). 저장·공유·팔로우 유도 금지. 마지막 줄은 「약수역 3분 · 작전역 2분 · 1:1 예약제」. 해시태그 6~8개, 약수역운동·작전역운동 포함. 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지). 주어는 「우리」「리얼무브먼트 전문가들」(박준규 1인 화자 금지). 도수·카이로 부각·치료행위 수행 암시 금지. 독자 문장에 메디컬·재활·치료·통증을 쓰지 마세요.\n[초안 형태 — 자가점검·단계·댓글]`,
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[리얼무브먼트] 바닥→앉기→서기 순서를 쉬운 말로. 표기 「리얼무브먼트」. 주어는 「우리」「리얼무브먼트」.\n[말미 링크] 약수·인천 예약 URL 두 개는 시스템이 붙인다. cta에 URL을 넣지 않는다.`,
+      insta: CHANNEL_INSTA_FORMAT + '\n\n[리얼무브먼트] 지점 줄은 약수역 3분 · 작전역 2분 · 1:1 예약제. 해시태그에 약수역운동, 작전역운동.',
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     2: { // 리얼 페이스
-      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[얼굴·뷰티 맥락] 20~40대 여성 독자. 과학적 근거는 가볍게, 공감과 희망. selfCare는 부담 없는 가벼운 동작·습관. 프로그램명 표기: 「리얼 페이스」(「리:얼」 금지, 영문 Re:Al Face 유지).\n[컬러] 임상가가 구조를 아는 **기능·웰니스** 톤. 도수·카이로·시술 장면을 주인공처럼 부각하지 말 것.\n[치료행위] 우리가 치료했다는 내용 금지.`,
-      insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n캐러셀 없이 **한 포스트 캡션**으로 스토리텔링하세요. 캡션 첫 줄은 그 자리에서 해 보는 자가 점검 한 문장. 문제→원인→해결을 줄바꿈으로 구분. 끝 행동은 하나(프로필 링크 문진). 저장·공유·팔로우 유도 금지. 해시태그 6~8개. 지역 태그는 작전역운동 등 인천. 약수역 태그는 넣지 마세요. 표기: 「리얼 페이스」(「리:얼」 금지). 도수·카이로 부각·치료행위 수행 암시 금지. 독자 문장에 메디컬·재활·치료·통증을 쓰지 마세요.\n[초안 형태 — 자가점검·단계·댓글]`,
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[리얼 페이스] 얼굴·목·자세를 같이 보는 가벼운 습관. 표기 「리얼 페이스」. 효과 보장·작은얼굴 단정 금지.\n[말미 링크] 인천 예약 URL 하나만 시스템이 붙인다. 약수 링크를 쓰지 않는다.`,
+      insta: CHANNEL_INSTA_FORMAT + '\n\n[리얼 페이스] 지점 줄은 「작전역 2분 · 1:1 예약제」만. 약수역 문장·태그 없음. 해시태그는 작전역운동 등 인천.',
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
@@ -15507,11 +15517,11 @@ function migrateUniversalContentFlowPrompts_(){
   Object.keys(state.prompts.categories).forEach(function(catId){
     var cat = state.prompts.categories[catId];
     if(!cat || typeof cat !== 'object') return;
-    if(cat.blog && String(cat.blog).indexOf('[블로그 공통 완성도 — 주제와 무관하게 적용]') < 0){
+    if(cat.blog && !promptHasVoiceCore_(cat.blog) && String(cat.blog).indexOf('[블로그 공통 완성도 — 주제와 무관하게 적용]') < 0){
       cat.blog = String(cat.blog).trim() + '\n\n' + BLOG_UNIVERSAL_QUALITY_RULE;
       changed = true;
     }
-    if(cat.threads && String(cat.threads).indexOf('[Threads 댓글 완성도 보강]') < 0){
+    if(cat.threads && !promptHasVoiceCore_(cat.threads) && String(cat.threads).indexOf('[Threads 댓글 완성도 보강]') < 0){
       cat.threads = String(cat.threads).trim() + '\n\n' + THREADS_UNIVERSAL_QUALITY_RULE;
       changed = true;
     }
@@ -15532,7 +15542,7 @@ function migrateHospitalGuidanceOnceInSelfCare_(){
   function ensureAddendum_(text){
     var t = String(text || '');
     if(!t.trim()) return { text: t, changed: false };
-    if(t.indexOf(marker) >= 0) return { text: t, changed: false };
+    if(promptHasVoiceCore_(t) || t.indexOf(marker) >= 0) return { text: t, changed: false };
     return { text: t.trim() + '\n\n' + addendum, changed: true };
   }
   if(state.prompts.base){
@@ -15566,7 +15576,7 @@ function migrateAntiAiPainSafetyPrompts_(){
   function ensureMarker_(text, mk, body){
     var t = String(text || '');
     if(!t.trim()) return { text: t, changed: false };
-    if(t.indexOf(mk) >= 0) return { text: t, changed: false };
+    if(promptHasVoiceCore_(t) || t.indexOf(mk) >= 0) return { text: t, changed: false };
     return { text: t.trim() + '\n\n' + body, changed: true };
   }
   if(state.prompts.base){
@@ -15600,7 +15610,7 @@ function migratePlainDraftSentencePrompts_(){
       if(!cat[type]) return;
       if(type !== 'blog' && !(id >= 3 && id <= 5)) return;
       var text = String(cat[type]);
-      if(text.indexOf(PLAIN_DRAFT_SENTENCE_MARKER) >= 0) return;
+      if(promptHasVoiceCore_(text) || text.indexOf(PLAIN_DRAFT_SENTENCE_MARKER) >= 0) return;
       cat[type] = text.trim() + '\n\n' + PLAIN_DRAFT_SENTENCE_RULE;
       changed = true;
     });
@@ -15614,7 +15624,7 @@ function migrateBlogPlainReadabilityPrompts_(){
     var cat = state.prompts.categories[catId];
     if(!cat || !cat.blog) return;
     var text = String(cat.blog);
-    if(text.indexOf(BLOG_PLAIN_READABILITY_MARKER) >= 0) return;
+    if(promptHasVoiceCore_(text) || text.indexOf(BLOG_PLAIN_READABILITY_MARKER) >= 0) return;
     cat.blog = text.trim() + '\n\n' + BLOG_PLAIN_READABILITY_RULE;
     changed = true;
   });
@@ -15634,17 +15644,17 @@ function migrateSpeechStylePromptDefaults_(){
   Object.keys(state.prompts.categories).forEach(function(catId){
     var cat = state.prompts.categories[catId];
     if(!cat || typeof cat !== 'object') return;
-    if(cat.blog && String(cat.blog).indexOf(blogMarker) < 0){
+    if(cat.blog && !promptHasVoiceCore_(cat.blog) && String(cat.blog).indexOf(blogMarker) < 0){
       cat.blog = String(cat.blog).trim() + '\n\n' + BLOG_INSTA_HONORIFIC_SPEECH_RULE;
       changed = true;
     }
-    if(cat.insta && String(cat.insta).indexOf(blogMarker) < 0){
+    if(cat.insta && !promptHasVoiceCore_(cat.insta) && String(cat.insta).indexOf(blogMarker) < 0){
       cat.insta = String(cat.insta).trim() + '\n\n' + BLOG_INSTA_HONORIFIC_SPEECH_RULE;
       changed = true;
     }
     if(cat.threads){
       var t = String(cat.threads);
-      if(t.indexOf(threadsMarker) >= 0) return;
+      if(promptHasVoiceCore_(t) || t.indexOf(threadsMarker) >= 0) return;
       if(t.indexOf(oldThreadsTone) >= 0){
         cat.threads = t.split(oldThreadsTone).join(THREADS_BANMAL_SPEECH_RULE);
         changed = true;
@@ -15722,8 +15732,9 @@ function migrateMangoImagePromptDefaults_(){
   return changed;
 }
 
-/** 저장 프롬프트에 초안 형태(자가 점검·셀프케어 단계·쓰레드 댓글)와 비도수 금지어를 붙인다 */
+/** 예전에 교정 문장을 덧붙이던 자리. 이제는 덧붙이지 않고, migrateVoiceCorePrompts_가 기본값으로 바꾼다. */
 function migrateDraftShapePrompts_(){
+  return false;
   if(!state.prompts) return false;
   var changed = false;
   var shape = '[초안 형태 — 자가점검·단계·댓글]';
@@ -15741,7 +15752,7 @@ function migrateDraftShapePrompts_(){
     var id = parseInt(catId, 10);
     var cat = state.prompts.categories[catId];
     if(!cat || typeof cat !== 'object') return;
-    if((id === 0 || id === 1 || id === 2) && cat.blog && String(cat.blog).indexOf(shape) < 0){
+    if((id === 0 || id === 1 || id === 2) && cat.blog && !promptHasVoiceCore_(cat.blog) && String(cat.blog).indexOf(shape) < 0){
       var blogAdd = shape + '\n' +
         '- selfCare는 동작 1개로 끝내지 마세요. 👉 먼저 확인(자가 점검 한 문장) → 👉 1.~4. 3~4단계(자세→숨→목·머리→등, 각 단계에 초·회) → 「아, 시원하다」에서 멈추기 → 혼자 할 때 자주 하는 실수 2~3개 → 적신호면 병원 한 문장.\n' +
         '- 비유는 글 전체 1개. 메커니즘을 직접 말하는 문장 우선.\n' +
@@ -15752,7 +15763,7 @@ function migrateDraftShapePrompts_(){
       cat.blog = String(cat.blog).trim() + '\n\n' + blogAdd;
       changed = true;
     }
-    if((id === 0 || id === 1 || id === 2) && cat.insta && String(cat.insta).indexOf(shape) < 0){
+    if((id === 0 || id === 1 || id === 2) && cat.insta && !promptHasVoiceCore_(cat.insta) && String(cat.insta).indexOf(shape) < 0){
       var instaAdd = shape + '\n' +
         '- 캡션 첫 줄은 그 자리에서 하는 자가 점검 한 문장.\n' +
         '- 메모·블로그에 없는 일화·회원 사례·숫자·「오늘 세션에서」를 만들지 마세요.\n' +
@@ -15767,7 +15778,7 @@ function migrateDraftShapePrompts_(){
       cat.insta = String(cat.insta).trim() + '\n\n' + instaAdd;
       changed = true;
     }
-    if(cat.threads && String(cat.threads).indexOf(shape) < 0 && id >= 0 && id <= 5){
+    if(cat.threads && !promptHasVoiceCore_(cat.threads) && String(cat.threads).indexOf(shape) < 0 && id >= 0 && id <= 5){
       var thAdd = shape + '\n' +
         '- 일반인 글의 본문은 자가 점검 질문으로 끝냅니다. 전문가 과정은 전제를 뒤집는 한 줄.\n' +
         '- 댓글은 빈 줄로 구분된 3~4개, 각 1~2문장. 마침표마다 쪼개지 마세요.\n' +
@@ -15779,6 +15790,34 @@ function migrateDraftShapePrompts_(){
       cat.threads = String(cat.threads).trim() + '\n\n' + thAdd;
       changed = true;
     }
+  });
+  return changed;
+}
+
+/** 덧붙인 교정 문장 대신, 목소리 원칙이 들어간 기본 프롬프트로 한 번에 교체 */
+function migrateVoiceCorePrompts_(){
+  if(!state.prompts) return false;
+  var changed = false;
+  if(!promptHasVoiceCore_(state.prompts.base)){
+    state.prompts.base = DEFAULT_PROMPTS.base;
+    changed = true;
+  }
+  if(!state.prompts.categories) return changed;
+  Object.keys(state.prompts.categories).forEach(function(catId){
+    var id = parseInt(catId, 10);
+    var cat = state.prompts.categories[catId];
+    var def = DEFAULT_PROMPTS.categories[id];
+    if(!cat || !def || typeof cat !== 'object') return;
+    ['blog', 'insta', 'threads'].forEach(function(type){
+      if(!def[type] || cat[type] == null || cat[type] === '') return;
+      if(promptHasVoiceCore_(cat[type])) return;
+      var cur = String(cat[type]);
+      var looksStacked = /\[초안 형태|\[말투 —|\[블로그 공통 완성도|\[Threads 댓글|\[금지어 —|\[병원 안내|\[초안 문장|\[가독성 —/.test(cur);
+      if(id <= 2 || looksStacked){
+        cat[type] = def[type];
+        changed = true;
+      }
+    });
   });
   return changed;
 }
@@ -22862,6 +22901,7 @@ function applyPersistPayload(s, opts){
   if(migrateBlogPlainReadabilityPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrateDraftShapePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateVoiceCorePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrated){
     var desktopReceiveOnly = isPlannerDesktopBrowser_() && !state._sessionUserEdit;
     if(opts && opts.authoritativeAdopt){
@@ -24339,6 +24379,7 @@ function runDeferredBootMigrations_(){
   if(migrateBlogPlainReadabilityPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrateDraftShapePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+    if(migrateVoiceCorePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrated){
       state.syncDirty = true;
       state.syncNeedsSnapshot = true;
@@ -24604,7 +24645,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=197').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=198').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -38221,14 +38262,14 @@ async function generateThreadsFromInsta_(catId, insta, topic){
     ? '\n- 전문가 과정: 인스타 캡션 범위 **밖** 내용 추가 금지. 본문 훅·댓글 해설 모두 인스타 근거 안에서.\n'
     : '';
   var generalHint = isGeneralAudienceCategory(catId)
-    ? '\n- 일반인 글: 본문은 통념 하나를 뒤집고, 자가 점검 질문으로 끝냅니다. 댓글은 빈 줄로 나눈 3~4개(각 1~2문장). 마지막 댓글만 적신호면 병원 먼저.\n'
+    ? '\n- 일반인 글: 반말. 본문은 자가 점검 질문으로 끝. 댓글은 빈 줄로 나눈 4개, 각 한 가지. 마지막은 행동. 적신호·병원·시간 약속 댓글 없음.\n'
     : '';
   var prompt = baseInfo + '\n\n' +
     '카테고리: ' + (CATEGORIES[catId] ? CATEGORIES[catId].name : '') + '\n' +
     '주제: "' + (topic || '') + '"\n\n' +
     '[쓰레드 작성 지침]\n' + threadsGuide + expertScope + generalHint + '\n' +
     '아래는 **확정·수정된 인스타 최종본**입니다. 인스타 문장을 그대로 옮기지 말고, **본문(훅)+댓글(해설)** 2단으로 **새로** 작성하세요.\n\n' +
-    'JSON만:\n{"threads":{"body":"본문 1~3문장. 일반인 글은 자가 점검 질문으로 끝","comment":"댓글1 1~2문장\\n\\n댓글2\\n\\n댓글3\\n\\n일반인 글이면 마지막은 적신호·병원 한 줄. 빈 줄로만 구분"}}\n\n' +
+    'JSON만:\n{"threads":{"body":"본문 1~3문장. 일반인 글은 자가 점검 질문으로 끝","comment":"댓글1\\n\\n댓글2\\n\\n댓글3\\n\\n댓글4는 행동으로 끝. 적신호 없음. 빈 줄로만 구분"}}\n\n' +
     '[인스타 최종본]\n' + buildInstaSourceText_(insta);
 
   var text = await callClaudePlanner_(prompt, { maxTokens: 2800, timeoutMs: THREADS_BG_TIMEOUT_MS });
@@ -38659,9 +38700,9 @@ window.copyWholeTab_ = function(btn){
 var SHEET_FIELD_META_ = {
   'blog.title':       { block: 'blog', label: '제목', instr: '증상명과 지역/브랜드 키워드가 자연스럽게 들어간, 검색·AI 인용에 강한 제목 한 줄. 존댓말·질문형 권장.' },
   'blog.problem':     { block: 'blog', label: '문제 제기', instr: '맨 앞 두 문장은 짧게, 문장 사이 빈 줄. 이어서 구체 장면 하나만. 번호·불릿 금지. 원리 설명과 같은 결론을 반복하지 말 것. **존댓말(해요체)**. **, ---, > 금지.' },
-  'blog.selfCare':    { block: 'blog', label: '셀프 케어', step: true, instr: '동작 하나로 끝내지 말 것. 👉 먼저 확인(자가 점검 한 문장) → 👉 1.~4. 3~4단계(자세→숨→목·머리→등, 각 단계에 초·회) → 아 시원하다에서 멈추기 → 혼자 할 때 자주 하는 실수 2~3개 → 적신호면 병원 한 문장. 단계 사이 빈 줄. 메모에 없는 일화·숫자 금지. **존댓말(해요체)**.' },
+  'blog.selfCare':    { block: 'blog', label: '셀프 케어', step: true, instr: '👉 먼저 확인 한 문장. 👉 1.~4. 3~4단계. 각 단계는 동작과 이유를 한 절에, 초·회 포함. 단계 사이만 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 맨 끝 한 줄만 적신호면 병원. 방향 추측 금지. 존댓말.' },
   'blog.explanation': { block: 'blog', label: '원리 설명', instr: '문제 제기의 장면을 다시 쓰지 말 것. 맨 앞 1~2문장만 핵심, 그 뒤는 새 이유. 마침표마다 빈 줄. 아주 짧은 문장은 다음 문장과 한 단락 가능. **존댓말(해요체)**. **, ---, > 금지.' },
-  'blog.cta':         { block: 'blog', label: '마무리 CTA', instr: '끝 행동은 하나. 저장·공유 금지. 일반 신규는 프로필 링크 문진. 병원 문구 금지. **존댓말** 2~3문장.' },
+  'blog.cta':         { block: 'blog', label: '마무리 CTA', instr: '끝 행동은 하나. 저장·공유 금지. 「프로필 링크에서 온라인 문진」. 브랜드가 실제로 하는 코칭만. 없는 약속·병원 문구 금지. 존댓말 2~3문장.' },
   'blog.hashtags':    { block: 'blog', label: '해시태그', array: true, instr: '증상·지역·브랜드와 관련된 해시태그 5~8개.' },
   'blog.hook':        { block: 'blog', label: '영상·사진 맥락', instr: '인용으로 쓸 두 문장. 문장 사이 빈 줄. 본문에서 같은 말을 길게 다시 풀지 말 것. 전문어는 처음 한 번 괄호로 풀기. **존댓말**. **, ---, > 금지.' },
   'blog.outline':     { block: 'blog', label: '시연·핵심 포인트', arrayLines: true, instr: '본문 장면 다음에 둘 짧은 줄. 한 줄에 완전한 문장 하나. 본문과 같은 설명을 반복하지 말 것. **존댓말**.' },
@@ -38671,15 +38712,15 @@ var SHEET_FIELD_META_ = {
   'community.selfCare':    { block: 'community', label: '셀프 케어', step: true, instr: '집에서 따라 할 수 있는 셀프 케어를 단계별로. 각 단계는 새 줄에서 "👉"로 시작하고 동작·초/회/세트를 앞쪽에 명시하세요. 단계 사이에는 빈 줄을 넣으세요.' },
   'community.explanation': { block: 'community', label: '원리 설명', instr: '왜 그런지 원리를 쉬운 말로, 단정적인 인과 문장으로 설명하세요.' },
   'insta.hook':     { block: 'insta', label: '첫 줄 후킹', instr: '스크롤을 멈추게 하는 인스타 첫 줄 후킹 한 문장. **존댓말(해요체)**.' },
-  'insta.caption':  { block: 'insta', label: '캡션', instr: '첫 줄은 자가 점검 한 문장. • 불릿은 짧은 순서. 메모에 없는 일화·회원 사례·숫자·오늘 세션 장면 금지. 끝 행동은 하나(프로필 링크 문진). 저장·공유·팔로우 금지. 리얼무브먼트면 마지막 줄 「약수역 3분 · 작전역 2분 · 1:1 예약제」. 비유는 1개 이내. 사용자가 넣은 빈 줄은 유지. **존댓말(해요체)**.' },
+  'insta.caption':  { block: 'insta', label: '캡션', instr: '자가 점검으로 시작. • 3개(동작+이유, 불릿 사이 빈 줄 없음). 빈 줄로 나눈 네 블록: 느껴지는 변화 / 브랜드 코칭 / 프로필 링크에서 온라인 문진 / 지점 줄. 리얼페이스 지점 줄은 작전역 2분만. 그 외는 약수역 3분 · 작전역 2분 · 1:1 예약제. 방향 추측·없는 약속·저장·공유·적신호 금지. 존댓말.' },
   'insta.hashtags': { block: 'insta', label: '해시태그', array: true, instr: '해시태그 6~8개. 리얼무브먼트·도수는 약수역운동·작전역운동 포함. 리얼페이스는 작전역운동 등 인천. 약수 태그는 넣지 말 것.' },
   'threads.body':    { block: 'threads', label: '본문 (게시글)', instr: '통념 뒤집기 1~3문장. 일반인 글은 자가 점검 질문으로 끝내 댓글을 유도. 해설·근거는 쓰지 마세요. **반말(구어체)**.' },
-  'threads.comment': { block: 'threads', label: '댓글 (재게시)', instr: '빈 줄로 구분된 3~4개 댓글. 각 1~2문장. 마침표마다 쪼개지 말 것. 일반인 글의 마지막 댓글은 적신호(팔 저림 등)면 병원 먼저. 메모에 없는 일화·숫자 금지. **반말**. 본문 문장 반복 금지.' },
+  'threads.comment': { block: 'threads', label: '댓글 (재게시)', instr: '빈 줄로 나눈 4개. 각 한 가지, 1~2문장. 주어를 분명히. 방향 추측 금지. 절제된 결과. 마지막은 자가 점검·행동. 적신호·병원·시간 약속 댓글 금지. 반말.' },
   'thread.topicTitle': { block: 'thread', label: '오늘의 한 줄', threadNorm: true, instr: '담백한 관찰·장면 한 줄. 짧은 감탄 가능. 따뜻한 위로·과한 감성 금지.' },
   'thread.summary':    { block: 'thread', label: '본문 (일상 나눔)', threadNorm: true, instr: '관찰 → 핵심 한 가지 → (선택) 짧은 감탄·철학 1문장. 담백·구어체. 과한 감성·설교 금지.' },
   'news.title': { block: 'news', label: '제목 · 첫 줄', instr: '소식용 제목 한 줄. 존댓말·질문형 권장. 과장 금지. 원데이면 일정 힌트, 정규면 적합성·변화 힌트.' },
   'news.body':  { block: 'news', label: '본문', instr: '현재 채널 톤. 신규=확신, 기존=이어짐. 원데이=일정·가격 먼저, 정규=가치·적합성 먼저. 네이버=정보·신뢰, 카카오=짧고 친근, 당근=동네·생활형. 존댓말.' },
-  'news.cta':   { block: 'news', label: 'CTA', instr: '신규면 맞는 사람·다음 행동 1개, 기존이면 다음 수업·멤버십. URL 넣지 말 것. 존댓말.' }
+  'news.cta':   { block: 'news', label: 'CTA', instr: '끝 행동 하나. 예약 또는 「프로필 링크에서 온라인 문진」. URL 없음. 약수는 약수역 3분, 인천은 작전역 2분, 리얼페이스는 인천만. 존댓말.' }
 };
 function fieldValueToString_(meta, block){
   if(!block) return '';
@@ -39801,7 +39842,7 @@ async function generateInstaFromBlog_(catId, blog, topic){
     ? '\n- 전문가 과정: 블로그에 없는 내용을 **새로 추가하지 말고**, 블로그·참고·영상·사진 범위 안에서만 압축하세요. **원리 설명** 한 줄이 드러나게.\n'
     : '';
   var generalHint = isGeneralAudienceCategory(catId)
-    ? '\n- 일반인 글: 캡션 첫 줄은 자가 점검 한 문장. 셀프 케어는 • 불릿 3개(자세·숨·목 또는 머리, 횟수·시간). 세션·회원 사례를 지어내지 마세요.\n'
+    ? '\n- 일반인 글: 캡션은 [인스타 형식]. 불릿은 동작+이유. 닫는 블록은 빈 줄. 방향 추측·없는 약속·적신호 문장 없음.\n'
     : '';
   var expertHint = isExpertCourseCategory(catId)
     ? '\n- 전문가 글: **영상·사진 맥락 → 시연 포인트 → 원리** 흐름. 캡션은 시연 포인트 2~3개 + 원리 한두 문장.\n'
@@ -39817,16 +39858,18 @@ async function generateInstaFromBlog_(catId, blog, topic){
     '아래는 **확정·수정된 블로그 글**입니다. 블로그 전체를 옮기지 말고, **현장 리포트** 톤의 짧은 인스타 한 포스트로 만드세요.\n' + expertScope + generalHint + expertHint + '\n' +
     '요구사항:\n' +
     (isGeneralAudienceCategory(catId)
-      ? '- hook: 흔한 방법 vs 같은 자리 비교 한 줄 (이모지 1개 전후, 25자 내외). 회원·세션 일화 금지\n' +
-        '- caption: 첫 줄은 그 자리에서 해 보는 자가 점검 한 문장. 이어서 메커니즘 1~2문장(비유는 없어도 되고, 쓴다면 1개). • 불릿 3개(자세·숨·목 또는 머리, 횟수·시간). 변화 한 줄. 끝 행동은 하나 — 프로필 링크 문진. 저장·공유·팔로우 유도 금지.' +
-        (parseInt(catId, 10) === 1 ? ' 마지막 줄은 「약수역 3분 · 작전역 2분 · 1:1 예약제」.' : '') +
-        ' hook 제외 **180~380자**. 사용자가 둔 줄바꿈 감각을 유지하고, 불릿 사이에 빈 줄을 끼워 넣지 마세요\n'
+      ? '- hook: 흔한 방법 vs 같은 자리 비교 한 줄 (25자 내외). 회원·세션 일화 금지\n' +
+        '- caption: 자가 점검으로 시작. • 3개(동작+이유, 불릿 사이 빈 줄 없음). 빈 줄로 나눈 네 블록: 느껴지는 변화 / 브랜드가 실제로 하는 코칭 / 프로필 링크에서 온라인 문진 / 지점 줄. ' +
+        (parseInt(catId, 10) === 2
+          ? '지점 줄은 「작전역 2분 · 1:1 예약제」만.'
+          : '지점 줄은 「약수역 3분 · 작전역 2분 · 1:1 예약제」.') +
+        ' 저장·공유·팔로우·적신호 금지. hook 제외 180~380자\n'
       : '- hook: 블로그 제목·후킹에서 **기억에 남는 한 줄** (이모지 1개 전후, 25자 내외 권장)\n' +
         '- caption: 블로그·영상 범위의 시연 포인트 2~3개와 원리 한 줄. hook 제외 **200~400자**. 없는 성과·사례·숫자 금지\n') +
     '- 입력·블로그·메모에 없는 일화·회원 사례·숫자·「오늘 세션에서 물어봤어요」 장면을 만들지 마세요\n' +
     '- 과정·철학·통념 뒤집기는 인스타가 아니라 쓰레드용 — 인스타는 **결과·장면**에 집중\n' +
     '- 블로그 700자대 본문·목차 전체 나열 금지. 읽고 나서도 떠오르는 **한 가지 메시지**에 집중\n' +
-    '- 위 요구사항이 작성 지침의 「저장·팔로우」「핵심 1개」「오늘 했더니」보다 우선합니다\n' +
+    '- 형식은 채널 지침의 본보기를 따른다. 본보기 문장을 다른 주제에 그대로 붙이지 않는다\n' +
     '- carousel: 반드시 빈 배열 []\n' +
     (isGeneralAudienceCategory(catId)
       ? (parseInt(catId, 10) === 2
@@ -41768,7 +41811,6 @@ ${briefPromptLines}
 
 [블로그 작성 지침]
 ${blogGuide}
-${(parseInt(catId, 10) === 1 || parseInt(catId, 10) === 2) ? '\n[금지어 — 이 채널] 독자 문장에 메디컬·재활·치료·통증을 쓰지 마세요. 불편·뻐근함. 지침의 「기능재활」은 본문에 베끼지 마세요. 적신호는 「병원 진료」.\n' : ''}
 ${imagePromptGuide}
 
 이 카테고리는 **blog(3단 구조)**와 **본문 사이에 넣을 실사 사진 3장(images.gptVisuals)** 을 만듭니다. 망고보드 7장(mangoBrief)은 필요할 때만 두고, 토큰이 모자라면 null. insta, notebookLM, community, thread 키는 JSON에 넣지 마세요. blog.title은 카드 주제와 같은 주장이어야 합니다.
@@ -41778,9 +41820,9 @@ ${imagePromptGuide}
 "blog": {
 "title": "${flowJsonTitleHint_(draft, '호기심·질문형 한 줄. 증상형이면 증상+지역·프로그램 키워드를 자연스럽게 (35자 내외, 과장 금지)')}",
 "problem": "문제 제기 2~4문장. 불릿·번호 없이. 문장(문단) 사이 빈 줄. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스. 자가 점검 문장은 넣지 말 것",
-"selfCare": "👉 먼저 확인: 자가 점검 한 문장. 빈 줄. 👉 1.~👉 4. 3~4단계(자세→숨→목·머리→등, 각 단계에 초·회, 단계 사이 빈 줄). 아 시원하다에서 멈추는 한 줄. 혼자 할 때 자주 하는 실수 2~3개. 적신호면 병원 한 문장. 동작 1개로 끝내지 말 것",
-"explanation": "맨 앞 1~2문장 TL;DR → 왜 도움이 되는지. 메커니즘 문장 우선, 비유는 글 전체 1개. 문단 사이 빈 줄. 병원 안내·자가 점검 반복 금지",
-"cta": "끝 행동 하나. 저장·공유 금지. 일반 신규는 프로필 문진. 병원 문구 금지. 증상 허브 URL은 압박 없이",
+"selfCare": "👉 먼저 확인: 자가 점검 한 문장. 빈 줄. 👉 1.~👉 4. 3~4단계(자세→숨→목·머리→등). 각 단계는 동작과 이유를 한 절에, 초·회 포함. 단계 사이만 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 맨 끝 한 줄만 적신호면 병원",
+"explanation": "맨 앞 1~2문장이 핵심. 그 뒤는 새 이유. 방향 단어를 추측하지 말 것. 문단 사이 빈 줄. 병원·자가 점검 반복 금지",
+"cta": "끝 행동 하나. 저장·공유 금지. 「프로필 링크에서 온라인 문진」. 없는 약속·병원 문구 금지",
 "hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6"]
 },
 ${generalImgJsonTail}
@@ -41989,9 +42031,9 @@ window.genContent = async function(ev){
       DEFAULT_NEWS_CHANNELS_PROMPT,
       '',
       blogSrc ? ('[참고 블로그 초안 — 같은 소재를 소식용으로 압축·변형]\n' + blogSrc + '\n') : '',
-      (parseInt(catId, 10) !== 0 && parseInt(catId, 10) !== 3)
-        ? '도수·CMT가 아닌 채널입니다. 본문에 메디컬·재활·치료·통증을 쓰지 마세요. 불편·뻐근함으로 쓰세요. 길이·지점 규칙은 그대로입니다.'
-        : '',
+      (parseInt(catId, 10) === 2)
+        ? '리얼페이스 소식은 인천만. 약수역·약수 일정을 넣지 마세요.'
+        : '약수 소식은 약수역 3분, 인천 소식은 작전역 2분. 끝 행동은 하나.',
       'JSON만 출력:',
       '{',
       '  "news": {',

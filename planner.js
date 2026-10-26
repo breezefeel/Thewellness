@@ -3674,8 +3674,8 @@ function buildImageGptVisualsJsonExample_(catId, opts){
   if(id === 7){
     return `"images": {
 "gptVisuals": [
-{"title":"상황 컷","role":"problem","prompt":"망고보드 AI 디자인용 한글 상세 프롬프트(일상 불편 장면·구도·인물·조명)"},
-{"title":"따라하기 컷","role":"selfCare","prompt":"망고보드 AI 디자인용 한글 상세 프롬프트(따라하기 핵심 동작·손 위치·자세가 보이게)"}
+{"title":"상황 컷","role":"problem","prompt":"한글 장면 프롬프트(일상 불편 장면·구도·인물·조명)"},
+{"title":"따라하기 컷","role":"selfCare","prompt":"한글 장면 프롬프트(따라하기 핵심 동작·손 위치·자세가 보이게)"}
 ],
 "mangoBrief": null
 }`;
@@ -4048,7 +4048,7 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
   },
   '6': {
     brandProfile: '일상 공유는 미카닥 박준규 개인 계정의 사람 레이어입니다. 페이스·도수·리얼무브먼트 계정에 올리지 않습니다. 그날의 장면(누구와·무엇을·몸 느낌)이거나, 떠오른 생각 한 줄을 사람들이 자기 이야기로 느끼게 풀어 씁니다. 장면 글은 재료 밖을 창작하지 말고, 생각 글은 오늘 일어난 일처럼 꾸며 내지 마세요. 사진은 원본을 4:5로만 맞춥니다.',
-    strategyGuide: '기준:\n- 장면 글: 입력 세 칸(누구와 / 무엇을 / 몸 느낌) 밖을 창작하지 않는다.\n- 생각 글: 원문 한 줄의 뜻을 유지하고, 오늘 일기처럼 꾸며 내지 않는다. 정답·옳고 그름을 가르지 않는다.\n- 가르침·셀프 케어·CTA·독자 질문은 넣지 않는다.\n- 이미지는 망고·글자 썸네일 없이 원본 4:5 보정만 한다.\n\n의도:\n- AI가 많이 쓰는 계정에서 사람 냄새를 남긴다.\n- 찍힌 날과, 가끔 떠오른 한 줄을 함께 남긴다.\n- 프로그램 계정과 역할을 나눈다.',
+    strategyGuide: '기준:\n- 장면 글: 입력 세 칸(누구와 / 무엇을 / 몸 느낌) 밖을 창작하지 않는다.\n- 생각 글: 원문 한 줄의 뜻을 유지하고, 오늘 일기처럼 꾸며 내지 않는다. 정답·옳고 그름을 가르지 않는다.\n- 가르침·셀프 케어·CTA·독자 질문은 넣지 않는다.\n- 이미지는 글자 썸네일 없이 원본 4:5 보정만 한다.\n\n의도:\n- AI가 많이 쓰는 계정에서 사람 냄새를 남긴다.\n- 찍힌 날과, 가끔 떠오른 한 줄을 함께 남긴다.\n- 프로그램 계정과 역할을 나눈다.',
     steps: [
       { id: '1', title: '1단계 · 장면 한 줄', summary: '누구와 무엇을 했는지 사실만', rationale: '제목만 바꾸면 개인 느낌이 사라집니다. 그날의 사람이 먼저여야 합니다.' },
       { id: '2', title: '2단계 · 몸 느낌', summary: '오늘 굳은 데·피로 한 가지', rationale: '전문가의 몸도 굳는다는 한 줄이 반전입니다. 가르침으로 바꾸지 마세요.' },
@@ -13903,7 +13903,7 @@ const DEFAULT_HEILJAGYAE_COMMUNITY_PROMPT = `힐스테이트 자이 계양 **아
 엘리베이터 앞, 30초면 충분합니다. 🙂
 (마무리 — 앱 고정)`;
 
-const DEFAULT_DAILY_SHARE_IMAGE_PROMPT = `일상 공유 이미지는 **망고보드·글자 썸네일을 만들지 않습니다.**
+const DEFAULT_DAILY_SHARE_IMAGE_PROMPT = `일상 공유 이미지는 **글자 썸네일을 만들지 않습니다.**
 
 [목적]
 초안에 붙인 **실제 사진**을 인스타 피드용 **4:5**로만 맞춥니다. 선명하게·(선택) AI 화질은 보정입니다. 분위기 컷·장면 컷 프롬프트는 작성하지 마세요.
@@ -14389,7 +14389,7 @@ function buildProgramColorPreviewBarHtml_(catId){
   // 이미지 탭 바는 상수(기본색)만 — 미리보기 세션 수정색과 혼동 방지
   var entry = getProgramColorPreviewEntry_(catId, { forceDefault: true });
   return '<div class="img-color-preview-bar">' +
-    '<button type="button" class="btn-color-preview" onclick="openProgramColorPreview_(' + entry.id + ')" title="망고보드·썸네일·탭 브랜드 색 확인">' +
+    '<button type="button" class="btn-color-preview" onclick="openProgramColorPreview_(' + entry.id + ')" title="썸네일·탭 브랜드 색 확인">' +
     '<span class="btn-color-preview-dot" style="background:' + entry.brand + '"></span>' +
     '<span class="btn-color-preview-label">색상 미리보기</span>' +
     '<span class="btn-color-preview-name" style="color:' + entry.brand + '">' + escapeHtml(entry.name) + '</span>' +
@@ -14478,7 +14478,7 @@ function renderProgramColorPreviewBody_(catId){
       '</div>' +
     '</div>' +
     '<div class="cp-section">' +
-      '<h3>망고보드 팔레트 · ' + escapeHtml(m.desc || '') + '</h3>' +
+      '<h3>슬라이드 색 · ' + escapeHtml(m.desc || '') + '</h3>' +
       '<div class="cp-swatches">' +
         colorPreviewSwatchHtml_('배경 bg', m.bg, 'mango.bg', base.mango.bg) +
         colorPreviewSwatchHtml_('배경2 bg2', m.bg2, 'mango.bg2', base.mango.bg2) +
@@ -14919,7 +14919,7 @@ function getMangoLayoutCopyRule_(catId){
   var p = getMangoPaletteForCat_(catId);
   var m = getMangoModelGuideForCat_(catId);
   var sparse = getMangoSparseAccentRule_(catId);
-  return `[레이아웃·카피 — 망고보드 생성 시 필수]
+  return `[레이아웃·카피 — 슬라이드 장면]
 - 표·긴 설명표 금지. 한 눈에 읽히는 「주의·안내」카드 / 짧은 불릿 / STEP 3~5개만.
 - **블로그 원문 붙여넣기·말줄임(…) 금지.** 장마다 헤드+짧은 불릿으로 **이미지용 핵심만**.
 - 장별 역할·메시지가 겹치지 않게 (표지≠공감≠원리≠따라하기).
@@ -14946,8 +14946,8 @@ function getMangoDetailBriefRule_(catId){
   var layoutCopy = getMangoLayoutCopyRule_(catId);
   var p = getMangoPaletteForCat_(catId);
   var m = getMangoModelGuideForCat_(catId);
-  return `[망고보드 AI 상세페이지 입력 — 필수 형식]
-망고보드 「상세페이지」 화면의 **제품명·소개 입력란에 그대로 붙여넣는 한글**만 작성합니다.
+  return `[슬라이드 소개 카피 — 7장]
+**제품명·소개에 넣을 한글**만 작성합니다. 각 장은 그 문장만 보고 장면이 그려지게 합니다.
 1) productName (=「제품명 혹은 주제」): **반드시 채움**, **최대 ${MANGO_DETAIL_TITLE_MAX}자**. 블로그 제목이 길면 **핵심 포인트가 남는 짧은 제목**으로. 이모지·과장 금지.
 2) intro (=「소개」): **반드시 채움**, **최대 ${MANGO_DETAIL_INTRO_MAX}자**. **이미지로 그릴 수 있는 짧은 카피**만. 블로그 원문 붙여넣기·말줄임(…) 금지.
 3) mangoInputPaste = intro와 **동일**.
@@ -14970,7 +14970,7 @@ intro 출력 예시 형식:
 레이아웃·톤도 함께 반영:
 ${layoutCopy}
 
-intro 맨 끝 필수 (짧게만 — 망고 붙여넣기용):
+intro 맨 끝 필수:
 [디자인]
 ${tone}
 
@@ -15033,9 +15033,9 @@ const BLOG_INSERT_GPT_VISUALS_RULE = `[우선 — images.gptVisuals 정확히 3�
 - 실사 사진풍. 생성 시 카테고리 **남/여 모델 가이드**를 따름.
 - 금지: 병원·수술·의료기기, 로고·긴 문장 텍스트, 만화·3D, 해부학적으로 어색한 손·팔, 영문만인 문장.
 
-[부차 — mangoBrief]
-망고보드 7장이 필요할 때만 쓰는 **선택** 기획입니다. 토큰이 부족하면 mangoBrief는 null(시스템이 블로그에서 로컬 변환).
-**gptVisuals 3장 본문 삽입 컷이 최우선.**`;
+[부차 — 7장 소개]
+7장 슬라이드 소개는 필요할 때만 둡니다. 토큰이 부족하면 mangoBrief는 null(시스템이 블로그에서 로컬 변환).
+**본문 사이에 넣을 사진 3장이 우선.**`;
 
 const DEFAULT_BLOG_INSTA_IMAGE_PROMPT = `블로그·인스타용 **본문 삽입 사진 프롬프트**를 작성합니다. 상세페이지 슬라이드가 아닙니다.
 장면에 넣을 문장이 있으면 [목소리와 원칙]을 따른다. 아래는 사진 형식만.
@@ -15055,7 +15055,7 @@ ${MANGO_SLIDE_VISUAL_COPY_RULE}
 
 제품명·소개·[디자인][레이아웃] 색상은 **생성 시 카테고리별 팔레트 지침**을 따릅니다.`;
 
-const DEFAULT_HEILJAGYAE_IMAGE_PROMPT = `힐자계 아파트너 게시글용 **망고보드 AI 디자이너** 이미지 프롬프트입니다.
+const DEFAULT_HEILJAGYAE_IMAGE_PROMPT = `힐자계 아파트너 게시글에 붙일 **실사 장면 프롬프트**입니다.
 
 [목적]
 게시판 **셀프 케어(따라하기)** 동작을 입주민이 한눈에 따라 할 수 있게 보여주는 **밝은 실사풍 시연 컷**용 **한글** 프롬프트를 작성합니다. (영문-only 프롬프트 금지)
@@ -15068,7 +15068,7 @@ const DEFAULT_HEILJAGYAE_IMAGE_PROMPT = `힐자계 아파트너 게시글용 **�
    - 단계가 여럿이면 가장 핵심 1~2동작을 한 장에 명확히, 필요하면 STEP 1·2가 읽히게.
    - "시원한 지점에서 멈추기" 뉘앙스가 시각적으로 전달되게.
 
-[각 prompt 작성법 — 망고보드 AI 디자인에 그대로 붙여넣기]
+[각 prompt 작성법]
 - **한글 한 덩어리** 180~450자. 문장형으로 구도·인물·공간·동작·조명·색감을 구체적으로.
 - 반드시 포함: (1) 샷 타입(전신/상반신) (2) 인물(30~50대 입주민 느낌·편안한 홈웨어) (3) 장소(아파트 거실·현관 등) (4) 구체 동작·손 위치 (5) 밝은 자연광·소프트 그린·깨끗한 배경 (6) 금지 요소
 - 금지: 병원·수술·의료기기, 로고·긴 문장 텍스트 남발, 선정성, 어두운 공포 톤, 영어만인 문장, mangoBrief
@@ -15120,6 +15120,7 @@ const VOICE_AND_PRINCIPLES = `${VOICE_CORE_MARKER}
 변화: 몸이 어떻게 달라지는지 쉬운 말로. 「엄청 편해집니다」처럼 느껴지는 변화. 「덜 애쓰는 느낌이 달라집니다」처럼 추상적으로 쓰지 않는다.
 서비스: 브랜드 이름을 넣고, 실제로 하는 일만. 불편이 반복되지 않게 생활습관과 바른 자세를 같이 코칭한다. 「10분 순서를 남겨 드립니다」처럼 없는 약속, 메모에 없는 일화·회원·숫자·오늘 세션은 만들지 않는다. 포스터 틀의 예시 문장을 초안에 가져오지 않는다.
 단어: 도수·CMT가 아니면 통증·메디컬·재활·치료를 쓰지 않는다. 불편·뻐근함. 우리가 치료했다는 서술 금지. 도수·CMT만 임상 서술이 가능하다. 「완치」「처방」「수술 대신」 금지.
+의료법: 완치나 효과 보장, 비교·최상급, 환자 후기를 만들지 않는다.
 끝 행동: 하나. 저장·공유·팔로우 금지. 일반 신규는 「프로필 링크에서 온라인 문진」. 예약은 네이버 예약. 블로그 말미 링크는 시스템이 붙인다.
 지점: 약수역 3분, 작전역 2분, 1:1 예약제. 리얼무브먼트·도수는 두 지점. 리얼페이스는 인천만(작전역 2분). 없는 지점 태그를 만들지 않는다.
 적신호: 병원 안내는 블로그 셀프 케어 맨 끝 한 줄만. 인스타·쓰레드·릴스·소식에는 넣지 않는다.
@@ -15132,6 +15133,7 @@ const MEDICAL_COMPLIANCE_RULE = `[의료법·포지셔닝 — 필수]
 - 작성자(미카닥 박준규)는 **현재 병원에서 근무하지 않습니다**. 진단·처방·치료행위를 하거나 암시하지 마세요(아래 채널 예외 참고).
 - 제공 범위는 **운동·재활·웰니스 프로그램**(리얼무브먼트, P-스트레칭, 기능운동 등)이며, 의료행위가 아님을 전제로 씁니다.
 - "완치""진단 확정""처방""수술 대신" 등 **의료행위 연상** 표현 금지. "이해를 돕기 위한 일반 정보"·"생활·운동 관리 참고" 톤.
+- 의료법: 완치나 효과 보장, 비교·최상급, 환자 후기를 만들지 않는다.
 - **치료행위 표현(채널별·필수)**
   - **예외(서술 가능)**: 도수치료 · CMT Academy — 임상·치료·시술 맥락 서술 OK.
   - **그 외 채널**(리얼무브먼트·리얼 페이스·Re:Al 움직임·IFC·일상·힐자계 등): **우리가 치료했다 / 치료한 결과 / 치료해 드린 / 시술 후(우리 행위)**처럼 **치료행위를 했다는 내용 금지**.
@@ -24645,7 +24647,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=198').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=199').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -32655,7 +32657,7 @@ function buildImagePromptGuide(topic, angle, customGuide, catId){
   const tone = getMangoDesignToneLine_(id);
   var model = getMangoModelGuideForCat_(id);
   return `
-[본문 삽입 사진 + 선택 망고보드]
+[본문 삽입 사진]
 이번 초안 주제: "${t}"
 작성 각도: "${a}"
 ${pillar ? '프로그램 톤: ' + pillar : ''}
@@ -32681,7 +32683,7 @@ function buildHeiljagyaeImagePromptGuide(topic, angle, customGuide){
   const a = String(angle || '').trim();
   const g = String(customGuide || '').trim();
   return `
-[힐자계 이미지 — 망고보드 AI 디자이너]
+[힐자계 이미지 — 실사 장면 2장]
 주제: "${t}" / 각도: "${a}"
 community.selfCare(따라하기)를 보고 **images.gptVisuals 2개**(상황 컷 + 따라하기 컷)에 **한글** 프롬프트를 디테일하게 작성하세요.
 따라하기 컷이 핵심입니다. 동작·손 위치·자세가 보이도록. mangoBrief는 null.
@@ -33218,8 +33220,8 @@ function renderMangoDetailInputCard_(brief){
   var titleVal = formatMangoTitlePaste_(brief);
   var introVal = formatMangoBriefPaste_(brief, catId);
   var html = '';
-  html += '<div class="img-section-title">선택 · 망고보드 7장 상세페이지</div>';
-  html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">본문 삽입 사진이 우선입니다. 망고보드가 필요할 때만 주황 버튼으로 <strong>제목+소개</strong> 복사 → 소개란에 붙여넣고 첫 줄만 제품명으로. 소개는 <strong>장별 헤드+짧은 불릿</strong>(블로그 원문·… 붙여넣기 X). 결과물: <strong>' + escapeHtml(p.label) + '</strong> · 배경 <strong>' + escapeHtml(p.bg + '·' + p.bg2) + '</strong>·헤드 <strong>' + escapeHtml(p.head) + '</strong>·포인트 <strong>' + escapeHtml(p.point) + '</strong>' + (isMangoSparseAccentCat_(catId) ? '(작은 체크·기호만 · <strong>빨강 전체 배경·큰 빨간 원 아이콘 금지</strong> · 표지 스크림은 차콜만)' : '') + '·카드 <strong>' + escapeHtml(p.card + '·' + p.card2) + '</strong>·구분선 <strong>' + escapeHtml(p.divider || p.head) + '</strong>(지정 외 색·흑백 모노 X), 주의·안내형, ' + escapeHtml(getMangoModelGuideForCat_(catId).uiHint) + ', 픽토그램 OK.</p>';
+  html += '<div class="img-section-title">선택 · 7장 슬라이드 소개</div>';
+  html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">본문 삽입 사진이 우선입니다. 7장 소개가 필요할 때만 주황 버튼으로 <strong>제목+소개</strong>를 복사합니다. 소개는 <strong>장별 헤드+짧은 불릿</strong>(블로그 원문·… 붙여넣기 X). 결과물: <strong>' + escapeHtml(p.label) + '</strong> · 배경 <strong>' + escapeHtml(p.bg + '·' + p.bg2) + '</strong>·헤드 <strong>' + escapeHtml(p.head) + '</strong>·포인트 <strong>' + escapeHtml(p.point) + '</strong>' + (isMangoSparseAccentCat_(catId) ? '(작은 체크·기호만 · <strong>빨강 전체 배경·큰 빨간 원 아이콘 금지</strong> · 표지 스크림은 차콜만)' : '') + '·카드 <strong>' + escapeHtml(p.card + '·' + p.card2) + '</strong>·구분선 <strong>' + escapeHtml(p.divider || p.head) + '</strong>(지정 외 색·흑백 모노 X), 주의·안내형, ' + escapeHtml(getMangoModelGuideForCat_(catId).uiHint) + ', 픽토그램 OK.</p>';
   html += '<div class="img-tool-card">';
   html += '<label style="display:block;font-size:11px;color:#374151;margin:0 0 4px;">제품명 혹은 주제 <span id="sheet-mango-title-count" style="color:#9CA3AF;">' + titleVal.length + '/' + MANGO_DETAIL_TITLE_MAX + '</span></label>';
   html += '<input type="text" class="sheet-edit" id="sheet-mango-title" maxlength="' + MANGO_DETAIL_TITLE_MAX + '" value="' + escapeHtml(titleVal) + '" oninput="updateMangoFieldCounts_()" style="width:100%;margin-bottom:12px;padding:8px 10px;font-size:13px;border:1px solid #E5E7EB;border-radius:8px;box-sizing:border-box;">';
@@ -33231,7 +33233,7 @@ function renderMangoDetailInputCard_(brief){
     html += '<div style="margin-top:10px;padding:10px 12px;background:#F5F3FF;border-radius:8px;font-size:12px;color:#5B21B6;line-height:1.55;"><strong>TIP · 참고 사진</strong><br>서비스·시연 장면 사진을 올리세요. ② 셀프 케어 전신 컷(실사)을 권장합니다. 제품이 잘린 사진·글자만 있는 캡처는 피하세요.</div>';
   }
   html += '<div class="img-tool-actions" style="margin-top:10px;">';
-  html += '<button type="button" class="img-tool-main-btn mango" onclick="copyMangoBriefAndOpen_()">망고보드 열기 · 제목·소개 복사</button>';
+  html += '<button type="button" class="img-tool-main-btn mango" onclick="copyMangoBriefAndOpen_()">제목·소개 복사</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="copyMangoTitleOnly_()">제품명만 복사</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="copyMangoBriefOnly_()">소개만 복사</button>';
   html += '<button type="button" class="img-tool-copy-btn" data-regen="mango" onclick="genContent(event)">소개 재생성</button>';
@@ -34988,7 +34990,7 @@ function renderThumbMakerCard_(content){
   '</div>';
   html += '<p style="font-size:12px;color:#6B7280;margin:0 0 10px;line-height:1.55;">' +
     (photoOnly
-      ? '찍힌 사진을 <strong>4:5</strong>로만 맞춥니다. 글자·망고·후킹은 없습니다. <strong>선명하게</strong>·<strong>AI 화질</strong>로 보정할 수 있어요. 여러 장이면 첫 장이 피드입니다.'
+      ? '찍힌 사진을 <strong>4:5</strong>로만 맞춥니다. 글자 썸네일·후킹은 없습니다. <strong>선명하게</strong>·<strong>AI 화질</strong>로 보정할 수 있어요. 여러 장이면 첫 장이 피드입니다.'
       : (addForm
         ? (thumbStep
           ? '릴스에서 고른 <strong>대표 장면</strong>으로 썸네일을 이어 만듭니다. 추천 컷을 바꾸거나 후킹·구도를 수정하세요.'
@@ -37042,7 +37044,7 @@ function buildHeiljagyaeImagePromptsFromCommunity_(community, topic){
     '과장된 고통 표정·병원·의료기기·로고·긴 글자 금지. 실사풍, 깨끗한 구도, 소프트 그린 포인트.';
 
   var carePrompt =
-    '망고보드 AI 디자인용 따라하기 시연 컷. 주제 「' + topicLine + '」. ' +
+    '따라하기 시연 컷. 주제 「' + topicLine + '」. ' +
     '아파트 거실, 밝은 자연광, 실사풍. 30~50대 입주민(편한 홈웨어)이 동작을 천천히 시연. ' +
     '핵심 동작: ' + mainAction +
     (secondAction ? ' 이어서 ' + secondAction : '') + '. ' +
@@ -37160,7 +37162,7 @@ window.copyAllBlogInsertPrompts_ = function(btn){
 window.copyCommunityOrDailyPromptAndOpenMango_ = function(){
   var pack = readCommunityOrDailyImagePromptsFromSheet_();
   if(isDailyShareCategory(pack.catId)){
-    setAppToast('일상 공유는 망고보드를 쓰지 않아요. 사진을 4:5 JPEG로 맞추면 됩니다.', { duration: 3500, variant: 'ok' });
+    setAppToast('일상 공유는 장면 프롬프트를 만들지 않아요. 사진을 4:5 JPEG로 맞추면 됩니다.', { duration: 3500, variant: 'ok' });
     return;
   }
   var text = getPrimaryCommunityOrDailyPromptText_(pack.slots, pack.catId);
@@ -37178,18 +37180,18 @@ window.copyCommunityOrDailyPromptAndOpenMango_ = function(){
   var open = function(){
     window.open(getMangoDesignerOpenUrl_(), '_blank', 'noopener,noreferrer');
     setAppToast(
-      (isDaily ? '장면 프롬프트' : '따라하기 프롬프트') + ' 복사됨 · 망고보드 AI 디자인에 붙여넣기 하세요.',
+      (isDaily ? '장면 프롬프트' : '따라하기 프롬프트') + ' 복사됨.',
       { duration: 4500, variant: 'ok' }
     );
   };
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(text).then(open).catch(function(){
       open();
-      window.prompt('망고보드에 붙여넣을 프롬프트:', text);
+      window.prompt('장면 프롬프트:', text);
     });
   } else {
     open();
-    window.prompt('망고보드에 붙여넣을 프롬프트:', text);
+    window.prompt('장면 프롬프트:', text);
   }
 };
 
@@ -37203,7 +37205,7 @@ async function generateHeiljagyaeImagePromptsFromCommunity_(catId, community, to
     getBasePrompt() + '\n\n' +
     '주제: "' + (topic || '') + '"\n\n' +
     (imageGuide ? '[카테고리 이미지 지침]\n' + imageGuide + '\n\n' : '') +
-    '아래 **확정·수정된 아파트너 게시판 글**의 셀프 케어(따라하기)를 시각화할 **망고보드 AI 디자이너용 한글 프롬프트 2개**만 만드세요.\n' +
+    '아래 **확정·수정된 아파트너 게시판 글**의 셀프 케어(따라하기)를 시각화할 **한글 장면 프롬프트 2개**만 만드세요.\n' +
     'community·blog 등 다른 키는 출력하지 마세요. mangoBrief는 null.\n\n' +
     '요구사항:\n' +
     '- gptVisuals 정확히 2개: (1) role problem / title 상황 컷 (2) role selfCare / title 따라하기 컷\n' +
@@ -37243,7 +37245,7 @@ async function generateBlogInsertPromptsFromBlog_(catId, blog, topic, draft){
     '주제: "' + (topic || '') + '"\n\n' +
     (imageGuide ? '[카테고리 이미지 지침]\n' + imageGuide + '\n\n' : '') +
     '아래 **확정·수정된 블로그**를 바탕으로 **본문 삽입용 실사 사진 프롬프트 3개**만 만드세요.\n' +
-    '7장 상세페이지·망고보드 슬라이드가 아닙니다. mangoBrief는 null. blog·insta 키는 출력하지 마세요.\n' +
+    '7장 슬라이드 소개가 아닙니다. mangoBrief는 null. blog·insta 키는 출력하지 마세요.\n' +
     '인물: ' + model.briefHint + ' (' + model.label + ')\n\n' +
     '요구사항:\n' +
     '- gptVisuals 정확히 3개: (1) role problem / title 공감 컷 / placeAfter 공감 단락 뒤\n' +
@@ -37375,10 +37377,10 @@ function renderSheetEmpty(draft, cat) {
     : isHeiljagyaeCategory(cat.id)
     ? 'AI가 <strong>아파트너 게시판 글</strong>을 만들어드려요'
     : isGeneralAudienceCategory(cat.id)
-    ? 'AI가 <strong>블로그(문제 제기·셀프 케어·원리)</strong>와 <strong>망고보드용 제품명·소개</strong>를 만들어드려요.<br>블로그 <strong>발행완료</strong> → 인스타 초안, 인스타 <strong>발행완료</strong> → 쓰레드 초안 순으로 만들어져요.<br><strong>소식</strong> 탭에서 같은 주제로 네이버·카카오·당근용 글도 만들 수 있어요.'
+    ? 'AI가 <strong>블로그(문제 제기·셀프 케어·원리)</strong>와 <strong>본문 사이 사진</strong>를 만들어드려요.<br>블로그 <strong>발행완료</strong> → 인스타 초안, 인스타 <strong>발행완료</strong> → 쓰레드 초안 순으로 만들어져요.<br><strong>소식</strong> 탭에서 같은 주제로 네이버·카카오·당근용 글도 만들 수 있어요.'
     : isExpertCourseCategory(cat.id)
-    ? '교육·강의 <strong>영상 링크</strong> 또는 <strong>실습 사진</strong>을 먼저 올리면, AI가 그에 맞춰<br><strong>영상·사진 맥락 → 시연 포인트 → 원리 설명</strong> 글과 <strong>망고보드용 제품명·소개</strong>를 만들어요.<br>블로그 <strong>발행완료</strong> → 인스타, 인스타 <strong>발행완료</strong> → 쓰레드 순으로 만들어져요.<br><strong>소식</strong> 탭에서 네이버·카카오·당근용 글도 만들 수 있어요.'
-    : 'AI가 <strong>블로그</strong>와 <strong>망고보드용 제품명·소개</strong>를 만들어드려요.<br>블로그 <strong>발행완료</strong> → 인스타 초안, 인스타 <strong>발행완료</strong> → 쓰레드 초안 순으로 만들어져요.<br><strong>소식</strong> 탭에서 네이버·카카오·당근용 글도 만들 수 있어요.';
+    ? '교육·강의 <strong>영상 링크</strong> 또는 <strong>실습 사진</strong>을 먼저 올리면, AI가 그에 맞춰<br><strong>영상·사진 맥락 → 시연 포인트 → 원리 설명</strong> 글과 <strong>본문 사이 사진</strong>를 만들어요.<br>블로그 <strong>발행완료</strong> → 인스타, 인스타 <strong>발행완료</strong> → 쓰레드 순으로 만들어져요.<br><strong>소식</strong> 탭에서 네이버·카카오·당근용 글도 만들 수 있어요.'
+    : 'AI가 <strong>블로그</strong>와 <strong>본문 사이 사진</strong>를 만들어드려요.<br>블로그 <strong>발행완료</strong> → 인스타 초안, 인스타 <strong>발행완료</strong> → 쓰레드 초안 순으로 만들어져요.<br><strong>소식</strong> 탭에서 네이버·카카오·당근용 글도 만들 수 있어요.';
   const sourceNoteHtml = buildDraftReferencePreviewHTML_(draft, { catId: cat.id });
   const ytAnalysisHtml = draft.youtubeAnalysis
     ? `<div style="margin-bottom:16px;padding:12px 14px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;">
@@ -39894,7 +39896,7 @@ async function generateMangoBriefFromBlog_(catId, blog, topic, draft){
     (brandBlock ? brandBlock + '\n\n' : '') +
     '주제: "' + (topic || '') + '"\n\n' +
     getMangoDetailBriefRule_(catId) + '\n\n' +
-    (imageGuide ? '[카테고리 망고보드 지침]\n' + imageGuide + '\n\n' : '') +
+    (imageGuide ? '[카테고리 이미지 지침]\n' + imageGuide + '\n\n' : '') +
     '아래 **확정·수정된 블로그**를 바탕으로 **mangoBrief만** 다시 만드세요.\n' +
     '블로그·인스타 등 다른 키는 출력하지 마세요.\n' +
     '블로그 문단 붙여넣기·말줄임(…) 금지. 【1~7장】헤드+불릿+비주얼로 변환.\n' +
@@ -39943,7 +39945,7 @@ function enqueueMangoFromBlog_(draftId, catId, topic, blog, draft){
   mangoBgByDraft[draftId] = { startedMs: startedMs, endMs: endMs, topic: topic || '', catId: catId };
   beginGenIndicator();
   var blogSnapshot = JSON.parse(JSON.stringify(blog || {}));
-  var label = String(topic || '망고보드');
+  var label = String(topic || '슬라이드 소개');
   if(label.length > 34) label = label.slice(0, 34) + '…';
   genActiveJob = { topic: label, endMs: endMs, kind: 'mango', draftId: draftId, catId: catId };
   updateGenIndicator();
@@ -39966,11 +39968,11 @@ function enqueueMangoFromBlog_(draftId, catId, topic, blog, draft){
           renderSheetContent(getDraftContent_(draftId) || content);
         }
       }
-      setAppToast('망고보드 소개를 다시 만들었어요.', { duration: 4500, variant: 'ok' });
+      setAppToast('슬라이드 소개를 다시 만들었어요.', { duration: 4500, variant: 'ok' });
     } catch(err){
       console.warn('[망고보드 재생성]', err);
       var msg = (err && err.message) ? err.message : String(err);
-      setAppToast('망고보드 재생성에 실패했어요.\n' + msg, { duration: 9000, variant: 'err' });
+      setAppToast('슬라이드 소개 재생성에 실패했어요.\n' + msg, { duration: 9000, variant: 'err' });
     } finally {
       delete mangoBgByDraft[draftId];
       genActiveJob = null;
@@ -40484,7 +40486,7 @@ function formatPromptDataSamplesBlock_(samples, promptTypes){
 }
 
 function buildCombinedFinalText_(finalTexts){
-  var labels = { blog: '블로그', insta: '인스타', threads: '쓰레드', image: '망고보드·이미지 프롬프트', community: '게시판', thread: '일상 공유' };
+  var labels = { blog: '블로그', insta: '인스타', threads: '쓰레드', image: '이미지 프롬프트', community: '게시판', thread: '일상 공유' };
   return Object.keys(finalTexts || {}).map(function(key){
     return '[' + (labels[key] || key) + ']\n' + finalTexts[key];
   }).join('\n\n---\n\n');
@@ -40494,7 +40496,7 @@ function parseCombinedFinalText_(text){
   var out = {};
   var raw = String(text || '').trim();
   if(!raw) return out;
-  var labels = { '블로그': 'blog', '인스타': 'insta', '쓰레드': 'threads', '망고보드·이미지 프롬프트': 'image', '이미지 생성 프롬프트': 'image', '게시판': 'community', '일상 공유': 'thread' };
+  var labels = { '블로그': 'blog', '인스타': 'insta', '쓰레드': 'threads', '이미지 프롬프트': 'image', '망고보드·이미지 프롬프트': 'image', '이미지 생성 프롬프트': 'image', '게시판': 'community', '일상 공유': 'thread' };
   var blocks = raw.split(/\n\n---\n\n/);
   var parsedAny = false;
   blocks.forEach(function(block){
@@ -41103,15 +41105,15 @@ ${pt==='community' && heiljCat ? `
 ${pt==='image' && (blogInstaCat || heiljCat || threadCat) ? `
 <div class="prompt-section">
   <div class="prompt-section-label">
-    ${threadCat ? '일상 사진 보정 지침' : '망고보드·이미지 지침'}
+    ${threadCat ? '일상 사진 보정 지침' : '이미지 지침'}
     ${promptResetBtnHtml_(state.editingCatId, 'image')}
   </div>
-  <textarea class="prompt-textarea" id="pt-image" style="min-height:200px;" placeholder="${heiljCat ? '망고보드 AI 디자인용 따라하기 이미지 프롬프트 규칙…' : (threadCat ? '실사 4:5 보정만. 망고·후킹·분위기 컷 금지…' : '망고보드·블로그용 사진 슬롯, 구도, 금지 요소, 3장 역할 등을 입력하세요...')}">${escapeHtml(imageVal)}</textarea>
+  <textarea class="prompt-textarea" id="pt-image" style="min-height:200px;" placeholder="${heiljCat ? '따라하기 장면 프롬프트 규칙…' : (threadCat ? '실사 4:5 보정만. 글자 썸네일·후킹·분위기 컷 금지…' : '본문 사이 사진 3장. 구도, 금지 요소, 장면 역할을 입력하세요...')}">${escapeHtml(imageVal)}</textarea>
   <div class="prompt-hint">${heiljCat
-    ? '힐자계: 게시판 셀프 케어(따라하기)를 시각화하는 <strong>한글</strong> 프롬프트 2장(상황 컷·따라하기 컷). 망고보드 AI 디자인에 붙여넣기용.'
+    ? '힐자계: 게시판 셀프 케어(따라하기)를 시각화하는 <strong>한글</strong> 프롬프트 2장(상황 컷·따라하기 컷).'
     : (threadCat
-      ? '일상 공유 이미지 탭은 <strong>실사 4:5 보정</strong>만. AI 분위기·장면 프롬프트·망고보드는 쓰지 않습니다.'
-      : '망고보드 상세페이지: 제품명 30자 · 소개 2000자(7장 · 이미지용 헤드+불릿, 블로그 원문 붙여넣기 X). GPT 영문 이미지 프롬프트는 사용하지 않습니다.')}</div>
+      ? '일상 공유 이미지 탭은 <strong>실사 4:5 보정</strong>만. 글자 썸네일과 분위기 컷은 쓰지 않습니다.'
+      : '본문 사이 사진 3장이 우선입니다. 7장 소개는 제품명 30자 · 소개 2000자(장별 헤드+불릿, 블로그 원문 붙여넣기 X).')}</div>
 </div>` : ''}
 
 ${pt==='base' ? `
@@ -41634,7 +41636,7 @@ function updateGenIndicator() {
 /** 상단 상태바: 무엇이 생성·재생성 중인지 */
 function genStatusPrefixForJob_(job){
   var kind = job && job.kind;
-  if(kind === 'mango') return '망고보드 작성 중';
+  if(kind === 'mango') return '슬라이드 소개 작성 중';
   if(kind === 'images' || kind === 'image') return '본문 사진 작성 중';
   if(kind === 'insta') return '인스타 작성 중';
   if(kind === 'threads') return '쓰레드 작성 중';
@@ -41645,7 +41647,7 @@ function genStatusPrefixForJob_(job){
 }
 function genStatusBusyLabel_(job){
   var kind = job && job.kind;
-  if(kind === 'mango') return '망고보드 재생성 중';
+  if(kind === 'mango') return '슬라이드 소개 재생성 중';
   if(kind === 'images' || kind === 'image') return '본문 사진 재생성 중';
   if(kind === 'insta') return '인스타 재생성 중';
   if(kind === 'threads') return '쓰레드 재생성 중';
@@ -41737,7 +41739,7 @@ if(isDailyShareCategory(catId)){
       '    "topicTitle": "원문의 핵심을 담은 평서 한 줄 (질문 금지)",\n' +
       '    "summary": "3~7문장. 원문을 일상 장면에 비추어 공감하게. 번호·불릿 금지. 가르침 없이 여운."\n' +
       '  },\n')
-    : ('이 카테고리는 **담백한 생활 나눔(thread)** 만 만듭니다. 사진은 초안에 올린 원본을 이미지 탭에서 4:5로 맞춥니다. **망고보드·분위기 컷·장면 컷 프롬프트는 만들지 마세요.**\n' +
+    : ('이 카테고리는 **담백한 생활 나눔(thread)** 만 만듭니다. 사진은 초안에 올린 원본을 이미지 탭에서 4:5로 맞춥니다. **글자 썸네일·분위기 컷·장면 컷 프롬프트는 만들지 마세요.**\n' +
       '본문은 [원장이 그날 준 재료]만 다듬습니다. 없는 사람·감정·동작·전문가 해설을 보태지 마세요. 강의·임상·홍보·과한 감성 톤 금지. blog, insta, community 키는 JSON에 넣지 마세요. mangoBrief는 null. images.gptVisuals는 빈 배열 [].\n\n' +
       '계절·날씨는 재료에 있을 때만. JSON만 출력:\n' +
       '{\n' +
@@ -41781,7 +41783,7 @@ ${communityGuide}
 
 ${hjImgGuide}
 
-이 카테고리는 **아파트너 게시판용 community**와 **망고보드 AI용 이미지 프롬프트(images.gptVisuals 2개)** 를 만듭니다. blog, insta, thread 키는 JSON에 넣지 마세요. mangoBrief는 null.
+이 카테고리는 **아파트너 게시판용 community**와 **실사 장면 프롬프트(images.gptVisuals 2개)** 를 만듭니다. blog, insta, thread 키는 JSON에 넣지 마세요. mangoBrief는 null.
 
 2026년 5~6월 봄·초여름 — 주제·각도에 맞을 때만 계절감(산책·냉방·꽃가루·붓기 등)을 자연스럽게. JSON만 출력:
 {
@@ -41796,7 +41798,7 @@ ${heiljagyaeImgJsonTail}
 
 community에는 인사말·고정 마무리 넣지 말 것. 글 흐름은 **문제 제기 → selfCare(해결책) → explanation(원리)** 순. selfCare는 👉로 시작.
 
-images.gptVisuals는 **정확히 2개**(상황 컷 + 따라하기 컷). 각 prompt는 **한글**로 망고보드 AI 디자인에 붙여넣을 상세 문장. 따라하기 컷에 selfCare 핵심 동작이 보이게. 영문-only·mangoBrief 금지.`;
+images.gptVisuals는 **정확히 2개**(상황 컷 + 따라하기 컷). 각 prompt는 **한글** 장면 문장. 따라하기 컷에 selfCare 핵심 동작이 보이게. 영문-only·mangoBrief 금지.`;
 } else if(isGeneralAudienceCategory(catId)){
   const hubCtaHint = getSymptomHubCtaHintForTopic_(draft.topic);
   const generalImgJsonTail = buildImageGptVisualsJsonExample_(catId);
@@ -41813,7 +41815,7 @@ ${briefPromptLines}
 ${blogGuide}
 ${imagePromptGuide}
 
-이 카테고리는 **blog(3단 구조)**와 **본문 사이에 넣을 실사 사진 3장(images.gptVisuals)** 을 만듭니다. 망고보드 7장(mangoBrief)은 필요할 때만 두고, 토큰이 모자라면 null. insta, notebookLM, community, thread 키는 JSON에 넣지 마세요. blog.title은 카드 주제와 같은 주장이어야 합니다.
+이 카테고리는 **blog(3단 구조)**와 **본문 사이에 넣을 실사 사진 3장(images.gptVisuals)** 을 만듭니다. 7장 슬라이드 소개(mangoBrief)는 필요할 때만 두고, 토큰이 모자라면 null. insta, notebookLM, community, thread 키는 JSON에 넣지 마세요. blog.title은 카드 주제와 같은 주장이어야 합니다.
 
 2026년 봄/초여름 — 주제·각도에 맞을 때만 계절감을 자연스럽게. JSON만 응답:
 {
@@ -41856,7 +41858,7 @@ ${blogGuide}
 
 ${imagePromptGuide}
 
-이 카테고리는 **blog**와 **본문 사이에 넣을 실사 사진 3장(images.gptVisuals)** 을 만듭니다. 망고보드 7장(mangoBrief)은 선택입니다. 토큰이 모자라면 null. insta, notebookLM, community, thread 키는 JSON에 넣지 마세요. blog.title은 카드 주제와 같은 주장이어야 합니다.
+이 카테고리는 **blog**와 **본문 사이에 넣을 실사 사진 3장(images.gptVisuals)** 을 만듭니다. 7장 슬라이드 소개(mangoBrief)는 선택입니다. 토큰이 모자라면 null. insta, notebookLM, community, thread 키는 JSON에 넣지 마세요. blog.title은 카드 주제와 같은 주장이어야 합니다.
 
 글 흐름: **영상·사진 맥락(hook) → 시연·핵심 포인트(outline) → 원리 설명(draft, 본문 중심)**
 
@@ -42141,7 +42143,7 @@ window.genContent = async function(ev){
   }
 
   if(tab === 'images' && isDailyShareCategory(catId)){
-    setAppToast('일상 공유 이미지 탭은 4:5 보정만 합니다. 망고보드 프롬프트는 만들지 않아요.', { duration: 4200, variant: 'ok' });
+    setAppToast('일상 공유 이미지 탭은 4:5 보정만 합니다. 장면 프롬프트는 만들지 않아요.', { duration: 4200, variant: 'ok' });
     return;
   }
 

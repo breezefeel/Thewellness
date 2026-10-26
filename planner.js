@@ -29312,6 +29312,17 @@ const CLAUDE_PLANNER_MODEL = 'claude-sonnet-4-6';
 
 var CONTENT_GUIDE_TEXT_ = '';
 var CONTENT_GUIDE_PROMISE_ = null;
+// 콘텐츠_기준.md 뒤쪽 '참고 기록'(옛 마케팅_전략.md)은 AI에 보내지 않는다. 표시 앞까지만 자른다.
+function cutContentGuideForAi_(text){
+  var t = String(text || '');
+  var i = t.indexOf('<!-- PLANNER_AI_CUTOFF');
+  if(i < 0){
+    var m = t.match(/^##[ \t]+참고 기록[ \t]*$/m);
+    if(m) i = m.index;
+  }
+  if(i >= 0) t = t.slice(0, i).replace(/\s*(?:---\s*)?$/, '');
+  return t.trim();
+}
 function loadContentGuide_(){
   if(CONTENT_GUIDE_PROMISE_) return CONTENT_GUIDE_PROMISE_;
   if(location.protocol === 'file:'){
@@ -29322,7 +29333,7 @@ function loadContentGuide_(){
     if(!res.ok) return '';
     return res.text();
   }).then(function(text){
-    CONTENT_GUIDE_TEXT_ = String(text || '').trim();
+    CONTENT_GUIDE_TEXT_ = cutContentGuideForAi_(text);
     return CONTENT_GUIDE_TEXT_;
   }).catch(function(){
     CONTENT_GUIDE_TEXT_ = '';

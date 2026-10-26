@@ -12459,6 +12459,13 @@ async function plannerGasJsonRequest_(requestPayload, timeoutMs){
       if(supaData && supaData.result === 'error' && supaData.retry){
         throw new Error(supaData.message || '서버 응답이 조금 오래 걸려요. 자동으로 다시 시도합니다.');
       }
+      if(supaData && supaData.supabaseApplied){
+        var supaSeqNow = parseInt(supaData.serverRevision, 10) || 0;
+        if(supaSeqNow > (parseInt(state.syncRevision, 10) || 0)){
+          state.syncRevision = supaSeqNow;
+          try { markGasSyncOk_(supaSeqNow, supaData.savedAt); } catch(eSeq){}
+        }
+      }
       return supaData;
     } catch(supaErr){
       if(supaTimedOut || (supaErr && supaErr.name === 'AbortError')){
@@ -13133,7 +13140,7 @@ function displaySubGoalStepTitle_(title, catId){
   }
   return t;
 }
-/** 리얼무브먼트 일반인 블로그 — 말미에 프로필·톡톡·인스타·예약 링크 카드를 고정 삽입 */
+/** 리얼무브먼트·리얼페이스 블로그 — 말미에 예약 링크 두 개를 고정 삽입 */
 function isRealMovementBlogCategory_(catId){ return Number(catId) === 1; }
 /** 도수치료·CMT Academy만 치료·시술 행위 서술 허용 */
 function allowsTreatmentActLanguage_(catId){
@@ -13540,51 +13547,45 @@ function renderNewsPostLinksBarHTML_(){
   return '<div class="sheet-news-post-links" aria-label="약수 소식 작성">' +
     '<div class="sheet-news-post-row">' + links + '</div></div>';
 }
-function getRealMovementBlogFooterText_(){
+function getBookingLinksFooterText_(){
   return [
-    '👇더 궁금한 점이 있다면 아래 링크를 참고해주세요',
-    PROFILE_BRAND_URL,
-    '',
-    '👇문의는 여기로 주세요 :)',
-    REAL_MOVEMENT_TALK_YAKSU_URL,
-    '',
-    REAL_MOVEMENT_TALK_INCHEON_URL,
-    '',
-    '인스타그램 @dr.park_dc.pt 에서도 움직임에 관련된 이야기를 하고 있습니다.',
-    REAL_MOVEMENT_IG_PARK_URL,
-    '',
-    REAL_MOVEMENT_IG_CENTER_URL,
-    '',
-    getBranchBookingDirectionsFooterText_('리얼무브먼트')
-  ].join('\n');
-}
-function getBranchBookingDirectionsFooterText_(brand){
-  return [
-    '👇' + brand + ' 약수점 네이버 예약',
+    '👇리얼무브먼트 약수점',
     REAL_MOVEMENT_BOOKING_YAKSU_URL,
     '',
-    '👇약수점 오시는 길',
-    REAL_MOVEMENT_DIRECTIONS_YAKSU_URL,
-    '',
-    '👇' + brand + ' 인천점 네이버 예약',
-    REAL_MOVEMENT_BOOKING_INCHEON_URL,
-    '',
-    '👇인천점 오시는 길',
-    REAL_MOVEMENT_DIRECTIONS_INCHEON_URL
+    '👇리얼무브먼트 인천점',
+    REAL_MOVEMENT_BOOKING_INCHEON_URL
   ].join('\n');
+}
+function getRealMovementBlogFooterText_(){
+  return getBookingLinksFooterText_();
 }
 function getRealFaceBlogFooterText_(){
-  return [
-    '👇리얼 페이스는 인천점에서 박준규 원장이 직접 진행합니다',
-    '',
-    '👇리얼 페이스 인천점 네이버 예약',
-    REAL_MOVEMENT_BOOKING_INCHEON_URL,
-    '',
-    '👇인천점 오시는 길',
-    REAL_MOVEMENT_DIRECTIONS_INCHEON_URL
-  ].join('\n');
+  return getBookingLinksFooterText_();
 }
-/** 리얼무브먼트·리얼페이스 블로그 말미: 네이버 예약 + 오시는 길 */
+var BRANCH_BLOG_FOOTER_STARTS_ = [
+  '👇더 궁금한 점이 있다면',
+  '👇문의는 여기로',
+  '👇리얼무브먼트 약수점',
+  '👇리얼무브먼트 인천점',
+  '👇리얼 페이스는 인천점',
+  '👇리얼 페이스 인천점',
+  '👇약수점 오시는 길',
+  '👇인천점 오시는 길',
+  '인스타그램 @dr.park_dc.pt'
+];
+function stripTrailingBranchFooter_(body){
+  var text = String(body || '').replace(/\s+$/, '');
+  if(!text) return '';
+  var start = Math.max(0, text.length - 1800);
+  var cut = -1;
+  BRANCH_BLOG_FOOTER_STARTS_.forEach(function(mark){
+    var i = text.indexOf(mark, start);
+    if(i >= 0 && (cut < 0 || i < cut)) cut = i;
+  });
+  if(cut < 0) return text.trim();
+  return text.slice(0, cut).trim();
+}
+/** 리얼무브먼트·리얼페이스 블로그 말미: 예약 링크 두 개 */
 function isBranchBookingBlogCategory_(catId){
   var id = Number(catId);
   return id === 1 || id === 2;
@@ -13596,11 +13597,10 @@ function getBranchBlogFooterText_(catId){
   return '';
 }
 function withRealMovementBlogFooter_(text, catId){
-  var body = String(text || '').trim();
+  var body = stripTrailingBranchFooter_(text);
   if(!body || !isBranchBookingBlogCategory_(catId)) return body;
   var footer = getBranchBlogFooterText_(catId);
   if(!footer) return body;
-  if(body.indexOf(REAL_MOVEMENT_BOOKING_YAKSU_URL) !== -1 || body.indexOf(REAL_MOVEMENT_BOOKING_INCHEON_URL) !== -1) return body;
   return body + '\n\n' + footer;
 }
 function getExpertCourseBlogFooterText_(catId){
@@ -15353,7 +15353,7 @@ ${MEDICAL_COMPLIANCE_RULE}
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     1: { // 리얼무브먼트
-      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[Movement 맥락] P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지. 프로그램명 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지, 영문 Re:Al 유지).\n[컬러] 보건의료 배경 임상가가 지도하는 **기능재활·움직임 센터**. 도수·카이로·시술 장면을 주인공처럼 부각하지 말 것.\n[치료행위] 우리가 치료했다는 내용 금지(치료한 결과·치료했어요 등). 「치료를 해도 반복=자세/움직임」 맥락은 허용.\n[말미 링크] 프로필·톡톡·인스타·예약/지도 URL은 시스템이 글 하단에 고정 삽입합니다. cta에는 URL을 넣지 말고 2~3문장만 쓰세요.`,
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[Movement 맥락] P-ROM·PAR·Position 1→2→3을 환자 언어로. '왜 이 동작인지'·호흡·긴장 조절·초·회·분·무리 금지. 프로그램명 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지, 영문 Re:Al 유지).\n[컬러] 보건의료 배경 임상가가 지도하는 **기능재활·움직임 센터**. 도수·카이로·시술 장면을 주인공처럼 부각하지 말 것.\n[치료행위] 우리가 치료했다는 내용 금지(치료한 결과·치료했어요 등). 「치료를 해도 반복=자세/움직임」 맥락은 허용.\n[말미 링크] 약수·인천 예약 URL 두 개는 시스템이 글 하단에 고정 삽입합니다. cta에는 URL을 넣지 말고 2~3문장만 쓰세요.`,
       insta: `${BLOG_INSTA_HONORIFIC_SPEECH_RULE}\n\n${buildComparisonExperienceHookRule_(1)}\n\n캐러셀 없이 **한 포스트 캡션**에 동작·포인트를 단계적으로 적습니다. 캡션 첫 줄은 자가 점검 한 문장. 끝 행동은 하나(프로필 링크 문진). 저장·공유·팔로우 유도 금지. 마지막 줄은 「약수역 3분 · 작전역 2분 · 1:1 예약제」. 해시태그 6~8개, 약수역운동·작전역운동 포함. 표기: 「리얼무브먼트」(붙여 쓰기·한 줄, 「리:얼」 금지). 주어는 「우리」「리얼무브먼트 전문가들」(박준규 1인 화자 금지). 도수·카이로 부각·치료행위 수행 암시 금지. 독자 문장에 메디컬·재활·치료·통증을 쓰지 마세요.\n[초안 형태 — 자가점검·단계·댓글]`,
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
@@ -17688,9 +17688,54 @@ function plannerConflictLabel_(key){
   if(p[0] === 'deleted') return '삭제 기록 · ' + p.slice(1).join(':');
   if(p[0] === 'pinned') return '고정 주제 · ' + p.slice(1).join(':');
   if(p[0] === 'override') return '주제 수정값 · ' + p.slice(1).join(':');
+  if(p[0] === 'blob') return '사진 파일';
   if(p[0] === 'ops') return '운영 매뉴얼';
   if(p[0] === 'milestone') return '프롬프트 개선 기록 · ' + p.slice(1).join(':');
   return key;
+}
+function pendingSyncValueTopic_(value){
+  var row = value;
+  if(row && row.value && typeof row.value === 'object' && row.topic == null && row.title == null) row = row.value;
+  if(row && row.content && typeof row.content === 'object'){
+    var titled = row.topic || row.title || (row.content.blog && row.content.blog.title);
+    if(titled) return String(titled).trim().slice(0, 42);
+    row = row.content;
+  }
+  if(row && (row.topic || row.title)) return String(row.topic || row.title).trim().slice(0, 42);
+  if(row && row.blog && row.blog.title) return String(row.blog.title).trim().slice(0, 42);
+  return '';
+}
+function listPendingSyncKeyRows_(){
+  var seen = {};
+  var rows = [];
+  function add(key, value){
+    key = String(key || '');
+    if(!key || seen[key] || (typeof isDeviceLocalSyncEntityKey_ === 'function' && isDeviceLocalSyncEntityKey_(key))) return;
+    seen[key] = true;
+    var label = plannerConflictLabel_(key);
+    var topic = pendingSyncValueTopic_(value);
+    if(!topic && key.indexOf('draft:') === 0 && typeof findDraftByIdAnywhere_ === 'function'){
+      var draft = findDraftByIdAnywhere_(key.slice('draft:'.length));
+      if(draft && draft.topic) topic = String(draft.topic).trim().slice(0, 42);
+    }
+    if(topic) label += ' · ' + topic;
+    rows.push({ key: key, label: label });
+  }
+  (state.syncOutbox || []).forEach(function(op){
+    if(op && op.key) add(op.key, op.value);
+  });
+  Object.keys(state.syncDirtyEntityKeys || {}).forEach(function(key){ add(key, null); });
+  return rows;
+}
+function pendingSyncKeyListHtml_(){
+  var rows = listPendingSyncKeyRows_();
+  if(!rows.length) return '';
+  var shown = rows.slice(0, 20);
+  var more = rows.length > shown.length ? '<li class="sync-preview-more">외 ' + (rows.length - shown.length) + '건…</li>' : '';
+  return '<div class="sync-preview-section"><div class="sync-preview-section-title">올리지 않은 항목 (' + rows.length + ')</div><ul class="sync-preview-conflict-list">' +
+    shown.map(function(row){
+      return '<li><strong>' + escapeHtml(row.label) + '</strong><span class="sync-preview-conflict-sub">' + escapeHtml(row.key) + '</span></li>';
+    }).join('') + more + '</ul></div>';
 }
 function plannerConflictPreview_(wrapped){
   if(wrapped === undefined) return '(삭제됨)';
@@ -19890,7 +19935,7 @@ function renderSyncStatusBodyHTML_(info){
       : '기준');
   var pendingMeta = '';
   if(info.pendingCount){
-    pendingMeta = '<br>미반영 변경 약 <strong>' + info.pendingCount + '</strong>건';
+    pendingMeta = '<br>미반영 변경 약 <strong>' + info.pendingCount + '</strong>건' + pendingSyncKeyListHtml_();
     if(info.sendingNow > 0 && info.phase === 'transferring'){
       pendingMeta += ' · 지금 올리는 중 <strong>' + info.sendingNow + '</strong>건';
     }
@@ -21909,6 +21954,7 @@ function renderManualSyncPreview_(preview){
   if(preview.remoteBy) revMeta += ' · ' + escapeHtml(preview.remoteBy);
   var html = '<div class="sync-preview-summary ' + escapeHtml(preview.direction) + '">' + preview.directionLabel + '</div>' +
     '<div class="sync-preview-meta">' + revMeta + '</div>';
+  html += pendingSyncKeyListHtml_();
   if(preview.subGoalHtml) html += '<div class="sync-preview-section">' + preview.subGoalHtml + '</div>';
   if(preview.conflictCount){
     html += '<div class="sync-preview-section"><div class="sync-preview-section-title">겹친 수정 (' + preview.conflictCount + '건)</div><ul class="sync-preview-conflict-list">' + preview.conflictPreviewHtml + '</ul></div>';
@@ -24558,7 +24604,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=196').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=197').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){

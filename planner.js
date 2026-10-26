@@ -20394,9 +20394,15 @@ async function runPlannerBootstrapInBackground_(){
         { duration: 7000, variant: 'err' });
     }
     try { updateSyncStatusUI_(); } catch(eAuthUi){}
-    if(!authFail && hasPendingLocalSyncChanges_()){
-      state.syncNeedsSnapshot = true;
-      state.syncDirty = true;
+    if(!authFail){
+      state._teamLoginRequired = false;
+      state._bootstrapChoiceDone = true;
+      if(hasPendingLocalSyncChanges_()){
+        state._sessionUserEdit = true;
+        state.syncDirty = true;
+        state.syncNeedsSnapshot = false;
+        try { schedulePlannerGasPush_(true); } catch(ePushFail){}
+      }
     }
   }
 }
@@ -22020,6 +22026,27 @@ window.startManualSyncPreview_ = async function(){
   } catch(ePrev){
     stopSyncPreviewCompareCountdown_();
     var msg = (ePrev && ePrev.message) ? ePrev.message : String(ePrev);
+    var pendingOnFail = 0;
+    try { pendingOnFail = countPendingSyncItems_(); } catch(ePendPrev){ pendingOnFail = (state.syncOutbox || []).length; }
+    if(pendingOnFail > 0){
+      _manualSyncPreviewCache_ = {
+        direction: 'merge_push',
+        directionLabel: '서버 목록을 다 읽지 못했습니다. 이 기기에 남은 <strong>' + pendingOnFail + '건</strong>은 확인하면 서버에 저장합니다. 서버에만 있는 항목은 지우지 않습니다.',
+        estimatedSec: 20,
+        localRev: parseInt(state.syncRevision, 10) || 0,
+        remoteRev: 0,
+        conflictCount: 0,
+        subGoalHtml: '',
+        conflictPreviewHtml: ''
+      };
+      renderManualSyncPreview_(_manualSyncPreviewCache_);
+      if(confirmBtn){
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = '선택 확인 후 동기화 시작';
+      }
+      if(err) err.textContent = msg;
+      return;
+    }
     previewBody.innerHTML =
       '<div class="sync-preview-summary warn">' + escapeHtml(msg) + '</div>' +
       '<div class="sync-preview-meta" style="margin-top:10px;">네트워크가 느리거나 서버(Apps Script) 데이터가 크면 시간이 더 걸릴 수 있어요.</div>' +
@@ -24531,7 +24558,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=195').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=196').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -39900,11 +39927,15 @@ window.onSheetDraftSave_ = function(){
       }
     }, 1400);
   }
+  var pendingAfterSave = 0;
+  try { pendingAfterSave = countPendingSyncItems_(); } catch(ePendToast){ pendingAfterSave = (state.syncOutbox || []).length; }
   setAppToast(photoFromBlog
     ? (topicPhotoWantsFigure_(content, state.selectedCatId)
       ? '저장했어요. 이 글은 설명 그림 프롬프트로 다시 썼어요.'
       : '저장했어요. 수정한 블로그에 맞춰 이미지 프롬프트를 다시 썼어요.')
-    : '초안을 저장하고 서버에 올렸어요. (발행 아님)', { duration: photoFromBlog ? 4200 : 3200, variant: 'ok' });
+    : ('이 기기에 초안을 저장했어요.' + (pendingAfterSave
+      ? (' 서버 반영은 아직 ' + pendingAfterSave + '건 남았습니다.')
+      : ' 서버 반영을 확인 중입니다.') + ' (발행 아님)'), { duration: photoFromBlog ? 4200 : 5200, variant: 'ok' });
 };
 
 /** opts.viaApi: PlannerSocial이 API로 이미 올린 뒤 — 발행 기록·다음 채널 초안만 만들고 복사·앱 이동은 하지 않는다 */

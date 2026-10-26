@@ -35002,7 +35002,7 @@ function renderThumbMakerCard_(content){
         ? (thumbStep
           ? '릴스에서 고른 <strong>대표 장면</strong>으로 썸네일을 이어 만듭니다. 추천 컷을 바꾸거나 후킹·구도를 수정하세요.'
           : '키워드와 맞는 <strong>사진·영상 장면</strong>을 고른 뒤 후킹·슬로건·브랜드를 수정합니다. 폴더를 고르면 그 안 미디어를 훑습니다.')
-        : '사진 위에 <strong>주제 후킹</strong>을 크게 올립니다. 미리보기에서 드래그로 초점, 글자를 누르면 입력칸으로 이동합니다.')) +
+        : '사진 위에 <strong>주제 후킹</strong>을 크게 올립니다. 배경은 올리거나 <strong>내 사진</strong>에서 고릅니다. 미리보기에서 드래그로 초점, 글자를 누르면 입력칸으로 이동합니다.')) +
     '</p>';
   html += '<div class="img-tool-card thumb-maker-card">';
   html += '<div class="thumb-maker-grid">';
@@ -35027,6 +35027,7 @@ function renderThumbMakerCard_(content){
     html += '<label class="thumb-maker-photo-btn" for="thumb-photo-input">' + (photoOnly ? '사진 올리기' : '배경 사진 올리기') + '</label>';
     html += '<input type="file" id="thumb-photo-input" accept="image/jpeg,image/png,image/webp,image/*" style="display:none" onchange="onThumbMakerPhoto_(event)">';
   }
+  html += '<button type="button" class="thumb-maker-photo-btn" id="thumb-photo-mine" onclick="openMyThumbsPicker_()">내 사진</button>';
   if(refCount){
     html += '<button type="button" class="img-tool-copy-btn" onclick="useDraftRefPhotoForThumb_(0)">초안 사진 쓰기' + (refCount > 1 ? ' (' + refCount + ')' : '') + '</button>';
   }
@@ -35789,6 +35790,17 @@ window.onThumbMakerPhoto_ = async function(ev){
   if(input) input.value = '';
 };
 
+/** 동기화된 보관함 사진. 파일로 올린 배경과 같은 준비·미리보기·저장 경로 */
+window.applyLibraryPhotoToThumbMaker_ = async function(dataUrl, fileName){
+  if(!dataUrl) throw new Error('사진을 읽지 못했어요.');
+  var name = fileName || '내 사진.jpg';
+  var payload = await prepareThumbBackgroundPayload_(dataUrl, name);
+  var prepared = 'data:' + (payload.mediaType || 'image/jpeg') + ';base64,' + payload.data;
+  clearThumbAiUpscaleCache_();
+  await setThumbMakerBackgroundFromDataUrl_(prepared, payload.name || name);
+  setAppToast('배경 사진을 올렸어요.', { duration: 1800, variant: 'ok' });
+};
+
 window.useDraftRefPhotoForThumb_ = async function(index, opts){
   opts = opts || {};
   var silent = !!opts.silent;
@@ -36474,7 +36486,7 @@ function renderTopicPhotoCard_(content){
   var preview = (st && st.bgDataUrl && st.draftId === state.selectedId && st.fileName === '주제 사진.jpg') ? st.bgDataUrl : '';
   var html = '';
   html += '<div class="img-section-title">이미지 생성</div>';
-  html += '<p class="empty-note" style="padding:0 0 8px;line-height:1.5;">1순위는 보관함 실사입니다. 「내 사진」에서 고르세요. 해부 일러스트는 GPT, 인물은 나노바나나입니다. 인물은 앞의 둘이 안 맞을 때만.</p>';
+  html += '<p class="empty-note" style="padding:0 0 8px;line-height:1.5;">1순위는 보관함 실사입니다. 해부 일러스트는 GPT, 인물은 나노바나나입니다. 인물은 앞의 둘이 안 맞을 때만.</p>';
   html += '<div class="img-tool-card">';
   html += '<div class="topic-photo-bar">';
   html += '<div class="topic-photo-bar-side">';
@@ -36500,7 +36512,6 @@ function renderTopicPhotoCard_(content){
   html += '<button type="button" class="topic-photo-go topic-photo-nano" id="topic-photo-nano" data-image-model="gemini-nano-banana-2.1" onclick="generateTopicPhoto_(this)">나노바나나</button>';
   html += '<div class="topic-photo-model-meta" id="topic-photo-nano-meta"></div>';
   html += '</div>';
-  html += '<button type="button" class="topic-photo-go topic-photo-mine" id="topic-photo-mine" onclick="openMyThumbsPicker_()">내 사진</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="copyCommunityOrDailyImageSlot_(0, this)">프롬프트 복사</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="rebuildTopicPhotoPrompt_()">프롬프트 재생성</button>';
   html += '</div></div>';
@@ -36911,31 +36922,6 @@ async function cropDataUrlToFourFive_(dataUrl){
   if(img.close){ try { img.close(); } catch(eClose2){} }
   return c.toDataURL('image/jpeg', 0.92);
 }
-/** 만든 사진·내 사진 공통: 4:5 가운데 자르기 후 미리보기·썸네일 배경·이 기기 작업본 */
-async function applyTopicPhotoDataUrl_(dataUrl, opts){
-  opts = opts || {};
-  var content = opts.content || getDraftContent_(state.selectedId);
-  if(!content) throw new Error('초안이 없어요. 본문 탭에서 먼저 초안을 만들어 주세요.');
-  var cropped = await cropDataUrlToFourFive_(dataUrl);
-  var st = ensureThumbMakerState_();
-  if(state.selectedId){
-    st.draftId = state.selectedId;
-    st.catId = state.selectedCatId;
-  }
-  st.sizeKey = '4x5';
-  st.focusX = 0.5;
-  st.focusY = opts.focusY != null ? opts.focusY : 0.4;
-  if(opts.zoom != null) st.zoom = opts.zoom;
-  var sizeEl = document.getElementById('thumb-size');
-  if(sizeEl) sizeEl.value = '4x5';
-  clearThumbAiUpscaleCache_();
-  await setThumbMakerBackgroundFromDataUrl_(cropped, '주제 사진.jpg');
-  syncThumbFocusPresetButtons_();
-  fillTopicPhotoPreview_(cropped);
-  persistDraftContent_(state.selectedId, content);
-  return cropped;
-}
-window.applyTopicPhotoDataUrl_ = applyTopicPhotoDataUrl_;
 window.generateTopicPhoto_ = async function(btn){
   if(btn && btn.disabled) return;
   var content = getDraftContent_(state.selectedId);
@@ -37042,11 +37028,19 @@ window.generateTopicPhoto_ = async function(btn){
     }
     noteTopicPhotoGeneratedModel_(imageModel, data.imageModel);
     var rawUrl = 'data:' + (data.mediaType || 'image/jpeg') + ';base64,' + data.imageBase64;
-    await applyTopicPhotoDataUrl_(rawUrl, {
-      content: content,
-      focusY: figure ? 0.5 : 0.4,
-      zoom: figure ? 1 : null
-    });
+    var cropped = await cropDataUrlToFourFive_(rawUrl);
+    var st = ensureThumbMakerState_();
+    st.sizeKey = '4x5';
+    st.focusX = 0.5;
+    st.focusY = figure ? 0.5 : 0.4;
+    if(figure) st.zoom = 1;
+    var sizeEl = document.getElementById('thumb-size');
+    if(sizeEl) sizeEl.value = '4x5';
+    clearThumbAiUpscaleCache_();
+    await setThumbMakerBackgroundFromDataUrl_(cropped, '주제 사진.jpg');
+    syncThumbFocusPresetButtons_();
+    fillTopicPhotoPreview_(cropped);
+    persistDraftContent_(state.selectedId, content);
     setAppToast('4:5 사진을 만들었어요. 아래 썸네일 배경에 올려 두었어요.', { duration: 3200, variant: 'ok' });
   } catch(err){
     setAppToast((err && err.message) || '이미지 생성에 실패했어요.', { duration: 5200, variant: 'err' });

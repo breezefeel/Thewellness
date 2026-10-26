@@ -2044,9 +2044,6 @@ background: linear-gradient(transparent, #F8F7F4);
 .topic-photo-nano {
   background: #fff; color: #111827; border: 1px solid #111827;
 }
-.topic-photo-mine {
-  background: #0F766E; color: #fff;
-}
 .topic-photo-gen {
   display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
 }

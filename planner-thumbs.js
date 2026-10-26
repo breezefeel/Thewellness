@@ -1,5 +1,5 @@
-/* 이미지 탭 「내 사진」. 비공개 thumbs 버킷을 팀 로그인으로 고릅니다.
- * 고른 사진은 planner.js applyTopicPhotoDataUrl_ 로 생성 결과와 같은 4:5 경로에 넣습니다.
+/* 썸네일 만들기의 「내 사진」. 비공개 thumbs 버킷을 팀 로그인으로 고릅니다.
+ * 고른 사진은 파일로 올린 배경과 같이 applyLibraryPhotoToThumbMaker_ 로 들어갑니다.
  */
 (function(){
   var BUCKET = 'thumbs';
@@ -163,8 +163,8 @@
       showNote('미리보기를 불러오는 중이에요. 한 번만 더 눌러 주세요.');
       return;
     }
-    if(typeof window.applyTopicPhotoDataUrl_ !== 'function'){
-      showNote('사진 적용 기능을 찾지 못했어요. 페이지를 새로고침해 주세요.');
+    if(typeof window.applyLibraryPhotoToThumbMaker_ !== 'function'){
+      showNote('썸네일 만들기를 찾지 못했어요. 페이지를 새로고침해 주세요.');
       return;
     }
     busy = true;
@@ -180,12 +180,9 @@
         reader.readAsDataURL(blob);
       });
     }).then(function(dataUrl){
-      return window.applyTopicPhotoDataUrl_(dataUrl, { focusY: 0.4 });
+      return window.applyLibraryPhotoToThumbMaker_(dataUrl, row.name || '내 사진.jpg');
     }).then(function(){
       closePicker();
-      if(typeof setAppToast === 'function'){
-        setAppToast('고른 사진을 4:5 주제 이미지로 넣었어요. 아래 썸네일 배경에 올려 두었어요.', { duration: 3200, variant: 'ok' });
-      }
     }).catch(function(err){
       busy = false;
       showNote((err && err.message) || '사진을 넣지 못했어요.');

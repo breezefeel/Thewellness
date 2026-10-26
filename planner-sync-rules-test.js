@@ -104,6 +104,79 @@ assert(R.plannerIsAuthFailure({ status: 401, message: 'permission' }), 'HTTP 401
 assert(R.plannerIsAuthFailure({ message: 'not authenticated' }), 'not authenticated is auth');
 assert(!R.plannerIsAuthFailure({ message: 'timeout', status: 500 }), 'a timeout is not auth');
 
+var conflicted = { mutationId: 'm1', version: 2, key: 'draft:d1', value: 'local edit' };
+var keptConflict = R.plannerFilterAckedOutbox([conflicted], {
+  ack: {},
+  sentByKey: { 'draft:d1': { version: 2 } },
+  holdKeys: R.plannerConflictHoldKeys([{ key: 'draft:d1', serverValue: 'server' }])
+});
+assert(keptConflict.length === 1 && keptConflict[0].value === 'local edit',
+  'a conflict key stays queued until the user chooses');
+
+var cardHeld = { mutationId: 'c1', version: 1, key: 'draft:d9' };
+var bodyHeld = { mutationId: 'b9', version: 1, key: 'generated:d9', value: 'body' };
+var heldPair = R.plannerFilterAckedOutbox([cardHeld, bodyHeld], {
+  ack: { c1: 1, b9: 1 },
+  sentByKey: { 'draft:d9': { version: 1 }, 'generated:d9': { version: 1 } },
+  holdKeys: { 'generated:d9': true }
+});
+assert(heldPair.length === 2, 'a conflicting body keeps its card queued');
+
+var acceptedOnly = R.plannerAcceptedSentByKey([
+  { mutationId: 'm1', version: 2, key: 'draft:d1' },
+  { mutationId: 'm2', version: 1, key: 'draft:d2' }
+], [
+  { mutationId: 'm2', version: 1, key: 'draft:d2' }
+]);
+assert(!acceptedOnly['draft:d1'] && acceptedOnly['draft:d2'].version === 1,
+  'a conflicted send is not treated as delivered');
+
+var topics = [
+  { id: 'late', slot: 2, index: 0, activityMs: 5000 },
+  { id: 'first', slot: 1, index: 1, activityMs: 1000 },
+  { id: 'third', slot: 3, index: 2, activityMs: 9000 }
+];
+function topicIds(mode){
+  return topics.slice().sort(function(a, b){
+    return R.plannerCompareTopicOrder(a, b, mode);
+  }).map(function(row){ return row.id; }).join(',');
+}
+assert(topicIds('user') === 'first,late,third', 'user order follows the slot, not activity');
+assert(topicIds('activity') === 'third,late,first', 'activity sort stays available');
+assert(R.plannerTopicSlot('2/5') === 2, 'slot reads the numerator');
+assert(R.plannerTopicSlot('') == null, 'blank step is not a slot');
+assert(R.plannerCompareTopicOrder(
+  { slot: null, index: 1, activityMs: 9 },
+  { slot: null, index: 0, activityMs: 1 },
+  'user'
+) > 0, 'without a slot, user order is the list index');
+
+var quotaPlan = R.plannerQuotaTrimPlan({
+  outbox: [
+    { key: 'generated:d1', value: 'unsynced body' },
+    { key: 'draft:d2', value: 'user order' }
+  ],
+  generatedIds: ['d1', 'd2', 'd3']
+});
+assert(quotaPlan.keepOutbox === true && quotaPlan.outbox.length === 2, 'quota trim keeps every outbox row');
+assert(quotaPlan.trimGeneratedIds.join(',') === 'd3', 'only an unqueued generated copy can be trimmed');
+assert(quotaPlan.trimImages === true && quotaPlan.clearCaches === true, 'quota frees images and caches');
+assert(R.plannerDataUrlOverLimit('data:image/jpeg;base64,' + 'x'.repeat(200000), 180000), 'a large image is over the quota trim line');
+assert(!R.plannerDataUrlOverLimit('hello', 180000), 'plain text is not an image trim');
+
+var smallBlob = R.plannerBlobSyncAction({ hash: 'h', data: 'data:image/jpeg;base64,abc' });
+assert(smallBlob.action === 'queue' && !smallBlob.notice, 'a small image is queued');
+var bigImage = R.plannerBlobSyncAction({
+  hash: 'h2',
+  data: 'data:image/png;base64,' + new Array(2200002).join('a')
+});
+assert(bigImage.action === 'compress' && bigImage.notice.indexOf('2.2MB') >= 0, 'an oversized image is compressed, not skipped');
+var bigVideo = R.plannerBlobSyncAction({
+  hash: 'h3',
+  data: 'data:video/mp4;base64,' + new Array(2200002).join('b')
+});
+assert(bigVideo.action === 'reject' && bigVideo.notice.indexOf('영상') >= 0, 'an oversized video gets a Korean notice');
+
 if(failed){
   console.error(failed + ' assertion(s) failed');
   process.exit(1);

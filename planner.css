@@ -810,6 +810,11 @@ margin-left: 4px;
   padding-left: 6px;
   padding-right: 6px;
 }
+.topic-sort-btn {
+  flex: 0.85;
+  padding-left: 8px;
+  padding-right: 8px;
+}
 .topic-list-mode-btn span {
   margin-left: 4px;
   font-size: 11px;

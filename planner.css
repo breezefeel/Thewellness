@@ -2041,28 +2041,31 @@ background: linear-gradient(transparent, #F8F7F4);
   font-family: inherit; background: #fff;
 }
 .topic-photo-go {
+  position: relative;
   padding: 10px 14px; border-radius: 10px; border: none;
   background: #111827; color: #fff; font-size: 12px; font-weight: 800;
-  cursor: pointer; font-family: inherit;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
 }
 .topic-photo-go:disabled { opacity: .55; cursor: default; }
+.topic-photo-go.topic-photo-has-update { padding-right: 18px; }
+.topic-photo-go.topic-photo-has-update::after {
+  content: '';
+  position: absolute; top: 5px; right: 5px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #f59e0b; box-shadow: 0 0 0 1.5px #111827;
+  pointer-events: none;
+}
 .topic-photo-nano {
   background: #fff; color: #111827; border: 1px solid #111827;
 }
-.topic-photo-gen {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
-}
-.topic-photo-model-meta {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
-  max-width: 180px; font-size: 10px; line-height: 1.35; color: #9CA3AF; font-weight: 600;
-}
-.topic-photo-model-meta:empty { display: none; }
-.topic-photo-model-name { word-break: break-all; }
-.topic-photo-model-update {
-  display: inline-block; margin-top: 1px; color: #b06d1a;
-  background: rgba(176, 109, 26, 0.12); border-radius: 999px;
-  padding: 1px 6px; font-size: 10px; font-weight: 700; line-height: 1.45;
-  cursor: help; word-break: break-all;
+.topic-photo-nano.topic-photo-has-update::after { box-shadow: 0 0 0 1.5px #fff; }
+@media (max-width: 420px) {
+  .topic-photo-bar-actions { margin-left: 0; width: 100%; }
+  .topic-photo-go,
+  .topic-photo-bar-actions .img-tool-copy-btn {
+    padding: 9px 10px; font-size: 11px;
+  }
+  .topic-photo-go.topic-photo-has-update { padding-right: 16px; }
 }
 .topic-photo-preview { margin-top: 12px; }
 .topic-photo-preview img {

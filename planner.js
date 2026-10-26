@@ -37084,14 +37084,8 @@ function renderTopicPhotoCard_(content){
   html += '</div>';
   html += '<div class="topic-photo-bar-side topic-photo-bar-actions">';
   html += '<button type="button" class="img-tool-copy-btn" id="topic-photo-download" onclick="downloadTopicPhoto_()"' + (preview ? '' : ' disabled') + '>다운로드</button>';
-  html += '<div class="topic-photo-gen">';
-  html += '<button type="button" class="topic-photo-go" id="topic-photo-go" data-image-model="gpt" onclick="generateTopicPhoto_(this)">GPT 생성</button>';
-  html += '<div class="topic-photo-model-meta" id="topic-photo-gpt-meta"></div>';
-  html += '</div>';
-  html += '<div class="topic-photo-gen">';
-  html += '<button type="button" class="topic-photo-go topic-photo-nano" id="topic-photo-nano" data-image-model="gemini-nano-banana-2.1" onclick="generateTopicPhoto_(this)">나노바나나</button>';
-  html += '<div class="topic-photo-model-meta" id="topic-photo-nano-meta"></div>';
-  html += '</div>';
+  html += '<button type="button" class="topic-photo-go" id="topic-photo-go" data-image-model="gpt" onclick="generateTopicPhoto_(this)">' + escapeHtml(topicPhotoButtonLabel_('gpt', 'gpt')) + '</button>';
+  html += '<button type="button" class="topic-photo-go topic-photo-nano" id="topic-photo-nano" data-image-model="gemini-nano-banana-2.1" onclick="generateTopicPhoto_(this)">' + escapeHtml(topicPhotoButtonLabel_('nano', 'gemini-nano-banana-2.1')) + '</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="copyCommunityOrDailyImageSlot_(0, this)">프롬프트 복사</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="rebuildTopicPhotoPrompt_()">프롬프트 재생성</button>';
   html += '</div></div>';
@@ -37353,13 +37347,41 @@ function topicPhotoModelKind_(model){
   if(!id || /^gpt/i.test(id)) return 'gpt';
   return '';
 }
-function topicPhotoModelCaption_(kind, modelId){
+function topicPhotoModelVersion_(modelId){
   var id = String(modelId || '').trim();
-  if(kind === 'nano'){
-    var nano = id.match(/nano-banana-(\d+(?:\.\d+)*)/i);
-    if(nano) return '나노바나나 ' + nano[1];
+  var nano = id.match(/nano-banana-(\d+(?:\.\d+)*)/i);
+  if(nano) return nano[1];
+  var gpt = id.match(/gpt(?:-image)?-(\d+(?:\.\d+)*)/i);
+  if(gpt) return gpt[1];
+  return '';
+}
+function topicPhotoModelShortLabel_(kind, modelId){
+  var version = topicPhotoModelVersion_(modelId);
+  if(kind === 'nano') return version ? ('나노바나나 ' + version) : '나노바나나';
+  return version ? ('GPT ' + version) : 'GPT';
+}
+function topicPhotoSideCurrent_(kind, side){
+  var live = topicPhotoLiveModel_[kind] || '';
+  if(live) return live;
+  if(side && !side.error) return String(side.current || '').trim();
+  return '';
+}
+function topicPhotoButtonLabel_(kind, fallbackId){
+  var row = readTopicPhotoModelStatus_();
+  var side = row && row[kind];
+  var current = topicPhotoSideCurrent_(kind, side) || String(fallbackId || '').trim();
+  return topicPhotoModelShortLabel_(kind, current);
+}
+function topicPhotoApplyButtonLabel_(btn, label){
+  if(!btn) return;
+  if(btn.getAttribute('data-planner-idle')){
+    btn.setAttribute('data-planner-idle', label);
+    activeButtonCountdowns_.forEach(function(w){
+      if(w.btn === btn) w.idleText = label;
+    });
+    return;
   }
-  return id;
+  btn.textContent = label;
 }
 function topicPhotoModelStatusFresh_(row){
   if(!row || row.result !== 'success') return false;
@@ -37401,28 +37423,21 @@ function writeTopicPhotoModelStatus_(data){
   return row;
 }
 function paintTopicPhotoModelSide_(kind, side){
-  var el = document.getElementById(kind === 'nano' ? 'topic-photo-nano-meta' : 'topic-photo-gpt-meta');
-  if(!el) return;
-  var live = topicPhotoLiveModel_[kind] || '';
-  if(side && side.error && !live){
-    el.innerHTML = '';
-    return;
-  }
-  var current = live || (side && String(side.current || '').trim()) || '';
-  if(!current){
-    el.innerHTML = '';
-    return;
-  }
-  var caption = topicPhotoModelCaption_(kind, current);
-  var html = '<span class="topic-photo-model-name"' +
-    (caption !== current ? ' title="' + escapeHtml(current) + '"' : '') + '>' + escapeHtml(caption) + '</span>';
+  var btn = document.getElementById(kind === 'nano' ? 'topic-photo-nano' : 'topic-photo-go');
+  if(!btn) return;
+  var current = topicPhotoSideCurrent_(kind, side) || topicPhotoImageModelFromButton_(btn);
+  topicPhotoApplyButtonLabel_(btn, topicPhotoModelShortLabel_(kind, current));
   var latest = side && !side.error && side.latest ? String(side.latest).trim() : '';
-  if(side && !side.error && side.updateAvailable && latest && latest !== current){
+  var hasUpdate = !!(side && !side.error && side.updateAvailable && latest && latest !== current);
+  btn.classList.toggle('topic-photo-has-update', hasUpdate);
+  if(hasUpdate){
     var prop = kind === 'nano' ? 'IMAGE_MODEL_NANO' : 'IMAGE_MODEL_GPT';
-    var tip = 'Apps Script 스크립트 속성 ' + prop + ' 를 새 이름(' + latest + ')으로 설정하면 적용됩니다.';
-    html += '<span class="topic-photo-model-update" title="' + escapeHtml(tip) + '">업데이트 가능 → ' + escapeHtml(latest) + '</span>';
+    var tip = '업데이트 가능 → ' + latest + '. Apps Script 스크립트 속성 ' + prop + ' 를 새 이름(' + latest + ')으로 설정하면 적용됩니다.';
+    btn.setAttribute('title', tip);
+    return;
   }
-  el.innerHTML = html;
+  if(current && current !== topicPhotoModelShortLabel_(kind, current)) btn.setAttribute('title', current);
+  else btn.removeAttribute('title');
 }
 function paintTopicPhotoModelStatus_(row){
   paintTopicPhotoModelSide_('gpt', row && row.gpt);
@@ -37542,7 +37557,7 @@ window.generateTopicPhoto_ = async function(btn){
   var figure = structured ? !useNano : topicPhotoWantsFigure_(content, state.selectedCatId);
   var apiBase = structured ? (figure ? atlasPrompt : personPrompt) : prompt;
   if(useNano) photoEstimateSec = 70;
-  if(btn) startButtonCountdown_(btn, { estimateSec: photoEstimateSec, busyLabel: '만드는 중', idleText: useNano ? '나노바나나' : 'GPT 생성' });
+  if(btn) startButtonCountdown_(btn, { estimateSec: photoEstimateSec, busyLabel: '만드는 중' });
   setAppToast(useNano
     ? '나노바나나로 4:5 인물을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'
     : (figure

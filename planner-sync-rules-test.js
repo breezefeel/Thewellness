@@ -177,6 +177,55 @@ var bigVideo = R.plannerBlobSyncAction({
 });
 assert(bigVideo.action === 'reject' && bigVideo.notice.indexOf('영상') >= 0, 'an oversized video gets a Korean notice');
 
+var stuckConflict = [{
+  mutationId: 'm1',
+  version: 2,
+  key: 'draft:d1',
+  value: 'unsynced edit',
+  baseEntityRevision: 4
+}];
+var serverRevs = { 'draft:d1': 9 };
+var choseServer = R.plannerApplyConflictResolution(stuckConflict, [
+  { key: 'draft:d1', useLocal: false, serverRevision: 9 }
+]);
+assert(choseServer.outbox.length === 0, 'choosing the server removes that conflict row');
+assert(R.plannerTopicGapAsks(choseServer.outbox, serverRevs).length === 0,
+  'a server choice is not asked again on the next sync');
+var keptOther = R.plannerApplyConflictResolution([
+  { key: 'draft:d1', value: 'conflict', baseEntityRevision: 4 },
+  { key: 'draft:d2', value: 'other edit', baseEntityRevision: 3 }
+], [{ key: 'draft:d1', useLocal: false, serverRevision: 9 }]);
+assert(keptOther.outbox.length === 1 && keptOther.outbox[0].key === 'draft:d2' && keptOther.outbox[0].value === 'other edit',
+  'resolving one key leaves a different unsynced edit queued');
+
+var choseLocal = R.plannerApplyConflictResolution(stuckConflict, [
+  { key: 'draft:d1', useLocal: true, serverRevision: 9 }
+]);
+assert(choseLocal.outbox.length === 1 && choseLocal.outbox[0].value === 'unsynced edit',
+  'choosing this device keeps the unsynced edit');
+assert(choseLocal.outbox[0].baseEntityRevision === 9 && choseLocal.outbox[0].conflictResolved === 'local',
+  'a local choice rebases onto the server revision');
+assert(R.plannerTopicGapAsks(choseLocal.outbox, serverRevs).length === 0,
+  'a rebased local choice is not a conflict on resync');
+var serverMoved = R.plannerHealStaleConflictRows(choseLocal.outbox, { 'draft:d1': 12 });
+assert(serverMoved.outbox[0].value === 'unsynced edit' && serverMoved.outbox[0].baseEntityRevision === 12,
+  'a later server revision rebases the kept edit again');
+assert(R.plannerTopicGapAsks(serverMoved.outbox, { 'draft:d1': 12 }).length === 0,
+  'resolve then resync does not ask for the same key');
+
+var v400Stuck = [{ mutationId: 'm-old', version: 3, key: 'draft:d9', value: 'phone edit', baseEntityRevision: 2 }];
+var healedStuck = R.plannerHealStaleConflictRows(v400Stuck, { 'draft:d9': 8 });
+assert(healedStuck.healed.join(',') === 'draft:d9', 'a stale v400 conflict row is healed');
+assert(healedStuck.outbox[0].value === 'phone edit' && healedStuck.outbox[0].baseEntityRevision === 8,
+  'healing keeps the unsynced edit and rebases it');
+assert(R.plannerTopicGapAsks(healedStuck.outbox, { 'draft:d9': 8 }).length === 0,
+  'a healed v400 row is not asked on the next check');
+var leftOpen = R.plannerHealStaleConflictRows(v400Stuck, { 'draft:d9': 8 }, ['draft:d9']);
+assert(leftOpen.healed.length === 0 && leftOpen.outbox[0].baseEntityRevision === 2,
+  'an open conflict choice is not rewritten before the user picks');
+assert(R.plannerTopicGapAsks(leftOpen.outbox, { 'draft:d9': 8 }).length === 1,
+  'an unanswered conflict is still something to choose');
+
 if(failed){
   console.error(failed + ' assertion(s) failed');
   process.exit(1);

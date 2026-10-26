@@ -11613,10 +11613,17 @@ function classifyTopicGap_(spec){
   var ask = [];
   var upload = [];
   var seen = {};
+  var ruleAsks = null;
+  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerTopicGapAsks){
+    ruleAsks = PlannerSyncRules.plannerTopicGapAsks(real, serverRev, spec.resolvedKeys || []);
+  }
   real.forEach(function(op){
-    var base = parseInt(op.base, 10) || 0;
+    var base = parseInt(op.baseEntityRevision != null ? op.baseEntityRevision : op.base, 10) || 0;
     var rev = parseInt(serverRev[op.key], 10) || 0;
-    if(rev > base){
+    var stillAsking = ruleAsks
+      ? ruleAsks.indexOf(op.key) >= 0
+      : (rev > base && op.conflictResolved !== 'local' && op.conflictResolved !== 'server');
+    if(stillAsking){
       if(ask.indexOf(op.key) < 0) ask.push(op.key);
       return;
     }
@@ -11666,9 +11673,16 @@ function applyTopicGapDecision_(detail, index){
     if(row && row.key) serverRev[String(row.key)] = parseInt(row.revision, 10) || 0;
   });
   detail.serverRev = serverRev;
+  healStaleConflictOutbox_(serverRev);
   var decision = classifyTopicGap_({
     outbox: (state.syncOutbox || []).map(function(op){
-      return { key: op && op.key, base: op && op.baseEntityRevision, localOnly: !!(op && op.localOnly) };
+      return {
+        key: op && op.key,
+        base: op && op.baseEntityRevision,
+        baseEntityRevision: op && op.baseEntityRevision,
+        conflictResolved: op && op.conflictResolved,
+        localOnly: !!(op && op.localOnly)
+      };
     }),
     selectedId: state.selectedId || '',
     focusIds: state._syncFocusDraftIds || null,
@@ -12090,19 +12104,74 @@ function queueTopicGapEntity_(key, deleted, baseRev, explicitValue){
     version: 1,
     key: key
   };
+  var keepResolvedValue = !!(existing && existing.conflictResolved === 'local' && explicitValue === undefined && !deleted);
   if(explicitValue !== undefined){
     op.value = cloneSyncValue_(explicitValue);
     op.deleted = false;
-  } else {
+  } else if(!keepResolvedValue){
     op.value = deleted ? null : (hasValue ? cloneSyncValue_(entities[key]) : null);
     op.deleted = !!deleted || !hasValue;
   }
-  op.baseEntityRevision = parseInt(baseRev, 10) || 0;
+  var nextBase = parseInt(baseRev, 10) || 0;
+  var prevBase = parseInt(op.baseEntityRevision, 10) || 0;
+  if(nextBase < prevBase) nextBase = prevBase;
+  op.baseEntityRevision = nextBase;
   op.updatedAt = new Date().toISOString();
   if(existing) bumpOutboxOpVersion_(op);
   if(!existing) state.syncOutbox.push(op);
   if(!state.syncDirtyEntityKeys) state.syncDirtyEntityKeys = {};
   state.syncDirtyEntityKeys[key] = true;
+}
+function topicGapPendingChoiceKeys_(){
+  var keys = [];
+  var pending = plannerSyncConflictPending_;
+  if(!pending || !pending.conflicts) return keys;
+  pending.conflicts.forEach(function(conflict){
+    if(conflict && conflict.key) keys.push(String(conflict.key));
+  });
+  return keys;
+}
+function healStaleConflictOutbox_(serverRev){
+  if(typeof PlannerSyncRules === 'undefined' || !PlannerSyncRules.plannerHealStaleConflictRows) return [];
+  var healed = PlannerSyncRules.plannerHealStaleConflictRows(state.syncOutbox || [], serverRev || {}, topicGapPendingChoiceKeys_());
+  if(!healed) return [];
+  state.syncOutbox = healed.outbox || [];
+  if(!healed.healed || !healed.healed.length) return [];
+  var touched = {};
+  healed.healed.forEach(function(key){ touched[key] = true; });
+  (state.syncOutbox || []).forEach(function(op){
+    if(op && touched[op.key]) bumpOutboxOpVersion_(op);
+  });
+  state.syncDirty = true;
+  state._sessionUserEdit = true;
+  try { rebuildDirtyStateFromOutbox_(); } catch(eHeal){}
+  try {
+    save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+  } catch(eHealSave){}
+  return healed.healed;
+}
+function applyConflictResolutionToOutbox_(choices){
+  var plan = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerApplyConflictResolution)
+    ? PlannerSyncRules.plannerApplyConflictResolution(state.syncOutbox || [], choices)
+    : null;
+  if(!plan) return null;
+  state.syncOutbox = plan.outbox || [];
+  (choices || []).forEach(function(choice){
+    if(!choice || !choice.useLocal || !choice.key) return;
+    (state.syncOutbox || []).forEach(function(op){
+      if(!op || op.key !== choice.key) return;
+      bumpOutboxOpVersion_(op);
+      op.conflictResolved = 'local';
+      op.localOnly = true;
+    });
+  });
+  try { rebuildDirtyStateFromOutbox_(); } catch(eRes){}
+  state._topicListGap = false;
+  state.syncDirty = hasPendingLocalSyncChanges_();
+  try {
+    save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+  } catch(eResSave){}
+  return plan;
 }
 window.applyTopicGapChoice_ = async function(side){
   var detail = state._topicListGapDetail || {};
@@ -12115,49 +12184,41 @@ window.applyTopicGapChoice_ = async function(side){
       state._topicListGap = false;
       return;
     }
+    var choices = keys.map(function(key){
+      return { key: key, useLocal: useLocal, serverRevision: (detail.serverRev || {})[key] || 0 };
+    });
+    applyConflictResolutionToOutbox_(choices);
+    state._topicListGap = false;
     if(useLocal){
-      keys.forEach(function(key){
-        queueTopicGapEntity_(key, false, (detail.serverRev || {})[key] || 0);
-      });
-      (state.syncOutbox || []).forEach(function(op){
-        if(op && keys.indexOf(op.key) >= 0) op.localOnly = true;
-      });
       state.syncDirty = true;
       state._sessionUserEdit = true;
       state._gapUploadActive = true;
       plannerSyncBootstrapReady_ = true;
       state._bootstrapChoiceDone = true;
-      try { rebuildDirtyStateFromOutbox_(); } catch(eReb){}
       var last = await plannerGasPushNow_();
       state._gapUploadActive = false;
-      state._topicListGap = !(last && last.ok);
       if(!last || !last.ok){
-        if(typeof setAppToast === 'function') setAppToast('고른 항목을 올리다 멈췄습니다. 다시 고르세요.', { duration: 5200, variant: 'err' });
+        if(typeof setAppToast === 'function') setAppToast('고른 항목을 이 기기 내용으로 남겼습니다. 올리다 멈추면 자동으로 다시 보냅니다.', { duration: 5200, variant: 'ok' });
       } else if(typeof setAppToast === 'function'){
         setAppToast('고른 항목을 이 기기 내용으로 서버에 저장했습니다.', { duration: 4200, variant: 'ok' });
       }
     } else {
-      state.syncOutbox = (state.syncOutbox || []).filter(function(op){
-        return !(op && keys.indexOf(op.key) >= 0);
-      });
-      try { rebuildDirtyStateFromOutbox_(); } catch(eOut){}
       state._topicGapReceiveKeys = keys.slice();
       state._topicGapForceKeys = true;
       await plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_PULL_TIMEOUT_MS);
-      state._topicListGap = false;
       if(typeof setAppToast === 'function') setAppToast('고른 항목을 서버 내용으로 맞췄습니다.', { duration: 4200, variant: 'ok' });
     }
   } catch(eGap){
     state._gapUploadActive = false;
     state._topicGapForceKeys = false;
-    state._topicListGap = keys.length > 0;
-    if(typeof setAppToast === 'function') setAppToast((eGap && eGap.message) || '맞추지 못했습니다.', { duration: 5200, variant: 'err' });
+    state._topicListGap = false;
+    if(typeof setAppToast === 'function') setAppToast((eGap && eGap.message) || '맞추지 못했습니다. 고른 항목은 다시 묻지 않습니다.', { duration: 5200, variant: 'err' });
   } finally {
     state._topicGapForceServer = false;
     state._topicGapForceKeys = false;
     state._topicGapResolving = false;
+    state._topicListGap = false;
     try { updateSyncStatusUI_(); } catch(eUi){}
-    if(state._topicListGap) setTimeout(function(){ try { openTopicGapChoice_(); } catch(eRe){} }, 400);
   }
 };
 var GENERAL_UPLOAD_DONE_KEY_ = 'ht_planner_general_upload_done';
@@ -17550,6 +17611,7 @@ function forceOutboxOverwriteBase_(conflicts){
     }
     if(op){
       op.baseEntityRevision = serverRev;
+      op.conflictResolved = 'local';
       op.updatedAt = now;
       bumpOutboxOpVersion_(op);
       return;
@@ -17562,6 +17624,7 @@ function forceOutboxOverwriteBase_(conflicts){
       value: localVal === undefined ? null : cloneSyncValue_(localVal),
       deleted: localVal === undefined,
       baseEntityRevision: serverRev,
+      conflictResolved: 'local',
       updatedAt: now
     });
   });
@@ -17937,8 +18000,14 @@ function normalizeSyncOutbox_(raw, opts){
       baseEntityRevision: Math.max(0, parseInt(item.baseEntityRevision, 10) || 0),
       updatedAt: String(item.updatedAt || new Date().toISOString())
     };
+    if(item.conflictResolved === 'local' || item.conflictResolved === 'server'){
+      normalized.conflictResolved = item.conflictResolved;
+    }
+    if(item.localOnly) normalized.localOnly = true;
     if(previous){
       normalized.baseEntityRevision = previous.baseEntityRevision;
+      if(previous.conflictResolved === 'local') normalized.conflictResolved = 'local';
+      else if(!normalized.conflictResolved && previous.conflictResolved) normalized.conflictResolved = previous.conflictResolved;
       if(!item.mutationId) normalized.mutationId = previous.mutationId;
       var mergedVersion = Math.max(previous.version + 1, normalized.version);
       if(mergedVersion > normalized.version && normalized.mutationId === previous.mutationId){
@@ -21481,6 +21550,7 @@ function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts, opts
     if(!real.length){
       dropSkippableOutboxConflicts_(conflicts);
       plannerSyncConflictPending_ = null;
+      state._topicListGap = false;
       var ovEmpty = document.getElementById('sync-conflict-overlay');
       closeScrollLockedOverlayEl_(ovEmpty);
       if(!plannerSyncBootstrapReady_) plannerSyncBootstrapReady_ = true;
@@ -21544,6 +21614,7 @@ function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts, opts
     forceOutboxOverwriteBase_(real);
     state.syncDirty = true;
     plannerSyncConflictPending_ = null;
+    state._topicListGap = false;
     var ov = document.getElementById('sync-conflict-overlay');
     closeScrollLockedOverlayEl_(ov);
     if(!plannerSyncBootstrapReady_) plannerSyncBootstrapReady_ = true;
@@ -21841,8 +21912,9 @@ function applyMixedConflictChoices_(choices, snap){
   if(localChoices.length) forceOutboxOverwriteBase_(localChoices);
   try { rebuildDirtyStateFromOutbox_(); } catch(eMix){}
   if(!plannerSyncBootstrapReady_) plannerSyncBootstrapReady_ = true;
+  state._topicListGap = false;
   state.syncDirty = hasPendingLocalSyncChanges_();
-  save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
+  save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
 }
 /** @deprecated dropSkippableOutboxConflicts_ 사용 */
 function bumpOutboxBaseForSkippedConflicts_(serverConflicts){
@@ -24865,7 +24937,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=400').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=401').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){

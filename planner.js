@@ -66,7 +66,7 @@ const CATEGORIES = [
       {id:"d6-5", topic:"오늘 찍힌 사진 그대로", angle:"생일 사진 톤 · 꾸민 썸네일 금지"},
       {id:"d6-6", topic:"짧게 남기는 오늘의 몸", angle:"음성 30초 분량 · 문장만 다듬기"},
     ]},
-  { id:7, icon:"", name:"기타", color:"#34D399", audience:"입주민",
+  { id:7, icon:"", name:"기타", color:"#6F8F80", audience:"입주민",
     sub:"생활건강 · 셀프케어 — PAR · P-스트레칭 · 자세 · 기능운동 · 작은얼굴",
     drafts:[
       {id:"d7-0", topic:"앉아만 있어도 목이 뻐근할 때, 먼저 확인해 보면 좋은 한 가지", angle:"거북목이라고 단정 짓기 전에 — 경추·어깨·호흡을 아주 쉽게"},
@@ -14085,8 +14085,8 @@ const MANGO_DETAIL_TITLE_MAX = 30;
 const MANGO_DETAIL_INTRO_MAX = 2000;
 
 
-/** 프로그램별 망고보드 7장 팔레트 — navy / sage / devon / green + 전문가 변형
- * 망고보드 팔레트 — 색상 미리보기 모달·카테고리 상수와 동일 소스.
+/** 프로그램별 7장 슬라이드 팔레트 — navy / sage / devon / green + 전문가 변형
+ * 슬라이드 팔레트 — 색상 미리보기 모달·카테고리 상수와 동일 소스.
  * 리얼 페이스(2)·IFC(4): FACE × FUNCTION 강의 팔레트(크림·세이지·다크 올리브). */
 const MANGO_PALETTES_BY_CAT = {
   0: {
@@ -14199,19 +14199,21 @@ const MANGO_PALETTES_BY_CAT = {
   }
 };
 
-/** 썸네일 스크림 — 망고 팔레트와 같은 hue (전문가는 채도 약간↑ )
- * 리얼 무브먼트(1): 차콜만 — 크림슨 하단 워시 금지(표지는 어두운 스크림 + 흰 타이포)
- * Re:Al 움직임 과정(5): 딥 차콜 + 와인 glow (일반 크림슨과 구분) */
+/** 썸네일 스크림 — 프로그램 색
+ * 리얼 무브먼트(1): 차콜만 — 크림슨 하단 워시 금지
+ * CMT(3): glow는 스틸 블루. 프로그램 색은 네이비
+ * Re:Al(5): 차콜 바탕, 와인 glow만 포인트. 프로그램 색 #8B1E3D 는 액센트
+ * 기타(7): 차분한 그레이그린
+ * 8(지점·브랜딩)은 프로그램이 아니라 스크림을 두지 않는다 */
 const THUMB_SCRIM_BY_CAT = {
   0: { tint: '#1e2a44', tint2: '#3A5080', glow: '#3a5080' },
   1: { tint: '#333333', tint2: '#2a2a2a', glow: '#1f1f1f' },
   2: { tint: '#332b23', tint2: '#9ca98a', glow: '#7c8a6c' },
-  3: { tint: '#0F172A', tint2: '#1E3A5F', glow: '#4F46E5' },
+  3: { tint: '#0F172A', tint2: '#1E3A5F', glow: '#3E6A9E' },
   4: { tint: '#332b23', tint2: '#7c8a6c', glow: '#9ca98a' },
-  5: { tint: '#1A1A1A', tint2: '#3D1520', glow: '#9F1239' },
+  5: { tint: '#1A1A1A', tint2: '#2a2a2a', glow: '#8B1E3D' },
   6: { tint: '#1f3d32', tint2: '#3D8B6A', glow: '#3d8b6a' },
-  7: { tint: '#14532D', tint2: '#34D399', glow: '#059669' },
-  8: { tint: '#312E81', tint2: '#6366F1', glow: '#6366F1' }
+  7: { tint: '#24332c', tint2: '#6F8F80', glow: '#5F7D70' }
 };
 
 function getMangoPaletteForCat_(catId){
@@ -14221,7 +14223,7 @@ function getMangoPaletteForCat_(catId){
 }
 
 /**
- * 색상 미리보기 모달용 엔트리 — 망고·썸네일·탭 브랜드를 한곳에.
+ * 색상 미리보기 모달용 엔트리 — 슬라이드·썸네일·탭 브랜드를 한곳에.
  * 팔레트 숫자는 MANGO_PALETTES_BY_CAT / THUMB_SCRIM_BY_CAT / CATEGORIES.color 가 원본.
  * 미리보기에서 수정한 값은 state.colorPreviewOverrides 에만 두고, 「저장」으로 JSON 내려받음.
  */
@@ -14486,7 +14488,7 @@ function renderProgramColorPreviewBody_(catId){
       '</div>' +
       '<div class="cp-mock-row">' +
         '<div>' +
-          '<div class="cp-mock-label">망고 슬라이드 목업</div>' +
+          '<div class="cp-mock-label">슬라이드 목업</div>' +
           '<div class="cp-mango-mock" style="background:linear-gradient(180deg,' + m.bg + ' 0%,' + m.bg2 + ' 100%);color:' + m.head + '">' +
             '<div class="cp-mango-head">허리가 뻐근한<br>진짜 이유</div>' +
             '<div class="cp-mango-divider" style="background:' + m.divider + '"></div>' +
@@ -24643,7 +24645,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=398').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=399').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -33318,11 +33320,28 @@ function getThumbBrandPreset_(catId){
   return THUMB_BRAND_PRESETS[id];
 }
 
-/** 썸네일 하단 스크림 — THUMB_SCRIM_BY_CAT (망고 팔레트와 동일 hue) */
+/** 썸네일 하단 스크림 — THUMB_SCRIM_BY_CAT */
 function getThumbPosterPaletteForCat_(catId){
   var id = parseInt(catId, 10);
   if(isNaN(id) || !THUMB_SCRIM_BY_CAT[id]) return THUMB_SCRIM_BY_CAT[1];
   return THUMB_SCRIM_BY_CAT[id];
+}
+
+/** 밝은 바탕 / 어두운 바탕. 썸네일 글은 어두운 스크림 위라 어두운 쪽을 쓴다. */
+var THUMB_AMBER_ON_LIGHT = '#b06d1a';
+var THUMB_AMBER_ON_DARK = '#d48a2c';
+function thumbAmberForBackdrop_(dark){
+  return dark ? THUMB_AMBER_ON_DARK : THUMB_AMBER_ON_LIGHT;
+}
+function isThumbExpertAudience_(catId){
+  var id = parseInt(catId, 10);
+  if(isNaN(id) || !CATEGORIES[id]) return false;
+  return String(CATEGORIES[id].audience || '').indexOf('전문가') >= 0;
+}
+/** auto → 전문가 템플릿, 그 외 시안 A. override 는 template | sianA */
+function resolveThumbPosterLayout_(catId, override){
+  if(override === 'template' || override === 'sianA') return override;
+  return isThumbExpertAudience_(catId) ? 'template' : 'sianA';
 }
 
 function clampThumbLine_(text, maxLen){
@@ -33426,7 +33445,8 @@ function buildThumbMakerCopy_(content, catId, opts){
     program: program,
     body: body,
     keywords: keywords.slice(0, 4),
-    brandProgram: normalizeThumbBrandOneLine_(preset.program) || preset.program
+    brandProgram: normalizeThumbBrandOneLine_(preset.program) || preset.program,
+    accent: ''
   };
 }
 
@@ -33454,7 +33474,8 @@ function ensureThumbMakerState_(){
       galleryCache: null,
       _wsRestoreGen: 0,
       typeScale: 1,
-      heroOneLine: false
+      heroOneLine: false,
+      layoutOverride: 'auto'
     };
   }
   var st = window.__thumbMakerState;
@@ -33472,6 +33493,7 @@ function ensureThumbMakerState_(){
   if(st.zoom == null) st.zoom = 1;
   if(st.typeScale == null) st.typeScale = 1;
   if(st.heroOneLine == null) st.heroOneLine = false;
+  if(st.layoutOverride !== 'template' && st.layoutOverride !== 'sianA') st.layoutOverride = 'auto';
   if(st.outFocus == null) st.outFocus = false;
   if(st.enhance == null) st.enhance = false;
   if(st.aiUpscaleOn == null) st.aiUpscaleOn = false;
@@ -33525,8 +33547,10 @@ function serializeThumbWorkspace_(st){
       program: fields.program || '',
       body: String(fields.body || '').replace(/^[:：]\s*/, ''),
       keywords: fields.keywords || [],
-      brandProgram: fields.brandProgram || ''
+      brandProgram: fields.brandProgram || '',
+      accent: fields.accent || ''
     } : null,
+    layoutOverride: (st.layoutOverride === 'template' || st.layoutOverride === 'sianA') ? st.layoutOverride : 'auto',
     programMode: st.programMode || 'topic',
     photoIndex: st.photoIndex || 0,
     sizeKey: st.sizeKey || '4x5',
@@ -33593,6 +33617,7 @@ async function applyThumbWorkspaceRow_(st, row){
   st.zoom = row.zoom != null ? row.zoom : 1;
   st.typeScale = row.typeScale != null ? clampThumbTypeScale_(row.typeScale) : 1;
   st.heroOneLine = !!row.heroOneLine;
+  st.layoutOverride = (row.layoutOverride === 'template' || row.layoutOverride === 'sianA') ? row.layoutOverride : 'auto';
   st.enhance = !!row.enhance;
   st.aiUpscaleOn = false;
   st.bgDataUrlUpscaled = null;
@@ -33604,7 +33629,8 @@ async function applyThumbWorkspaceRow_(st, row){
       program: row.fields.program || '',
       body: String(row.fields.body || '').replace(/^[:：]\s*/, ''),
       keywords: row.fields.keywords || [],
-      brandProgram: row.fields.brandProgram || ''
+      brandProgram: row.fields.brandProgram || '',
+      accent: row.fields.accent || ''
     };
     if(row.v === 1){
       loadedFields = migrateThumbCopyToHookHero_(loadedFields, st.programMode);
@@ -33638,6 +33664,7 @@ function refreshThumbMakerDomFromState_(){
   updateThumbZoomLabel_();
   updateThumbTypeLabel_();
   syncThumbHeroOneLineButton_();
+  syncThumbLayoutButtons_();
   syncThumbFocusPresetButtons_();
   syncThumbFxButtons_();
   updateThumbPhotoBadge_();
@@ -33879,7 +33906,8 @@ function persistThumbMakerFieldsFromDom_(){
     program: copy.program,
     body: String(copy.body || '').replace(/^[:：]\s*/, ''),
     keywords: (st.fields && st.fields.keywords) || [],
-    brandProgram: (st.fields && st.fields.brandProgram) || getThumbBrandPreset_(state.selectedCatId).program
+    brandProgram: (st.fields && st.fields.brandProgram) || getThumbBrandPreset_(state.selectedCatId).program,
+    accent: copy.accent || ''
   };
   st.lastCopy = st.fields;
   schedulePersistThumbWorkspace_(false);
@@ -33897,6 +33925,7 @@ function readThumbMakerFields_(){
   var tagEl = document.getElementById('thumb-tagline');
   var progEl = document.getElementById('thumb-program');
   var bodyEl = document.getElementById('thumb-body');
+  var accentEl = document.getElementById('thumb-accent');
   var sizeEl = document.getElementById('thumb-size');
   var st = ensureThumbMakerState_();
   if(isThumbPhotoOnlyMode_()){
@@ -33920,7 +33949,10 @@ function readThumbMakerFields_(){
       hero: heroNorm,
       tagline: tagEl ? String(tagEl.value || '').trim() : '',
       program: normalizeThumbBrandOneLine_(progEl ? String(progEl.value || '').trim() : '') || (progEl ? String(progEl.value || '').trim() : ''),
-      body: scrubNonClinicalTreatmentCopy_(bodyNorm, st.catId != null ? st.catId : state.selectedCatId)
+      body: scrubNonClinicalTreatmentCopy_(bodyNorm, st.catId != null ? st.catId : state.selectedCatId),
+      accent: accentEl
+        ? String(accentEl.value || '').replace(/\s+/g, ' ').trim()
+        : String((st.fields && st.fields.accent) || '')
     };
   }
   return st.fields || st.lastCopy || buildThumbMakerCopy_(null, state.selectedCatId);
@@ -34272,7 +34304,285 @@ function syncThumbHeroTextareaFromLayout_(heroLines){
   st.lastCopy = st.fields || st.lastCopy;
 }
 
-function layoutThumbPosterText_(ctx, W, H, copy, scale){
+/** 9:16은 가운데 3:4만 프로필 격자에 남는다. 그 안에 글자를 둔다. */
+function thumbPosterSafeBounds_(W, H){
+  var ratio = H / Math.max(1, W);
+  var grid = 4 / 3;
+  if(ratio <= grid + 0.04){
+    return {
+      top: Math.round(H * 0.08),
+      bottom: H - Math.round(H * 0.055)
+    };
+  }
+  var inset = Math.max(0, (H - W * grid) / 2);
+  var pad = Math.round(Math.min(W, H) * 0.028);
+  return {
+    top: Math.round(inset + pad),
+    bottom: Math.round(H - inset - pad)
+  };
+}
+
+/** 시안 A 훅. 줄바꿈이 있으면 1줄/나머지. 없으면 쉼표에서 한 번 나눈다. */
+function splitThumbSianHook_(heroRaw){
+  var raw = String(heroRaw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  if(!raw) return { light: '', heavy: '', heroLines: [''] };
+  if(raw.indexOf('\n') >= 0){
+    var lines = raw.split('\n').map(function(l){ return l.trim(); }).filter(Boolean).slice(0, 3);
+    if(lines.length <= 1) return { light: '', heavy: lines[0] || '', heroLines: lines.length ? lines : [''] };
+    return { light: lines[0], heavy: lines.slice(1).join('\n'), heroLines: lines };
+  }
+  var t = raw.replace(/\s+/g, ' ').trim();
+  var comma = t.search(/[,，]/);
+  if(comma >= 4 && (t.length - comma) >= 6){
+    var light = t.slice(0, comma).trim();
+    var heavy = t.slice(comma + 1).replace(/^[\s,，]+/, '').trim();
+    if(light && heavy) return { light: light, heavy: heavy, heroLines: [t] };
+  }
+  return { light: '', heavy: t, heroLines: [t] };
+}
+
+function buildThumbSianBrandLine_(copy){
+  var program = normalizeThumbBrandOneLine_((copy && (copy.program || copy.brandProgram)) || '');
+  var tag = String((copy && copy.tagline) || '').replace(/\s+/g, ' ').trim();
+  if(program && tag && program !== tag) return program + ' · ' + tag;
+  return program || tag || '';
+}
+
+function layoutThumbSianAText_(ctx, W, H, copy, scale){
+  scale = scale || 1;
+  var typeScale = 1;
+  try {
+    var typeSt = ensureThumbMakerState_();
+    typeScale = clampThumbTypeScale_(typeSt.typeScale);
+    typeSt.heroOneLine = false;
+    typeSt.outFocus = false;
+  } catch(eType){}
+  var safe = thumbPosterSafeBounds_(W, H);
+  var padX = Math.round(W * 0.078);
+  var barW = Math.max(4, Math.round(W * 0.0055));
+  var barGap = Math.round(W * 0.016);
+  var textX = padX + barW + barGap;
+  var textMax = Math.max(40, W - textX - padX);
+  var parts = splitThumbSianHook_(copy && copy.hero);
+  var lightFit = parts.light
+    ? fitThumbTextBlock_(
+      ctx, parts.light, textMax,
+      Math.max(16, Math.round(W * 0.044 * scale * typeScale)),
+      Math.max(13, Math.round(W * 0.026)),
+      '500', 2
+    )
+    : { size: Math.round(W * 0.04), lines: [] };
+  var heavyFit = fitThumbTextBlock_(
+    ctx, parts.heavy || '', textMax,
+    Math.max(22, Math.round(W * 0.084 * scale * typeScale)),
+    Math.max(16, Math.round(W * 0.04)),
+    '900', 3
+  );
+  var brandText = buildThumbSianBrandLine_(copy);
+  var brandFit = brandText
+    ? fitThumbTextBlock_(
+      ctx, brandText, textMax,
+      Math.max(13, Math.round(W * 0.026 * scale)),
+      Math.max(11, Math.round(W * 0.018)),
+      '500', 2
+    )
+    : { size: Math.round(W * 0.024), lines: [] };
+
+  var lightLines = (lightFit.lines || []).filter(function(l){ return String(l || '').trim(); });
+  var heavyLines = (heavyFit.lines || []).filter(function(l){ return String(l || '').trim(); });
+  var brandLines = (brandFit.lines || []).filter(function(l){ return String(l || '').trim(); });
+  var lightLH = Math.round(lightFit.size * 1.28);
+  var heavyLH = Math.round(heavyFit.size * 1.12);
+  var brandLH = Math.round(brandFit.size * 1.35);
+  var gapLight = lightLines.length && heavyLines.length ? Math.round(lightFit.size * 0.42) : 0;
+  var gapBrand = brandLines.length ? Math.round((heavyLines.length ? heavyFit.size : lightFit.size) * 0.55) : 0;
+  var blockH =
+    lightLines.length * lightLH + gapLight +
+    heavyLines.length * heavyLH + gapBrand +
+    brandLines.length * brandLH;
+  var y = safe.bottom - blockH;
+  var overflow = false;
+  if(y < safe.top){
+    y = safe.top;
+    if(y + blockH > safe.bottom + 1) overflow = true;
+  }
+  return {
+    variant: 'sianA',
+    padX: padX,
+    textX: textX,
+    barX: padX,
+    barW: barW,
+    textMax: textMax,
+    y: y,
+    bottom: y + blockH,
+    overflow: overflow,
+    heroLines: parts.heroLines,
+    lightLines: lightLines,
+    lightSize: lightFit.size,
+    lightLH: lightLH,
+    gapLight: gapLight,
+    heavyLines: heavyLines,
+    heavySize: heavyFit.size,
+    heavyLH: heavyLH,
+    gapBrand: gapBrand,
+    brandLines: brandLines,
+    brandSize: brandFit.size,
+    brandLH: brandLH
+  };
+}
+
+function fillThumbTextWithAccent_(ctx, text, x, y, accent, accentColor, baseColor){
+  var full = String(text || '');
+  var word = String(accent || '').trim();
+  var idx = word ? full.indexOf(word) : -1;
+  var base = baseColor || '#ffffff';
+  if(idx < 0){
+    ctx.fillStyle = base;
+    ctx.fillText(full, x, y);
+    return ctx.measureText(full).width;
+  }
+  var before = full.slice(0, idx);
+  var mid = full.slice(idx, idx + word.length);
+  var after = full.slice(idx + word.length);
+  var cursor = x;
+  if(before){
+    ctx.fillStyle = base;
+    ctx.fillText(before, cursor, y);
+    cursor += ctx.measureText(before).width;
+  }
+  ctx.fillStyle = accentColor;
+  ctx.fillText(mid, cursor, y);
+  cursor += ctx.measureText(mid).width;
+  if(after){
+    ctx.fillStyle = base;
+    ctx.fillText(after, cursor, y);
+    cursor += ctx.measureText(after).width;
+  }
+  return cursor - x;
+}
+
+/** 시안 A: 잔잔한 프로그램 색 워시, 앰버 세로 막대, 가벼운 1줄 + 굵은 2줄 + 브랜드 한 줄 */
+function drawThumbSianAOnCanvas_(ctx, W, H, copy, layout, opts){
+  opts = opts || {};
+  var activeField = opts.activeField || null;
+  var palette = getThumbPosterPaletteForCat_(opts.catId);
+  var tint = palette.tint || '#1a1a1a';
+  var tint2 = palette.tint2 || tint;
+  var textTop = layout.y;
+  var scrimPad = Math.round(H * 0.06);
+  var scrimStart = Math.max(0, textTop - scrimPad);
+  var dark = ctx.createLinearGradient(0, scrimStart, 0, H);
+  dark.addColorStop(0, 'rgba(0,0,0,0)');
+  dark.addColorStop(0.22, hexToRgba_(tint, 0.18));
+  dark.addColorStop(0.62, hexToRgba_(tint, 0.46));
+  dark.addColorStop(1, hexToRgba_(tint, 0.62));
+  ctx.fillStyle = dark;
+  ctx.fillRect(0, scrimStart, W, H - scrimStart);
+  var wash = ctx.createLinearGradient(0, scrimStart, 0, H);
+  wash.addColorStop(0, 'rgba(0,0,0,0)');
+  wash.addColorStop(0.55, hexToRgba_(tint2, 0.10));
+  wash.addColorStop(1, hexToRgba_(tint2, 0.2));
+  ctx.fillStyle = wash;
+  ctx.fillRect(0, scrimStart, W, H - scrimStart);
+
+  var amber = thumbAmberForBackdrop_(true);
+  var barH = Math.max(0, layout.bottom - layout.y);
+  if(barH > 0){
+    ctx.fillStyle = amber;
+    ctx.fillRect(layout.barX, layout.y, layout.barW, barH);
+  }
+
+  var hitRegions = [];
+  var blockPad = Math.round(W * 0.012);
+  function pushHit(key, x0, y0, w0, h0){
+    var x = Math.max(0, x0 - blockPad);
+    var yy = Math.max(0, y0 - blockPad);
+    hitRegions.push({
+      key: key,
+      x: x,
+      y: yy,
+      w: Math.min(W - x, w0 + blockPad * 2),
+      h: Math.min(H - yy, h0 + blockPad * 2)
+    });
+  }
+  function strokeActive(x0, y0, w0, h0){
+    if(!activeField) return;
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(96, 165, 250, 0.95)';
+    ctx.lineWidth = Math.max(2, Math.round(W * 0.003));
+    ctx.setLineDash([8, 6]);
+    ctx.strokeRect(x0, y0, w0, h0);
+    ctx.restore();
+  }
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = Math.max(3, Math.round(W * 0.004));
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = Math.max(1, Math.round(W * 0.001));
+  var fontFamily = '"Noto Sans KR","Apple SD Gothic Neo",sans-serif';
+  var y = layout.y;
+  var textX = layout.textX;
+  var accent = String((copy && copy.accent) || '').trim();
+
+  if(layout.lightLines.length){
+    var lightY0 = y;
+    ctx.font = '500 ' + layout.lightSize + 'px ' + fontFamily;
+    var lightW = 0;
+    for(var li = 0; li < layout.lightLines.length; li++){
+      lightW = Math.max(lightW, ctx.measureText(layout.lightLines[li]).width);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(layout.lightLines[li], textX, y);
+      y += layout.lightLH;
+    }
+    pushHit('hero', textX, lightY0, Math.max(lightW, layout.textMax * 0.45), y - lightY0);
+    y += layout.gapLight;
+  }
+
+  var heavyY0 = y;
+  ctx.font = '900 ' + layout.heavySize + 'px ' + fontFamily;
+  var heavyW = 0;
+  for(var hi = 0; hi < layout.heavyLines.length; hi++){
+    heavyW = Math.max(heavyW, fillThumbTextWithAccent_(ctx, layout.heavyLines[hi], textX, y, accent, amber, '#ffffff'));
+    y += layout.heavyLH;
+  }
+  var heavyH = y - heavyY0;
+  if(heavyH > 0){
+    pushHit('hero', textX, heavyY0, Math.max(heavyW, layout.textMax * 0.55), heavyH);
+    if(activeField === 'hero'){
+      var heroTop = layout.lightLines.length ? layout.y : heavyY0;
+      strokeActive(textX - blockPad, heroTop - blockPad, Math.max(heavyW, layout.textMax * 0.55) + blockPad * 2, (y - heroTop) + blockPad * 2);
+    }
+  }
+
+  if(layout.brandLines.length){
+    y += layout.gapBrand;
+    var brandY0 = y;
+    ctx.font = '500 ' + layout.brandSize + 'px ' + fontFamily;
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    var brandW = 0;
+    for(var bi = 0; bi < layout.brandLines.length; bi++){
+      brandW = Math.max(brandW, ctx.measureText(layout.brandLines[bi]).width);
+      ctx.fillText(layout.brandLines[bi], textX, y);
+      y += layout.brandLH;
+    }
+    pushHit('program', textX, brandY0, Math.max(brandW, layout.textMax * 0.5), y - brandY0);
+    if(activeField === 'program' || activeField === 'tagline'){
+      strokeActive(textX - blockPad, brandY0 - blockPad, Math.max(brandW, layout.textMax * 0.5) + blockPad * 2, y - brandY0 + blockPad * 2);
+    }
+  }
+
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  return hitRegions;
+}
+
+function layoutThumbPosterText_(ctx, W, H, copy, scale, variant){
+  if(variant === 'sianA') return layoutThumbSianAText_(ctx, W, H, copy, scale);
   scale = scale || 1;
   var padX = Math.round(W * 0.055);
   // 우측까지 넓게 써서 줄바꿈을 최소화 (기존 0.62 → 거의 전폭)
@@ -34421,16 +34731,25 @@ function drawThumbPosterOnCanvas_(ctx, W, H, copy, bgImg, opts){
     return [];
   }
 
+  var catIdForLayout = st.catId != null ? st.catId : state.selectedCatId;
+  var layoutVariant = resolveThumbPosterLayout_(catIdForLayout, st.layoutOverride);
   var scale = 1;
-  var layout = layoutThumbPosterText_(ctx, W, H, copy, scale);
+  var layout = layoutThumbPosterText_(ctx, W, H, copy, scale, layoutVariant);
   for(var attempt = 0; attempt < 14 && layout.overflow; attempt++){
     scale *= 0.9;
-    layout = layoutThumbPosterText_(ctx, W, H, copy, scale);
+    layout = layoutThumbPosterText_(ctx, W, H, copy, scale, layoutVariant);
   }
   try { syncThumbHeroTextareaFromLayout_(layout.heroLines); } catch(eSync){}
 
+  if(layout.variant === 'sianA'){
+    return drawThumbSianAOnCanvas_(ctx, W, H, copy, layout, {
+      activeField: activeField,
+      catId: catIdForLayout
+    });
+  }
+
   // 스크림을 텍스트 바로 위부터 시작해 위쪽 빈 여백을 줄임
-  var thumbPalette = getThumbPosterPaletteForCat_(st.catId != null ? st.catId : state.selectedCatId);
+  var thumbPalette = getThumbPosterPaletteForCat_(catIdForLayout);
   var tint = thumbPalette.tint;
   var tint2 = thumbPalette.tint2;
   var glow = thumbPalette.glow || tint2;
@@ -34578,6 +34897,8 @@ function applyThumbFieldsToDom_(copy){
     if(el) el.value = map[id];
   });
   syncThumbHeroTextareaRows_(heroVal);
+  var accentEl = document.getElementById('thumb-accent');
+  if(accentEl) accentEl.value = (copy && copy.accent) || '';
   try {
     var st = ensureThumbMakerState_();
     st.heroLineLocked = false;
@@ -35098,11 +35419,23 @@ function renderThumbMakerCard_(content){
     html += '<option value="' + k + '"' + (k === sizeKey ? ' selected' : '') + '>' + escapeHtml(THUMB_SIZE_PRESETS[k].label) + '</option>';
   });
   html += '</select>';
+  var layoutCat = st.catId != null ? st.catId : state.selectedCatId;
+  var layoutOverride = (st.layoutOverride === 'template' || st.layoutOverride === 'sianA') ? st.layoutOverride : 'auto';
+  var autoLayout = resolveThumbPosterLayout_(layoutCat, 'auto');
+  html += '<label>레이아웃</label>';
+  html += '<div class="thumb-maker-mode-row" id="thumb-layout-row">';
+  html += '<button type="button" class="thumb-maker-mode-btn' + (layoutOverride === 'auto' ? ' on' : '') + '" data-thumb-layout="auto" onclick="setThumbLayoutOverride_(\'auto\')">자동 · ' + (autoLayout === 'sianA' ? '시안 A' : '템플릿') + '</button>';
+  html += '<button type="button" class="thumb-maker-mode-btn' + (layoutOverride === 'template' ? ' on' : '') + '" data-thumb-layout="template" onclick="setThumbLayoutOverride_(\'template\')">템플릿</button>';
+  html += '<button type="button" class="thumb-maker-mode-btn' + (layoutOverride === 'sianA' ? ' on' : '') + '" data-thumb-layout="sianA" onclick="setThumbLayoutOverride_(\'sianA\')">시안 A</button>';
+  html += '</div>';
+  html += '<p class="thumb-maker-click-hint" style="margin-top:-4px;">자동은 청중을 따릅니다. 전문가는 템플릿, 그 외는 시안 A입니다. 시안 A는 1줄은 가볍게, 2줄은 굵게, 아래는 브랜드 · 슬로건 한 줄입니다.</p>';
   }
   if(!photoOnly){
   html += '<label for="thumb-hero">후킹 타이틀 · 그리드에서 가장 크게</label>';
   var heroEdit = expandThumbHeroLinesForEdit_(copy.hero);
   html += '<textarea id="thumb-hero" rows="' + Math.min(3, Math.max(1, heroEdit.split('\n').filter(Boolean).length || 1)) + '" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'hero\')" onblur="onThumbMakerFieldBlur_()">' + escapeHtml(heroEdit) + '</textarea>';
+  html += '<label for="thumb-accent">강조 단어 · 시안 A에서 앰버</label>';
+  html += '<input type="text" id="thumb-accent" value="' + escapeHtml((copy && copy.accent) || '') + '" placeholder="한 단어. 비우면 없음" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'hero\')" onblur="onThumbMakerFieldBlur_()">';
   html += '<div class="thumb-maker-mode-row thumb-maker-zoom-row">';
   html += '<span class="thumb-maker-axis-label">후킹 글씨</span>';
   html += '<button type="button" class="thumb-maker-mode-btn" onclick="nudgeThumbTypeScale_(-0.08)" aria-label="글씨 줄이기">−</button>';
@@ -35517,6 +35850,22 @@ window.onThumbMakerFieldChange_ = function(){
 };
 
 
+function syncThumbLayoutButtons_(){
+  var st = ensureThumbMakerState_();
+  var mode = (st.layoutOverride === 'template' || st.layoutOverride === 'sianA') ? st.layoutOverride : 'auto';
+  var btns = document.querySelectorAll('.thumb-maker-mode-btn[data-thumb-layout]');
+  for(var i = 0; i < btns.length; i++){
+    btns[i].classList.toggle('on', btns[i].getAttribute('data-thumb-layout') === mode);
+  }
+}
+window.setThumbLayoutOverride_ = function(mode){
+  var st = ensureThumbMakerState_();
+  st.layoutOverride = (mode === 'template' || mode === 'sianA') ? mode : 'auto';
+  syncThumbLayoutButtons_();
+  schedulePersistThumbWorkspace_(false);
+  paintThumbMakerPreview_();
+};
+
 window.setThumbFocusX_ = function(v){
   var st = ensureThumbMakerState_();
   st.focusX = clamp01_(v);
@@ -35868,6 +36217,7 @@ window.refreshThumbMakerFromTopic_ = function(){
     programMode: 'topic',
     preferTopic: true
   });
+  if(prev && prev.accent) st.fields.accent = prev.accent;
   st.lastCopy = st.fields;
   if(addForm){
     st.draftId = '__add_form__';

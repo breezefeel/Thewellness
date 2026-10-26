@@ -24638,7 +24638,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=395').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=396').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -36465,8 +36465,14 @@ function renderTopicPhotoCard_(content){
   html += '</div>';
   html += '<div class="topic-photo-bar-side topic-photo-bar-actions">';
   html += '<button type="button" class="img-tool-copy-btn" id="topic-photo-download" onclick="downloadTopicPhoto_()"' + (preview ? '' : ' disabled') + '>다운로드</button>';
-  html += '<button type="button" class="topic-photo-go" id="topic-photo-go" onclick="generateTopicPhoto_(this)">이미지 생성</button>';
-  html += '<button type="button" class="topic-photo-go topic-photo-nano" id="topic-photo-nano" data-image-model="gemini-3-pro-image" onclick="generateTopicPhoto_(this)">나노바나나</button>';
+  html += '<div class="topic-photo-gen">';
+  html += '<button type="button" class="topic-photo-go" id="topic-photo-go" data-image-model="gpt" onclick="generateTopicPhoto_(this)">GPT 생성</button>';
+  html += '<div class="topic-photo-model-meta" id="topic-photo-gpt-meta"></div>';
+  html += '</div>';
+  html += '<div class="topic-photo-gen">';
+  html += '<button type="button" class="topic-photo-go topic-photo-nano" id="topic-photo-nano" data-image-model="gemini-nano-banana-2.1" onclick="generateTopicPhoto_(this)">나노바나나</button>';
+  html += '<div class="topic-photo-model-meta" id="topic-photo-nano-meta"></div>';
+  html += '</div>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="copyCommunityOrDailyImageSlot_(0, this)">프롬프트 복사</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="rebuildTopicPhotoPrompt_()">프롬프트 재생성</button>';
   html += '</div></div>';
@@ -36481,7 +36487,20 @@ function fillTopicPhotoPreview_(dataUrl){
   var dl = document.getElementById('topic-photo-download');
   if(dl) dl.disabled = !dataUrl;
   if(!box) return;
-  box.innerHTML = dataUrl ? '<img alt="만든 주제 사진" src="' + dataUrl + '">' : '';
+  if(!dataUrl){
+    box.innerHTML = '';
+    return;
+  }
+  var img = box.querySelector('img');
+  if(!img || img.getAttribute('src') !== dataUrl){
+    box.innerHTML = '<img alt="만든 주제 사진" src="' + dataUrl + '">';
+  }
+  var shown = dataUrl;
+  cropDataUrlToFourFive_(shown).then(function(cropped){
+    if(!cropped || cropped === shown || !box.isConnected) return;
+    var current = box.querySelector('img');
+    if(current && current.getAttribute('src') === shown) current.src = cropped;
+  }).catch(function(){});
 }
 window.setTopicPhotoControls_ = function(){
   var content = getDraftContent_(state.selectedId);
@@ -36695,36 +36714,173 @@ function plannerGasPostXhr_(url, body, waitMs){
     xhr.send(body);
   });
 }
-async function cropDataUrlToFourFive_(dataUrl, keepBottom){
+var TOPIC_PHOTO_MODEL_STATUS_KEY_ = 'planner-image-model-status';
+var TOPIC_PHOTO_MODEL_STATUS_TTL_ = 6 * 60 * 60 * 1000;
+var topicPhotoModelStatusMem_ = null;
+var topicPhotoModelStatusStarted_ = false;
+var topicPhotoLiveModel_ = { gpt: '', nano: '' };
+
+function topicPhotoImageModelFromButton_(btn){
+  if(!btn || !btn.getAttribute) return '';
+  var raw = btn.getAttribute('data-image-model');
+  return raw == null ? '' : String(raw).trim();
+}
+function topicPhotoIsNanoModel_(model){
+  return /^gemini/i.test(String(model || '').trim());
+}
+function topicPhotoModelKind_(model){
+  var id = String(model || '').trim();
+  if(topicPhotoIsNanoModel_(id)) return 'nano';
+  if(!id || /^gpt/i.test(id)) return 'gpt';
+  return '';
+}
+function topicPhotoModelCaption_(kind, modelId){
+  var id = String(modelId || '').trim();
+  if(kind === 'nano'){
+    var nano = id.match(/nano-banana-(\d+(?:\.\d+)*)/i);
+    if(nano) return '나노바나나 ' + nano[1];
+  }
+  return id;
+}
+function topicPhotoModelStatusFresh_(row){
+  if(!row || row.result !== 'success') return false;
+  var saved = Number(row.savedAt) || 0;
+  if(!saved || (Date.now() - saved) > TOPIC_PHOTO_MODEL_STATUS_TTL_) return false;
+  return !!(row.gpt || row.nano);
+}
+function readTopicPhotoModelStatus_(){
+  if(topicPhotoModelStatusFresh_(topicPhotoModelStatusMem_)) return topicPhotoModelStatusMem_;
+  topicPhotoModelStatusMem_ = null;
+  try {
+    var raw = localStorage.getItem(TOPIC_PHOTO_MODEL_STATUS_KEY_);
+    var row = raw ? JSON.parse(raw) : null;
+    if(topicPhotoModelStatusFresh_(row)){
+      topicPhotoModelStatusMem_ = row;
+      return row;
+    }
+  } catch(eRead){}
+  return null;
+}
+function writeTopicPhotoModelStatus_(data){
+  var row = {
+    result: 'success',
+    gpt: data && data.gpt ? data.gpt : null,
+    nano: data && data.nano ? data.nano : null,
+    checkedAt: (data && data.checkedAt) || '',
+    savedAt: Date.now()
+  };
+  ['gpt', 'nano'].forEach(function(kind){
+    var live = topicPhotoLiveModel_[kind];
+    var side = row[kind];
+    if(!live || !side || side.error) return;
+    if(String(side.current || '') === live) return;
+    side.current = live;
+    if(side.latest && String(side.latest) === live) side.updateAvailable = false;
+  });
+  topicPhotoModelStatusMem_ = row;
+  try { localStorage.setItem(TOPIC_PHOTO_MODEL_STATUS_KEY_, JSON.stringify(row)); } catch(eWrite){}
+  return row;
+}
+function paintTopicPhotoModelSide_(kind, side){
+  var el = document.getElementById(kind === 'nano' ? 'topic-photo-nano-meta' : 'topic-photo-gpt-meta');
+  if(!el) return;
+  var live = topicPhotoLiveModel_[kind] || '';
+  if(side && side.error && !live){
+    el.innerHTML = '';
+    return;
+  }
+  var current = live || (side && String(side.current || '').trim()) || '';
+  if(!current){
+    el.innerHTML = '';
+    return;
+  }
+  var caption = topicPhotoModelCaption_(kind, current);
+  var html = '<span class="topic-photo-model-name"' +
+    (caption !== current ? ' title="' + escapeHtml(current) + '"' : '') + '>' + escapeHtml(caption) + '</span>';
+  var latest = side && !side.error && side.latest ? String(side.latest).trim() : '';
+  if(side && !side.error && side.updateAvailable && latest && latest !== current){
+    var prop = kind === 'nano' ? 'IMAGE_MODEL_NANO' : 'IMAGE_MODEL_GPT';
+    var tip = 'Apps Script 스크립트 속성 ' + prop + ' 를 새 이름(' + latest + ')으로 설정하면 적용됩니다.';
+    html += '<span class="topic-photo-model-update" title="' + escapeHtml(tip) + '">업데이트 가능 → ' + escapeHtml(latest) + '</span>';
+  }
+  el.innerHTML = html;
+}
+function paintTopicPhotoModelStatus_(row){
+  paintTopicPhotoModelSide_('gpt', row && row.gpt);
+  paintTopicPhotoModelSide_('nano', row && row.nano);
+}
+function noteTopicPhotoGeneratedModel_(requested, returned){
+  var id = String(returned || '').trim();
+  if(!id) return;
+  var kind = topicPhotoModelKind_(id) || topicPhotoModelKind_(requested);
+  if(!kind) return;
+  var row = readTopicPhotoModelStatus_();
+  var side = row && (kind === 'nano' ? row.nano : row.gpt);
+  var shown = topicPhotoLiveModel_[kind] || (side && !side.error && String(side.current || '').trim()) || '';
+  if(shown !== id){
+    topicPhotoLiveModel_[kind] = id;
+    if(row && side && !side.error){
+      side.current = id;
+      if(side.latest && String(side.latest) === id) side.updateAvailable = false;
+      topicPhotoModelStatusMem_ = row;
+      try { localStorage.setItem(TOPIC_PHOTO_MODEL_STATUS_KEY_, JSON.stringify(row)); } catch(eNote){}
+    }
+  }
+  paintTopicPhotoModelSide_(kind, side);
+}
+function ensureTopicPhotoModelStatus_(){
+  var cached = readTopicPhotoModelStatus_();
+  if(cached){
+    paintTopicPhotoModelStatus_(cached);
+    topicPhotoModelStatusStarted_ = true;
+    return;
+  }
+  paintTopicPhotoModelStatus_(null);
+  if(topicPhotoModelStatusStarted_) return;
+  topicPhotoModelStatusStarted_ = true;
+  if(!getPlannerGasUrl_() || location.protocol === 'file:') return;
+  var body;
+  try { body = plannerGasRequestBody_({ action: 'plannerImageModelStatus' }); }
+  catch(eBody){ return; }
+  plannerGasPostXhr_(getPlannerGasUrl_(), body, 20000).then(function(pack){
+    var data = pack && pack.data;
+    if(!pack || !pack.ok || !data || data.result !== 'success') return;
+    paintTopicPhotoModelStatus_(writeTopicPhotoModelStatus_(data));
+  }).catch(function(){});
+}
+async function cropDataUrlToFourFive_(dataUrl){
+  if(!dataUrl) return dataUrl;
   var img = await loadBitmapForThumb_(dataUrl);
   var w = img.naturalWidth || img.width || 1;
   var h = img.naturalHeight || img.height || 1;
   var target = 4 / 5;
   var ratio = w / h;
-  var closeEnough = Math.abs(ratio - target) <= 0.02;
-  if(closeEnough && w >= 1080 && h >= 1350){
+  if(Math.abs(ratio - target) <= 0.02){
     if(img.close){ try { img.close(); } catch(eClose){} }
     return dataUrl;
   }
   var sw = w, sh = h, sx = 0, sy = 0;
-  if(ratio > target + 0.02){
-    sh = h; sw = h * target; sx = (w - sw) / 2; sy = 0;
-  } else if(ratio < target - 0.02){
-    sw = w; sh = w / target; sx = 0; sy = keepBottom ? Math.max(0, h - sh) : 0;
-  }
-  var outW = 1080;
-  var outH = 1350;
-  if(sw >= 1080 && sh >= 1350){
-    outW = Math.max(1080, Math.round(sw));
-    outH = Math.max(1350, Math.round(outW / target));
+  if(ratio > target){
+    sh = h;
+    sw = Math.min(w, h * target);
+    sx = Math.max(0, (w - sw) / 2);
+    sy = 0;
+  } else {
+    sw = w;
+    sh = Math.min(h, w / target);
+    sx = 0;
+    sy = Math.max(0, (h - sh) / 2);
   }
   var c = document.createElement('canvas');
-  c.width = outW; c.height = outH;
+  c.width = 1080;
+  c.height = 1350;
   var ctx = c.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, c.width, c.height);
   ctx.imageSmoothingEnabled = true;
   if(ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
-  if(img.close){ try { img.close(); } catch(eClose){} }
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  if(img.close){ try { img.close(); } catch(eClose2){} }
   return c.toDataURL('image/jpeg', 0.92);
 }
 window.generateTopicPhoto_ = async function(btn){
@@ -36760,12 +36916,12 @@ window.generateTopicPhoto_ = async function(btn){
   var model = topicPhotoModelKey_(content, state.selectedCatId);
   var photoEstimateSec = 60;
   var figure = topicPhotoWantsFigure_(content, state.selectedCatId);
-  var imageModel = btn && btn.getAttribute('data-image-model') || '';
-  var useNanoPro = imageModel === 'gemini-3-pro-image';
-  if(useNanoPro) photoEstimateSec = 70;
-  if(btn) startButtonCountdown_(btn, { estimateSec: photoEstimateSec, busyLabel: '만드는 중', idleText: useNanoPro ? '나노바나나' : '이미지 생성' });
-  setAppToast(useNanoPro
-    ? '나노바나나 프로로 4:5 그림을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'
+  var imageModel = topicPhotoImageModelFromButton_(btn);
+  var useNano = topicPhotoIsNanoModel_(imageModel);
+  if(useNano) photoEstimateSec = 70;
+  if(btn) startButtonCountdown_(btn, { estimateSec: photoEstimateSec, busyLabel: '만드는 중', idleText: useNano ? '나노바나나' : 'GPT 생성' });
+  setAppToast(useNano
+    ? '나노바나나로 4:5 그림을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'
     : (figure
       ? '블로그 내용으로 설명 그림을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'
       : '참고 사진으로 4:5 사진을 만들고 있어요. 약 ' + photoEstimateSec + '초 예상입니다.'), { duration: 4000, variant: 'ok' });
@@ -36807,7 +36963,7 @@ window.generateTopicPhoto_ = async function(btn){
         images: slim,
         imageModel: imageModel
       });
-      var pack = await plannerGasPostXhr_(getPlannerGasUrl_(), body, useNanoPro ? 180000 : 120000);
+      var pack = await plannerGasPostXhr_(getPlannerGasUrl_(), body, useNano ? 180000 : 120000);
       if(!pack || !pack.data){
         if(pass === 0) continue;
         throw new Error(!pack || pack.ok ? '서버 응답 형식 오류' : ('서버 연결 실패 (HTTP ' + ((pack && pack.status) || '?') + ')'));
@@ -36827,8 +36983,9 @@ window.generateTopicPhoto_ = async function(btn){
       if(lost) msg = '사진 요청이 서버까지 도착하지 않았어요. 한 번 더 눌러 주세요.';
       throw new Error(msg);
     }
+    noteTopicPhotoGeneratedModel_(imageModel, data.imageModel);
     var rawUrl = 'data:' + (data.mediaType || 'image/jpeg') + ';base64,' + data.imageBase64;
-    var cropped = await cropDataUrlToFourFive_(rawUrl, figure);
+    var cropped = await cropDataUrlToFourFive_(rawUrl);
     var st = ensureThumbMakerState_();
     st.sizeKey = '4x5';
     st.focusX = 0.5;
@@ -36848,7 +37005,7 @@ window.generateTopicPhoto_ = async function(btn){
     if(btn) stopButtonCountdown_(btn);
   }
 };
-window.downloadTopicPhoto_ = function(){
+window.downloadTopicPhoto_ = async function(){
   var st = ensureThumbMakerState_();
   var url = (st && st.fileName === '주제 사진.jpg' && st.bgDataUrl) ? st.bgDataUrl : '';
   if(!url){
@@ -36859,6 +37016,7 @@ window.downloadTopicPhoto_ = function(){
     setAppToast('아직 만든 사진이 없어요.', { duration: 2200, variant: 'err' });
     return;
   }
+  try { url = await cropDataUrlToFourFive_(url); } catch(eCrop){}
   var a = document.createElement('a');
   a.href = url;
   a.download = '주제사진-4x5.jpg';
@@ -37583,6 +37741,12 @@ function renderSheetContent(content) {
   scheduleWorkshopTextareaGrow_(document.getElementById('sheet-body'));
   renderAllSelfCareStepPreviews_();
   scheduleThumbMakerInit_();
+  if(tab === 'images' && document.getElementById('topic-photo-go')){
+    ensureTopicPhotoModelStatus_();
+    var topicPreview = document.querySelector('#topic-photo-preview img');
+    var topicPreviewSrc = topicPreview && (topicPreview.getAttribute('src') || '');
+    if(topicPreviewSrc) fillTopicPhotoPreview_(topicPreviewSrc);
+  }
   scrollSheetBodyToStart_();
 }
 

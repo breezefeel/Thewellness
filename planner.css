@@ -2044,6 +2044,21 @@ background: linear-gradient(transparent, #F8F7F4);
 .topic-photo-nano {
   background: #fff; color: #111827; border: 1px solid #111827;
 }
+.topic-photo-gen {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+}
+.topic-photo-model-meta {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  max-width: 180px; font-size: 10px; line-height: 1.35; color: #9CA3AF; font-weight: 600;
+}
+.topic-photo-model-meta:empty { display: none; }
+.topic-photo-model-name { word-break: break-all; }
+.topic-photo-model-update {
+  display: inline-block; margin-top: 1px; color: #b06d1a;
+  background: rgba(176, 109, 26, 0.12); border-radius: 999px;
+  padding: 1px 6px; font-size: 10px; font-weight: 700; line-height: 1.45;
+  cursor: help; word-break: break-all;
+}
 .topic-photo-preview { margin-top: 12px; }
 .topic-photo-preview img {
   width: min(100%, 280px); aspect-ratio: 4 / 5; object-fit: cover;

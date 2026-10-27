@@ -295,6 +295,54 @@ assert(R.plannerDraftActivityDay('2026-10-26T01:00:00') === R.plannerDraftActivi
 var newerUpdated = R.plannerDraftListDate({ id: 'd4-c1', createdAt: '2026-07-24', activityAt: '2026-07-24', updatedAt: '2026-10-26' });
 assert(newerUpdated.label === '10.26.' && newerUpdated.edited === true, 'a newer updatedAt is shown even when activityAt is still July');
 
+assert(R.plannerPromptConflictAction({
+  key: 'prompt:0:blog',
+  localText: '같은 지침\n',
+  remoteText: '같은 지침',
+  userEdited: true
+}) === 'align', 'the same prompt text is not a conflict');
+assert(R.plannerPromptConflictAction({
+  key: 'prompt:base',
+  localText: '자동으로 바뀐 기본 지침',
+  remoteText: '서버에 저장된 지침',
+  userEdited: false
+}) === 'adopt-server', 'an untouched prompt follows the server');
+assert(R.plannerPromptConflictAction({
+  key: 'prompt:1:insta',
+  localText: '이 기기에서 고친 지침',
+  remoteText: '다른 기기에서 고친 지침',
+  userEdited: true
+}) === 'ask', 'a prompt edited on both sides still asks');
+assert(R.plannerPromptConflictAction({
+  key: 'draft:d1',
+  localText: '원고',
+  remoteText: '다른 원고',
+  userEdited: false
+}) === 'keep', 'a draft is not treated as a prompt');
+assert(R.plannerTopicDrawerKey('허리·골반·고관절') === R.plannerTopicDrawerKey('허리 / 골반 / 고관절'),
+  'a drawer title matches when only the separator differs');
+assert(R.plannerTopicDrawerKey('3단계 · 허리·골반·고관절') === '허리골반고관절',
+  'a step prefix is ignored when matching a drawer');
+assert(R.plannerImportNeedsMove({ imported: true, stepId: 'misc', miscId: 'misc', stepResolves: false }) === true,
+  'an imported card still in misc is moved again');
+assert(R.plannerImportNeedsMove({ imported: true, stepId: 's3', stepResolves: true }) === false,
+  'an imported card already in a real drawer stays');
+assert(R.plannerImportNeedsMove({ imported: true, stepId: 'gone', stepResolves: false }) === true,
+  'an imported card whose drawer id is missing is moved again');
+var left = R.plannerKeysLeftBehind(
+  [{ key: 'draft:a' }, { key: 'prompt:base' }, { key: 'draft:b' }],
+  [{ key: 'draft:a' }]
+);
+assert(left.join(',') === 'prompt:base,draft:b', 'the batch remainder is the keys that were not sent');
+assert(R.plannerSameKeyList(['draft:b', 'prompt:base'], ['prompt:base', 'draft:b']),
+  'the same leftover keys count as a stalled batch');
+assert(R.plannerStripClinicTitlePrefix('[약수/인천] 유연한데 왜 자꾸 삐끗할까') === '유연한데 왜 자꾸 삐끗할까',
+  'a stored clinic prefix is removed from the title');
+assert(R.plannerStripClinicTitlePrefix('[약수/인천] [약수/인천] 모니터 앞에서 목이 뻣뻣할 때') === '모니터 앞에서 목이 뻣뻣할 때',
+  'a repeated clinic prefix is removed');
+assert(R.plannerStripClinicTitlePrefix('접두어 없는 제목') === '접두어 없는 제목',
+  'a title without the prefix stays as written');
+
 if(failed){
   console.error(failed + ' assertion(s) failed');
   process.exit(1);

@@ -12627,6 +12627,15 @@ function applySupabaseEntityRows_(rows){
         return;
       }
       if(base !== serverRev){
+        var promptAction = promptConflictAction_(key, localVal, serverVal, op);
+        if(promptAction === 'align' || promptAction === 'adopt-server'){
+          setSyncEntity_(payload, key, row.deleted ? undefined : serverVal);
+          payload.syncEntityRevisions[key] = serverRev;
+          op._dropQuietPrompt = true;
+          changed = true;
+          return;
+        }
+        if(conflictKeyIsSnoozed_(key)) return;
         conflicts.push({
           key: key,
           mutationId: op.mutationId || '',
@@ -12681,6 +12690,16 @@ function applySupabaseEntityRows_(rows){
       changed = true;
     }
   });
+  var quietPrompt = false;
+  state.syncOutbox = (state.syncOutbox || []).filter(function(op){
+    if(!op || !op._dropQuietPrompt) return true;
+    quietPrompt = true;
+    if(state.syncDirtyEntityKeys) delete state.syncDirtyEntityKeys[op.key];
+    return false;
+  });
+  if(quietPrompt){
+    try { rebuildDirtyStateFromOutbox_(); } catch(eQuiet){}
+  }
   if(sawIncomingGeneralPlan && !keepGeneral) markGeneralUploadDone_();
   if(changed){
     state.syncEntityRevisions = payload.syncEntityRevisions;
@@ -17007,7 +17026,7 @@ function normalizeDraftRowForSync_(draft){
   ['id','topic','angle','series','step','pillar','rationale','writingBrief','roadmapStepId',
     'shareMonth','createdAt','sourceNote','collab','youtubeAnalysis','updatedAt','activityAt','publishedChannels','dailyShareKind',
     'dailyThought','dailyWho','dailyWhat','dailyBody','articleKind','previousRoadmapStepId',
-    'previousSeries','miscLocked','importDrawerSettled','articleFlow'].forEach(function(k){
+    'previousSeries','miscLocked','importDrawerSettled','drawerUserPlaced','articleFlow'].forEach(function(k){
     var v = draft[k];
     if(v == null || v === '') return;
     if(Array.isArray(v) && !v.length) return;
@@ -17609,12 +17628,17 @@ function clearStuckSyncFlagsIfClean_(remotePayload){
 /** 로컬 미업로드 수정이 없을 때 — GAS를 기준본으로 채택 */
 function adoptServerPayloadAuthoritatively_(remotePayload, remoteRevision){
   try { invalidateStalePendingPlans_(); } catch(eInv){}
-  applyPersistPayload(remotePayload || {}, {
-    skipRestorePending: true,
-    replaceDeletedDraftIds: true,
-    authoritativeAdopt: true,
-    deferHeavyRepair: !!state._bootstrapDeferHeavy
-  });
+  state._deferClinicRepair = true;
+  try {
+    applyPersistPayload(remotePayload || {}, {
+      skipRestorePending: true,
+      replaceDeletedDraftIds: true,
+      authoritativeAdopt: true,
+      deferHeavyRepair: !!state._bootstrapDeferHeavy
+    });
+  } finally {
+    state._deferClinicRepair = false;
+  }
   state.syncRevision = parseInt(remoteRevision, 10) || getPayloadRevision_(remotePayload);
   state.syncEntityRevisions = ensureSyncEntityRevisions_(remotePayload || {});
   state.syncEntityTombstones = Object.assign({}, (remotePayload && remotePayload.syncEntityTombstones) || {});
@@ -17635,6 +17659,10 @@ function adoptServerPayloadAuthoritatively_(remotePayload, remoteRevision){
   if(state._postAdoptMigration){
     state._postAdoptMigration = false;
   }
+  // 서버 본문을 받은 뒤에 제목 접두어·기타 서랍만 고친다. 이 줄은 충돌이 아니라 정리 업로드다.
+  try {
+    if(applyClinicTitleAndImportDrawerRepair_()) state.syncDirty = true;
+  } catch(eClinicAdopt){}
 }
 /**
  * 서버 기준본. 이 세션 수정만 올리는 중이면 'push'.
@@ -17835,6 +17863,10 @@ function syncEntitiesEquivalent_(key, localVal, remoteVal){
     }
     return syncValueFingerprint_(subMetaCore_(l)) === syncValueFingerprint_(subMetaCore_(r));
   }
+  if(isPromptSyncKey_(key)){
+    var promptAction = promptConflictAction_(key, l, r, null);
+    if(promptAction === 'align') return true;
+  }
   if(key.indexOf('plan:subgoal:') === 0 && l && typeof l === 'object' && r && typeof r === 'object'){
     var localOrder = (typeof l.order === 'number') ? l.order : null;
     var remoteOrder = (typeof r.order === 'number') ? r.order : null;
@@ -17925,6 +17957,66 @@ function dropSkippableOutboxConflicts_(serverConflicts){
   }
   return n;
 }
+function isPromptSyncKey_(key){
+  key = String(key || '');
+  return key === 'prompt:base' || /^prompt:\d+:[^:]+$/.test(key);
+}
+function rememberPromptUserEdited_(key){
+  if(!isPromptSyncKey_(key)) return;
+  if(!state.promptUserEditedKeys || typeof state.promptUserEditedKeys !== 'object') state.promptUserEditedKeys = {};
+  state.promptUserEditedKeys[key] = true;
+}
+function promptWasUserEdited_(key, op){
+  if(op && op.userEdited) return true;
+  return !!(state.promptUserEditedKeys && state.promptUserEditedKeys[String(key || '')]);
+}
+function findOutboxOp_(key){
+  var ops = state.syncOutbox || [];
+  for(var i = 0; i < ops.length; i++){
+    if(ops[i] && ops[i].key === key) return ops[i];
+  }
+  return null;
+}
+function promptConflictAction_(key, localVal, remoteVal, op){
+  if(typeof PlannerSyncRules === 'undefined' || !PlannerSyncRules.plannerPromptConflictAction) return 'keep';
+  return PlannerSyncRules.plannerPromptConflictAction({
+    key: key,
+    localText: unwrapSyncEntityValue_(localVal),
+    remoteText: unwrapSyncEntityValue_(remoteVal),
+    userEdited: promptWasUserEdited_(key, op || findOutboxOp_(key))
+  });
+}
+function dropUntouchedPromptOutboxOps_(){
+  var before = (state.syncOutbox || []).length;
+  var droppedKeys = {};
+  state.syncOutbox = (state.syncOutbox || []).filter(function(op){
+    if(!op || !isPromptSyncKey_(op.key) || promptWasUserEdited_(op.key, op)) return true;
+    droppedKeys[op.key] = true;
+    return false;
+  });
+  if((state.syncOutbox || []).length === before) return 0;
+  Object.keys(droppedKeys).forEach(function(key){
+    if(state.syncDirtyEntityKeys) delete state.syncDirtyEntityKeys[key];
+    delete _conflictAutoKeepCount_[key];
+  });
+  try { rebuildDirtyStateFromOutbox_(); } catch(eReb){}
+  if(!hasPendingLocalSyncChanges_()){
+    state.syncNeedsSnapshot = false;
+    state.syncDirty = false;
+    _syncTransferStartedAt_ = 0;
+  }
+  return before - (state.syncOutbox || []).length;
+}
+function conflictKeyIsSnoozed_(key){
+  return !!(state._conflictSnoozeKeys && state._conflictSnoozeKeys[String(key || '')]);
+}
+function clearDividedSaveToast_(){
+  var el = document.getElementById('app-toast');
+  if(!el || !el.classList.contains('show')) return;
+  if(String(el.textContent || '').indexOf('나눠 저장 중') !== 0) return;
+  try { clearTimeout(appToastTimer); } catch(eClr){}
+  el.classList.remove('show');
+}
 /** 한쪽만 추가된 키·로컬 생성 초안(서버에 본문 없음)은 충돌 UI 없이 병합 */
 function shouldSkipPlannerConflict_(key, localVal, remoteVal){
   key = String(key || '');
@@ -17962,6 +18054,8 @@ function detectPlannerEntityConflicts_(local, remote){
     return rEntities;
   }
   function pushIfRealConflict_(conflicts, key){
+    if(conflictKeyIsSnoozed_(key)) return;
+    if(isPromptSyncKey_(key) && !promptWasUserEdited_(key, findOutboxOp_(key))) return;
     var lEnt = entitiesL_()[key];
     var rEnt = entitiesR_()[key];
     if(shouldSkipPlannerConflict_(key, lEnt, rEnt)) return;
@@ -18168,6 +18262,9 @@ function getPersistPayload(){
     payload.pinnedDraftIds = state.pinnedDraftIds;
   }
   if(state.plannerSetupDismissed) payload.plannerSetupDismissed = true;
+  if(state.promptUserEditedKeys && Object.keys(state.promptUserEditedKeys).length){
+    payload.promptUserEditedKeys = state.promptUserEditedKeys;
+  }
   if(state.opsManual) payload.opsManual = state.opsManual;
   if(state.catGroupLast) payload.catGroupLast = state.catGroupLast;
   if(state._blockAutoSeedTopics && typeof state._blockAutoSeedTopics === 'object'){
@@ -18299,7 +18396,7 @@ function enqueueSyncOutboxChanges_(changedKeys, payload){
       existing.updatedAt = times[key] || new Date().toISOString();
       bumpOutboxOpVersion_(existing);
     } else {
-      state.syncOutbox.push({
+      var created = {
         mutationId: makePlannerMutationId_(),
         version: 1,
         key: key,
@@ -18309,7 +18406,18 @@ function enqueueSyncOutboxChanges_(changedKeys, payload){
           ? (parseInt(state.syncEntityRevisions[key], 10) || 0)
           : 0,
         updatedAt: times[key] || new Date().toISOString()
-      });
+      };
+      if(state._enqueueNormalization) created.normalization = true;
+      if(state._promptUserEditedPending && isPromptSyncKey_(key)){
+        created.userEdited = true;
+        rememberPromptUserEdited_(key);
+      }
+      state.syncOutbox.push(created);
+    }
+    if(existing && state._enqueueNormalization) existing.normalization = true;
+    if(existing && state._promptUserEditedPending && isPromptSyncKey_(key)){
+      existing.userEdited = true;
+      rememberPromptUserEdited_(key);
     }
   });
   rebuildDirtyStateFromOutbox_();
@@ -18591,10 +18699,11 @@ function plannerPushTimeoutMs_(bodyBytes, snapshot){
   // 삭제 조각(수 KB)은 25~35초, 40KB는 약 70초. 용량이 클수록만 더 기다림
   return Math.max(25000, Math.min(150000, 22000 + Math.ceil(n / 8000) * 10000));
 }
-function buildPendingSyncMutations_(payload){
+function buildPendingSyncMutations_(payload, preferKeys){
   ensureOutboxFromLegacyDirty_(payload);
   migrateIndexedPlanEntityKeysInPayload_(payload || {}, state.syncOutbox);
   var sorted = (state.syncOutbox || []).slice().filter(function(op){
+    if(op && conflictKeyIsSnoozed_(op.key)) return false;
     if(!state._generalUploadOnly || state._gapUploadActive) return true;
     return !!(op && isGeneralProgramSyncKey_(op.key) && !op.deleted);
   }).sort(function(a, b){
@@ -18620,6 +18729,25 @@ function buildPendingSyncMutations_(payload){
     out.push(mut);
   }
   if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerSelectSyncBatch){
+    var preferList = [];
+    var preferMap = {};
+    (preferKeys || []).forEach(function(key){
+      key = String(key || '');
+      if(!key || preferMap[key]) return;
+      preferMap[key] = true;
+    });
+    if(Object.keys(preferMap).length){
+      out.forEach(function(mut){
+        if(mut && preferMap[String(mut.key)]) preferList.push(mut);
+      });
+      if(preferList.length){
+        return PlannerSyncRules.plannerSelectSyncBatch(preferList, {
+          maxItems: maxItems,
+          maxBytes: maxBytes,
+          bytesOf: syncMutationBytes_
+        });
+      }
+    }
     return PlannerSyncRules.plannerSelectSyncBatch(out, {
       maxItems: maxItems,
       maxBytes: maxBytes,
@@ -18841,6 +18969,7 @@ function applyServerPayloadPreservingOutbox_(serverPayload, serverRevision){
   applyPersistPayload(merged, {
     skipRestorePending: true,
     authoritativeAdopt: true,
+    preserveOutbox: true,
     deferHeavyRepair: !!state._bootstrapDeferHeavy
   });
   try {
@@ -19085,6 +19214,7 @@ function dropBulkOutboxUnlessChosen_(){
 async function plannerGasPushNow_(){
   var url = getPlannerGasUrl_();
   if(!url || !plannerSyncBootstrapReady_ || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return { ok: false, skipped: true };
+  try { dropUntouchedPromptOutboxOps_(); } catch(ePromptDrop){}
   if(typeof PlannerSyncSupabase !== 'undefined' && PlannerSyncSupabase.configured()){
     state.syncProtocolVersion = 2;
   }
@@ -19147,9 +19277,11 @@ async function plannerGasPushNow_(){
     var lastOkRevision = state.syncRevision;
     var outboxPrevRound = (state.syncOutbox || []).length;
     var outboxPrevStamp = syncOutboxProgressStamp_();
+    var prevLeftKeys = [];
+    var forceTailKeys = null;
     while(round < maxPatchRounds){
       round++;
-      if(round > 1 && (state.syncOutbox || []).length >= outboxPrevRound && syncOutboxProgressStamp_() === outboxPrevStamp){
+      if(round > 1 && (state.syncOutbox || []).length >= outboxPrevRound && syncOutboxProgressStamp_() === outboxPrevStamp && !forceTailKeys){
         break;
       }
       outboxPrevRound = (state.syncOutbox || []).length;
@@ -19160,15 +19292,28 @@ async function plannerGasPushNow_(){
         body.savedAt = new Date().toISOString();
         ensurePlanRowStableIdsInPayload_(body);
         migrateIndexedPlanEntityKeysInPayload_(body, state.syncOutbox);
-        mutations = buildPendingSyncMutations_(body);
+        try { dropUntouchedPromptOutboxOps_(); } catch(ePromptMid){}
+        mutations = buildPendingSyncMutations_(body, forceTailKeys);
+        forceTailKeys = null;
         if(!mutations.length || state.syncNeedsSnapshot || state.syncProtocolVersion < 2) break;
-        if((state.syncOutbox || []).length > mutations.length && typeof setAppToast === 'function'){
+        var eligibleOutbox = (state.syncOutbox || []).filter(function(op){
+          return op && !conflictKeyIsSnoozed_(op.key);
+        });
+        var leftKeys = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerKeysLeftBehind)
+          ? PlannerSyncRules.plannerKeysLeftBehind(eligibleOutbox, mutations)
+          : [];
+        if(leftKeys.length && PlannerSyncRules.plannerSameKeyList && PlannerSyncRules.plannerSameKeyList(prevLeftKeys, leftKeys)){
+          forceTailKeys = leftKeys.slice();
+        }
+        prevLeftKeys = leftKeys.slice();
+        var stillQueued = eligibleOutbox.length;
+        if(stillQueued > mutations.length && typeof setAppToast === 'function'){
           setAppToast(
-            '나눠 저장 중이에요. 남은 ' +
-              Math.max(0, (state.syncOutbox || []).length - mutations.length) +
-              '건…',
+            '나눠 저장 중이에요. 남은 ' + stillQueued + '건…',
             { duration: 2800, variant: 'ok' }
           );
+        } else {
+          clearDividedSaveToast_();
         }
       }
     noteSyncSending_(usePatch ? mutations.length : Math.max(1, countPendingSyncItems_()), !usePatch);
@@ -20428,6 +20573,7 @@ function updateSyncStatusUI_(){
   btn.classList.add(info.overall);
   if(label) label.textContent = '동기화';
   if(sub) sub.textContent = formatSyncHeaderSub_(info);
+  if(info.overall === 'ok') clearDividedSaveToast_();
   btn.title = '동기화 및 설정\n' + info.summary +
     (info.actionHint ? '\n\n할 일: ' + info.actionHint : '');
   var generalUpBtn = document.getElementById('btn-sync-general-up');
@@ -21841,7 +21987,11 @@ window.continuePlannerWithLocalData_ = function(){
   }
 };
 function openPlannerConflict_(local, remote, serverRevision){
+  try { dropUntouchedPromptOutboxOps_(); } catch(ePromptOpen){}
   var conflicts = detectPlannerEntityConflicts_(local, remote);
+  conflicts = (conflicts || []).filter(function(conflict){
+    return conflict && !conflictKeyIsSnoozed_(conflict.key);
+  });
   if(!conflicts.length) return false;
   // 1~5건은 대용량이어도 선택창. 예전엔 자동 유지→재전송이 같은 1건을 수십 분 반복함
   if(conflicts.length > 5){
@@ -22041,7 +22191,31 @@ function bindPlannerConflictButtons_(){
       applyAllConflictsKeepLocal_();
     }, true);
   }
+  var laterBtn = document.getElementById('sync-conflict-later');
+  if(laterBtn && !laterBtn._boundConflictLater){
+    laterBtn._boundConflictLater = true;
+    laterBtn.addEventListener('click', function(ev){
+      ev.preventDefault();
+      ev.stopPropagation();
+      dismissPlannerConflictForLater_();
+    }, true);
+  }
 }
+window.dismissPlannerConflictForLater_ = function(){
+  var pending = plannerSyncConflictPending_;
+  var keys = pending && pending.conflicts ? pending.conflicts : [];
+  if(!state._conflictSnoozeKeys) state._conflictSnoozeKeys = {};
+  keys.forEach(function(conflict){
+    if(conflict && conflict.key) state._conflictSnoozeKeys[String(conflict.key)] = true;
+  });
+  plannerSyncConflictPending_ = null;
+  var overlay = document.getElementById('sync-conflict-overlay');
+  closeScrollLockedOverlayEl_(overlay);
+  if(typeof setAppToast === 'function'){
+    setAppToast('이 충돌은 나중에 다시 고를 수 있어요. 원고는 그대로 둡니다.', { duration: 3600, variant: 'ok' });
+  }
+  if(hasPendingLocalSyncChanges_() && !plannerSyncConflictPending_) schedulePlannerGasPush_(true);
+};
 window.applyAllConflictsKeepLocal_ = function(){
   var pending = plannerSyncConflictPending_;
   if(!pending){
@@ -22177,6 +22351,7 @@ function settleContentConflictsByLatest_(conflicts){
   return { upload: upload.length, kept: kept, rest: rest };
 }
 function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
+  try { dropUntouchedPromptOutboxOps_(); } catch(ePromptOpen){}
   var localPayload = getPersistPayload();
   var localEntities = collectSyncEntities_(localPayload, { skipEnsureIds: true });
   var outboxByKey = {};
@@ -22196,6 +22371,8 @@ function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
       version: parseInt(conflict.version, 10) || (op && parseInt(op.version, 10)) || 1
     };
   }).filter(function(conflict){
+    if(!conflict || conflictKeyIsSnoozed_(conflict.key)) return false;
+    if(isPromptSyncKey_(conflict.key) && promptConflictAction_(conflict.key, conflict.local, conflict.remote, findOutboxOp_(conflict.key)) !== 'ask') return false;
     return !shouldSkipPlannerConflict_(conflict.key, conflict.local, conflict.remote);
   });
   if(!conflicts.length) return false;
@@ -23147,6 +23324,7 @@ function collectExtraDrafts(){
         sourceNote: d.sourceNote,
         collab: d.collab,
         importDrawerSettled: d.importDrawerSettled,
+        drawerUserPlaced: d.drawerUserPlaced,
         youtubeAnalysis: d.youtubeAnalysis,
         youtubeUrls: d.youtubeUrls,
         articleFlow: d.articleFlow,
@@ -23201,6 +23379,7 @@ function mergeExtraDrafts(byCat){
       if(Array.isArray(d.collab) && d.collab.length) merged.collab = d.collab.slice();
       if(d.miscLocked) merged.miscLocked = true;
       if(d.importDrawerSettled) merged.importDrawerSettled = true;
+      if(d.drawerUserPlaced) merged.drawerUserPlaced = true;
       if(merged && !merged.previousRoadmapStepId) delete merged.previousRoadmapStepId;
       if(merged && !merged.previousSeries) delete merged.previousSeries;
       // 이미 단계가 있으면 재배정하지 않음 — 매 동기화 apply마다 updatedAt이 바뀌어 재전송 루프가 생김
@@ -23378,6 +23557,9 @@ function applyPersistPayload(s, opts){
   state.chatgptOpenUrl = s.chatgptOpenUrl || '';
   state.prompts = s.prompts !== undefined ? s.prompts : null;
   state.promptsUpdatedAt = s.promptsUpdatedAt || '';
+  if(s.promptUserEditedKeys && typeof s.promptUserEditedKeys === 'object'){
+    state.promptUserEditedKeys = Object.assign({}, state.promptUserEditedKeys || {}, s.promptUserEditedKeys);
+  }
   state.promptRefineMilestones = s.promptRefineMilestones || {};
   state.branding = s.branding && typeof s.branding === 'object' ? s.branding : null;
   state.draftBrandOverrides = s.draftBrandOverrides && typeof s.draftBrandOverrides === 'object' ? s.draftBrandOverrides : {};
@@ -23463,26 +23645,37 @@ function applyPersistPayload(s, opts){
     state._pendingHeavyRepair = true;
   }
   if(migrateLegacyPublishTabPublished_()) migrated = true;
-  if(migrateLegacyBaseAffiliationPrompt_()) migrated = true;
-  if(migrateLegacyExpertCoursePrompts_()) migrated = true;
-  if(migrateRealMovementExpertBlogPrompt_()) migrated = true;
-  if(migrateUniversalContentFlowPrompts_()) migrated = true;
-  if(migrateSpeechStylePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
-  if(migrateHospitalGuidanceOnceInSelfCare_()){ migrated = true; touchPromptsUpdatedAt_(); }
-  if(migrateAntiAiPainSafetyPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
-  if(migratePlainDraftSentencePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
-  if(migrateBlogPlainReadabilityPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
-  if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
-  if(migrateDraftShapePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
-  if(migrateVoiceCorePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  var promptMigrated = false;
+  if(migrateLegacyBaseAffiliationPrompt_()) promptMigrated = true;
+  if(migrateLegacyExpertCoursePrompts_()) promptMigrated = true;
+  if(migrateRealMovementExpertBlogPrompt_()) promptMigrated = true;
+  if(migrateUniversalContentFlowPrompts_()) promptMigrated = true;
+  if(migrateSpeechStylePromptDefaults_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateHospitalGuidanceOnceInSelfCare_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateAntiAiPainSafetyPrompts_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
+  if(migratePlainDraftSentencePrompts_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateBlogPlainReadabilityPrompts_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateMangoImagePromptDefaults_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateDraftShapePrompts_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateVoiceCorePrompts_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
+  if(promptMigrated){
+    try { dropUntouchedPromptOutboxOps_(); } catch(ePromptMig){}
+    if(!migrated){
+      try {
+        save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+      } catch(ePromptSave){}
+    }
+  }
   if(migrated){
     var desktopReceiveOnly = isPlannerDesktopBrowser_() && !state._sessionUserEdit;
     if(opts && opts.authoritativeAdopt){
       state._postAdoptMigration = true;
       state.syncNeedsSnapshot = false;
-      state.syncDirty = false;
-      state.syncDirtyEntityKeys = {};
-      state.syncOutbox = [];
+      if(!(opts && opts.preserveOutbox)){
+        state.syncDirty = false;
+        state.syncDirtyEntityKeys = {};
+        state.syncOutbox = [];
+      }
     } else if(desktopReceiveOnly){
       state._postAdoptMigration = true;
       keepPlannerTeamOutbox_();
@@ -23493,7 +23686,7 @@ function applyPersistPayload(s, opts){
     state._applyMigrated = true;
     save(migOpts);
   }
-  if(applyClinicTitleAndImportDrawerRepair_()){
+  if(!state._deferClinicRepair && applyClinicTitleAndImportDrawerRepair_()){
     try {
       save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
     } catch(eClinicSave){}
@@ -24129,6 +24322,7 @@ function save(opts) {
     if(!desktopAuto && (changedEntities.length || contentChanged)) state.syncDirty = true;
     if(!desktopAuto) changedEntities.forEach(function(key){ state.syncDirtyEntityKeys[key] = true; });
     if(!desktopAuto) enqueueSyncOutboxChanges_(changedEntities, getPersistPayload());
+    state._promptUserEditedPending = false;
     if(untrackedChanged && !desktopAuto) state.syncNeedsSnapshot = true;
     if(!desktopAuto) rebuildDirtyStateFromOutbox_();
     if(untrackedChanged && !desktopAuto) state.syncDirty = true;
@@ -25012,18 +25206,19 @@ function runDeferredBootMigrations_(){
       migrated = true;
     }
     if(migrateLegacyPublishTabPublished_()) migrated = true;
-    if(migrateLegacyBaseAffiliationPrompt_()) migrated = true;
-    if(migrateLegacyExpertCoursePrompts_()) migrated = true;
-  if(migrateRealMovementExpertBlogPrompt_()) migrated = true;
-    if(migrateUniversalContentFlowPrompts_()) migrated = true;
-    if(migrateSpeechStylePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
-    if(migrateHospitalGuidanceOnceInSelfCare_()){ migrated = true; touchPromptsUpdatedAt_(); }
-    if(migrateAntiAiPainSafetyPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
-  if(migratePlainDraftSentencePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
-  if(migrateBlogPlainReadabilityPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
-    if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
-    if(migrateDraftShapePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
-    if(migrateVoiceCorePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+    if(migrateLegacyBaseAffiliationPrompt_()) touchPromptsUpdatedAt_();
+    if(migrateLegacyExpertCoursePrompts_()) touchPromptsUpdatedAt_();
+    if(migrateRealMovementExpertBlogPrompt_()) touchPromptsUpdatedAt_();
+    if(migrateUniversalContentFlowPrompts_()) touchPromptsUpdatedAt_();
+    if(migrateSpeechStylePromptDefaults_()) touchPromptsUpdatedAt_();
+    if(migrateHospitalGuidanceOnceInSelfCare_()) touchPromptsUpdatedAt_();
+    if(migrateAntiAiPainSafetyPrompts_()) touchPromptsUpdatedAt_();
+    if(migratePlainDraftSentencePrompts_()) touchPromptsUpdatedAt_();
+    if(migrateBlogPlainReadabilityPrompts_()) touchPromptsUpdatedAt_();
+    if(migrateMangoImagePromptDefaults_()) touchPromptsUpdatedAt_();
+    if(migrateDraftShapePrompts_()) touchPromptsUpdatedAt_();
+    if(migrateVoiceCorePrompts_()) touchPromptsUpdatedAt_();
+    try { dropUntouchedPromptOutboxOps_(); } catch(ePromptBoot){}
     var clinicMoved = false;
     if(applyClinicTitleAndImportDrawerRepair_() || state._clinicRepairNeedsSave){
       clinicMoved = true;
@@ -25297,7 +25492,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=407').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=408').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -27469,7 +27664,7 @@ function copyOpsMarketingReport_(itemId){
 }
 window.copyOpsMarketingReport_ = copyOpsMarketingReport_;
 function renderOpsMarketingPanelHTML_(itemId){
-  if(!isOpsMobileDevice_()) setTimeout(checkOpsAdsApi_, 50);
+  if(!isOpsMobileDevice_() && opsAdsApiOnline_ === true) setTimeout(checkOpsAdsApi_, 50);
   var r = buildOpsMarketingReport_(itemId);
   var seed = getOpsMarketingSeed_();
   var rep = r.report;
@@ -27719,7 +27914,6 @@ function buildOpsAdsApiGuideHTML_(kind, accountId){
       '일반 키워드, 동네(= 광고그룹 이름), 동네 조합 키워드를 확인하고 필요하면 고칩니다',
       '소재(제목·설명·연결 URL)와 확장소재(전화·플레이스·서브링크)를 확인하고 고칩니다',
       '각 칸의 <strong>「적용하기」</strong> → 바뀔 내용 미리보기 → <strong>「이대로 적용」</strong>. 없는 그룹은 만들고, 목록에서 뺀 키워드·그룹·예전 소재는 끕니다(삭제는 하지 않음)'];
-  setTimeout(checkOpsAdsApi_, 50);
   return '<div class="ops-review-group ops-kw-group" style="border:1px solid rgba(15,118,110,.18);background:rgba(15,118,110,.04);padding:12px 14px;border-radius:10px">' +
     '<div class="ops-review-group-title"><strong>API 연결</strong> <span class="ops-review-group-hint">' + (isG ? '구글 애즈 API' : '네이버 검색광고 API') + ' · 파일 다운로드·업로드 없이 바로 반영</span>' +
       '<span class="ops-review-group-progress" data-ops-ads-api-status>' + (opsAdsApiOnline_ === true ? '연결됨' : (opsAdsApiOnline_ === false ? '꺼짐' : '확인 중')) + '</span></div>' +
@@ -29420,7 +29614,7 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
   if(seriesLine) intentLines.push('<div class="card-intent-line muted">' + escapeHtml(oneLine_(seriesLine)) + '</div>');
   if(d.angle) intentLines.push('<div class="card-intent-line">' + escapeHtml(oneLine_(d.angle)) + '</div>');
   if(brandMeta.rationale) intentLines.push('<div class="card-intent-line">' + escapeHtml(oneLine_(stripTopicRationaleStepPrefix_(brandMeta.rationale))) + '</div>');
-  var lineTitle = oneLine_(blogTitleOfContent_(getDraftContent_(d.id)) || d.topic) || '(제목 없음)';
+  var lineTitle = oneLine_(stripClinicBlogTitlePrefix_(blogTitleOfContent_(getDraftContent_(d.id)) || d.topic)) || '(제목 없음)';
   var branchLabel = clinicBranchLabel_(cat.id);
   var branchHtml = branchLabel ? '<span class="card-branch-label">' + escapeHtml(branchLabel) + '</span>' : '';
   var orderBtns = '';
@@ -32247,6 +32441,7 @@ window.dropDraftOnStep_ = function(catId, draftId, targetStepId, beforeDraftId){
   }
   var moved = relocateDraftToStepNoSave_(catId, draft, targetStepId, beforeDraftId);
   if(!moved) return;
+  draft.drawerUserPlaced = true;
   var sameStep = moved.sameStep;
   save({ driveImmediate: true, gasImmediate: true });
   renderMain();
@@ -33337,6 +33532,9 @@ function getGeneralBlogProblemText_(b){
   return '';
 }
 function stripClinicBlogTitlePrefix_(title){
+  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerStripClinicTitlePrefix){
+    return PlannerSyncRules.plannerStripClinicTitlePrefix(title);
+  }
   var t = String(title || '').replace(/\s+/g, ' ').trim();
   if(!t) return '';
   var prev = '';
@@ -33371,15 +33569,26 @@ function stripStoredClinicBlogTitles_(){
   }
   function walk_(content){
     if(!content || typeof content !== 'object') return;
-    if(content.blog) stripField_(content.blog, 'title');
+    if(content.blog){
+      stripField_(content.blog, 'title');
+      stripField_(content.blog, 'importTitle');
+    }
     if(content.community && /^\[약수\/인천\]/.test(String(content.community.title || '').replace(/\s+/g, ' ').trim())){
       stripField_(content.community, 'title');
     }
   }
+  function walkDraft_(draft){
+    if(!draft || typeof draft !== 'object') return;
+    stripField_(draft, 'topic');
+  }
+  CATEGORIES.forEach(function(cat){
+    (cat.drafts || []).forEach(walkDraft_);
+  });
   Object.keys(state.generatedOnly || {}).forEach(function(id){ walk_(state.generatedOnly[id]); });
   Object.keys(state.published || {}).forEach(function(id){
     var row = state.published[id];
     if(!row || typeof row !== 'object') return;
+    stripField_(row, 'topic');
     if(row.content) walk_(row.content);
     if(row.finalTexts && typeof row.finalTexts.blog === 'string'){
       var nextBlog = row.finalTexts.blog.replace(/^(?:\[약수\/인천\]\s*)+/, '');
@@ -38684,7 +38893,7 @@ function openDetail(draftId, catId, tab, opts) {
   if(content && alignDraftTopicToBlogTitle_(draftId, content)){
     try { save({ gasImmediate: true }); } catch(eTopic){}
   }
-  document.getElementById('sheet-title').textContent = draft.topic;
+  document.getElementById('sheet-title').textContent = stripClinicBlogTitlePrefix_(draft.topic);
   if(content){
     var beforeLen = (content.images && content.images.gptVisuals) ? content.images.gptVisuals.length : 0;
     normalizeContentImages_(content, catId);
@@ -42679,6 +42888,7 @@ function bindPromptTextareaAutosave_(){
     if(!el || el.__htPromptAutosave) return;
     el.__htPromptAutosave = true;
     el.addEventListener('input', function(){
+      state._promptUserEditedPending = true;
       if(hasAnyLivePromptModifications_(true)) touchPromptsUpdatedAt_();
       updatePromptResetButtons_();
       schedulePromptCloudSave_();
@@ -42738,7 +42948,10 @@ var afterFp = syncValueFingerprint_({
   image: state.prompts.categories[state.editingCatId].image,
   base: state.prompts.base
 });
-if(beforeFp !== afterFp) touchPromptsUpdatedAt_();
+if(beforeFp !== afterFp){
+  state._promptUserEditedPending = true;
+  touchPromptsUpdatedAt_();
+}
 }
 
 window.resetPrompt = function(type) {
@@ -43736,6 +43949,12 @@ function importTopicStepId_(topic){
   var id = 't' + Math.abs(hash).toString(36);
   return id === 't0' ? '' : id;
 }
+function topicDrawerMatchKey_(title, catId){
+  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerTopicDrawerKey){
+    return PlannerSyncRules.plannerTopicDrawerKey(displaySubGoalStepTitle_(title, catId));
+  }
+  return curiosityStepTitleKey_(title, catId);
+}
 function ensureImportTopicDrawer_(catId, topic){
   var title = String(topic || '').replace(/\s+/g, ' ').trim();
   if(!title) return '';
@@ -43751,12 +43970,12 @@ function ensureImportTopicDrawer_(catId, topic){
   }
   if(!Array.isArray(plan.steps)) plan.steps = [];
   var wasEmpty = !plan.steps.length;
-  var want = normalizeTopicMatchKey_(title);
+  var want = topicDrawerMatchKey_(title, catId);
   var i;
   for(i = 0; i < plan.steps.length; i++){
     var step = plan.steps[i];
     if(!step) continue;
-    if(normalizeTopicMatchKey_(displaySubGoalStepTitle_(step.title, catId)) === want){
+    if(want && topicDrawerMatchKey_(step.title, catId) === want){
       step.importTopic = true;
       if(!step.rationale) step.rationale = '원고 가져오기';
       return String(step.id);
@@ -43817,21 +44036,44 @@ function isImportedDraft_(draft){
   if(String(draft.rationale || '').trim() === '원고 가져오기') return true;
   return /(^|\n)원고 가져오기(\n|$)/.test(String(draft.sourceNote || ''));
 }
+function importedDraftStepId_(draft){
+  if(!draft) return '';
+  var ov = state.draftBrandOverrides && state.draftBrandOverrides[draft.id];
+  var sid = ov && ov.roadmapStepId ? String(ov.roadmapStepId).trim() : '';
+  if(!sid) sid = String(draft.roadmapStepId || '').trim();
+  return sid;
+}
+function importedDraftNeedsDrawerMove_(draft, catId){
+  if(!draft || !isImportedDraft_(draft) || draft.drawerUserPlaced) return false;
+  var sid = importedDraftStepId_(draft);
+  var plan = peekSubGoalPlan_(catId);
+  var resolves = !!(sid && sid !== SUBGOAL_MISC_ID && plan && normalizeStepIdAgainstPlan_(plan, sid));
+  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerImportNeedsMove){
+    return PlannerSyncRules.plannerImportNeedsMove({
+      imported: true,
+      userPlaced: false,
+      stepId: sid,
+      miscId: SUBGOAL_MISC_ID,
+      stepResolves: resolves
+    });
+  }
+  return !sid || sid === SUBGOAL_MISC_ID || !resolves;
+}
 function relocateImportedMiscDrafts_(){
   var moved = false;
   var seen = {};
   CATEGORIES.forEach(function(cat, catId){
     (cat.drafts || []).forEach(function(draft){
-      if(!draft || !draft.id || seen[draft.id] || !isImportedDraft_(draft)) return;
+      if(!draft || !draft.id || seen[draft.id] || !importedDraftNeedsDrawerMove_(draft, catId)) return;
       seen[draft.id] = true;
-      if(draft.importDrawerSettled || draft.miscLocked) return;
-      var sid = String(draft.roadmapStepId || '').trim();
-      if(sid && sid !== SUBGOAL_MISC_ID) return;
       if(!String(draft.topic || '').trim()) return;
       var placed = '';
       try { placed = placeImportedDraftOnTopic_(draft, catId); } catch(ePlace){ placed = ''; }
-      if(!placed || placed === SUBGOAL_MISC_ID) return;
+      var plan = peekSubGoalPlan_(catId);
+      var resolved = placed && plan ? normalizeStepIdAgainstPlan_(plan, placed) : '';
+      if(!resolved || resolved === SUBGOAL_MISC_ID) return;
       draft.importDrawerSettled = true;
+      draft.roadmapStepId = resolved;
       moved = true;
     });
   });
@@ -43846,9 +44088,13 @@ function applyClinicTitleAndImportDrawerRepair_(){
     var prev = {};
     try { prev = readPreviousDiskPayloadSync_() || {}; } catch(ePrev){}
     var now = getPersistPayload();
-    enqueueSyncOutboxChanges_(listChangedSyncEntityKeys_(prev, now), now);
-    state.syncDirty = true;
-    state._sessionUserEdit = true;
+    state._enqueueNormalization = true;
+    try {
+      enqueueSyncOutboxChanges_(listChangedSyncEntityKeys_(prev, now), now);
+    } finally {
+      state._enqueueNormalization = false;
+    }
+    state.syncDirty = hasPendingLocalSyncChanges_();
   } catch(eEnq){}
   return true;
 }

@@ -457,6 +457,82 @@ var PlannerSyncRules = (function(){
     return url.length > (parseInt(maxChars, 10) || PLANNER_QUOTA_IMAGE_CHARS);
   }
 
+  function plannerNormalizePromptText(value){
+    if(value == null) return '';
+    if(typeof value !== 'string'){
+      try { value = JSON.stringify(value); } catch(eJson){ value = String(value); }
+    }
+    return String(value).replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').trim();
+  }
+
+  // 프롬프트 충돌. align=같은 내용, adopt-server=사용자가 안 고친 값, ask=양쪽 수정.
+  function plannerPromptConflictAction(spec){
+    spec = spec || {};
+    var key = String(spec.key || '');
+    if(key !== 'prompt:base' && !/^prompt:\d+:[^:]+$/.test(key)) return 'keep';
+    var localText = plannerNormalizePromptText(spec.localText);
+    var remoteText = plannerNormalizePromptText(spec.remoteText);
+    if(localText === remoteText) return 'align';
+    if(!spec.userEdited) return 'adopt-server';
+    return 'ask';
+  }
+
+  function plannerTopicDrawerKey(title){
+    return String(title || '')
+      .replace(/^\d+\s*단계\s*[·ㆍ・․.\-–—]\s*/, '')
+      .replace(/[·ㆍ・․.\s\-–—_/,，]+/g, '')
+      .replace(/["""''「」]/g, '')
+      .toLowerCase();
+  }
+
+  // 가져오기 카드가 아직 기타이거나, 서랍에 없는 단계 id면 다시 옮긴다.
+  function plannerImportNeedsMove(spec){
+    spec = spec || {};
+    if(!spec.imported) return false;
+    if(spec.userPlaced) return false;
+    var sid = String(spec.stepId || '').trim();
+    var misc = String(spec.miscId || 'misc');
+    if(!sid || sid === misc) return true;
+    if(spec.stepResolves === false) return true;
+    return false;
+  }
+
+  function plannerKeysLeftBehind(allOps, batchOps){
+    var inBatch = {};
+    (batchOps || []).forEach(function(op){
+      if(op && op.key) inBatch[String(op.key)] = true;
+    });
+    var left = [];
+    (allOps || []).forEach(function(op){
+      if(!op || !op.key || inBatch[String(op.key)]) return;
+      left.push(String(op.key));
+    });
+    return left;
+  }
+
+  function plannerSameKeyList(a, b){
+    a = a || [];
+    b = b || [];
+    if(!a.length || a.length !== b.length) return false;
+    var seen = {};
+    a.forEach(function(key){ seen[String(key)] = true; });
+    for(var i = 0; i < b.length; i++){
+      if(!seen[String(b[i])]) return false;
+    }
+    return true;
+  }
+
+  function plannerStripClinicTitlePrefix(title){
+    var t = String(title || '').replace(/\s+/g, ' ').trim();
+    if(!t) return '';
+    var prev = '';
+    while(t && t !== prev){
+      prev = t;
+      t = t.replace(/^\[약수\/인천\]\s*/, '').trim();
+    }
+    return t;
+  }
+
   function plannerBlobSyncAction(blob){
     var data = String(blob && blob.data || '');
     if(!blob || !blob.hash || !data) return { action: 'skip', notice: '' };
@@ -503,6 +579,13 @@ var PlannerSyncRules = (function(){
     plannerQuotaTrimPlan: plannerQuotaTrimPlan,
     plannerDataUrlOverLimit: plannerDataUrlOverLimit,
     plannerBlobSyncAction: plannerBlobSyncAction,
+    plannerNormalizePromptText: plannerNormalizePromptText,
+    plannerPromptConflictAction: plannerPromptConflictAction,
+    plannerTopicDrawerKey: plannerTopicDrawerKey,
+    plannerImportNeedsMove: plannerImportNeedsMove,
+    plannerKeysLeftBehind: plannerKeysLeftBehind,
+    plannerSameKeyList: plannerSameKeyList,
+    plannerStripClinicTitlePrefix: plannerStripClinicTitlePrefix,
     PLANNER_SYNC_BLOB_MAX_CHARS: PLANNER_SYNC_BLOB_MAX_CHARS,
     PLANNER_QUOTA_IMAGE_CHARS: PLANNER_QUOTA_IMAGE_CHARS
   };

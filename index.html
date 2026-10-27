@@ -71,8 +71,8 @@
 })();
 </script>
 <!-- CSS는 비차단 로드 — 렌더 막지 않음 -->
-<link rel="stylesheet" href="planner.css?v=407" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="planner.css?v=407"></noscript>
+<link rel="stylesheet" href="planner.css?v=408" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="planner.css?v=408"></noscript>
 <!-- 서비스워커는 head에서 등록하지 않음 — 문서 이동이 SW 대기(수십 초)에 걸리지 않게 함 -->
 </head>
 <body>
@@ -292,6 +292,7 @@
     <div class="sync-conflict-actions">
       <button type="button" class="modal-btn" id="sync-conflict-apply">선택한 쪽으로 맞추기</button>
       <button type="button" class="modal-btn" id="sync-conflict-keep-local" style="background:#F3F4F6;color:#374151;margin-top:8px;">이 기기 기준으로 맞추기</button>
+      <button type="button" class="modal-btn" id="sync-conflict-later" style="background:#fff;color:#6B7280;margin-top:8px;">나중에</button>
     </div>
   </div>
 </div>
@@ -475,10 +476,10 @@
 <script src="ops-channel-review-seed.js?v=1"></script>
 <script src="planner-reel.js?v=27"></script>
 <script src="planner-sync-config.js?v=1"></script>
-<script src="planner-sync-rules.js?v=403"></script>
+<script src="planner-sync-rules.js?v=408"></script>
 <script src="planner-import.js?v=405"></script>
 <script src="planner-sync-supabase.js?v=395"></script>
-<script src="planner.js?v=407" defer></script>
+<script src="planner.js?v=408" defer></script>
 <script src="planner-thumbs.js?v=399" defer></script>
 <script src="planner-social.js?v=6" defer></script>
 <script>

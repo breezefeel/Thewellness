@@ -6552,6 +6552,13 @@ function rebuildPendingProgramAssignments_(payload, oldSteps){
   });
   if(!payload.assignments.length) payload.assignments = newAssignments;
 }
+function draftsShownWithoutPlan_(cat){
+  var all = (cat && cat.drafts) || [];
+  if(state.legacyDraftsOpen) return all;
+  return all.filter(function(d){
+    return d && d.id && (d.rationale === '원고 가져오기' || String(d.sourceNote || '').indexOf('원고 가져오기') === 0);
+  });
+}
 function getVisibleDraftsInMain_(catId){
   var cat = CATEGORIES[catId];
   if(!cat || !cat.drafts) return [];
@@ -6568,6 +6575,10 @@ function getVisibleDraftsInMain_(catId){
     if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
     seen[d.id] = true;
     out.push(d);
+  }
+  if(!plan || !plan.steps || !plan.steps.length){
+    draftsShownWithoutPlan_(cat).forEach(pushDraft);
+    return out;
   }
   if(plan && plan.steps && plan.steps.length){
     plan.steps.forEach(function(step){
@@ -10398,7 +10409,9 @@ function renderProgramRoadmapHTML_(catId){
     '</div>';
   }
   if(!plan || !plan.steps.length){
-    var legacyCards = sortDraftsForTopicDisplay_(filterDraftsByTopicListMode_(cat.drafts || [], catId), catId).map(function(d){
+    var importedOnly = draftsShownWithoutPlan_(cat);
+    var shownDrafts = importedOnly;
+    var legacyCards = sortDraftsForTopicDisplay_(filterDraftsByTopicListMode_(shownDrafts, catId), catId).map(function(d){
       return draftCardHTML(d, cat, false, cat.drafts.indexOf(d), false);
     }).join('');
     var draftCount = (cat.drafts || []).filter(function(d){ return d && d.id; }).length;
@@ -10415,7 +10428,7 @@ function renderProgramRoadmapHTML_(catId){
       html += '<button type="button" class="program-legacy-toggle" onclick="toggleLegacyDrafts_()">' +
         (state.legacyDraftsOpen ? '기존 주제 숨기기' : '기존 주제 ' + draftCount + '개 보기') +
       '</button>';
-      if(state.legacyDraftsOpen && legacyCards){
+      if(legacyCards && (state.legacyDraftsOpen || importedOnly.length)){
         html += '<div class="subgoal-step-cards legacy">' + legacyCards + '</div>';
       }
     }
@@ -13575,6 +13588,10 @@ function closeTopmostPlannerOverlay_(){
     closeDrawerEditor_();
     return true;
   }
+  if(plannerOverlayIsOpen_('draft-import-overlay')){
+    closeDraftImport_();
+    return true;
+  }
   if(plannerOverlayIsOpen_('links-modal-overlay')){
     if(typeof closeLinksModal_ === 'function') closeLinksModal_();
     else {
@@ -16151,7 +16168,8 @@ var SCROLL_LOCKED_OVERLAY_IDS_ = {
   'bulk-reassign-overlay': 1,
   'drawer-edit-overlay': 1,
   'sync-conflict-overlay': 1,
-  'sync-bootstrap-choice-overlay': 1
+  'sync-bootstrap-choice-overlay': 1,
+  'draft-import-overlay': 1
 };
 function dismissPlannerOverlayOpenState_(id){
   var el = document.getElementById(id);
@@ -21453,7 +21471,7 @@ function openPlannerBootstrapSyncChoice_(local, remote, serverRevision){
       });
     });
   }
-  ['sync-bootstrap-overlay', 'api-modal', 'drive-oauth-busy', 'sync-status-overlay', 'sync-preview-overlay'].forEach(function(id){
+  ['sync-bootstrap-overlay', 'api-modal', 'drive-oauth-busy', 'sync-status-overlay', 'sync-preview-overlay', 'draft-import-overlay'].forEach(function(id){
     dismissPlannerOverlayOpenState_(id);
   });
   openScrollLockedOverlayEl_(document.getElementById('sync-bootstrap-choice-overlay'));
@@ -21830,7 +21848,7 @@ function autoResolveConflictsKeepLocal_(local, remote, serverRevision, conflicts
 }
 function renderPlannerConflictUi_(pending){
   // 다른 오버레이가 클릭을 가로채지 못하게 전부 닫음 (스크롤 잠금도 함께 해제)
-  ['sync-bootstrap-overlay', 'api-modal', 'drive-oauth-busy', 'sync-status-overlay', 'sync-preview-overlay', 'sync-bootstrap-choice-overlay'].forEach(function(id){
+  ['sync-bootstrap-overlay', 'api-modal', 'drive-oauth-busy', 'sync-status-overlay', 'sync-preview-overlay', 'sync-bootstrap-choice-overlay', 'draft-import-overlay'].forEach(function(id){
     dismissPlannerOverlayOpenState_(id);
   });
   var list = document.getElementById('sync-conflict-list');
@@ -25133,7 +25151,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=403').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=404').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -43423,4 +43441,344 @@ window.genContent = async function(ev){
   } finally {
     if(clickBtn && !clickBtn.classList.contains('btn-regen')) stopButtonCountdown_(clickBtn);
   }
+};
+
+var _draftImportView_ = null;
+function importNormKey_(s){
+  return String(s || '').replace(/\s+/g, '').toLowerCase();
+}
+function importPlannedIso_(dateStr){
+  var m = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return '';
+  var dt = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 12, 0, 0);
+  if(isNaN(dt.getTime())) return '';
+  return dt.toISOString();
+}
+function collectExistingImportSlots_(){
+  var rows = [];
+  CATEGORIES.forEach(function(cat){
+    (cat.drafts || []).forEach(function(d){
+      if(!d || !d.id || !d.topic) return;
+      if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
+      var content = null;
+      try { content = getDraftContent_(d.id); } catch(eSlot){ content = null; }
+      var slots = {};
+      var blog = content && content.blog;
+      if(blog && (blog.title || blog.draft || blog.explanation || blog.problem || blog.selfCare || blog.hook)){
+        var blogTitle = String(blog.importTitle || blog.title || '').replace(/^\[약수\/인천\]\s*/, '').trim();
+        slots.blog = blogTitle || true;
+      }
+      var ig = content && content.insta;
+      if(ig && (ig.caption || ig.hook || ig.text)) slots.instagram = ig.importTitle ? String(ig.importTitle).trim() : true;
+      var threads = content && content.threads;
+      if(threads && (threads.body || threads.text || threads.comment)) slots.threads = threads.importTitle ? String(threads.importTitle).trim() : true;
+      var news = content && content.news;
+      if(news){
+        ['naver', 'kakao', 'karrot'].forEach(function(slot){
+          var item = news[slot];
+          if(!item || !(item.title || item.body || item.cta)) return;
+          slots['sonsik:' + slot] = String(item.importTitle || item.title || '').trim() || true;
+        });
+      }
+      rows.push({ catId: cat.id, topic: d.topic, slots: slots });
+    });
+  });
+  return rows;
+}
+function findImportDraftByTopic_(catId, topic){
+  var cat = CATEGORIES[catId];
+  if(!cat) return null;
+  var want = importNormKey_(topic);
+  var found = null;
+  (cat.drafts || []).forEach(function(d){
+    if(!d || !d.id) return;
+    if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
+    if(importNormKey_(d.topic) === want) found = d;
+  });
+  return found;
+}
+function importSourceBlock_(pieces){
+  var labels = { blog: '블로그', instagram: '인스타', threads: '쓰레드', sonsik: '소식' };
+  var slots = { naver: '네이버', kakao: '카카오', karrot: '당근' };
+  var lines = ['원고 가져오기'];
+  (pieces || []).forEach(function(piece){
+    var label = labels[piece.channel] || piece.channel;
+    if(piece.channel === 'sonsik' && piece.newsSlot) label += ' ' + (slots[piece.newsSlot] || piece.newsSlot);
+    lines.push('[' + label + '] ' + (piece.title || ''));
+    if(piece.hookType) lines.push('훅: ' + piece.hookType);
+    if(piece.account) lines.push('계정: ' + piece.account);
+    if(piece.scheduledDate) lines.push('예정일: ' + piece.scheduledDate);
+    (piece.sourceLinks || []).forEach(function(url){ lines.push(url); });
+  });
+  return lines.join('\n');
+}
+function applyImportPiece_(content, piece, catId){
+  if(piece.channel === 'blog'){
+    content.blog = {
+      title: piece.title,
+      hook: '',
+      outline: [],
+      draft: piece.body,
+      problem: '',
+      selfCare: '',
+      explanation: piece.body,
+      cta: '',
+      hashtags: [],
+      importTitle: piece.title,
+      account: piece.account || ''
+    };
+    if(isHeiljagyaeCategory(catId)){
+      content.community = {
+        title: piece.title,
+        problem: '',
+        empathyLead: '',
+        empathyBullets: [],
+        explanation: piece.body,
+        selfCare: ''
+      };
+    }
+    return;
+  }
+  if(piece.channel === 'instagram'){
+    content.insta = {
+      hook: '',
+      caption: piece.body,
+      carousel: [],
+      hashtags: [],
+      importTitle: piece.title,
+      account: piece.account || ''
+    };
+    return;
+  }
+  if(piece.channel === 'threads'){
+    content.threads = {
+      body: piece.body,
+      comment: '',
+      text: piece.body,
+      importTitle: piece.title,
+      account: piece.account || ''
+    };
+    return;
+  }
+  if(piece.channel === 'sonsik'){
+    if(!content.news || typeof content.news !== 'object') content.news = {};
+    content.news[piece.newsSlot || 'naver'] = {
+      title: piece.title,
+      body: piece.body,
+      cta: '',
+      importTitle: piece.title,
+      account: piece.account || ''
+    };
+  }
+}
+function applyDraftImportBatch_(drafts){
+  var pieceCount = 0;
+  var firstCat = null;
+  (drafts || []).forEach(function(group){
+    var cat = CATEGORIES[group.catId];
+    if(!cat || !group.pieces || !group.pieces.length) return;
+    if(firstCat == null) firstCat = group.catId;
+    var created = false;
+    var draft = findImportDraftByTopic_(group.catId, group.topic);
+    if(!draft){
+      created = true;
+      var id = 'd' + group.catId + '-c' + String(Date.now() + pieceCount);
+      while((cat.drafts || []).some(function(row){ return row && row.id === id; })) id += 'x';
+      var iso = importPlannedIso_(group.date) || new Date().toISOString();
+      draft = {
+        id: id,
+        topic: group.topic,
+        angle: (group.pieces[0] && group.pieces[0].hookType) || group.pieces[0].title,
+        series: getDefaultSeriesForCat_(group.catId),
+        pillar: getDefaultPillarForCat_(group.catId),
+        rationale: '원고 가져오기',
+        createdAt: iso,
+        activityAt: iso,
+        updatedAt: iso,
+        sourceNote: importSourceBlock_(group.pieces),
+        publishedChannels: []
+      };
+      cat.drafts.push(draft);
+    } else {
+      var block = importSourceBlock_(group.pieces);
+      draft.sourceNote = draft.sourceNote ? (String(draft.sourceNote).trim() + '\n\n' + block) : block;
+      if(group.date){
+        var nextIso = importPlannedIso_(group.date);
+        var currentMs = 0;
+        try { currentMs = getDraftListActivityMs_(draft) || 0; } catch(eMs){ currentMs = 0; }
+        var nextMs = nextIso ? Date.parse(nextIso) : 0;
+        if(nextMs && nextMs >= currentMs){
+          draft.activityAt = nextIso;
+          draft.updatedAt = nextIso;
+        }
+      }
+    }
+    var content = {};
+    try {
+      var prev = getDraftContent_(draft.id);
+      if(prev) content = JSON.parse(JSON.stringify(prev));
+    } catch(eCopy){ content = {}; }
+    group.pieces.forEach(function(piece){
+      applyImportPiece_(content, piece, group.catId);
+      pieceCount += 1;
+    });
+    if(isHeiljagyaeCategory(group.catId) && !content.community){
+      var first = group.pieces[0];
+      content.community = {
+        title: first.title,
+        problem: '',
+        empathyLead: '',
+        empathyBullets: [],
+        explanation: first.body,
+        selfCare: ''
+      };
+    }
+    state.generatedOnly[draft.id] = content;
+    if(!state.published[draft.id] || typeof state.published[draft.id] !== 'object') state.published[draft.id] = {};
+    state.published[draft.id].content = content;
+    if(created){
+      try {
+        if(!applyResolvedUserAddedStepOrMisc_(draft, group.catId)) assignUserAddedDraftToMisc_(draft, group.catId);
+      } catch(eStep){}
+    }
+  });
+  return { count: pieceCount, catId: firstCat };
+}
+function renderDraftImportPreview_(view, parseError){
+  var host = document.getElementById('draft-import-preview');
+  var commit = document.getElementById('draft-import-commit');
+  if(!host) return;
+  if(parseError){
+    host.innerHTML = '<p class="draft-import-error">' + escapeHtml(parseError) + '</p>';
+    if(commit){
+      commit.disabled = true;
+      commit.textContent = '저장할 초안 없음';
+    }
+    return;
+  }
+  var items = view.items || [];
+  var byIndex = {};
+  items.forEach(function(item){ byIndex[item.index] = item; });
+  var ready = items.filter(function(item){ return item.ok; }).length;
+  var html = '<p class="draft-import-summary">' + items.length + '개 중 ' + ready + '개를 가져올 수 있습니다. 저장해도 예약·발행하지 않습니다.</p>';
+  if(ready){
+    html += '<label class="draft-import-all"><input type="checkbox" id="draft-import-all" checked onchange="toggleDraftImportAll_(this)"> 가져올 수 있는 글 모두 선택</label>';
+  }
+  (view.groups || []).forEach(function(group){
+    html += '<section class="draft-import-group"><h3>' + escapeHtml(group.programLabel) + ' · ' + escapeHtml(group.topic) + '</h3>';
+    group.items.forEach(function(index){
+      var item = byIndex[index];
+      if(!item) return;
+      html += '<label class="draft-import-row is-' + escapeHtml(item.status) + '">';
+      html += '<input type="checkbox" data-import-index="' + item.index + '"' + (item.ok ? ' checked' : ' disabled') + '>';
+      html += '<span><strong>' + escapeHtml(item.channelLabel || '채널') + '</strong> ' + escapeHtml(item.title || '(제목 없음)');
+      var meta = [];
+      if(item.account) meta.push(item.account);
+      if(item.scheduledDate) meta.push(item.scheduledDate);
+      if(meta.length) html += '<em>' + escapeHtml(meta.join(' · ')) + '</em>';
+      (item.warnings || []).forEach(function(warning){ html += '<em class="is-warn">' + escapeHtml(warning) + '</em>'; });
+      (item.errors || []).forEach(function(error){ html += '<em class="is-err">' + escapeHtml(error) + '</em>'; });
+      html += '</span></label>';
+    });
+    html += '</section>';
+  });
+  host.innerHTML = html;
+  updateDraftImportCommitLabel_();
+}
+function updateDraftImportCommitLabel_(){
+  var commit = document.getElementById('draft-import-commit');
+  if(!commit) return;
+  var n = document.querySelectorAll('#draft-import-preview input[data-import-index]:checked').length;
+  commit.disabled = n === 0;
+  commit.textContent = n ? ('선택한 초안 저장 (' + n + ')') : '저장할 초안 없음';
+}
+function bindDraftImportPreview_(){
+  var host = document.getElementById('draft-import-preview');
+  if(!host || host.__importBound) return;
+  host.__importBound = true;
+  host.addEventListener('change', function(ev){
+    if(!ev.target || ev.target.id === 'draft-import-all') return;
+    updateDraftImportCommitLabel_();
+  });
+}
+window.toggleDraftImportAll_ = function(box){
+  document.querySelectorAll('#draft-import-preview input[data-import-index]').forEach(function(input){
+    if(input.disabled) return;
+    input.checked = !!(box && box.checked);
+  });
+  updateDraftImportCommitLabel_();
+};
+window.openDraftImport_ = function(){
+  if(typeof PlannerImport === 'undefined'){
+    setAppToast('가져오기 모듈을 불러오지 못했습니다. 새로고침해 주세요.', { duration: 4000, variant: 'err' });
+    return;
+  }
+  bindDraftImportPreview_();
+  openScrollLockedOverlayEl_(document.getElementById('draft-import-overlay'));
+};
+window.closeDraftImport_ = function(ev){
+  if(ev && ev.target && ev.target.id !== 'draft-import-overlay') return;
+  closeScrollLockedOverlayEl_(document.getElementById('draft-import-overlay'));
+};
+window.onDraftImportFile_ = function(input){
+  var file = input && input.files && input.files[0];
+  if(!file) return;
+  if(file.size > 1500000){
+    setAppToast('파일이 너무 커요. 1.5MB 이하로 올려 주세요.', { duration: 4000, variant: 'err' });
+    input.value = '';
+    return;
+  }
+  var reader = new FileReader();
+  reader.onload = function(){
+    var ta = document.getElementById('draft-import-text');
+    if(ta) ta.value = String(reader.result || '');
+    previewDraftImport_();
+  };
+  reader.onerror = function(){
+    setAppToast('파일을 읽지 못했어요.', { duration: 4000, variant: 'err' });
+  };
+  reader.readAsText(file);
+};
+window.previewDraftImport_ = function(){
+  if(typeof PlannerImport === 'undefined'){
+    setAppToast('가져오기 모듈을 불러오지 못했습니다. 새로고침해 주세요.', { duration: 4000, variant: 'err' });
+    return;
+  }
+  var ta = document.getElementById('draft-import-text');
+  var parsed = PlannerImport.parse(ta ? ta.value : '');
+  if(!parsed.ok){
+    _draftImportView_ = null;
+    renderDraftImportPreview_(null, parsed.error);
+    return;
+  }
+  _draftImportView_ = PlannerImport.inspect(parsed.posts, collectExistingImportSlots_());
+  renderDraftImportPreview_(_draftImportView_, '');
+};
+window.commitDraftImport_ = function(){
+  if(!_draftImportView_ || typeof PlannerImport === 'undefined') return;
+  var selected = [];
+  document.querySelectorAll('#draft-import-preview input[data-import-index]:checked').forEach(function(input){
+    selected.push(parseInt(input.getAttribute('data-import-index'), 10));
+  });
+  var result = PlannerImport.batch(_draftImportView_.items, selected);
+  if(!result.drafts.length){
+    var reason = (result.skipped[0] && result.skipped[0].reason) || '선택한 글이 없습니다.';
+    setAppToast(reason, { duration: 4200, variant: 'err' });
+    return;
+  }
+  var applied = applyDraftImportBatch_(result.drafts);
+  try { save({ gasImmediate: true, driveImmediate: false }); }
+  catch(eSave){
+    setAppToast('저장에 실패했어요. ' + ((eSave && eSave.message) || ''), { duration: 5000, variant: 'err' });
+    return;
+  }
+  closeDraftImport_();
+  if(applied.catId != null){
+    try { selectCat(applied.catId); } catch(eCat){ try { renderMain(); } catch(eRender){} }
+  }
+  var msg = '초안 ' + applied.count + '개를 가져왔어요. 예약하거나 발행하지 않았습니다.';
+  if(result.skipped.length){
+    msg += '\n건너뛴 ' + result.skipped.length + '개: ' + result.skipped.slice(0, 3).map(function(row){ return row.reason; }).join(' / ');
+  }
+  setAppToast(msg, { duration: 5200, variant: 'ok' });
 };

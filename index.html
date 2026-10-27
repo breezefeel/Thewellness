@@ -71,8 +71,8 @@
 })();
 </script>
 <!-- CSS는 비차단 로드 — 렌더 막지 않음 -->
-<link rel="stylesheet" href="planner.css?v=403" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="planner.css?v=403"></noscript>
+<link rel="stylesheet" href="planner.css?v=404" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="planner.css?v=404"></noscript>
 <!-- 서비스워커는 head에서 등록하지 않음 — 문서 이동이 SW 대기(수십 초)에 걸리지 않게 함 -->
 </head>
 <body>
@@ -409,6 +409,28 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="draft-import-overlay" role="dialog" aria-modal="true" aria-labelledby="draft-import-title" onclick="closeDraftImport_(event)">
+  <div class="modal-box draft-import-box" onclick="event.stopPropagation()">
+    <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div class="modal-title" id="draft-import-title" style="margin:0;">원고 가져오기</div>
+      <button type="button" class="prompt-modal-close" onclick="closeDraftImport_()" aria-label="닫기">×</button>
+    </div>
+    <p class="modal-desc">JSON을 붙여 넣거나 .json / .md 파일을 고르세요. 체크한 글만 초안으로 저장합니다. 예약하거나 발행하지 않습니다.</p>
+    <label class="draft-import-file">파일 선택
+      <input id="draft-import-file" type="file" accept=".json,.md,.markdown,application/json,text/markdown,text/plain" onchange="onDraftImportFile_(this)">
+    </label>
+    <textarea id="draft-import-text" rows="6" placeholder='[{"topic":"","program":"도수치료","channel":"blog","account":"","title":"","body":"","hookType":"","sourceLinks":[],"scheduledDate":"2026-11-03"}]'></textarea>
+    <div class="draft-import-tools">
+      <button type="button" class="modal-btn" onclick="previewDraftImport_()">미리보기</button>
+    </div>
+    <div id="draft-import-preview"></div>
+    <div class="draft-import-actions">
+      <button type="button" class="modal-btn" id="draft-import-commit" onclick="commitDraftImport_()" disabled>선택한 초안 저장</button>
+      <button type="button" class="modal-btn-ghost" onclick="closeDraftImport_()">닫기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 앱 루트: JS 로딩 전에도 inert 로 잠그지 않음 (3분 대기 체감 원인) -->
 <div id="planner-app-root">
 <div class="planner-head">
@@ -436,6 +458,9 @@
   <div id="gen-status-bar" class="gen-status-bar"></div>
   <div class="cat-tabs-grid" id="cat-tabs-grid"></div>
 </div>
+<div class="draft-import-launch">
+  <button type="button" id="btn-import-drafts" onclick="openDraftImport_()">원고 가져오기</button>
+</div>
 
 <div id="app-toast" class="app-toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
@@ -451,8 +476,9 @@
 <script src="planner-reel.js?v=27"></script>
 <script src="planner-sync-config.js?v=1"></script>
 <script src="planner-sync-rules.js?v=403"></script>
+<script src="planner-import.js?v=404"></script>
 <script src="planner-sync-supabase.js?v=395"></script>
-<script src="planner.js?v=403" defer></script>
+<script src="planner.js?v=404" defer></script>
 <script src="planner-thumbs.js?v=399" defer></script>
 <script src="planner-social.js?v=6" defer></script>
 <script>

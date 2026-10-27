@@ -1,0 +1,24 @@
+[
+  {
+    "topic": "목이 뻐근할 때 먼저 볼 것",
+    "program": "도수치료",
+    "channel": "blog",
+    "account": "dr.park_dc.pt",
+    "title": "같은 의자인데 목이 편한 앉기",
+    "body": "살만 느껴지면 좌골이 앞으로 빠진 상태예요. 숨을 길게 내쉬며 허리 긴장을 이완해 보세요.",
+    "hookType": "공감 질문",
+    "sourceLinks": ["https://example.com/neck"],
+    "scheduledDate": "2026-11-03"
+  },
+  {
+    "topic": "목이 뻐근할 때 먼저 볼 것",
+    "program": "도수치료",
+    "channel": "instagram",
+    "account": "dr.park_dc.pt",
+    "title": "목이 편한 앉기",
+    "body": "같은 의자인데 목만 편한 사람이 있어요. 좌골이 앞으로 빠지지 않았는지 먼저 봐 주세요.",
+    "hookType": "한 줄 반전",
+    "sourceLinks": [],
+    "scheduledDate": "2026-11-03"
+  }
+]

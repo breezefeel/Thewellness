@@ -74,6 +74,22 @@ var unchecked = I.batch(view.items, [1]);
 assert(unchecked.drafts.length === 1 && unchecked.drafts[0].catId === 1, 'only the checked row is imported');
 assert(unchecked.skipped.some(function(s){ return s.index === 5; }), 'unchecked duplicates are still reported');
 
+var collabView = I.inspect([
+  { topic: '목', program: '도수치료', channel: 'instagram', account: 'dr.park_dc.pt', title: '앉기', body: '본문', hookType: '질문', sourceLinks: ['https://example.com'], collab: ['@dr.face_ifc', 'dr.face_ifc', 're.al_movement_official'] },
+  { topic: '목', program: '도수치료', channel: 'blog', account: 'dr.park_dc.pt', title: '앉기 블로그', body: '본문', hookType: '질문', sourceLinks: [], collab: 'cmt_academy, @dr.face_ifc' },
+  { topic: '목', program: '도수치료', channel: 'threads', account: 'x', title: '쓰레드', body: '본문', hookType: '질문', sourceLinks: [], collab: { bad: true } },
+  { topic: '다른 주제', program: '도수치료', channel: 'blog', account: 'a', title: '다른 제목', body: '본문', hookType: '질문', sourceLinks: [], collab: ['good_handle', '띄어 쓰기'] }
+], []);
+assert(collabView.items[0].ok && collabView.items[0].collab.join(',') === 'dr.face_ifc,re.al_movement_official', 'collab strips @ and dedupes');
+assert(collabView.items[0].hookType === '질문' && collabView.items[0].sourceLinks[0] === 'https://example.com', 'hookType and sourceLinks stay on a collab row');
+assert(collabView.items[1].ok && collabView.items[1].collab.join(',') === 'cmt_academy,dr.face_ifc', 'collab string is accepted');
+assert(!collabView.items[2].ok && /collab/.test(collabView.items[2].errors.join(' ')), 'bad collab type is skipped');
+assert(collabView.items[3].ok && collabView.items[3].collab.join(',') === 'good_handle' && /뺐습니다/.test(collabView.items[3].warnings.join(' ')), 'invalid handle warns and is dropped');
+var collabBatch = I.batch(collabView.items, [0, 1, 3]);
+assert(collabBatch.drafts.length === 2 && collabBatch.drafts[0].pieces[0].collab[0] === 'dr.face_ifc' && collabBatch.drafts[0].pieces[1].collab[1] === 'dr.face_ifc', 'collab is kept on the saved pieces');
+assert(collabBatch.skipped.some(function(s){ return s.index === 2; }), 'bad collab is reported');
+assert(!collabBatch.publish && !collabBatch.schedule, 'collab import still does not publish or schedule');
+
 if(failed){
   console.error(failed + ' failed');
   process.exit(1);

@@ -71,8 +71,8 @@
 })();
 </script>
 <!-- CSS는 비차단 로드 — 렌더 막지 않음 -->
-<link rel="stylesheet" href="planner.css?v=404" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="planner.css?v=404"></noscript>
+<link rel="stylesheet" href="planner.css?v=405" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="planner.css?v=405"></noscript>
 <!-- 서비스워커는 head에서 등록하지 않음 — 문서 이동이 SW 대기(수십 초)에 걸리지 않게 함 -->
 </head>
 <body>
@@ -419,7 +419,7 @@
     <label class="draft-import-file">파일 선택
       <input id="draft-import-file" type="file" accept=".json,.md,.markdown,application/json,text/markdown,text/plain" onchange="onDraftImportFile_(this)">
     </label>
-    <textarea id="draft-import-text" rows="6" placeholder='[{"topic":"","program":"도수치료","channel":"blog","account":"","title":"","body":"","hookType":"","sourceLinks":[],"scheduledDate":"2026-11-03"}]'></textarea>
+    <textarea id="draft-import-text" rows="6" placeholder='[{"topic":"","program":"도수치료","channel":"instagram","account":"","title":"","body":"","hookType":"","sourceLinks":[],"collab":["dr.face_ifc"],"scheduledDate":"2026-11-03"}]'></textarea>
     <div class="draft-import-tools">
       <button type="button" class="modal-btn" onclick="previewDraftImport_()">미리보기</button>
     </div>
@@ -476,9 +476,9 @@
 <script src="planner-reel.js?v=27"></script>
 <script src="planner-sync-config.js?v=1"></script>
 <script src="planner-sync-rules.js?v=403"></script>
-<script src="planner-import.js?v=404"></script>
+<script src="planner-import.js?v=405"></script>
 <script src="planner-sync-supabase.js?v=395"></script>
-<script src="planner.js?v=404" defer></script>
+<script src="planner.js?v=405" defer></script>
 <script src="planner-thumbs.js?v=399" defer></script>
 <script src="planner-social.js?v=6" defer></script>
 <script>

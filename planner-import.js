@@ -100,6 +100,29 @@ var PlannerImport = (function(){
     if(typeof raw === 'string') return raw.split(/[\s,]+/).map(norm).filter(Boolean);
     return null;
   }
+  function collabList(raw){
+    if(raw == null || raw === '') return { handles: [], bad: [] };
+    var parts = null;
+    if(Array.isArray(raw)) parts = raw;
+    else if(typeof raw === 'string') parts = raw.split(/[\s,]+/);
+    else return null;
+    var handles = [];
+    var seen = {};
+    var bad = [];
+    parts.forEach(function(part){
+      var handle = norm(part).replace(/^@+/, '');
+      if(!handle) return;
+      if(!/^[A-Za-z0-9._]{1,30}$/.test(handle)){
+        bad.push(handle);
+        return;
+      }
+      var key = handle.toLowerCase();
+      if(seen[key]) return;
+      seen[key] = true;
+      handles.push(handle);
+    });
+    return { handles: handles, bad: bad };
+  }
   function validDate(value){
     var s = norm(value);
     var m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -136,6 +159,7 @@ var PlannerImport = (function(){
       body: '',
       hookType: '',
       sourceLinks: [],
+      collab: [],
       scheduledDate: ''
     };
     if(!raw || typeof raw !== 'object' || Array.isArray(raw)){
@@ -170,6 +194,12 @@ var PlannerImport = (function(){
     var links = linkList(raw.sourceLinks);
     if(links == null) item.errors.push('sourceLinks는 주소 배열이어야 합니다.');
     else item.sourceLinks = links;
+    var collab = collabList(raw.collab);
+    if(collab == null) item.errors.push('collab는 인스타 계정 배열이어야 합니다.');
+    else {
+      item.collab = collab.handles;
+      if(collab.bad.length) item.warnings.push('콜라보 계정 형식이 아니어서 뺐습니다: ' + collab.bad.join(', '));
+    }
     if(raw.scheduledDate != null && norm(raw.scheduledDate)){
       if(!validDate(raw.scheduledDate)) item.errors.push('scheduledDate는 YYYY-MM-DD 여야 합니다.');
       else item.scheduledDate = norm(raw.scheduledDate);
@@ -293,6 +323,7 @@ var PlannerImport = (function(){
         hookType: item.hookType,
         account: item.account,
         sourceLinks: item.sourceLinks.slice(),
+        collab: item.collab.slice(),
         scheduledDate: item.scheduledDate
       });
     });

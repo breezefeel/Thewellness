@@ -5704,6 +5704,14 @@ a.ops-kw-btn {
   white-space: nowrap;
   letter-spacing: -0.02em;
 }
+.draft-card .draft-collab-line {
+  margin: 2px 0 0 22px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #1D4ED8;
+  font-weight: 700;
+  word-break: break-word;
+}
 .draft-card.topic-line .topic-line-more {
   flex: 0 0 auto;
   border: none;
@@ -5938,6 +5946,7 @@ a.ops-kw-btn {
 }
 .draft-import-row span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .draft-import-row em { font-style: normal; font-size: 12px; color: #6B7280; }
+.draft-import-row em.is-collab { color: #1D4ED8; font-weight: 700; }
 .draft-import-row em.is-warn { color: #B45309; }
 .draft-import-row em.is-err { color: #B91C1C; }
 .draft-import-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }

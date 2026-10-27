@@ -16951,7 +16951,7 @@ function normalizeDraftRowForSync_(draft){
   if(!draft || typeof draft !== 'object') return draft;
   var row = {};
   ['id','topic','angle','series','step','pillar','rationale','writingBrief','roadmapStepId',
-    'shareMonth','createdAt','sourceNote','youtubeAnalysis','updatedAt','activityAt','publishedChannels','dailyShareKind',
+    'shareMonth','createdAt','sourceNote','collab','youtubeAnalysis','updatedAt','activityAt','publishedChannels','dailyShareKind',
     'dailyThought','dailyWho','dailyWhat','dailyBody','articleKind','previousRoadmapStepId',
     'previousSeries','miscLocked','articleFlow'].forEach(function(k){
     var v = draft[k];
@@ -23016,6 +23016,7 @@ function collectExtraDrafts(){
         activityAt: d.activityAt || '',
         publishedChannels: d.publishedChannels || [],
         sourceNote: d.sourceNote,
+        collab: d.collab,
         youtubeAnalysis: d.youtubeAnalysis,
         youtubeUrls: d.youtubeUrls,
         articleFlow: d.articleFlow,
@@ -23067,6 +23068,7 @@ function mergeExtraDrafts(byCat){
       if(d.dailyWho) merged.dailyWho = d.dailyWho;
       if(d.dailyWhat) merged.dailyWhat = d.dailyWhat;
       if(d.dailyBody) merged.dailyBody = d.dailyBody;
+      if(Array.isArray(d.collab) && d.collab.length) merged.collab = d.collab.slice();
       if(d.miscLocked) merged.miscLocked = true;
       if(merged && !merged.previousRoadmapStepId) delete merged.previousRoadmapStepId;
       if(merged && !merged.previousSeries) delete merged.previousSeries;
@@ -25151,7 +25153,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=404').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=405').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -29332,6 +29334,7 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
       <div class="topic-line-meta">${badges}</div>
       <button type="button" class="topic-line-more" onclick="toggleTopicLineMore_(this,event)">자세히</button>
     </div>
+    ${draftCollabLineHTML_(d)}
     <div class="card-more-body" onclick="event.stopPropagation()">${moreBody}</div>
   </div>`;
 }
@@ -43497,6 +43500,37 @@ function findImportDraftByTopic_(catId, topic){
   });
   return found;
 }
+function importCollabUnion_(pieces, previous){
+  var out = [];
+  var seen = {};
+  function add(list){
+    (list || []).forEach(function(handle){
+      var clean = String(handle || '').replace(/^@+/, '').trim();
+      var key = clean.toLowerCase();
+      if(!clean || seen[key]) return;
+      seen[key] = true;
+      out.push(clean);
+    });
+  }
+  add(previous);
+  (pieces || []).forEach(function(piece){ add(piece && piece.collab); });
+  return out;
+}
+function draftCollabHandles_(draft){
+  var raw = draft && Array.isArray(draft.collab) ? draft.collab : [];
+  if(!raw.length && draft){
+    try {
+      var content = getDraftContent_(draft.id);
+      if(content && Array.isArray(content.collab)) raw = content.collab;
+    } catch(eCollab){}
+  }
+  return importCollabUnion_([{ collab: raw }]);
+}
+function draftCollabLineHTML_(draft){
+  var handles = draftCollabHandles_(draft);
+  if(!handles.length) return '';
+  return '<div class="draft-collab-line">초대 ' + escapeHtml(handles.map(function(handle){ return '@' + handle; }).join(' ')) + '</div>';
+}
 function importSourceBlock_(pieces){
   var labels = { blog: '블로그', instagram: '인스타', threads: '쓰레드', sonsik: '소식' };
   var slots = { naver: '네이버', kakao: '카카오', karrot: '당근' };
@@ -43507,6 +43541,9 @@ function importSourceBlock_(pieces){
     lines.push('[' + label + '] ' + (piece.title || ''));
     if(piece.hookType) lines.push('훅: ' + piece.hookType);
     if(piece.account) lines.push('계정: ' + piece.account);
+    if(piece.collab && piece.collab.length){
+      lines.push('초대: ' + piece.collab.map(function(handle){ return '@' + String(handle).replace(/^@+/, ''); }).join(' '));
+    }
     if(piece.scheduledDate) lines.push('예정일: ' + piece.scheduledDate);
     (piece.sourceLinks || []).forEach(function(url){ lines.push(url); });
   });
@@ -43636,6 +43673,11 @@ function applyDraftImportBatch_(drafts){
     state.generatedOnly[draft.id] = content;
     if(!state.published[draft.id] || typeof state.published[draft.id] !== 'object') state.published[draft.id] = {};
     state.published[draft.id].content = content;
+    var handles = importCollabUnion_(group.pieces, [].concat(draft.collab || [], content.collab || []));
+    if(handles.length){
+      draft.collab = handles;
+      content.collab = handles.slice();
+    }
     if(created){
       try {
         if(!applyResolvedUserAddedStepOrMisc_(draft, group.catId)) assignUserAddedDraftToMisc_(draft, group.catId);
@@ -43676,6 +43718,9 @@ function renderDraftImportPreview_(view, parseError){
       if(item.account) meta.push(item.account);
       if(item.scheduledDate) meta.push(item.scheduledDate);
       if(meta.length) html += '<em>' + escapeHtml(meta.join(' · ')) + '</em>';
+      if(item.collab && item.collab.length){
+        html += '<em class="is-collab">초대 ' + escapeHtml(item.collab.map(function(handle){ return '@' + handle; }).join(' ')) + '</em>';
+      }
       (item.warnings || []).forEach(function(warning){ html += '<em class="is-warn">' + escapeHtml(warning) + '</em>'; });
       (item.errors || []).forEach(function(error){ html += '<em class="is-err">' + escapeHtml(error) + '</em>'; });
       html += '</span></label>';

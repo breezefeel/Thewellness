@@ -4575,7 +4575,26 @@ function syncCuriosityHubPlanFromSeed_(catId){
       }
     }
   }
-  if(String(plan.hubRev || '') === rev && titlesAligned) return false;
+  var importExtrasOnly = plan.steps.length >= seed.steps.length;
+  if(importExtrasOnly){
+    for(var pi = 0; pi < seed.steps.length; pi++){
+      if(curiosityStepTitleKey_(plan.steps[pi] && plan.steps[pi].title, catId) !==
+         curiosityStepTitleKey_(seed.steps[pi] && seed.steps[pi].title, catId)){
+        importExtrasOnly = false;
+        break;
+      }
+    }
+  }
+  if(importExtrasOnly){
+    for(var ei = seed.steps.length; ei < plan.steps.length; ei++){
+      var extraStep = plan.steps[ei];
+      if(!extraStep || !(extraStep.importTopic || String(extraStep.rationale || '') === '원고 가져오기')){
+        importExtrasOnly = false;
+        break;
+      }
+    }
+  }
+  if(String(plan.hubRev || '') === rev && (titlesAligned || importExtrasOnly)) return false;
 
   var byKey = {};
   plan.steps.forEach(function(st){
@@ -4628,9 +4647,15 @@ function syncCuriosityHubPlanFromSeed_(catId){
   });
 
   var miscLabel = getSubGoalMiscLabel_(plan);
+  var keptImportSteps = [];
   Object.keys(byKey).forEach(function(k){
     var rs = byKey[k];
     if(!rs) return;
+    if(rs.importTopic || String(rs.rationale || '') === '원고 가져오기'){
+      keptImportSteps.push(rs);
+      changed = true;
+      return;
+    }
     changed = true;
     var rid = String(rs.id != null ? rs.id : '').trim();
     if(!rid) return;
@@ -4641,6 +4666,34 @@ function syncCuriosityHubPlanFromSeed_(catId){
       var order = miscPeers.length + oi + 1;
       applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, order, Math.max(order, 1));
       try { ensurePendingAssignmentForDraft_(catId, SUBGOAL_MISC_ID, order, d.id); } catch(eAsg){}
+    });
+  });
+  keptImportSteps.forEach(function(rs){
+    var oldId = String(rs && rs.id != null ? rs.id : '').trim();
+    var used = {};
+    newSteps.forEach(function(st){ if(st && st.id != null) used[String(st.id)] = true; });
+    var wantId = oldId;
+    if(!wantId || used[wantId]){
+      var n = newSteps.length + 1;
+      wantId = 's' + n;
+      while(used[wantId]){
+        n++;
+        wantId = 's' + n;
+      }
+    }
+    if(oldId && oldId !== wantId){
+      idMap[oldId] = wantId;
+      if(/^\d+$/.test(oldId)) idMap['s' + oldId] = wantId;
+      var bare = oldId.replace(/^s/i, '');
+      if(bare && bare !== oldId) idMap[bare] = wantId;
+    }
+    newSteps.push({
+      id: wantId,
+      title: rs.title || '',
+      summary: rs.summary || '',
+      rationale: rs.rationale || '원고 가져오기',
+      importTopic: true,
+      pinned: !!rs.pinned
     });
   });
 
@@ -4697,6 +4750,7 @@ function repairIncompleteSubGoalPlan_(catId){
       title: (s && s.title) || '',
       summary: (s && s.summary) || '',
       rationale: (s && s.rationale) || '',
+      importTopic: !!(s && (s.importTopic || String(s.rationale || '') === '원고 가져오기')),
       pinned: !!(s && s.pinned)
     };
   });
@@ -17354,6 +17408,73 @@ function requeueLocalRicherContent_(remotePayload){
 function requeueLocalYearPlanIfRicher_(remotePayload){
   return requeueLocalRicherContent_(remotePayload);
 }
+function pendingWorkIsNeverSyncedTopicsOnly_(){
+  if(state.syncNeedsSnapshot) return false;
+  var ops = [];
+  (state.syncOutbox || []).forEach(function(op){
+    if(!op || !op.key || op.deleted || isDeviceLocalSyncEntityKey_(op.key)) return;
+    ops.push(op);
+  });
+  if(!ops.length || ops.length > REAL_UNPUSHED_PUSH_MAX_) return false;
+  var i;
+  for(i = 0; i < ops.length; i++){
+    var key = String(ops[i].key);
+    var topic = /^(draft|generated|published|override):/.test(key) || key.indexOf('plan:subgoal:') === 0;
+    if(!topic) return false;
+    var base = parseInt(ops[i].baseEntityRevision, 10) || 0;
+    var known = parseInt((state.syncEntityRevisions || {})[key], 10) || 0;
+    if(base !== 0 || known !== 0) return false;
+  }
+  var dirty = Object.keys(state.syncDirtyEntityKeys || {});
+  for(i = 0; i < dirty.length; i++){
+    var dk = dirty[i];
+    if(isDeviceLocalSyncEntityKey_(dk)) continue;
+    var found = false;
+    var j;
+    for(j = 0; j < ops.length; j++){
+      if(String(ops[j].key) === dk){ found = true; break; }
+    }
+    if(!found) return false;
+  }
+  return true;
+}
+function markNeverSyncedTopicOpsLocal_(){
+  var n = 0;
+  (state.syncOutbox || []).forEach(function(op){
+    if(!op || op.deleted || !op.key) return;
+    if(!/^(draft|generated|published):/.test(String(op.key)) && String(op.key).indexOf('plan:subgoal:') !== 0) return;
+    var base = parseInt(op.baseEntityRevision, 10) || 0;
+    var known = parseInt((state.syncEntityRevisions || {})[op.key], 10) || 0;
+    if(base !== 0 || known !== 0) return;
+    op.localOnly = true;
+    n++;
+  });
+  return n;
+}
+function restoreOutboxTopicDraftsMissingLocally_(){
+  var local = {};
+  try { local = listLocalUserDraftIds_(); } catch(eIds){ local = {}; }
+  var missing = false;
+  (state.syncOutbox || []).forEach(function(op){
+    if(!op || op.deleted || !/^draft:/.test(String(op.key)) || !op.value) return;
+    var id = String(op.key).slice('draft:'.length);
+    if(id && !local[id]) missing = true;
+  });
+  if(!missing) return 0;
+  var before = local;
+  var payload = overlayOutboxOnPayload_(getPersistPayload());
+  applyPersistPayload(payload, { skipRestorePending: true, deferHeavyRepair: true });
+  var after = {};
+  try { after = listLocalUserDraftIds_(); } catch(eAfter){ after = {}; }
+  var restored = 0;
+  Object.keys(after).forEach(function(id){ if(!before[id]) restored++; });
+  if(restored){
+    state.syncDirty = true;
+    state._sessionUserEdit = true;
+    try { rebuildDirtyStateFromOutbox_(); } catch(eReb){}
+  }
+  return restored;
+}
 function discardStaleUnpushedBeforeConnect_(){
   if(state._emptyServerSeed) return;
   var n = countRealUnpushedMutations_();
@@ -20346,6 +20467,10 @@ window.plannerSupabaseSignInFromSync_ = async function(){
   }
   try {
     await PlannerSyncSupabase.signIn(email, password);
+    if(!isPlannerEmployeeEmailValid_(getPlannerEmployeeId_()) && isPlannerEmployeeEmailValid_(email)){
+      setPlannerEmployeeId_(email);
+    }
+    markNeverSyncedTopicOpsLocal_();
     if(passEl) passEl.value = '';
     if(typeof setAppToast === 'function') setAppToast('팀 로그인되었습니다. Supabase 내용을 확인합니다.', { duration: 2800, variant: 'ok' });
     state._teamLoginRequired = false;
@@ -20810,6 +20935,7 @@ async function runPlannerBootstrapInBackground_(){
       );
     }
     await yieldPlannerBootstrapUi_(null);
+    markNeverSyncedTopicOpsLocal_();
     discardStaleUnpushedBeforeConnect_();
     // 비교 전에 integrity를 돌리면 로컬만 바뀌어 F5마다 「선택」창이 뜸 → 비교 후에만 정리
     var bootstrapData = await verifyPlannerServerReachable_();
@@ -20829,12 +20955,15 @@ async function runPlannerBootstrapInBackground_(){
         save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
       } catch(eSupaSv){}
       try { renderTabs(); renderMain(); } catch(eSupaR){}
-        if(!bootstrapData.emptyTable && hasPendingLocalSyncChanges_()){
+      try { restoreOutboxTopicDraftsMissingLocally_(); } catch(eRest){}
+      markNeverSyncedTopicOpsLocal_();
+      var allowEmptyTopicPush = !!(bootstrapData.emptyTable && pendingWorkIsNeverSyncedTopicsOnly_());
+      if((!bootstrapData.emptyTable || allowEmptyTopicPush) && hasPendingLocalSyncChanges_()){
         try { schedulePlannerGasPush_(true); } catch(eSupaPush){}
       }
       try { updateSyncStatusUI_(); } catch(eSupaU){}
       if(typeof setAppToast === 'function'){
-        setAppToast(bootstrapData.emptyTable
+        setAppToast(bootstrapData.emptyTable && !allowEmptyTopicPush
           ? 'Supabase에 아직 팀 내용이 없습니다. 이 브라우저의 내용은 올리지 않았습니다.'
           : (hasPendingLocalSyncChanges_()
             ? '이 기기에만 있는 주제를 서버로 올리는 중이에요. 올린 뒤 다른 기기가 받습니다.'
@@ -25153,7 +25282,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=405').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=406').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -43531,6 +43660,90 @@ function draftCollabLineHTML_(draft){
   if(!handles.length) return '';
   return '<div class="draft-collab-line">초대 ' + escapeHtml(handles.map(function(handle){ return '@' + handle; }).join(' ')) + '</div>';
 }
+function importTopicStepId_(topic){
+  var key = normalizeTopicMatchKey_(topic);
+  var hash = 0;
+  var i;
+  for(i = 0; i < key.length; i++) hash = ((hash << 5) - hash + key.charCodeAt(i)) | 0;
+  var id = 't' + Math.abs(hash).toString(36);
+  return id === 't0' ? '' : id;
+}
+function ensureImportTopicDrawer_(catId, topic){
+  var title = String(topic || '').replace(/\s+/g, ' ').trim();
+  if(!title) return '';
+  if(!state.branding || typeof state.branding !== 'object') state.branding = {};
+  if(!state.branding.subGoalPlans) state.branding.subGoalPlans = {};
+  var key = String(catId);
+  var plan = state.branding.subGoalPlans[key];
+  var createdPlan = false;
+  if(!plan || typeof plan !== 'object'){
+    plan = { steps: [], miscLabel: SUBGOAL_MISC_LABEL };
+    state.branding.subGoalPlans[key] = plan;
+    createdPlan = true;
+  }
+  if(!Array.isArray(plan.steps)) plan.steps = [];
+  var wasEmpty = !plan.steps.length;
+  var want = normalizeTopicMatchKey_(title);
+  var i;
+  for(i = 0; i < plan.steps.length; i++){
+    var step = plan.steps[i];
+    if(!step) continue;
+    if(normalizeTopicMatchKey_(displaySubGoalStepTitle_(step.title, catId)) === want){
+      step.importTopic = true;
+      if(!step.rationale) step.rationale = '원고 가져오기';
+      return String(step.id);
+    }
+  }
+  var id = importTopicStepId_(title) || ('t' + String(Date.now()));
+  var used = {};
+  plan.steps.forEach(function(row){ if(row && row.id != null) used[String(row.id)] = true; });
+  while(used[id]) id += 'x';
+  plan.steps.push({
+    id: id,
+    title: title,
+    summary: '',
+    rationale: '원고 가져오기',
+    importTopic: true,
+    pinned: false
+  });
+  if(wasEmpty || createdPlan) plan.hubCustom = true;
+  plan.updatedAt = new Date().toISOString();
+  return id;
+}
+function placeImportedDraftOnTopic_(draft, catId){
+  if(!draft) return '';
+  var sid = ensureImportTopicDrawer_(catId, draft.topic);
+  if(!sid) return '';
+  var plan = peekSubGoalPlan_(catId);
+  if(!plan){
+    plan = state.branding && state.branding.subGoalPlans && state.branding.subGoalPlans[String(catId)];
+  }
+  var title = getSubGoalStepTitle_(plan || { steps: [], miscLabel: SUBGOAL_MISC_LABEL }, sid);
+  var peers = [];
+  try {
+    peers = getDraftsForSubGoalStep_(catId, sid, { live: true }).filter(function(row){
+      return row && row.id !== draft.id;
+    });
+  } catch(ePeers){ peers = []; }
+  var order = peers.length + 1;
+  withDraftStepReassignAllowed_(function(){
+    applyDraftRoadmapAssignment_(draft, catId, sid, title || draft.topic, order, Math.max(order, 1));
+  });
+  try { syncCuriosityHubPlanFromSeed_(catId); } catch(eHub){}
+  try {
+    var planLive = state.branding && state.branding.subGoalPlans && state.branding.subGoalPlans[String(catId)];
+    var renumbered = dedupeSubGoalPlanStepsInPlace_(planLive, { collectIdMap: true });
+    if(renumbered && renumbered.changed && renumbered.idMap && Object.keys(renumbered.idMap).length){
+      remapDraftStepIdsForCat_({ draftBrandOverrides: state.draftBrandOverrides }, catId, renumbered.idMap);
+    }
+  } catch(eDedupe){}
+  var finalId = String(draft.roadmapStepId || sid);
+  try {
+    if(!state.collapsedSubGoalSteps) state.collapsedSubGoalSteps = {};
+    state.collapsedSubGoalSteps[subGoalStepKey_(catId, finalId)] = false;
+  } catch(eOpen){}
+  return finalId;
+}
 function importSourceBlock_(pieces){
   var labels = { blog: '블로그', instagram: '인스타', threads: '쓰레드', sonsik: '소식' };
   var slots = { naver: '네이버', kakao: '카카오', karrot: '당근' };
@@ -43678,10 +43891,8 @@ function applyDraftImportBatch_(drafts){
       draft.collab = handles;
       content.collab = handles.slice();
     }
-    if(created){
-      try {
-        if(!applyResolvedUserAddedStepOrMisc_(draft, group.catId)) assignUserAddedDraftToMisc_(draft, group.catId);
-      } catch(eStep){}
+    if(created || !String(draft.roadmapStepId || '').trim() || String(draft.roadmapStepId) === SUBGOAL_MISC_ID){
+      try { placeImportedDraftOnTopic_(draft, group.catId); } catch(ePlace){}
     }
   });
   return { count: pieceCount, catId: firstCat };

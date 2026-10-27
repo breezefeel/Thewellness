@@ -17007,7 +17007,7 @@ function normalizeDraftRowForSync_(draft){
   ['id','topic','angle','series','step','pillar','rationale','writingBrief','roadmapStepId',
     'shareMonth','createdAt','sourceNote','collab','youtubeAnalysis','updatedAt','activityAt','publishedChannels','dailyShareKind',
     'dailyThought','dailyWho','dailyWhat','dailyBody','articleKind','previousRoadmapStepId',
-    'previousSeries','miscLocked','articleFlow'].forEach(function(k){
+    'previousSeries','miscLocked','importDrawerSettled','articleFlow'].forEach(function(k){
     var v = draft[k];
     if(v == null || v === '') return;
     if(Array.isArray(v) && !v.length) return;
@@ -22123,7 +22123,7 @@ function copyMissingContentChannels_(intoVal, fromVal){
 }
 function blogTitleOfContent_(content){
   if(!content || !content.blog) return '';
-  return String(content.blog.title || '').trim();
+  return stripClinicBlogTitlePrefix_(content.blog.title);
 }
 function alignDraftTopicToBlogTitle_(){
   // 블로그 제목으로 카드 주제를 바꾸면, 초안 생성 직후 다른 글이 생긴 것처럼 보인다.
@@ -23146,6 +23146,7 @@ function collectExtraDrafts(){
         publishedChannels: d.publishedChannels || [],
         sourceNote: d.sourceNote,
         collab: d.collab,
+        importDrawerSettled: d.importDrawerSettled,
         youtubeAnalysis: d.youtubeAnalysis,
         youtubeUrls: d.youtubeUrls,
         articleFlow: d.articleFlow,
@@ -23199,6 +23200,7 @@ function mergeExtraDrafts(byCat){
       if(d.dailyBody) merged.dailyBody = d.dailyBody;
       if(Array.isArray(d.collab) && d.collab.length) merged.collab = d.collab.slice();
       if(d.miscLocked) merged.miscLocked = true;
+      if(d.importDrawerSettled) merged.importDrawerSettled = true;
       if(merged && !merged.previousRoadmapStepId) delete merged.previousRoadmapStepId;
       if(merged && !merged.previousSeries) delete merged.previousSeries;
       // 이미 단계가 있으면 재배정하지 않음 — 매 동기화 apply마다 updatedAt이 바뀌어 재전송 루프가 생김
@@ -23417,6 +23419,7 @@ function applyPersistPayload(s, opts){
   if(fastBoot){
     state._pendingHeavyRepair = true;
     state._pendingBootMigrations = true;
+    try { if(applyClinicTitleAndImportDrawerRepair_()) state._clinicRepairNeedsSave = true; } catch(eClinicFast){}
     return;
   }
   var migOpts = opts && opts.authoritativeAdopt
@@ -23489,6 +23492,11 @@ function applyPersistPayload(s, opts){
     }
     state._applyMigrated = true;
     save(migOpts);
+  }
+  if(applyClinicTitleAndImportDrawerRepair_()){
+    try {
+      save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+    } catch(eClinicSave){}
   }
 }
 function runDeferredHeavyPlanRepairs_(){
@@ -25016,12 +25024,19 @@ function runDeferredBootMigrations_(){
     if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrateDraftShapePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrateVoiceCorePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+    var clinicMoved = false;
+    if(applyClinicTitleAndImportDrawerRepair_() || state._clinicRepairNeedsSave){
+      clinicMoved = true;
+      state._clinicRepairNeedsSave = false;
+    }
     if(migrated){
       state.syncDirty = true;
       state.syncNeedsSnapshot = true;
+    }
+    if(migrated || clinicMoved){
       save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
     }
-    if(expertMigrated){
+    if(expertMigrated || clinicMoved){
       try { renderTabs(); renderMain(); } catch(eExpertRender){}
     }
   } catch(eMig){
@@ -25282,7 +25297,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=406').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=407').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -29406,6 +29421,8 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
   if(d.angle) intentLines.push('<div class="card-intent-line">' + escapeHtml(oneLine_(d.angle)) + '</div>');
   if(brandMeta.rationale) intentLines.push('<div class="card-intent-line">' + escapeHtml(oneLine_(stripTopicRationaleStepPrefix_(brandMeta.rationale))) + '</div>');
   var lineTitle = oneLine_(blogTitleOfContent_(getDraftContent_(d.id)) || d.topic) || '(제목 없음)';
+  var branchLabel = clinicBranchLabel_(cat.id);
+  var branchHtml = branchLabel ? '<span class="card-branch-label">' + escapeHtml(branchLabel) + '</span>' : '';
   var orderBtns = '';
   try {
     var stepIdForOrder = getDraftRoadmapStepId_(d, cat.id, draftIndex);
@@ -29459,6 +29476,7 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
     ${searchWhereHtml}
     <div class="topic-line-row">
       <span class="topic-drag-handle" title="끌어서 단계 이동" aria-hidden="true">⠿</span>
+      ${branchHtml}
       <div class="card-topic">${escapeHtml(lineTitle)}</div>
       <div class="topic-line-meta">${badges}</div>
       <button type="button" class="topic-line-more" onclick="toggleTopicLineMore_(this,event)">자세히</button>
@@ -33318,13 +33336,60 @@ function getGeneralBlogProblemText_(b){
   if(b.hook && String(b.hook).trim()) return String(b.hook).trim();
   return '';
 }
-function withClinicBlogTitle_(title, catId){
-  var id = Number(catId);
-  if(id !== 0 && id !== 1 && id !== 2) return String(title || '').trim();
+function stripClinicBlogTitlePrefix_(title){
   var t = String(title || '').replace(/\s+/g, ' ').trim();
   if(!t) return '';
-  if(/^\[약수\/인천\]/.test(t)) return t;
-  return '[약수/인천] ' + t;
+  var prev = '';
+  while(t && t !== prev){
+    prev = t;
+    t = t.replace(/^\[약수\/인천\]\s*/, '').trim();
+  }
+  return t;
+}
+function clinicBranchLabel_(catId){
+  var id = Number(catId);
+  if(id === 1) return '약수·인천';
+  if(id === 2) return '인천점';
+  return '';
+}
+function clinicBranchLabelSheetHtml_(catId){
+  var label = clinicBranchLabel_(catId);
+  if(!label) return '';
+  return '<div class="sheet-branch-label">' + escapeHtml(label) + '</div>';
+}
+function withClinicBlogTitle_(title, catId){
+  return stripClinicBlogTitlePrefix_(title);
+}
+function stripStoredClinicBlogTitles_(){
+  var changed = false;
+  function stripField_(obj, key){
+    if(!obj || obj[key] == null) return;
+    var next = stripClinicBlogTitlePrefix_(obj[key]);
+    if(next === String(obj[key])) return;
+    obj[key] = next;
+    changed = true;
+  }
+  function walk_(content){
+    if(!content || typeof content !== 'object') return;
+    if(content.blog) stripField_(content.blog, 'title');
+    if(content.community && /^\[약수\/인천\]/.test(String(content.community.title || '').replace(/\s+/g, ' ').trim())){
+      stripField_(content.community, 'title');
+    }
+  }
+  Object.keys(state.generatedOnly || {}).forEach(function(id){ walk_(state.generatedOnly[id]); });
+  Object.keys(state.published || {}).forEach(function(id){
+    var row = state.published[id];
+    if(!row || typeof row !== 'object') return;
+    if(row.content) walk_(row.content);
+    if(row.finalTexts && typeof row.finalTexts.blog === 'string'){
+      var nextBlog = row.finalTexts.blog.replace(/^(?:\[약수\/인천\]\s*)+/, '');
+      if(nextBlog !== row.finalTexts.blog){
+        row.finalTexts.blog = nextBlog;
+        changed = true;
+      }
+    }
+  });
+  return changed;
 }
 function normalizeBlogBlock(raw, catId){
   if(!raw || typeof raw !== 'object') return null;
@@ -33736,7 +33801,7 @@ function buildMangoBriefFromBlog_(content, topic, catId){
   catId = catId != null ? catId : state.selectedCatId;
   var palette = getMangoPaletteForCat_(catId);
   var blog = content && content.blog ? content.blog : null;
-  var title = blog && String(blog.title || '').trim();
+  var title = stripClinicBlogTitlePrefix_(blog && blog.title);
   var productName = shortenMangoProductName_(title || topic || '');
   var problem = '';
   var selfCare = '';
@@ -38753,6 +38818,7 @@ function renderSheetContent(content, opts) {
     if(blogUsesStructuredGeneralFormat_(blogCatId, b)){
       bodyHTML = composeSheetTabLayout_(tab,
         addSourceHtml + sheetFullCopyBar_() +
+        clinicBranchLabelSheetHtml_(blogCatId) +
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, syncTopic: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('문제 제기', 'sheet-blog-problem', getGeneralBlogProblemText_(b), { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지', regen: 'blog.problem', copy: true, paragraphs: true }) +
         sheetEditField_('셀프 케어', 'sheet-blog-selfcare', b.selfCare || '', { rows: 8, help: '👉 먼저 확인 한 줄 · 👉 1.~4. 3~4단계(초·회) · 실수 2~3개 · 단계 사이 빈 줄', regen: 'blog.selfCare', copy: true, stepPreview: true }) +
@@ -38766,6 +38832,7 @@ function renderSheetContent(content, opts) {
     } else if(isExpertCourseCategory(blogCatId)){
       bodyHTML = composeSheetTabLayout_(tab,
         addSourceHtml + sheetFullCopyBar_() +
+        clinicBranchLabelSheetHtml_(blogCatId) +
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, syncTopic: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('영상·사진 맥락', 'sheet-blog-hook', b.hook, { rows: 4, help: '이번 영상·사진에서 다룬 장면·상황', regen: 'blog.hook', copy: true, paragraphs: true }) +
         sheetEditField_('시연·핵심 포인트', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '손 위치·동작·주의사항 — 한 줄에 하나씩', regen: 'blog.outline', copy: true }) +
@@ -38778,6 +38845,7 @@ function renderSheetContent(content, opts) {
     } else {
       bodyHTML = composeSheetTabLayout_(tab,
         addSourceHtml + sheetFullCopyBar_() +
+        clinicBranchLabelSheetHtml_(blogCatId) +
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, syncTopic: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('후킹 오프닝', 'sheet-blog-hook', b.hook, { rows: 4, regen: 'blog.hook', copy: true, paragraphs: true }) +
         sheetEditField_('목차 구성', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '한 줄에 소제목 하나씩', regen: 'blog.outline', copy: true }) +
@@ -38927,7 +38995,7 @@ function getTabCopyText(tab, content){
     if(!b) return '';
     if(blogUsesStructuredGeneralFormat_(catId, b)) return formatGeneralBlogPostText(b, catId);
     const outline = (b.outline || []).map(function(o, i){ return (i + 1) + '. ' + o; }).join('\n\n');
-    return withExpertCourseBlogFooter_(withRealMovementBlogFooter_('[블로그]\n제목: ' + b.title + '\n\n' + (b.hook || '') + '\n\n' + outline + '\n\n' + (b.draft || '') + '\n\n' + (b.cta || '') + '\n\n' + (b.hashtags || []).map(function(h){ return '#' + h; }).join(' '), catId), catId);
+    return withExpertCourseBlogFooter_(withRealMovementBlogFooter_('[블로그]\n제목: ' + withClinicBlogTitle_(b.title, catId) + '\n\n' + (b.hook || '') + '\n\n' + outline + '\n\n' + (b.draft || '') + '\n\n' + (b.cta || '') + '\n\n' + (b.hashtags || []).map(function(h){ return '#' + h; }).join(' '), catId), catId);
   }
   if(tab === 'insta'){
     const ig = content.insta;
@@ -41201,7 +41269,7 @@ function buildBlogSourceText_(b, catId){
   if(!b) return '';
   if(blogUsesStructuredGeneralFormat_(catId, b)){
     return (
-      '제목: ' + (b.title || '') + '\n\n' +
+      '제목: ' + withClinicBlogTitle_(b.title, catId) + '\n\n' +
       '문제 제기:\n' + getGeneralBlogProblemText_(b) + '\n\n' +
       '셀프 케어:\n' + (b.selfCare || '') + '\n\n' +
       '원리 설명:\n' + (b.explanation || '') + '\n\n' +
@@ -41212,7 +41280,7 @@ function buildBlogSourceText_(b, catId){
   var tags = (b.hashtags || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
   if(isExpertCourseCategory(catId)){
     return (
-      '제목: ' + (b.title || '') + '\n\n' +
+      '제목: ' + withClinicBlogTitle_(b.title, catId) + '\n\n' +
       '영상·사진 맥락:\n' + (b.hook || '') + '\n\n' +
       '시연·핵심 포인트:\n' + outline + '\n\n' +
       '원리 설명:\n' + (b.draft || '') + '\n\n' +
@@ -41221,7 +41289,7 @@ function buildBlogSourceText_(b, catId){
     ).trim();
   }
   return (
-    '제목: ' + (b.title || '') + '\n\n' +
+    '제목: ' + withClinicBlogTitle_(b.title, catId) + '\n\n' +
     '후킹 오프닝:\n' + (b.hook || '') + '\n\n' +
     '목차:\n' + outline + '\n\n' +
     '본문:\n' + (b.draft || '') + '\n\n' +
@@ -43743,6 +43811,46 @@ function placeImportedDraftOnTopic_(draft, catId){
     state.collapsedSubGoalSteps[subGoalStepKey_(catId, finalId)] = false;
   } catch(eOpen){}
   return finalId;
+}
+function isImportedDraft_(draft){
+  if(!draft) return false;
+  if(String(draft.rationale || '').trim() === '원고 가져오기') return true;
+  return /(^|\n)원고 가져오기(\n|$)/.test(String(draft.sourceNote || ''));
+}
+function relocateImportedMiscDrafts_(){
+  var moved = false;
+  var seen = {};
+  CATEGORIES.forEach(function(cat, catId){
+    (cat.drafts || []).forEach(function(draft){
+      if(!draft || !draft.id || seen[draft.id] || !isImportedDraft_(draft)) return;
+      seen[draft.id] = true;
+      if(draft.importDrawerSettled || draft.miscLocked) return;
+      var sid = String(draft.roadmapStepId || '').trim();
+      if(sid && sid !== SUBGOAL_MISC_ID) return;
+      if(!String(draft.topic || '').trim()) return;
+      var placed = '';
+      try { placed = placeImportedDraftOnTopic_(draft, catId); } catch(ePlace){ placed = ''; }
+      if(!placed || placed === SUBGOAL_MISC_ID) return;
+      draft.importDrawerSettled = true;
+      moved = true;
+    });
+  });
+  return moved;
+}
+function applyClinicTitleAndImportDrawerRepair_(){
+  var changed = false;
+  try { if(stripStoredClinicBlogTitles_()) changed = true; } catch(eTitle){}
+  try { if(relocateImportedMiscDrafts_()) changed = true; } catch(eMove){}
+  if(!changed) return false;
+  try {
+    var prev = {};
+    try { prev = readPreviousDiskPayloadSync_() || {}; } catch(ePrev){}
+    var now = getPersistPayload();
+    enqueueSyncOutboxChanges_(listChangedSyncEntityKeys_(prev, now), now);
+    state.syncDirty = true;
+    state._sessionUserEdit = true;
+  } catch(eEnq){}
+  return true;
 }
 function importSourceBlock_(pieces){
   var labels = { blog: '블로그', instagram: '인스타', threads: '쓰레드', sonsik: '소식' };

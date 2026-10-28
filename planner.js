@@ -29584,6 +29584,16 @@ function blogScheduleButtonHTML_(){
 function blogPlanDatePassed_(plan){
   return !!(plan && plan.at && opsPlanYmd_(plan.at) && opsPlanYmd_(plan.at) < opsPlanYmd_(new Date()));
 }
+/** 블로그를 예약해 둔 글의 썸네일을 바꾸면, 네이버 예약에는 옛 이미지가 그대로 남는다. 경고만 한다. */
+function warnThumbChangedAfterReserve_(draftId){
+  var pub = state.published && state.published[draftId];
+  if(!pub || (pub.tabPublished && pub.tabPublished.blog)) return false;
+  if(!getChannelPlan_(draftId, 'blog')) return false;
+  if(typeof setAppToast === 'function'){
+    setAppToast('예약에는 옛 이미지가 남아 있어요.\n네이버에서 예약한 글의 썸네일을 직접 바꿔 주세요.', { duration: 7000, variant: 'err' });
+  }
+  return true;
+}
 function onBlogPublishConfirm_(){
   var draftId = state.selectedId;
   var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
@@ -37900,6 +37910,7 @@ async function persistThumbMakerToDraft_(copy){
     save({ skipDriveUpload: true, gasImmediate: false });
   } catch(eSave){}
   try { ensureDraftSyncKeysQueued_(draftId); } catch(eThumbSync){}
+  try { warnThumbChangedAfterReserve_(draftId); } catch(eThumbWarn){}
 
   schedulePersistThumbWorkspace_(true);
   try {

@@ -25990,6 +25990,7 @@ window.onload = () => {
         }
         try { document.documentElement.classList.add('planner-ready'); } catch(e7){}
         setTimeout(function(){ try { runDeferredBootMigrations_(); } catch(e){} }, 600);
+        setTimeout(function(){ try { if(!plannerSafeModeBlocksSync_()) warnPassedBlogPlans_(); } catch(eWarnPlan){} }, 5000);
         setTimeout(function(){ try { runPlannerBootstrapSync_(); } catch(e2){} }, 1200);
         if(oauthReturned){
           handleDrivePendingActionAfterRedirect_();
@@ -29568,7 +29569,50 @@ function blogScheduleButtonHTML_(){
   var plan = getChannelPlan_(state.selectedId, 'blog');
   var label = plan ? (opsPlanChipLabel_(plan.at) + ' 수정') : '예약하기';
   var title = plan ? '예약 날짜를 바꿉니다' : '날짜를 고르고 블로그 글쓰기를 엽니다';
-  return '<button type="button" class="btn-save-draft" data-blog-schedule onclick="onBlogSchedule_()" title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
+  var html = '<button type="button" class="btn-save-draft" data-blog-schedule onclick="onBlogSchedule_()" title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
+  if(plan){
+    // 네이버 에디터에서 예약한 글은 플래너가 발행 여부를 알 수 없다. 확인 버튼으로 발행 완료로 바꾼다.
+    var passed = blogPlanDatePassed_(plan);
+    html += '<button type="button" class="btn-save-draft" data-blog-confirm onclick="onBlogPublishConfirm_()" title="네이버에서 발행된 것을 확인했으면 눌러 발행 완료로 바꿉니다"' +
+      (passed ? ' style="border-color:#B45309;color:#B45309;font-weight:700;"' : '') + '>' + (passed ? '확인 필요' : '발행 확인') + '</button>';
+  }
+  return html;
+}
+function blogPlanDatePassed_(plan){
+  return !!(plan && plan.at && opsPlanYmd_(plan.at) && opsPlanYmd_(plan.at) < opsPlanYmd_(new Date()));
+}
+function onBlogPublishConfirm_(){
+  var draftId = state.selectedId;
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  var plan = getChannelPlan_(draftId, 'blog');
+  if(!plan){ if(typeof setAppToast === 'function') setAppToast('예약된 블로그가 없어요.', { duration: 2500, variant: 'err' }); return; }
+  if(!confirm(opsPlanChipLabel_(plan.at) + ' 예약한 글이 네이버에서 발행됐나요?\n확인하면 발행 완료로 바꿉니다.')) return;
+  try {
+    commitSheetTabPublish_(draftId, catId, 'blog', { skipDom: true, at: plan.at });
+  } catch(eConfirm){
+    if(typeof setAppToast === 'function') setAppToast('발행 확인을 저장하지 못했어요: ' + (eConfirm && eConfirm.message || eConfirm), { duration: 5000, variant: 'err' });
+    return;
+  }
+  var btn = document.querySelector('[data-blog-schedule]');
+  if(btn) btn.textContent = '예약하기';
+  var cbtn = document.querySelector('[data-blog-confirm]');
+  if(cbtn) cbtn.remove();
+  try { paintOpsPlanStrip_(); } catch(ePaint){}
+  if(typeof setAppToast === 'function') setAppToast('발행 완료로 바꿨어요.', { duration: 3000, variant: 'ok' });
+}
+window.onBlogPublishConfirm_ = onBlogPublishConfirm_;
+/** 예약일이 지났는데 발행 확인이 안 된 블로그가 있으면 한 번 알린다. */
+function warnPassedBlogPlans_(){
+  var n = 0;
+  Object.keys(state.published || {}).forEach(function(id){
+    var pub = state.published[id];
+    if(!pub || (pub.tabPublished && pub.tabPublished.blog)) return;
+    if(blogPlanDatePassed_(pub.channelPlan && pub.channelPlan.blog)) n++;
+  });
+  if(n && typeof setAppToast === 'function'){
+    setAppToast('예약일이 지난 블로그 ' + n + '건이 아직 「예약」으로 남아 있어요.\n글을 열어 「발행 확인」을 눌러 주세요.', { duration: 7000, variant: 'ok' });
+  }
+  return n;
 }
 function onBlogSchedule_(){
   var draftId = state.selectedId;

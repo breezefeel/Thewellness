@@ -12732,6 +12732,7 @@ function applySupabaseEntityRows_(rows){
   return { conflicts: conflicts, changed: changed, appliedGeneration: 2 };
 }
 async function plannerGasJsonRequest_(requestPayload, timeoutMs){
+  if(plannerSafeModeBlocksSync_()) return { result: 'error', retry: false, safeMode: true, message: '안전 모드: 서버 동기화를 하지 않습니다.' };
   var syncAction = requestPayload && requestPayload.action;
   if(syncAction === 'plannerSyncPull' || syncAction === 'plannerSyncPatch' || syncAction === 'plannerSyncPush'){
     if(typeof PlannerSyncSupabase === 'undefined' || !PlannerSyncSupabase.handle){
@@ -16543,9 +16544,50 @@ function stampDraftBrandOverride_(draftId, patch){
   state.draftBrandOverrides[draftId] = next;
 }
 
+// 컨테이너만 복제하고 문자열(특히 data:image)은 참조 공유. JSON stringify/parse 복제는
+// 2MB 사진 문자열을 매번 두세 벌 만들어 iOS Safari 메모리 한도를 넘겼다.
+var plannerPerf_ = { clones: 0, approxBytes: 0, stringify: 0 };
+try { if(typeof window !== 'undefined') window.__plannerPerf = plannerPerf_; } catch(ePerfExp){}
+function cloneSyncValueDeep_(v, depth){
+  if(v === null || typeof v !== 'object') return (typeof v === 'function') ? undefined : v;
+  if(depth > 60) throw new Error('clone depth');
+  if(Array.isArray(v)){
+    var arr = new Array(v.length);
+    for(var i = 0; i < v.length; i++){
+      var item = cloneSyncValueDeep_(v[i], depth + 1);
+      arr[i] = item === undefined ? null : item;
+    }
+    return arr;
+  }
+  if(typeof v.toJSON === 'function') return v.toJSON();
+  var out = {};
+  var keys = Object.keys(v);
+  for(var k = 0; k < keys.length; k++){
+    var c = cloneSyncValueDeep_(v[keys[k]], depth + 1);
+    if(c !== undefined) out[keys[k]] = c;
+  }
+  return out;
+}
 function cloneSyncValue_(value){
   if(value === undefined) return undefined;
-  try { return JSON.parse(JSON.stringify(value)); } catch(e){ return value; }
+  plannerPerf_.clones++;
+  try { return cloneSyncValueDeep_(value, 0); } catch(e){ return value; }
+}
+/** JSON 길이에 가까운 크기 추정. stringify 없이 문자열 길이만 합산한다. */
+function syncValueApproxBytes_(v, depth){
+  if(v === null || v === undefined) return 4;
+  var t = typeof v;
+  if(t === 'string') return v.length + 2;
+  if(t !== 'object') return 8;
+  if(depth > 60) return 16;
+  var n = 2;
+  if(Array.isArray(v)){
+    for(var i = 0; i < v.length; i++) n += syncValueApproxBytes_(v[i], depth + 1) + 1;
+    return n;
+  }
+  var keys = Object.keys(v);
+  for(var k = 0; k < keys.length; k++) n += keys[k].length + 4 + syncValueApproxBytes_(v[keys[k]], depth + 1);
+  return n;
 }
 function syncStringHash_(str){
   str = String(str || '');
@@ -17490,17 +17532,20 @@ function markNeverSyncedTopicOpsLocal_(){
   return n;
 }
 function restoreOutboxTopicDraftsMissingLocally_(){
+  if(plannerSafeModeBlocksSync_()) return 0;
   var local = {};
   try { local = listLocalUserDraftIds_(); } catch(eIds){ local = {}; }
   var missing = false;
+  var missingKeys = {};
   (state.syncOutbox || []).forEach(function(op){
     if(!op || op.deleted || !/^draft:/.test(String(op.key)) || !op.value) return;
     var id = String(op.key).slice('draft:'.length);
-    if(id && !local[id]) missing = true;
+    if(id && !local[id]){ missing = true; missingKeys[op.key] = true; }
   });
   if(!missing) return 0;
   var before = local;
-  var payload = overlayOutboxOnPayload_(getPersistPayload());
+  // 없는 초안 op만 얹는다. 22건 전부를 복제하면 사진 문자열이 같이 복제된다.
+  var payload = overlayOutboxOnPayload_(getPersistPayload(), { onlyKeys: missingKeys });
   applyPersistPayload(payload, { skipRestorePending: true, deferHeavyRepair: true });
   var after = {};
   try { after = listLocalUserDraftIds_(); } catch(eAfter){ after = {}; }
@@ -18516,6 +18561,16 @@ function syncMutationLightness_(op){
   return 2;
 }
 var SYNC_INLINE_BINARY_MAX_ = 450000;
+var SYNC_IOS_PATCH_MAX_ITEMS_ = 2;
+var SYNC_IOS_PATCH_MAX_BYTES_ = 12000;
+var SYNC_IOS_INLINE_BINARY_MAX_ = 60000;
+var _syncSplitCache_ = {};
+function plannerIsMemoryTightDevice_(){
+  try {
+    if(/[?&]ios=1(&|$)/.test(location.search || '')) return true;
+    return typeof isIOSLikeDevice === 'function' && isIOSLikeDevice();
+  } catch(e){ return false; }
+}
 function splitSyncBinaries_(value){
   var blobs = [];
   var seen = {};
@@ -18653,7 +18708,7 @@ function compressDataUrlUnderLimit_(dataUrl, maxChars){
 var _syncBlobCompressQueue_ = [];
 var _syncBlobCompressActive_ = null;
 function scheduleSyncBlobCompress_(blob){
-  if(state && state._plannerSafeMode) return;
+  if(plannerSafeModeBlocksSync_()) return;
   var hash = String((blob && blob.hash) || '');
   if(!hash || !blob || !blob.data || _syncBlobCompressing_[hash]) return;
   _syncBlobCompressing_[hash] = true;
@@ -18744,14 +18799,18 @@ function toPlannerSyncMutation_(op){
     mutationId: op.mutationId,
     version: parseInt(op.version, 10) || 1,
     key: op.key,
-    value: op.deleted ? null : cloneSyncValue_(op.value),
+    // 전송 묶음은 읽기만 한다(분리는 새 객체를 만든다). 복제하지 않고 참조를 공유한다.
+    value: op.deleted ? null : op.value,
     deleted: !!op.deleted,
     baseEntityRevision: parseInt(op.baseEntityRevision, 10) || 0,
     updatedAt: op.updatedAt || new Date().toISOString()
   };
 }
 function syncMutationBytes_(mut){
-  try { return JSON.stringify(mut).length; } catch(e){ return 4000; }
+  try {
+    plannerPerf_.approxBytes++;
+    return syncValueApproxBytes_(mut, 0);
+  } catch(e){ return 4000; }
 }
 function plannerPushTimeoutMs_(bodyBytes, snapshot){
   var n = parseInt(bodyBytes, 10) || 0;
@@ -18776,14 +18835,27 @@ function buildPendingSyncMutations_(payload, preferKeys){
   var first = !!_syncFastAckPending_;
   var maxItems = first ? SYNC_OUTBOX_PATCH_FIRST_ITEMS_ : SYNC_OUTBOX_PATCH_MAX_ITEMS_;
   var maxBytes = first ? SYNC_OUTBOX_PATCH_FIRST_BYTES_ : SYNC_OUTBOX_PATCH_MAX_BYTES_;
+  var inlineMax = SYNC_INLINE_BINARY_MAX_;
+  if(plannerIsMemoryTightDevice_()){
+    // iOS: 1~2건씩, 사진이 든 항목은 작은 크기부터 blob으로 분리해 하나씩 올린다
+    maxItems = Math.min(maxItems, SYNC_IOS_PATCH_MAX_ITEMS_);
+    maxBytes = Math.min(maxBytes, SYNC_IOS_PATCH_MAX_BYTES_);
+    inlineMax = SYNC_IOS_INLINE_BINARY_MAX_;
+  }
   var out = [];
   for(var i = 0; i < sorted.length; i++){
     if(!sorted[i] || !sorted[i].key) continue;
     var mut = toPlannerSyncMutation_(sorted[i]);
-    if(!mut.deleted && String(mut.key).indexOf('blob:') !== 0 && syncMutationBytes_(mut) > SYNC_INLINE_BINARY_MAX_){
+    if(!mut.deleted && String(mut.key).indexOf('blob:') !== 0 && syncMutationBytes_(mut) > inlineMax){
       if(state && state._plannerSafeMode) continue;
       try {
-        var splitBin = splitSyncBinaries_(mut.value);
+        // 같은 op는 라운드마다 다시 쪼개지 않는다(2MB 문자열 해시·순회 반복 방지)
+        var splitKey = String(mut.mutationId) + ':' + String(mut.version);
+        var splitBin = _syncSplitCache_[splitKey];
+        if(!splitBin){
+          if(Object.keys(_syncSplitCache_).length > 120) _syncSplitCache_ = {};
+          splitBin = _syncSplitCache_[splitKey] = splitSyncBinaries_(mut.value);
+        }
         mut.value = splitBin.value;
         queueSyncBlobMutations_(splitBin.blobs);
       } catch(eSplit){}
@@ -18944,6 +19016,7 @@ function acknowledgeSyncOutbox_(accepted, sentMutations, holdKeys){
     ? PlannerSyncRules.plannerFilterAckedOutbox
     : null;
   var beforeOps = (state.syncOutbox || []).slice();
+  if((acceptedForSent || []).length) plannerMarkBootHealthy_('first push accepted');
   if(filter){
     state.syncOutbox = filter(state.syncOutbox || [], {
       ack: ackVer,
@@ -18988,8 +19061,11 @@ function acknowledgeSyncBatch_(accepted, sentMutations, conflicts){
   rotateIdempotentOutbox_(accepted);
   acknowledgeSyncOutbox_(ok, sentMutations, holdKeys);
 }
-function overlayOutboxOnPayload_(payload){
-  var ops = state.syncOutbox || [];
+function overlayOutboxOnPayload_(payload, opts){
+  var onlyKeys = opts && opts.onlyKeys;
+  var ops = (state.syncOutbox || []).filter(function(op){
+    return !onlyKeys || (op && onlyKeys[op.key]);
+  });
   // outbox 없으면 전체 payload deep clone 생략 (대용량 초안에서 부트스트랩 정지 원인)
   if(!ops.length) return payload || {};
   // 초안 본문 전체 JSON clone 금지 — 건드릴 컨테이너만 얕게 복사
@@ -19113,6 +19189,7 @@ function outboxHasUserDraftUpload_(){
   return plannerOutboxHasTeamContent_();
 }
 function schedulePlannerGasPush_(immediate){
+  if(plannerSafeModeBlocksSync_()) return;
   if(!plannerSyncBootstrapReady_ || !state._bootstrapChoiceDone || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return;
   if(typeof shouldProtectComposeUi_ === 'function' && shouldProtectComposeUi_()){
     if(!plannerGasPushTimer){
@@ -19191,6 +19268,7 @@ function clearPlannerGasRetry_(){
   plannerLastSyncError_ = '';
 }
 function schedulePlannerGasRetry_(error){
+  if(plannerSafeModeBlocksSync_()) return;
   if(!hasPendingLocalSyncChanges_() || !plannerSyncBootstrapReady_ || plannerSyncConflictPending_) return;
   if(typeof navigator !== 'undefined' && navigator.onLine === false) return;
   if(plannerGasRetryTimer_) return;
@@ -19218,6 +19296,7 @@ function schedulePlannerGasRetry_(error){
   updateSyncStatusUI_();
 }
 async function plannerPullRemoteIntoStateCore_(){
+  if(plannerSafeModeBlocksSync_()) return false;
   var body = getPersistPayload();
   var fpBefore = plannerSyncFingerprint_(body);
   var remote = null;
@@ -19274,6 +19353,7 @@ function dropBulkOutboxUnlessChosen_(){
   return 0;
 }
 async function plannerGasPushNow_(){
+  if(plannerSafeModeBlocksSync_()) return { ok: false, skipped: true, safeMode: true };
   var url = getPlannerGasUrl_();
   if(!url || !plannerSyncBootstrapReady_ || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return { ok: false, skipped: true };
   try { dropUntouchedPromptOutboxOps_(); } catch(ePromptDrop){}
@@ -19296,9 +19376,8 @@ async function plannerGasPushNow_(){
     } catch(ePreStuck){}
     var skipPull = !!(state._generalUploadOnly || state._gapUploadActive);
     try {
-      var preBody = getPersistPayload();
-      var preMut = buildPendingSyncMutations_(preBody);
-      var prePatch = preMut.length > 0 && (state.syncProtocolVersion || 1) >= 2;
+      // 보낼 것이 있는지만 본다. 묶음 전체를 미리 만들면(복제·해시) iOS에서 메모리가 두 배로 든다.
+      var prePatch = (hasSendableOutboxOps_() || Object.keys(state.syncDirtyEntityKeys || {}).length > 0) && (state.syncProtocolVersion || 1) >= 2;
       if(prePatch) state.syncNeedsSnapshot = false;
       var locRev = parseInt(state.syncRevision, 10) || 0;
       var storedRev = readStoredSyncRev_(GAS_LAST_SYNC_REV_KEY);
@@ -19359,10 +19438,16 @@ async function plannerGasPushNow_(){
       outboxPrevStamp = syncOutboxProgressStamp_();
       if(round > 1){
         if(plannerSyncConflictPending_ || !state.syncDirty) break;
-        body = getPersistPayload();
+        if(plannerSafeModeBlocksSync_()) break;
+        // 배치 사이에 메인 스레드를 비워 GC·렌더가 따라오게 한다
+        await plannerYieldToUi_(plannerIsMemoryTightDevice_() ? 40 : 0);
+        // 매 라운드 전체 payload를 다시 만들지 않는다. outbox가 남아 있으면 1라운드 body를 재사용한다.
+        if(!(state.syncOutbox || []).length){
+          body = getPersistPayload();
+          ensurePlanRowStableIdsInPayload_(body);
+          migrateIndexedPlanEntityKeysInPayload_(body, state.syncOutbox);
+        }
         body.savedAt = new Date().toISOString();
-        ensurePlanRowStableIdsInPayload_(body);
-        migrateIndexedPlanEntityKeysInPayload_(body, state.syncOutbox);
         try { dropUntouchedPromptOutboxOps_(); } catch(ePromptMid){}
         mutations = buildPendingSyncMutations_(body, forceTailKeys);
         forceTailKeys = null;
@@ -20269,6 +20354,7 @@ function formatSyncHeaderSub_(info){
   }
   if(info.phase === 'checking') return '서버 확인';
   if(info.phase === 'conflict') return '충돌 선택';
+  if(plannerSafeModeBlocksSync_()) return '안전 모드 · 대기 ' + (info.pendingCount || 0) + '건';
   if(info.phase === 'held') return '선택 대기 ' + (info.heldCount || 0) + '건';
   if(info.phase === 'pull') return '받을 내용';
   if(info.phase === 'pending'){
@@ -21131,6 +21217,7 @@ function reconcileBootstrapLight_(localPayload, remotePayload, remoteRevision){
   return reconcileLocalWithServerPayload_(localPayload, remotePayload, remoteRevision);
 }
 async function verifyPlannerServerReachable_(){
+  if(plannerSafeModeBlocksSync_()) throw new Error('안전 모드: 서버 동기화를 하지 않습니다.');
   if(!isPlannerEmployeeEmailValid_(getPlannerEmployeeId_())) throw new Error('직원 이메일을 입력해야 팀 데이터를 사용할 수 있어요.');
   var url = getPlannerGasUrl_();
   if(!url || location.protocol === 'file:') throw new Error('웹 배포 주소(https)에서 접속해야 서버 데이터를 확인할 수 있어요.');
@@ -21146,6 +21233,7 @@ function yieldPlannerBootstrapUi_(message){
   return new Promise(function(resolve){ setTimeout(resolve, 0); });
 }
 async function runPlannerBootstrapInBackground_(){
+  if(plannerSafeModeBlocksSync_()) return;
   try {
     if(!isPlannerEmployeeEmailValid_(getPlannerEmployeeId_())) return;
     if(state._bootstrapChoiceDone || plannerBootstrapChoicePending_) return;
@@ -21184,12 +21272,17 @@ async function runPlannerBootstrapInBackground_(){
         save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
       } catch(eSupaSv){}
       try { renderTabs(); renderMain(); } catch(eSupaR){}
-      try { restoreOutboxTopicDraftsMissingLocally_(); } catch(eRest){}
       markNeverSyncedTopicOpsLocal_();
       var allowEmptyTopicPush = !!(bootstrapData.emptyTable && pendingWorkIsNeverSyncedTopicsOnly_());
-      if((!bootstrapData.emptyTable || allowEmptyTopicPush) && hasPendingLocalSyncChanges_()){
-        try { schedulePlannerGasPush_(true); } catch(eSupaPush){}
-      }
+      var wantBootPush = (!bootstrapData.emptyTable || allowEmptyTopicPush) && hasPendingLocalSyncChanges_();
+      // 첫 렌더 뒤에 복원 → 그다음에 올리기. 동시에 돌리면 iOS에서 메모리가 겹친다.
+      plannerRunAfterFirstPaint_(function(){
+        try { restoreOutboxTopicDraftsMissingLocally_(); } catch(eRest){}
+        if(!wantBootPush) return;
+        setTimeout(function(){
+          try { if(hasPendingLocalSyncChanges_()) schedulePlannerGasPush_(true); } catch(eSupaPush){}
+        }, plannerIsMemoryTightDevice_() ? 3000 : 800);
+      }, plannerIsMemoryTightDevice_() ? 2500 : 600);
       try { updateSyncStatusUI_(); } catch(eSupaU){}
       if(typeof setAppToast === 'function'){
         setAppToast(bootstrapData.emptyTable && !allowEmptyTopicPush
@@ -21238,7 +21331,9 @@ async function runPlannerBootstrapInBackground_(){
           save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
         } catch(eAdSv2){}
         try { renderTabs(); renderMain(); } catch(eAdR2){}
-        try { schedulePlannerGasPush_(true); } catch(eBootPush){}
+        plannerRunAfterFirstPaint_(function(){
+          try { schedulePlannerGasPush_(true); } catch(eBootPush){}
+        }, plannerIsMemoryTightDevice_() ? 3000 : 400);
         try { updateSyncStatusUI_(); } catch(eBootU){}
         if(typeof setAppToast === 'function'){
           setAppToast('Supabase 내용을 받은 뒤, 이 기기에서 고친 ' + sessionOps.length + '건을 올립니다…', { duration: 3600, variant: 'ok' });
@@ -22031,6 +22126,7 @@ window.skipPlannerBootstrapChoiceKeepLocal_ = function(){
   updateSyncStatusUI_();
 };
 async function runPlannerBootstrapSync_(){
+  if(plannerSafeModeBlocksSync_()) return;
   if(plannerSyncBootstrapRunning_) return;
   plannerSyncBootstrapRunning_ = true;
   state._bootstrapDeferHeavy = true;
@@ -24462,6 +24558,7 @@ let driveUploadTimer = null;
 let promptCloudSaveTimer = null;
 
 function loadGsiScript(){
+  if(plannerSafeModeBlocksSync_()) return Promise.reject(new Error('안전 모드: 외부 로그인 스크립트를 불러오지 않습니다.'));
   if(window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
   if(window.__htGsiLoadPromise) return window.__htGsiLoadPromise;
   window.__htGsiLoadPromise = new Promise(function(resolve, reject){
@@ -25025,6 +25122,7 @@ async function driveUploadNow(){
   });
 }
 function scheduleDriveUpload(immediate){
+  if(plannerSafeModeBlocksSync_()) return;
   if(!plannerSyncBootstrapReady_ || plannerSyncConflictPending_) return;
   try {
     if(!hasDriveValidToken_()) return;
@@ -25261,6 +25359,8 @@ function stripGeneratedContentBodiesInPayload_(payload){
   return n;
 }
 function runDeferredBootMigrations_(){
+  // 안전 모드: 부팅 이관도 로컬 데이터를 바꾸므로 건너뛴다(대기열·초안 보존)
+  if(plannerSafeModeBlocksSync_()) return;
   if(!state._pendingBootMigrations) return;
   state._pendingBootMigrations = false;
   try {
@@ -25614,15 +25714,155 @@ function plannerWriteBootCrashCount_(n){
   try { sessionStorage.setItem(PLANNER_BOOT_CRASH_KEY_, s); } catch(eSs){}
   try { localStorage.setItem(PLANNER_BOOT_CRASH_KEY_, s); } catch(eLs){}
 }
+function plannerReadSafeFlag_(){
+  try {
+    var q = new URLSearchParams(location.search || '');
+    var on = function(v){ return v != null && v !== '' && !/^(0|false|off|no)$/i.test(v); };
+    if(on(q.get('safe'))) return 'safe';
+    if(on(q.get('nosync'))) return 'nosync';
+  } catch(eQ){}
+  return '';
+}
+/** 안전 모드면 서버 push·pull·사진 압축·초안 복원·부팅 이관을 모두 멈춘다. 로컬 데이터와 대기열은 건드리지 않는다. */
+function plannerSafeModeBlocksSync_(){
+  return !!(state && state._plannerSafeMode);
+}
+function plannerYieldToUi_(ms){
+  return new Promise(function(resolve){ setTimeout(resolve, ms || 0); });
+}
+function plannerRunAfterFirstPaint_(fn, delayMs){
+  var tries = 0;
+  (function wait(){
+    if(!(state && state._bootFirstPaintDone) && tries++ < 40){ setTimeout(wait, 250); return; }
+    var go = function(){
+      setTimeout(function(){
+        if(plannerSafeModeBlocksSync_()) return;
+        try { fn(); } catch(eAfterPaint){ console.warn('[after first paint]', eAfterPaint); }
+      }, delayMs || 0);
+    };
+    if(typeof requestAnimationFrame === 'function') requestAnimationFrame(go); else go();
+  })();
+}
+/** 부팅이 무사히 끝났다고 볼 때만 연속 크래시 카운터를 0으로 되돌린다. 안전 모드는 사용자가 끌 때까지 유지. */
+function plannerMarkBootHealthy_(why){
+  if(state && state._plannerSafeMode) return;
+  if(plannerReadBootCrashCount_() === 0) return;
+  plannerWriteBootCrashCount_(0);
+  try { console.info('[crash guard] 카운터 초기화:', why); } catch(eC){}
+}
 function armPlannerCrashGuard_(){
   var prev = plannerReadBootCrashCount_();
   var next = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerBootCrashState)
     ? PlannerSyncRules.plannerBootCrashState(prev, { limit: 3 })
-    : { count: prev + 1, safeMode: (prev + 1) >= 3, clearAfterMs: 12000 };
-  plannerWriteBootCrashCount_(next.count);
-  state._plannerSafeMode = !!next.safeMode;
-  var wait = parseInt(next.clearAfterMs, 10) || 12000;
-  setTimeout(function(){ plannerWriteBootCrashCount_(0); }, wait);
+    : { count: prev + 1, safeMode: (prev + 1) >= 3 };
+  var flag = plannerReadSafeFlag_();
+  // 주소 옵션으로 연 안전 모드는 크래시 횟수를 세지 않는다(끄고 나왔을 때 자동 안전 모드로 되돌아가지 않게)
+  if(!flag) plannerWriteBootCrashCount_(next.count);
+  state._plannerSafeMode = !!next.safeMode || !!flag;
+  state._plannerSafeReason = flag || (next.safeMode ? 'crash' : '');
+  if(state._plannerSafeMode) return;
+  // 1) 사용자가 새로고침·이동해 정상적으로 떠나면 크래시가 아니다 (jetsam 종료는 pagehide가 오지 않는다)
+  window.addEventListener('pagehide', function(ev){
+    if(ev && ev.persisted) return;
+    plannerMarkBootHealthy_('pagehide');
+  });
+  // 2) 부팅 60초 뒤에도 살아 있고 보낼 것이 없으면 정상. 보낼 것이 남았으면 비워질 때까지 기다린다.
+  setTimeout(function check(){
+    if(state._plannerSafeMode) return;
+    var idle = true;
+    try { idle = !hasSendableOutboxOps_(); } catch(eIdle){}
+    if(idle) plannerMarkBootHealthy_('60s idle');
+    else setTimeout(check, 15000);
+  }, 60000);
+}
+function plannerLocalBackupParts_(){
+  var parts = [];
+  var payload = getPersistPayload();
+  parts.push('{"app":"thewellness-planner","kind":"local-backup","exportedAt":' + JSON.stringify(new Date().toISOString()) +
+    ',"safeMode":' + (state._plannerSafeMode ? 'true' : 'false') + ',"payload":');
+  parts.push(JSON.stringify(payload));
+  parts.push(',"syncDirtyEntityKeys":' + JSON.stringify(state.syncDirtyEntityKeys || {}));
+  parts.push(',"syncOutbox":[');
+  (state.syncOutbox || []).forEach(function(op, i){
+    if(i) parts.push(',');
+    parts.push(JSON.stringify(op));
+  });
+  parts.push(']}');
+  return parts;
+}
+function plannerExportLocalBackup_(){
+  var stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 13);
+  var name = 'planner-local-backup-' + stamp + '.json';
+  var blob;
+  try { blob = new Blob(plannerLocalBackupParts_(), { type: 'application/json' }); }
+  catch(eBlob){
+    if(typeof setAppToast === 'function') setAppToast('백업 파일을 만들지 못했어요: ' + (eBlob && eBlob.message || eBlob), { duration: 6000, variant: 'err' });
+    return false;
+  }
+  var done = function(){
+    if(typeof setAppToast === 'function') setAppToast('로컬 백업을 내보냈어요. 이 기기의 데이터와 대기열은 그대로입니다.', { duration: 5000, variant: 'ok' });
+  };
+  var download = function(){
+    var a = document.createElement('a');
+    var url = URL.createObjectURL(blob);
+    a.href = url; a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch(eRm){} }, 60000);
+    done();
+  };
+  try {
+    var file = new File([blob], name, { type: 'application/json' });
+    if(navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share){
+      navigator.share({ files: [file], title: name }).then(done).catch(function(eShare){
+        if(eShare && eShare.name === 'AbortError') return;
+        download();
+      });
+      return true;
+    }
+  } catch(eFile){}
+  download();
+  return true;
+}
+function plannerLeaveSafeMode_(){
+  plannerWriteBootCrashCount_(0);
+  var q;
+  try {
+    q = new URLSearchParams(location.search || '');
+    q.delete('safe'); q.delete('nosync');
+  } catch(eQ){ q = null; }
+  var qs = q && q.toString();
+  location.href = location.pathname + (qs ? '?' + qs : '') + (location.hash || '');
+}
+function plannerShowSafeModeBanner_(){
+  if(!(state && state._plannerSafeMode) || document.getElementById('planner-safe-banner')) return;
+  var reason = state._plannerSafeReason === 'crash'
+    ? '이 탭이 반복해서 종료돼 자동으로 켰어요.'
+    : '주소의 안전 모드 옵션으로 켜졌어요.';
+  var box = document.createElement('div');
+  box.id = 'planner-safe-banner';
+  box.setAttribute('role', 'status');
+  box.style.cssText = 'position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:2147483000;' +
+    'background:#fff7e0;color:#4a3300;border:1px solid #e0b84a;border-radius:12px;padding:10px 12px;font:13px/1.45 -apple-system,system-ui,sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.18)';
+  var t = document.createElement('div');
+  t.innerHTML = '<b>안전 모드</b> · ' + reason + ' 서버 올리기·받기를 멈췄고, 이 기기의 수정과 대기열 ' +
+    ((state.syncOutbox || []).length) + '건은 지우지 않아요.';
+  var row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;margin-top:8px';
+  function btn(label, fn, primary){
+    var b = document.createElement('button');
+    b.type = 'button'; b.textContent = label;
+    b.style.cssText = 'flex:1;min-height:40px;border-radius:9px;border:1px solid #c9992b;font:600 13px system-ui;' +
+      (primary ? 'background:#c9992b;color:#fff' : 'background:#fff;color:#4a3300');
+    b.addEventListener('click', fn);
+    return b;
+  }
+  row.appendChild(btn('로컬 백업 내보내기', function(){ plannerExportLocalBackup_(); }, true));
+  row.appendChild(btn('안전 모드 끄기', function(){
+    if(confirm('안전 모드를 끄고 다시 불러옵니다. 계속할까요?')) plannerLeaveSafeMode_();
+  }, false));
+  box.appendChild(t); box.appendChild(row);
+  document.body.appendChild(box);
 }
 function plannerSkipDeepLink_(){
   return !!(state && state._plannerSafeMode);
@@ -25667,6 +25907,7 @@ window.onload = () => {
         try { updateAddButtonVisibility_(); } catch(e5){}
         try { renderMain(); } catch(e6){}
         state._bootFirstPaintDone = true;
+        try { plannerShowSafeModeBanner_(); } catch(eBanner){}
         if(state._plannerSafeMode && typeof setAppToast === 'function'){
           setAppToast('이 탭이 반복해서 다시 시작돼 이미지 화면과 큰 사진 줄이기를 잠시 건너뜁니다. 이 기기의 수정은 그대로 둡니다.', { duration: 6400, variant: 'ok' });
         }
@@ -25693,6 +25934,7 @@ window.onload = () => {
         try { renderMain(); } catch(eMain){}
         state._bootFirstPaintDone = true;
       }
+      try { plannerShowSafeModeBanner_(); } catch(eBanner2){}
       document.documentElement.classList.add('planner-ready');
     } catch(eSafe){}
   }, 4000);

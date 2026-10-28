@@ -14155,7 +14155,7 @@ function getInstaFullPasteText_(ig, catId){
   const mid = hook ? hook + (body ? '\n\n' + body : '') : body;
   const cid = catId != null ? catId : getActiveInstagramCatId_();
   const withCollab = withInstagramCollabMention_(mid, cid);
-  const tags = (ig.hashtags || []).map(function (h){ return '#' + h; }).join(' ');
+  const tags = (ig.hashtags || []).map(function (h){ return '#' + String(h).replace(/^#+/, ''); }).join(' ');
   return (withCollab + (tags ? '\n\n' + tags : '')).trim();
 }
 
@@ -39530,7 +39530,7 @@ function renderSheetContent(content, opts) {
         sheetEditField_('셀프 케어', 'sheet-blog-selfcare', b.selfCare || '', { rows: 8, help: '👉 먼저 확인 한 줄 · 👉 1.~4. 3~4단계(초·회) · 실수 2~3개 · 단계 사이 빈 줄', regen: 'blog.selfCare', copy: true, stepPreview: true }) +
         sheetEditField_('원리 설명', 'sheet-blog-explanation', b.explanation || '', { rows: 6, regen: 'blog.explanation', copy: true, paragraphs: true }) +
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
-        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
+        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         (isBranchBookingBlogCategory_(blogCatId) ? realMovementBlogFooterSheetHtml_(blogCatId) : expertCourseBlogFooterSheetHtml_(blogCatId)) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>지금 올리기·예약하기</strong>는 글을 복사하고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙고, 버튼으로 날짜를 바꿀 수 있어요. <strong>수정된 블로그 최종본</strong>으로 인스타 캡션이 백그라운드에서 만들어져요.' +
         ((isBranchBookingBlogCategory_(blogCatId) || isExpertCourseCategory(blogCatId)) ? ' 하단 <strong>말미 링크</strong>는 고정으로 붙어요.' : '') + '</p>'
@@ -39544,7 +39544,7 @@ function renderSheetContent(content, opts) {
         sheetEditField_('시연·핵심 포인트', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '손 위치·동작·주의사항 — 한 줄에 하나씩', regen: 'blog.outline', copy: true }) +
         sheetEditField_('원리 설명', 'sheet-blog-draft', b.draft, { rows: 12, help: '본문의 중심. 왜 이렇게 하는지·짧은 메커니즘', regen: 'blog.draft', copy: true, paragraphs: true }) +
         sheetEditField_('마무리', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
-        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분 · 3~5개 권장', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
+        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요 · 3~5개 권장', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         expertCourseBlogFooterSheetHtml_(blogCatId) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>지금 올리기·예약하기</strong>는 저장·복사되고 글쓰기로 이동해요. 하단 <strong>말미 링크</strong>는 해당 과정 안내로 고정해서 붙어요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙습니다.</p>'
       );
@@ -39557,7 +39557,7 @@ function renderSheetContent(content, opts) {
         sheetEditField_('목차 구성', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '한 줄에 소제목 하나씩', regen: 'blog.outline', copy: true }) +
         sheetEditField_('본문 초안', 'sheet-blog-draft', b.draft, { rows: 14, regen: 'blog.draft', copy: true, paragraphs: true }) +
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
-        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
+        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>지금 올리기·예약하기</strong>는 블로그가 저장·복사되고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙습니다.</p>'
       );
     }
@@ -39575,7 +39575,7 @@ function renderSheetContent(content, opts) {
         addSourceHtml + sheetFullCopyBar_() +
         sheetEditField_('첫 줄 후킹', 'sheet-insta-hook', ig.hook, { rows: 2, title: true, regen: 'insta.hook', copy: true }) +
         sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10, regen: 'insta.caption', copy: true, paragraphs: true }) +
-        sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).map(function(h){ return String(h).replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
+        sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
         instagramCollabSheetHtml_(state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId)) +
         '<div data-social-slot="insta"></div>' +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>지금 올리기</strong>는 @dr.park_dc.pt에 바로 게시하고(연결 계정은 공동작업자로 초대), <strong>예약하기</strong>는 고른 시간에 클라우드가 올립니다. 올리면 <strong>수정된 인스타 최종본</strong>으로 쓰레드 초안이 만들어져요. 앱에서 직접 올렸다면 <strong>직접 올림</strong>을 누르세요.</p>'
@@ -40739,14 +40739,17 @@ function sheetFullCopyBar_(){
     '<span class="sheet-fullcopy-hint">구분된 내용을 한 줄씩 띄워 복사해요</span></div>';
 }
 
+/** 해시태그 입력을 나눈다. 사용자가 넣은 #은 지우지 않고 그대로 둔다(#태그 → #태그, 태그 → 태그). */
+function parseHashtagInput_(text){
+  return (String(text || '').match(/#?[^\s,#]+/g) || []).map(function(t){ return t.trim(); }).filter(Boolean);
+}
 window.copySheetField_ = function(id, btn, isHashtags){
   var el = document.getElementById(id);
   if(!el) return;
   var text = String(el.value || '');
   var html = '';
   if(isHashtags){
-    text = text.split(/[\s,#]+/).map(function(t){ return t.replace(/^#/, '').trim(); })
-      .filter(Boolean).map(function(t){ return '#' + t; }).join(' ');
+    text = parseHashtagInput_(text).map(function(t){ return '#' + t.replace(/^#+/, ''); }).join(' ');
   } else if(el.getAttribute('data-selfcare-preview') === '1'){
     html = formatSelfCareStepsHtmlForCopy_(text);
     text = formatSelfCareStepsForCopy_(text);
@@ -41601,7 +41604,7 @@ window.onSheetTitleSyncTopic_ = function(el){
 function readSheetBlogEdits_(){
   function v(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
   if(!document.getElementById('sheet-blog-title')) return null;
-  var tags = v('sheet-blog-hashtags').split(/[\s,#]+/).map(function(t){ return t.replace(/^#/, '').trim(); }).filter(Boolean);
+  var tags = parseHashtagInput_(v('sheet-blog-hashtags'));
   if(document.getElementById('sheet-blog-problem')){
     return {
       title: v('sheet-blog-title'),
@@ -41641,7 +41644,7 @@ function applySheetBlogEdits_(content){
 function readSheetInstaEdits_(){
   if(!document.getElementById('sheet-insta-hook')) return null;
   function v(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
-  var tags = v('sheet-insta-hashtags').split(/[\s,#]+/).map(function(t){ return t.replace(/^#/, '').trim(); }).filter(Boolean);
+  var tags = parseHashtagInput_(v('sheet-insta-hashtags'));
   return {
     hook: v('sheet-insta-hook'),
     caption: v('sheet-insta-caption'),

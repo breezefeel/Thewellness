@@ -26227,6 +26227,7 @@ function saveKey() {
   }
   var syncTokEl = document.getElementById('planner-sync-token');
   if(syncTokEl) setPlannerSyncToken_(syncTokEl.value);
+  try { saveBlogDefaultCategories_(); } catch(eBdcS){}
   save();
   closeApiModal();
   updateApiBadge();
@@ -26245,7 +26246,57 @@ function closeApiModalBackdrop(ev){
   closeApiModal();
 }
 window.closeApiModalBackdrop = closeApiModalBackdrop;
+// 네이버 블로그 기본 카테고리 — 프로그램별. 이 기기에 저장(localStorage). 리얼페이스 기본값은 코드에 둔다.
+var BLOG_DEFAULT_CATEGORY_KEY_ = 'ht_blog_default_cat_v1';
+var BLOG_DEFAULT_CATEGORY_BUILTIN_ = { 2: '안면비대칭/축소' };
+function readBlogDefaultCategories_(){
+  try {
+    var raw = JSON.parse(localStorage.getItem(BLOG_DEFAULT_CATEGORY_KEY_) || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch(e){ return {}; }
+}
+function getBlogDefaultCategoryForCat_(catId){
+  var saved = readBlogDefaultCategories_();
+  var id = String(catId);
+  if(Object.prototype.hasOwnProperty.call(saved, id)) return String(saved[id] || '').trim();
+  return BLOG_DEFAULT_CATEGORY_BUILTIN_[id] || '';
+}
+function renderBlogDefaultCategoryInputs_(){
+  var host = document.getElementById('blog-default-cat-list');
+  if(!host) return;
+  host.innerHTML = CATEGORIES.map(function(cat){
+    if(!cat || cat.id > 5) return '';
+    var val = getBlogDefaultCategoryForCat_(cat.id);
+    return '<label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;color:#374151;">' +
+      '<span style="flex:0 0 112px;">' + escapeHtml(cat.name) + '</span>' +
+      '<input class="modal-input" type="text" data-blog-default-cat="' + cat.id + '" value="' + escapeHtml(val) + '" placeholder="카테고리 이름" autocomplete="off" style="margin:0;flex:1;">' +
+      '</label>';
+  }).join('');
+}
+function saveBlogDefaultCategories_(){
+  var host = document.getElementById('blog-default-cat-list');
+  if(!host) return;
+  var out = {};
+  host.querySelectorAll('input[data-blog-default-cat]').forEach(function(inp){
+    var id = inp.getAttribute('data-blog-default-cat');
+    var v = String(inp.value || '').trim();
+    var builtin = BLOG_DEFAULT_CATEGORY_BUILTIN_[id] || '';
+    // 기본값과 같으면 저장하지 않는다. 비운 칸은 「없음」으로 저장해 기본값을 끈다.
+    if(v === builtin) return;
+    out[id] = v;
+  });
+  try { localStorage.setItem(BLOG_DEFAULT_CATEGORY_KEY_, JSON.stringify(out)); } catch(e){}
+}
+function noteBlogDefaultCategoryOnOpen_(catId){
+  var name = getBlogDefaultCategoryForCat_(catId);
+  if(!name || typeof setAppToast !== 'function') return;
+  // 열기 직후 뜨는 다른 안내 토스트가 지나간 뒤에 보이게 한다
+  setTimeout(function(){
+    setAppToast('네이버 에디터에서 카테고리는 「' + name + '」으로 골라 주세요.', { duration: 6000, variant: 'ok' });
+  }, 1800);
+}
 function openApiModal() {
+  try { renderBlogDefaultCategoryInputs_(); } catch(eBdc){}
   document.getElementById('api-input').value = state.apiKey === '__server__' ? '' : state.apiKey;
   document.getElementById('api-input').type = 'password';
   var toggleBtn = document.getElementById('api-key-toggle');
@@ -29538,7 +29589,7 @@ function onBlogSchedule_(){
       setChannelPlan_(draftId, catId, 'blog', when.toISOString(), '');
       var btn = document.querySelector('[data-blog-schedule]');
       if(btn) btn.textContent = opsPlanChipLabel_(when.toISOString()) + ' 수정';
-      if(!existing && content && content.blog) copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId));
+      if(!existing && content && content.blog) copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId), catId);
       if(typeof setAppToast === 'function') setAppToast('블로그 예약 ' + opsPlanChipLabel_(when.toISOString()), { duration: 2500, variant: 'ok' });
     }
   });
@@ -39699,11 +39750,12 @@ function ensureNotifyForInstaBg_(){
   } catch(e){}
 }
 
-function copyAndOpenNaverBlog_(text){
+function copyAndOpenNaverBlog_(text, catId){
   if(text && navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(text).catch(function(){});
   }
   openExternalNaverBlog();
+  try { noteBlogDefaultCategoryOnOpen_(catId != null ? catId : state.selectedCatId); } catch(eNote){}
 }
 function startInstaDraftAfterBlogPublish_(draftId, catId, topic, content){
   if(!isBlogInstaCategory(catId) || !content || !content.blog) return;
@@ -42132,7 +42184,7 @@ window.onSheetPublishComplete = async function(opts){
       var quickText = buildFinalTextForKey_(quickContent, catId, quickResult.key);
       if(tab === 'blog') startInstaDraftAfterBlogPublish_(draftId, catId, (quickContent && quickContent.blog && quickContent.blog.title) || '', quickContent);
       if(!viaApi && tab === 'blog'){
-        copyAndOpenNaverBlog_(quickText);
+        copyAndOpenNaverBlog_(quickText, catId);
         setAppToast(isPhoneOrTablet()
           ? '수정본 저장 · 복사 · 글쓰기 앱으로 이동'
           : '수정본 저장 · 복사 · 글쓰기 페이지로 이동', { duration: 3600, variant: 'ok' });
@@ -42179,7 +42231,7 @@ window.onSheetPublishComplete = async function(opts){
       state.activeTab = 'insta';
       setOpenDetailHash_(draftId, catId, 'insta');
       startInstaDraftAfterBlogPublish_(draftId, catId, draft ? draft.topic : '', content);
-      copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId));
+      copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId), catId);
       renderSheetContent(getDraftContent_(draftId) || content);
       renderTabs();
       renderMain();

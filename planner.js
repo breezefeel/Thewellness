@@ -22318,6 +22318,55 @@ function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts, opts
 function autoResolveConflictsKeepLocal_(local, remote, serverRevision, conflicts){
   keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts);
 }
+/** 충돌한 두 값에서 어느 칸이 다른지. 비교에서 무시하는 시각 필드·빈 칸·줄 끝 공백은 뺀다. */
+var CONFLICT_FIELD_LABELS_ = {
+  title: '제목', importTitle: '제목', headline: '제목',
+  draft: '본문', body: '본문', explanation: '본문', problem: '본문', selfCare: '본문', caption: '본문', text: '본문',
+  hook: '본문', empathyLead: '본문', empathyBullets: '본문', comment: '본문', cta: '본문', finalText: '본문',
+  status: '상태', state: '상태', publishState: '상태', published: '상태',
+  scheduledDate: '날짜', scheduledAt: '날짜', date: '날짜', publishedAt: '날짜', activityAt: '날짜', createdAt: '날짜', plannedDate: '날짜',
+  topic: '주제', angle: '각도', series: '시리즈', pillar: '필러', roadmapStepId: '단계', step: '단계',
+  collab: '공동작업', account: '계정', sourceNote: '메모', rationale: '이유', writingBrief: '작성 메모'
+};
+var CONFLICT_CHANNEL_LABELS_ = { blog: '블로그', insta: '인스타', instagram: '인스타', threads: '쓰레드', news: '소식', community: '커뮤니티' };
+function conflictDiffFields_(localVal, remoteVal){
+  function flatten(v){
+    var out = {};
+    (function walk(x, path){
+      if(x === undefined || x === null) return;
+      if(typeof x === 'object'){
+        Object.keys(x).forEach(function(k){ walk(x[k], path ? path + '.' + k : k); });
+        return;
+      }
+      out[path] = String(x);
+    })(stripSyncVolatileForCompare_(unwrapSyncEntityValue_(v)), '');
+    return out;
+  }
+  var l = flatten(localVal), r = flatten(remoteVal);
+  var paths = {};
+  Object.keys(l).concat(Object.keys(r)).forEach(function(k){ if(l[k] !== r[k]) paths[k] = true; });
+  var labels = [];
+  Object.keys(paths).forEach(function(path){
+    var parts = path.split('.');
+    var leaf = parts[parts.length - 1];
+    if(/^\d+$/.test(leaf) && parts.length > 1) leaf = parts[parts.length - 2];
+    var field = CONFLICT_FIELD_LABELS_[leaf] || leaf;
+    var channel = '';
+    for(var i = 0; i < parts.length - 1; i++){
+      if(CONFLICT_CHANNEL_LABELS_[parts[i]]){ channel = CONFLICT_CHANNEL_LABELS_[parts[i]]; break; }
+    }
+    var label = (channel && field !== '날짜' ? channel + ' ' : '') + field;
+    if(labels.indexOf(label) < 0) labels.push(label);
+  });
+  return labels;
+}
+function conflictDiffLineHTML_(conflict){
+  var labels = [];
+  try { labels = conflictDiffFields_(conflict.local, conflict.remote); } catch(eDiff){ labels = []; }
+  if(!labels.length) return '';
+  var shown = labels.slice(0, 8).join(', ') + (labels.length > 8 ? ' 외 ' + (labels.length - 8) + '칸' : '');
+  return '<div class="sync-conflict-diff" style="font-size:12px;color:#92400E;margin:4px 0">다른 칸: <strong>' + escapeHtml(shown) + '</strong></div>';
+}
 function renderPlannerConflictUi_(pending){
   // 다른 오버레이가 클릭을 가로채지 못하게 전부 닫음 (스크롤 잠금도 함께 해제)
   ['sync-bootstrap-overlay', 'api-modal', 'drive-oauth-busy', 'sync-status-overlay', 'sync-preview-overlay', 'sync-bootstrap-choice-overlay', 'draft-import-overlay'].forEach(function(id){
@@ -22341,7 +22390,7 @@ function renderPlannerConflictUi_(pending){
         ? '<div class="sync-conflict-name-sub" style="font-size:11px;color:#B45309;margin-top:4px;">이 기기 초안 본문이 있어요. 「이 기기」 권장.</div>'
         : '';
       return '<div class="sync-conflict-item">' +
-        '<div class="sync-conflict-name">' + escapeHtml(plannerConflictLabel_(conflict.key)) + '</div>' + hint +
+        '<div class="sync-conflict-name">' + escapeHtml(plannerConflictLabel_(conflict.key)) + '</div>' + conflictDiffLineHTML_(conflict) + hint +
         '<div class="sync-conflict-options">' +
           '<label class="sync-conflict-option"><input type="radio" name="sync-conflict-' + i + '" value="remote"' + remoteChecked + '>' +
             '<span><strong>서버 기준' + escapeHtml(remoteBy) + '</strong><span class="sync-conflict-preview">' + escapeHtml(plannerConflictPreview_(conflict.remote)) + '</span></span></label>' +

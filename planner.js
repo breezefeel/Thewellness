@@ -15510,13 +15510,16 @@ problem:
 selfCare:
 👉 먼저 확인: 손을 엉덩이 아래에 넣어 보세요. 뼈 끝이 닿나요?
 
-👉 1. 두 발을 바닥에 두고 골반을 세워, 좌골이 의자 가운데 오게 합니다.
-👉 2. 숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완하는게 중요합니다.
-👉 3. 정수리를 천장 쪽으로 보내 목이 어깨 위에 놓이게 합니다.
+1) 두 발을 바닥에 두고 골반을 세워, 좌골이 의자 가운데 오게 합니다.
+
+2) 숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완하는게 중요합니다.
+
+3) 정수리를 천장 쪽으로 보내 목이 어깨 위에 놓이게 합니다.
 
 시원하다 싶으면 거기서 멈추세요.
-혼자 할 때 실수: 목만 당긴다. 숨을 참는다. 허리를 억지로 젖힌다.
-팔이 저리거나 힘이 빠지면 운동보다 병원 진료가 먼저입니다.
+
+✕ 혼자 할 때 실수: 목만 당긴다. 숨을 참는다. 허리를 억지로 젖힌다.
+✕ 팔이 저리거나 힘이 빠지면 운동보다 병원 진료가 먼저입니다.
 
 explanation:
 살만 느껴진다면 좌골이 앞으로 빠진 상태예요. 바른 자세의 출발점은 아래입니다. 그래서 목만 늘리면 유지가 잘 안 됩니다.
@@ -15529,7 +15532,7 @@ const DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW = `${VOICE_CORE_POINTER}
 [블로그 형식]
 존댓말. **, ---, > 금지. 문단 사이 빈 줄. 같은 결론을 칸마다 반복하지 않는다.
 1. problem: 일상 장면 2~4문장. 자가 점검·병원 안내 없음.
-2. selfCare: 👉 먼저 확인(자가 점검 한 문장) → 👉 1.~4. 3~4단계(자세→숨→목·머리→등). 각 단계는 동작과 이유를 한 절에, 초·회를 포함한다. 단계 사이에만 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 맨 끝 한 줄만 적신호면 병원. 「1단계 —」 표기 금지.
+2. selfCare: 👉 먼저 확인(자가 점검 한 문장) → 1) 2) 3) (4)) 3~4단계(자세→숨→목·머리→등). 번호는 「1)」 형식이고 앞에 👉를 붙이지 않는다. 각 단계는 동작과 이유를 한 절에, 초·회를 포함한다. 항목(먼저 확인·번호 단계) 사이마다 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 주의·실수·적신호 줄은 모두 「✕ 」로 시작한다(예: ✕ 목만 당긴다). 맨 끝 한 줄만 적신호면 병원. 「1단계 —」 표기 금지.
 3. explanation: 맨 앞 1~2문장이 핵심. 그 뒤는 새 이유. 병원·자가 점검 반복 없음.
 4. cta: 「프로필 링크에서 온라인 문진」 하나. 병원 문구 없음. 허브 URL은 주제와 맞을 때 하나 — 허리 ?hub=back · 목 ?hub=neck · 어깨 ?hub=shoulder · 무릎 ?hub=knee · 골반 ?hub=pelvis (기본 ${PROFILE_BRAND_URL})
 5. title: 궁금증 한 줄, 35자 내외. hashtags 6~8개.
@@ -39794,9 +39797,25 @@ function ensureNotifyForInstaBg_(){
   } catch(e){}
 }
 
+/** 첫 줄(제목)을 인용구(blockquote)로, 나머지는 문단으로 — 네이버 에디터에 붙이면 제목이 인용구가 된다. */
+function blogPasteHtmlWithQuotedTitle_(text){
+  var raw = String(text || '').replace(/\r\n/g, '\n').trim();
+  if(!raw) return '';
+  var nl = raw.indexOf('\n');
+  var title = (nl < 0 ? raw : raw.slice(0, nl)).trim();
+  if(!title || title.length > 120) return '';
+  var rest = nl < 0 ? '' : raw.slice(nl + 1).trim();
+  var paras = rest ? rest.split(/\n\s*\n/).map(function(block){
+    return '<p>' + escapeHtml(block.trim()).replace(/\n/g, '<br/>') + '</p>';
+  }).join('') : '';
+  return '<blockquote>' + escapeHtml(title.replace(/^제목\s*[:：]\s*/, '')) + '</blockquote>' + paras;
+}
 function copyAndOpenNaverBlog_(text, catId){
-  if(text && navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).catch(function(){});
+  if(text){
+    var quotedHtml = '';
+    try { quotedHtml = blogPasteHtmlWithQuotedTitle_(text); } catch(eQuote){ quotedHtml = ''; }
+    if(quotedHtml) writeClipboardRich_(text, quotedHtml, function(){});
+    else if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(function(){});
   }
   openExternalNaverBlog();
   try { noteBlogDefaultCategoryOnOpen_(catId != null ? catId : state.selectedCatId); } catch(eNote){}
@@ -41206,22 +41225,52 @@ function parseSelfCareSteps_(text){
 /** 👉 와 빈 줄로 이미 짜인 셀프 케어는 번호를 다시 매기지 않는다 */
 function selfCareKeepsAuthorBreaks_(text){
   var t = String(text || '');
+  if(/(^|\n)\s*\d+\)\s+\S/.test(t) && /\n\s*\n/.test(t)) return true;
   return /(^|\n)\s*👉/.test(t) && /\n\s*\n/.test(t);
+}
+/** 주의·실수 줄 머리표 → 「✕ 」 */
+var SELFCARE_CAUTION_RE_ = /^(?:[⚠❗❌✗✘×✖]\uFE0F?\s*|※\s*|주의\s*[:：]?\s*)/;
+/**
+ * 운동 단계 템플릿: 번호는 1) 2) 3), 항목 사이 빈 줄, 주의 줄은 「✕ 」로 시작.
+ * 예전 「👉 1.」 형식도 같은 모양으로 맞춘다. 내용 문장은 바꾸지 않는다.
+ */
+function normalizeSelfCareTemplate_(text){
+  var lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+  var out = [];
+  var prevKind = '';
+  function blank(){ if(out.length && out[out.length - 1] !== '') out.push(''); }
+  lines.forEach(function(raw){
+    var ln = raw.trim();
+    if(!ln){ blank(); prevKind = ''; return; }
+    var m = ln.match(/^(?:👉\s*)?(\d+)\s*[.)]\s*(.+)$/);
+    if(m){ blank(); out.push(m[1] + ') ' + m[2].trim()); prevKind = 'step'; return; }
+    if(/^✕\s/.test(ln)){ if(prevKind !== 'caution') blank(); out.push(ln); prevKind = 'caution'; return; }
+    if(/^혼자 할 때 실수\s*[:：]/.test(ln)){ if(prevKind !== 'caution') blank(); out.push('✕ ' + ln); prevKind = 'caution'; return; }
+    var cm = ln.match(SELFCARE_CAUTION_RE_);
+    if(cm && ln.length > cm[0].length){
+      if(prevKind !== 'caution') blank();
+      out.push('✕ ' + ln.slice(cm[0].length).trim());
+      prevKind = 'caution';
+      return;
+    }
+    out.push(ln); prevKind = 'text';
+  });
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /** 미리보기처럼 번호 + 단계 사이 빈 줄 — 아파트너·블로그 붙여넣기용 */
 function formatSelfCareStepsForCopy_(text){
   var t = String(text || '').replace(/\r\n/g, '\n').trim();
   if(!t) return '';
-  if(selfCareKeepsAuthorBreaks_(t)) return t.replace(/\n{3,}/g, '\n\n');
+  if(selfCareKeepsAuthorBreaks_(t)) return normalizeSelfCareTemplate_(t);
   var steps = parseSelfCareSteps_(t);
   if(steps.length <= 1){
     var one = String(steps[0] || t).replace(SELFCARE_STEP_STRIP_RE_, '').trim();
-    return one || t;
+    return normalizeSelfCareTemplate_(one || t);
   }
-  return steps.map(function(s, i){
-    return (i + 1) + '. ' + String(s || '').replace(SELFCARE_STEP_STRIP_RE_, '').trim();
-  }).join('\n\n');
+  return normalizeSelfCareTemplate_(steps.map(function(s, i){
+    return (i + 1) + ') ' + String(s || '').replace(SELFCARE_STEP_STRIP_RE_, '').trim();
+  }).join('\n\n'));
 }
 
 /** 리치 에디터 붙여넣기용 — 따라하기 미리보기 카드와 비슷한 HTML */
@@ -41230,7 +41279,7 @@ function formatSelfCareStepsHtmlForCopy_(text){
   if(!t) return '';
   if(selfCareKeepsAuthorBreaks_(t)){
     return '<div style="white-space:pre-wrap;line-height:1.7;font-size:14px;color:#1F2937;word-break:keep-all;">' +
-      escapeHtml(t.replace(/\n{3,}/g, '\n\n')).replace(/\n/g, '<br/>') + '</div>';
+      escapeHtml(normalizeSelfCareTemplate_(t)).replace(/\n/g, '<br/>') + '</div>';
   }
   var steps = parseSelfCareSteps_(t);
   function bodyHtml(s){

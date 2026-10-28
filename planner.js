@@ -20832,6 +20832,10 @@ function renderSyncStatusBodyHTML_(info){
       '</div>';
   }
 
+  // 중복 카드 확인(지우지 않고 목록만)
+  html += '<div class="sync-status-action-hint"><button type="button" class="modal-btn sync-settings-mini-btn" onclick="openDuplicateCardsReview_()">중복 카드 확인</button> ' +
+    '<span style="font-size:12px;opacity:.75">날짜·채널·주제가 같은 카드 목록. 지우지 않아요.</span></div>';
+
   // 1. 사용자 이메일
   html += row(
     '1. 사용자 이메일',
@@ -23603,6 +23607,17 @@ function ensureSyncedContentDraftCards_(){
       var cat = CATEGORIES[catId];
       if(!cat) return;
       if(!cat.drafts) cat.drafts = [];
+      // 다른 기기가 같은 원고를 다른 id로 올렸으면, 서버 내용만으로 같은 카드를 또 만들지 않는다.
+      // 내용은 지우지 않고 그대로 두며, 중복 확인 화면에 「카드 없이 남은 원고」로 보인다.
+      var sameWork = findLiveCardWithSameWork_(catId, id, topic, content);
+      if(sameWork){
+        if(!state._dupPlaceholderSkipped) state._dupPlaceholderSkipped = {};
+        if(!state._dupPlaceholderSkipped[id]){
+          state._dupPlaceholderSkipped[id] = { id: id, topic: topic || '', existingId: sameWork.id, catId: catId };
+          try { console.info('[중복 카드 생성 막음]', JSON.stringify(state._dupPlaceholderSkipped[id])); } catch(eLogSkip){}
+        }
+        return;
+      }
       cat.drafts.push({
         id: id,
         topic: topic || '가져온 주제',
@@ -44430,72 +44445,226 @@ function importedCopyHasOwnWork_(draft){
   }
   return false;
 }
+/** 채널별 본문이 들어 있는지만 본다. 내용이 아니라 어느 채널에 글이 있는지의 모양. */
+function contentChannelSig_(content){
+  if(!content || typeof content !== 'object') return '';
+  var parts = [];
+  var blog = content.blog;
+  if(blog && (blog.title || blog.draft || blog.explanation || blog.problem || blog.selfCare || blog.hook)) parts.push('blog');
+  var ig = content.insta;
+  if(ig && (ig.caption || ig.hook || ig.text)) parts.push('instagram');
+  var th = content.threads;
+  if(th && (th.body || th.text || th.comment)) parts.push('threads');
+  var news = content.news;
+  if(news) ['naver', 'kakao', 'karrot'].forEach(function(slot){
+    var item = news[slot];
+    if(item && (item.title || item.body || item.cta)) parts.push('sonsik:' + slot);
+  });
+  return parts.sort().join(',');
+}
+function dupTopicKey_(topic){
+  return typeof normalizeTopicKey_ === 'function' ? normalizeTopicKey_(topic) : String(topic || '').replace(/\s+/g, '').toLowerCase();
+}
+/** 채널별 제목까지 포함한 같은 원고 판별 키. 서버 내용으로 만든 카드는 주제가 블로그 제목이라 주제만으로는 못 맞춘다. */
+function contentWorkKey_(content){
+  var sig = contentChannelSig_(content);
+  if(!sig) return '';
+  var t = [];
+  function norm(v){ return String(v == null ? '' : v).replace(/\s+/g, '').toLowerCase(); }
+  var b = content.blog || {}; t.push(norm(b.importTitle || b.title));
+  var ig = content.insta || {}; t.push(norm(ig.importTitle || ig.hook));
+  var th = content.threads || {}; t.push(norm(th.importTitle));
+  var n = content.news || {};
+  ['naver', 'kakao', 'karrot'].forEach(function(slot){ var it = n[slot] || {}; t.push(norm(it.importTitle || it.title)); });
+  var joined = t.join('|');
+  return /[^|]/.test(joined) ? sig + '#' + joined : '';
+}
+function findLiveCardWithSameWork_(catId, selfId, topic, content){
+  var cat = CATEGORIES[catId];
+  var want = contentWorkKey_(content);
+  if(!cat || !want) return null;
+  var found = null;
+  (cat.drafts || []).forEach(function(d){
+    if(found || !d || !d.id || d.id === selfId || d._syncPlaceholder) return;
+    if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
+    var own = null;
+    try { own = getDraftContent_(d.id); } catch(eOwn){ own = null; }
+    if(contentWorkKey_(own) === want) found = d;
+  });
+  return found;
+}
+function dupCardDateLabel_(d){
+  try {
+    if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerDraftListDate) return PlannerSyncRules.plannerDraftListDate(d).label;
+  } catch(eLbl){}
+  return String((d && d.createdAt) || '').slice(5, 10);
+}
 /**
- * 같은 원고 파일을 두 기기에서 각각 가져오면 같은 글이 다른 id 로 두 장이 된다.
- * 주제가 같고, 내용·본문이 글자 하나까지 같고, 어느 쪽에도 사용자 작업이 없는 가져오기 사본만 한 장으로 합친다.
- * 조금이라도 다르면 둘 다 둔다. 합친 목록은 state._importCopyMergeReport 와 콘솔에 남긴다.
+ * 중복으로 보이는 카드 묶음. 지우지 않고 목록만 만든다.
+ * level 'same'  = 프로그램·주제·날짜·채널이 모두 같음(경고 대상)
+ * level 'similar' = 프로그램·주제·채널은 같고 날짜만 다름(확인용)
  */
-function mergeIdenticalImportedCopies_(){
+function findPossibleDuplicateCards_(){
+  var strict = {};
+  var loose = {};
+  CATEGORIES.forEach(function(cat, catId){
+    (cat.drafts || []).forEach(function(d){
+      if(!d || !d.id || !d.topic) return;
+      if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
+      var content = null;
+      try { content = getDraftContent_(d.id); } catch(eC){ content = null; }
+      var sig = contentChannelSig_(content);
+      var tk = dupTopicKey_(d.topic);
+      if(!tk) return;
+      var date = dupCardDateLabel_(d);
+      var row = { d: d, catId: catId, sig: sig, date: date };
+      var sk = catId + '|' + tk + '|' + date + '|' + sig;
+      (strict[sk] = strict[sk] || []).push(row);
+      if(sig){
+        var lk = catId + '|' + tk + '|' + sig;
+        (loose[lk] = loose[lk] || []).push(row);
+      }
+    });
+  });
+  var groups = [];
+  var inSame = {};
+  function mk(level, list){
+    return {
+      level: level,
+      catId: list[0].catId,
+      program: (CATEGORIES[list[0].catId] && CATEGORIES[list[0].catId].name) || '',
+      topic: list[0].d.topic,
+      channels: list[0].sig,
+      cards: list.map(function(r){
+        var d = r.d;
+        var ent = state.syncEntityRevisions || {};
+        return {
+          id: d.id,
+          date: r.date,
+          createdAt: String(d.createdAt || ''),
+          step: String(d.roadmapStepId || ''),
+          placeholder: !!d._syncPlaceholder,
+          published: (typeof draftIsPublished_ === 'function') ? !!draftIsPublished_(d.id) : false,
+          onServer: !!ent['draft:' + d.id]
+        };
+      })
+    };
+  }
+  Object.keys(strict).forEach(function(k){
+    if(strict[k].length < 2) return;
+    strict[k].forEach(function(r){ inSame[r.d.id] = true; });
+    groups.push(mk('same', strict[k]));
+  });
+  Object.keys(loose).forEach(function(k){
+    var list = loose[k];
+    var dates = {};
+    list.forEach(function(r){ dates[r.date] = true; });
+    if(list.length < 2 || Object.keys(dates).length < 2) return;
+    groups.push(mk('similar', list));
+  });
+  return groups;
+}
+function plannerDuplicateCardReport_(){
+  var groups = findPossibleDuplicateCards_();
+  var orphans = Object.keys(state._dupPlaceholderSkipped || {}).map(function(id){ return state._dupPlaceholderSkipped[id]; });
+  return { groups: groups, orphanContent: orphans };
+}
+window.plannerListDuplicateCards_ = function(){
+  var r = plannerDuplicateCardReport_();
+  try { console.table(r.groups.map(function(g){ return { 구분: g.level, 프로그램: g.program, 주제: g.topic, 채널: g.channels, 카드: g.cards.map(function(c){ return c.id + '(' + c.date + ')'; }).join(' / ') }; })); } catch(eT){}
+  return r;
+};
+var _dupWarnSig_ = '';
+/** 날짜·채널·주제가 같은 카드가 두 장 이상이면 한 번 알린다(같은 상태에서는 반복하지 않음). */
+function warnIfDuplicateCards_(reason){
+  var same = findPossibleDuplicateCards_().filter(function(g){ return g.level === 'same'; });
+  var sig = same.map(function(g){ return g.cards.map(function(c){ return c.id; }).sort().join('+'); }).sort().join('|');
+  if(!sig){ _dupWarnSig_ = ''; return 0; }
+  if(sig === _dupWarnSig_) return same.length;
+  _dupWarnSig_ = sig;
+  try { console.warn('[같은 카드 두 장]', reason, JSON.stringify(same.map(function(g){ return { topic: g.topic, date: g.cards[0].date, ids: g.cards.map(function(c){ return c.id; }) }; }))); } catch(eW){}
+  if(typeof setAppToast === 'function'){
+    setAppToast('날짜·채널·주제가 같은 카드가 ' + same.length + '곳에서 두 장씩 있어요. 지우지 않았어요.\n동기화 상태 ▸ 중복 카드 확인에서 볼 수 있어요.', { duration: 8000, variant: 'err' });
+  }
+  return same.length;
+}
+window.openDuplicateCardsReview_ = function(){
+  var old = document.getElementById('dup-cards-overlay');
+  if(old) old.remove();
+  var r = plannerDuplicateCardReport_();
+  var box = document.createElement('div');
+  box.id = 'dup-cards-overlay';
+  box.style.cssText = 'position:fixed;inset:0;z-index:2147482000;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center';
+  var sheet = document.createElement('div');
+  sheet.style.cssText = 'background:#fff;color:#1c1c1e;width:100%;max-width:560px;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));font:14px/1.5 -apple-system,system-ui,sans-serif';
+  function esc(t){ return escapeHtml(String(t == null ? '' : t)); }
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">중복으로 보이는 카드</b><button type="button" id="dup-cards-close" style="border:0;background:#eee;border-radius:8px;min-height:36px;padding:0 12px">닫기</button></div>' +
+    '<p style="margin:6px 0 12px;color:#555">확인용이에요. 여기서도, 자동으로도 카드를 지우지 않습니다. 지울지는 직접 정하세요.</p>';
+  if(!r.groups.length && !r.orphanContent.length) html += '<p>중복으로 보이는 카드가 없어요.</p>';
+  r.groups.forEach(function(g){
+    var tag = g.level === 'same' ? '<span style="background:#fde2e2;color:#a31;padding:1px 6px;border-radius:6px">같은 날짜</span>' : '<span style="background:#fff3c4;color:#6a5000;padding:1px 6px;border-radius:6px">날짜만 다름</span>';
+    html += '<section style="border:1px solid #ddd;border-radius:10px;padding:10px;margin-bottom:10px"><div>' + tag + ' <b>' + esc(g.program) + '</b> · ' + esc(g.topic) + '</div>' +
+      '<div style="color:#666;font-size:12px;margin:2px 0 6px">채널: ' + esc(g.channels || '(본문 없음)') + '</div>';
+    g.cards.forEach(function(c){
+      html += '<div style="font-size:13px;padding:4px 0;border-top:1px dashed #e5e5e5">' + esc(c.date) + ' · ' + esc(c.id) +
+        ' · 단계 ' + esc(c.step || '-') + (c.published ? ' · 발행됨' : '') + (c.onServer ? ' · 서버에 있음' : ' · 이 기기에만') + (c.placeholder ? ' · 서버 내용만으로 생긴 카드' : '') + '</div>';
+    });
+    html += '</section>';
+  });
+  if(r.orphanContent.length){
+    html += '<section style="border:1px solid #ddd;border-radius:10px;padding:10px;margin-bottom:10px"><b>카드 없이 남은 원고</b><div style="color:#666;font-size:12px;margin:2px 0 6px">같은 카드가 이미 있어 새 카드를 만들지 않았어요. 원고는 지우지 않았습니다.</div>';
+    r.orphanContent.forEach(function(o){ html += '<div style="font-size:13px">' + esc(o.id) + ' · ' + esc(o.topic) + ' → 기존 ' + esc(o.existingId) + '</div>'; });
+    html += '</section>';
+  }
+  html += '<button type="button" id="dup-cards-copy" style="width:100%;min-height:44px;border-radius:10px;border:1px solid #888;background:#fff">목록 복사</button>';
+  sheet.innerHTML = html;
+  box.appendChild(sheet);
+  box.addEventListener('click', function(ev){ if(ev.target === box) box.remove(); });
+  document.body.appendChild(box);
+  document.getElementById('dup-cards-close').addEventListener('click', function(){ box.remove(); });
+  document.getElementById('dup-cards-copy').addEventListener('click', function(){
+    var text = JSON.stringify(r, null, 2);
+    try { navigator.clipboard.writeText(text).then(function(){ setAppToast('목록을 복사했어요.', { duration: 2400, variant: 'ok' }); }); } catch(eCp){ console.log(text); }
+  });
+};
+/**
+ * 같은 원고 파일을 두 기기에서 각각 가져오면 같은 글이 다른 id 로 두 장이 된다(새로 가져올 때는 같은 id를 쓰도록 고쳤다).
+ * 이미 생긴 사본은 지우지 않는다. 완전히 같은 사본만 state._importCopyMergeReport 와 콘솔에 남긴다.
+ */
+function reportIdenticalImportedCopies_(){
   var report = [];
   CATEGORIES.forEach(function(cat, catId){
     var groups = {};
     (cat.drafts || []).forEach(function(d){
       if(!d || !d.id || d._syncPlaceholder || !isUserAddedDraftId_(d.id) || !isImportedDraft_(d)) return;
       if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
-      var key = typeof normalizeTopicKey_ === 'function' ? normalizeTopicKey_(d.topic) : String(d.topic || '').replace(/\s+/g, '').toLowerCase();
+      var key = dupTopicKey_(d.topic);
       if(!key) return;
       (groups[key] = groups[key] || []).push(d);
     });
     Object.keys(groups).forEach(function(key){
       var list = groups[key];
       if(list.length < 2) return;
-      // 남길 카드: 서버에 이미 올라간 것 → 먼저 만든 것 → id 순
-      list.sort(function(a, b){
-        var ra = (state.syncEntityRevisions && state.syncEntityRevisions['draft:' + a.id]) ? 0 : 1;
-        var rb = (state.syncEntityRevisions && state.syncEntityRevisions['draft:' + b.id]) ? 0 : 1;
-        if(ra !== rb) return ra - rb;
-        var ta = parseIsoMs_(a.createdAt) || 0;
-        var tb = parseIsoMs_(b.createdAt) || 0;
-        if(ta !== tb) return ta - tb;
-        return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
-      });
-      var keep = list[0];
-      if(importedCopyHasOwnWork_(keep)) return;
-      var keepFp = importedCopyFingerprint_(keep);
-      if(!keepFp) return;
+      var fp0 = importedCopyFingerprint_(list[0]);
+      if(!fp0) return;
       list.slice(1).forEach(function(dup){
-        if(importedCopyHasOwnWork_(dup)) return;
-        if(importedCopyFingerprint_(dup) !== keepFp) return;
-        report.push({
-          catId: catId,
-          topic: String(dup.topic || ''),
-          keptId: keep.id,
-          keptDate: String(keep.createdAt || '').slice(0, 10),
-          mergedId: dup.id,
-          mergedDate: String(dup.createdAt || '').slice(0, 10)
-        });
-        deleteDraftSilent_(catId, dup.id);
-        if(state.draftBrandOverrides) delete state.draftBrandOverrides[dup.id];
+        if(importedCopyFingerprint_(dup) !== fp0) return;
+        report.push({ catId: catId, topic: String(dup.topic || ''), idA: list[0].id, idB: dup.id, dateA: String(list[0].createdAt || '').slice(0, 10), dateB: String(dup.createdAt || '').slice(0, 10) });
       });
     });
   });
+  state._importCopyMergeReport = report;
   if(report.length){
-    state._importCopyMergeReport = (state._importCopyMergeReport || []).concat(report);
-    try { console.info('[가져오기 사본 합침]', JSON.stringify(report)); } catch(eLog){}
-    if(typeof setAppToast === 'function'){
-      var names = report.slice(0, 3).map(function(row){
-        return row.topic.length > 18 ? row.topic.slice(0, 18) + '…' : row.topic;
-      }).join(' / ');
-      setAppToast('내용이 완전히 같은 가져오기 사본 ' + report.length + '장을 한 장으로 합쳤어요.\n' + names + (report.length > 3 ? ' 외 ' + (report.length - 3) + '장' : ''), { duration: 7000, variant: 'ok' });
-    }
+    try { console.info('[내용이 같은 가져오기 사본(지우지 않음)]', JSON.stringify(report)); } catch(eLog){}
   }
-  return report.length > 0;
+  return false;
 }
 function applyClinicTitleAndImportDrawerRepair_(){
   var changed = false;
   try { if(stripStoredClinicBlogTitles_()) changed = true; } catch(eTitle){}
-  try { if(mergeIdenticalImportedCopies_()) changed = true; } catch(eCopies){}
+  try { reportIdenticalImportedCopies_(); } catch(eCopies){}
   try { if(relocateImportedMiscDrafts_()) changed = true; } catch(eMove){}
+  try { warnIfDuplicateCards_('repair'); } catch(eDupWarn){}
   if(!changed) return false;
   try {
     var prev = {};
@@ -44588,6 +44757,19 @@ function applyImportPiece_(content, piece, catId){
     };
   }
 }
+/** 같은 프로그램·같은 주제를 두 기기에서 가져와도 같은 id가 되게 한다(다른 id면 서버에서 두 장이 된다). */
+function importDeterministicDraftId_(catId, topic){
+  var key = importNormKey_(topic);
+  if(!key) return '';
+  var h1 = 2166136261, h2 = 5381, i;
+  for(i = 0; i < key.length; i++){
+    var c = key.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+    h2 = (Math.imul(h2, 33) + c) >>> 0;
+  }
+  var tail = String(h1 % 1000000).padStart(6, '0') + String(h2 % 100000).padStart(5, '0');
+  return 'd' + catId + '-c17' + tail;
+}
 function applyDraftImportBatch_(drafts){
   var pieceCount = 0;
   var firstCat = null;
@@ -44599,7 +44781,11 @@ function applyDraftImportBatch_(drafts){
     var draft = findImportDraftByTopic_(group.catId, group.topic);
     if(!draft){
       created = true;
-      var id = 'd' + group.catId + '-c' + String(Date.now() + pieceCount);
+      var id = importDeterministicDraftId_(group.catId, group.topic);
+      // 이미 같은 id가 있거나(다른 주제와 충돌) 지운 기록이 있으면 예전 방식 id를 쓴다
+      var idTaken = !id || (state.deletedDraftIds && state.deletedDraftIds[id]) ||
+        CATEGORIES.some(function(c){ return (c.drafts || []).some(function(row){ return row && row.id === id; }); });
+      if(idTaken) id = 'd' + group.catId + '-c' + String(Date.now() + pieceCount);
       while((cat.drafts || []).some(function(row){ return row && row.id === id; })) id += 'x';
       var iso = importPlannedIso_(group.date) || new Date().toISOString();
       draft = {
@@ -44662,6 +44848,7 @@ function applyDraftImportBatch_(drafts){
       try { placeImportedDraftOnTopic_(draft, group.catId); } catch(ePlace){}
     }
   });
+  try { warnIfDuplicateCards_('import'); } catch(eDupW){}
   return { count: pieceCount, catId: firstCat };
 }
 function renderDraftImportPreview_(view, parseError){

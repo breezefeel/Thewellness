@@ -13693,11 +13693,11 @@ const EXT_NAVER_BLOG_WRITE = 'https://blog.naver.com/PostWriteForm.naver?blogId=
 /** 기본(폴백) — 도수치료·CMT. 실제 이동은 getInstagramUrlForCat_ 사용 */
 const EXT_INSTAGRAM_WEB = 'https://www.instagram.com/dr.park_dc.pt/';
 const EXT_THREADS = 'https://www.threads.com/@dr.park_dc.pt';
-/** 프로그램별 인스타 계정 — 도수·CMT / 페이스·IFC / 무브먼트·움직임 */
+/** 인스타 게시 계정 — 모든 프로그램의 기본 게시 계정은 박준규 계정. 프로그램 계정은 아래 공동작업 계정으로 붙인다. */
 const INSTAGRAM_USER_BY_PROGRAM = {
   park: 'dr.park_dc.pt',
-  face: 'dr.face_ifc',
-  movement: 're.al_movement_official'
+  face: 'dr.park_dc.pt',
+  movement: 'dr.park_dc.pt'
 };
 /** 인스타 발행·복사 시 캡션에 넣는 연결 계정 (콜라보) */
 const INSTAGRAM_COLLAB_USER_BY_PROGRAM = {
@@ -14113,12 +14113,15 @@ function withInstagramCollabMention_(text, catId){
   if(textHasInstagramCollabMention_(body, mention)) return body;
   return body ? body + '\n\n' + mention : mention;
 }
-function instagramCollabSheetHtml_(catId){
+/** 계정 칸 표기: 게시 계정과 공동작업 계정을 나눠 보여 준다. */
+function instagramAccountSplitText_(catId){
   var mention = instagramCollabMentionForCat_(catId);
-  if(!mention) return '';
-  return '<div class="cb"><div class="cb-label">연결 계정 (고정 · 발행·복사 시 캡션에 포함)</div>' +
-    '<div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">' +
-    escapeHtml(mention) + '</div></div>';
+  return '게시: @' + getInstagramUsernameForCat_(catId) + ' / 공동작업: ' + (mention || '없음');
+}
+function instagramCollabSheetHtml_(catId){
+  return '<div class="cb"><div class="cb-label">계정 (공동작업 계정은 발행·복사 시 캡션에 포함)</div>' +
+    '<div class="cb-box" data-insta-accounts="1" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">' +
+    escapeHtml(instagramAccountSplitText_(catId)) + '</div></div>';
 }
 /** 예전 초안: carousel이 있으면 캡션에 합쳐 붙여넣기용으로 사용 */
 function formatCarouselKeyPointsForCaption_(carousel){
@@ -15665,8 +15668,8 @@ const DEFAULT_PROMPTS = {
 프로그램: Real Movement(P-스트레칭·기능운동·자세교정), 리얼 페이스(얼굴 교정·작은얼굴), CMT/IFC/Re:Al 전문가 교육
 프로필·약력: https://breezefeel.github.io/drpark · https://blog.naver.com/allenjoy/120205433765
 ${BLOG_CONTENT_VOICE_RULE}
-인스타(프로그램별): 도수·CMT @dr.park_dc.pt · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트·움직임 @re.al_movement_official
-인스타 연결 계정(시스템이 캡션에 자동 삽입, 본문에 쓰지 말 것): CMT @cmt_academy · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트 @re.al_movement_official (도수치료·Re:Al 과정은 연결 계정 없음)
+인스타 게시 계정: 모든 프로그램 @dr.park_dc.pt
+인스타 공동작업 계정(시스템이 캡션에 자동 삽입, 본문에 쓰지 말 것): CMT @cmt_academy · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트 @re.al_movement_official (도수치료·Re:Al 과정은 공동작업 계정 없음)
 표기: 「리얼무브먼트」붙여 쓰기. 「리얼 페이스」. 「리:얼」 금지. 영문 Re:Al / Re:Al Face는 유지.` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
   categories: {
     0: { // 도수치료
@@ -44939,7 +44942,15 @@ function renderDraftImportPreview_(view, parseError){
       html += '<input type="checkbox" data-import-index="' + item.index + '"' + (item.ok ? ' checked' : ' disabled') + '>';
       html += '<span><strong>' + escapeHtml(item.channelLabel || '채널') + '</strong> ' + escapeHtml(item.title || '(제목 없음)');
       var meta = [];
-      if(item.account) meta.push(item.account);
+      if(item.channel === 'instagram'){
+        // 파일의 account가 박준규 계정이 아니면 프로그램 계정이라 공동작업으로 본다
+        var postUser = 'dr.park_dc.pt';
+        var acct = String(item.account || '').replace(/^@+/, '').trim();
+        var collabs = (item.collab && item.collab.length) ? item.collab.slice() : [];
+        if(acct && acct.toLowerCase() !== postUser && collabs.map(function(h){ return String(h).replace(/^@+/, '').toLowerCase(); }).indexOf(acct.toLowerCase()) < 0 && !collabs.length) collabs.push(acct);
+        if(!collabs.length){ var m = instagramCollabMentionForCat_(item.catId); if(m) collabs.push(m); }
+        meta.push('게시: @' + postUser + ' / 공동작업: ' + (collabs.length ? collabs.map(function(h){ return '@' + String(h).replace(/^@+/, ''); }).join(' ') : '없음'));
+      } else if(item.account) meta.push(item.account);
       if(item.scheduledDate) meta.push(item.scheduledDate);
       if(meta.length) html += '<em>' + escapeHtml(meta.join(' · ')) + '</em>';
       if(item.collab && item.collab.length){

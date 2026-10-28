@@ -16598,10 +16598,22 @@ function syncStringHash_(str){
   }
   return (h >>> 0).toString(36) + ':' + str.length;
 }
+// 서버(jsonb)는 객체 키를 정렬해 돌려준다. 키 삽입 순서에 따라 문자열이 달라지면
+// 같은 내용도 「다름」으로 판정돼 충돌 창과 안 줄어드는 남은 건수가 생긴다. 키를 정렬해 비교한다.
+function canonicalizeForFingerprint_(v, depth){
+  if(v === null || typeof v !== 'object' || depth > 60) return v;
+  if(Array.isArray(v)) return v.map(function(x){ return canonicalizeForFingerprint_(x, depth + 1); });
+  if(typeof v.toJSON === 'function') return v.toJSON();
+  var out = {};
+  Object.keys(v).sort().forEach(function(k){
+    if(v[k] !== undefined) out[k] = canonicalizeForFingerprint_(v[k], depth + 1);
+  });
+  return out;
+}
 function syncValueFingerprint_(value){
   if(value === undefined) return '__missing__';
   try {
-    var s = JSON.stringify(value);
+    var s = JSON.stringify(canonicalizeForFingerprint_(value, 0));
     // 대형 초안/발행본 전체 문자열 비교는 부트스트랩에서 메인 스레드를 멈춤
     if(s.length > 2500) return 'h:' + syncStringHash_(s);
     return s;
@@ -17081,15 +17093,19 @@ function normalizeDraftRowForSync_(draft){
   if(imageSig) row.imageSig = imageSig;
   return row;
 }
+// 비교에서만 무시하는 수정 시각 필드. 예약·발행 날짜(scheduledDate, publishedAt 등)는 내용이라 비교에 넣는다.
+var SYNC_COMPARE_IGNORED_KEYS_ = { updatedAt: 1, savedAt: 1, order: 1, index: 1, modifiedAt: 1, editedAt: 1, lastEditedAt: 1, lastSavedAt: 1, localSavedAt: 1, syncedAt: 1 };
 function omitEmptyForSyncCompare_(value){
   if(value == null) return undefined;
+  // 줄 끝 공백·개행 차이만 있는 글은 같은 글로 본다
+  if(typeof value === 'string') return value.replace(/\r\n/g, '\n').trim();
   if(typeof value !== 'object') return value;
   if(Array.isArray(value)){
     return value.map(omitEmptyForSyncCompare_).filter(function(v){ return v !== undefined; });
   }
   var out = {};
   Object.keys(value).forEach(function(k){
-    if(k === 'updatedAt' || k === 'savedAt' || k === 'order' || k === 'index') return;
+    if(SYNC_COMPARE_IGNORED_KEYS_[k]) return;
     var v = omitEmptyForSyncCompare_(value[k]);
     if(v === undefined || v === '' || v === false || v === null) return;
     if(Array.isArray(v) && !v.length) return;
@@ -17101,10 +17117,7 @@ function omitEmptyForSyncCompare_(value){
 function stripSyncVolatileForCompare_(value){
   if(!value || typeof value !== 'object') return value;
   var copy = Array.isArray(value) ? value.slice() : Object.assign({}, value);
-  delete copy.updatedAt;
-  delete copy.savedAt;
-  delete copy.order;
-  delete copy.index;
+  Object.keys(SYNC_COMPARE_IGNORED_KEYS_).forEach(function(k){ delete copy[k]; });
   if(copy.roadmapStepId) copy.roadmapStepId = canonicalizeStepIdForCompare_(copy.roadmapStepId);
   if(copy.previousRoadmapStepId) copy.previousRoadmapStepId = canonicalizeStepIdForCompare_(copy.previousRoadmapStepId);
   if(copy.strategyGuide){
@@ -17113,10 +17126,7 @@ function stripSyncVolatileForCompare_(value){
   }
   if(copy.value && typeof copy.value === 'object' && !Array.isArray(copy.value)){
     copy.value = Object.assign({}, copy.value);
-    delete copy.value.updatedAt;
-    delete copy.value.savedAt;
-    delete copy.value.order;
-    delete copy.value.index;
+    Object.keys(SYNC_COMPARE_IGNORED_KEYS_).forEach(function(k){ delete copy.value[k]; });
     if(copy.value.roadmapStepId) copy.value.roadmapStepId = canonicalizeStepIdForCompare_(copy.value.roadmapStepId);
     if(copy.value.previousRoadmapStepId) copy.value.previousRoadmapStepId = canonicalizeStepIdForCompare_(copy.value.previousRoadmapStepId);
     if(copy.value.strategyGuide){

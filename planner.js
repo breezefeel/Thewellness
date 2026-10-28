@@ -29,7 +29,7 @@ const CATEGORIES = [
       {id:"d2-4", topic:"이중턱이 생기는 세 가지 구조적 이유",                 angle:"피부·지방·골격 요인을 분리해서 설명, 각각의 접근법"},
     ]},
   { id:3, icon:"", name:"CMT 전문가 교육", color:"#1E3A5F", audience:"전문가",
-    sub:"도수치료 전문가 과정",
+    sub:"CMT 임상 도수치료 과정",
     drafts:[
       {id:"d3-0", topic:"촉진(Palpation)이 치료보다 먼저인 이유",               angle:"평가-치료 연결의 핵심, 실전 촉진 훈련의 필요성"},
       {id:"d3-1", topic:"교과서 해부학과 실전 도수치료의 괴리",                 angle:"이론적 지식을 임상 적용으로 전환하는 사고 훈련"},
@@ -13478,7 +13478,7 @@ function getExpertCourseTopicAudienceLine_(catId){
 /** 초안·주제 생성 등에 쓰는 탭별 독자 한 줄 (cat.audience보다 구체적) */
 function getProgramAudienceLine_(catId){
   var id = parseInt(catId, 10);
-  if(id === 3) return 'CMT 임상도수 과정 수강·복습 중인 물리치료사·도수 치료사 (평가·촉진 중심)';
+  if(id === 3) return 'CMT 임상 도수치료 과정 수강·복습 중인 물리치료사·도수 치료사 (평가·촉진 중심)';
   if(id === 4) return 'IFC 얼굴·구조 교육 수강·복습 중인 얼굴·구조 교육 전문가 (미용·도수·물리치료)';
   if(id === 5) return 'Re:Al 움직임 과정 — 강사·트레이너·물리치료사 등 움직임 지도자 (직군 제한 없음 · 강사/회원 호칭)';
   if(id === 0) return '통증·구조 치료에 관심 있는 일반인';
@@ -13913,7 +13913,7 @@ function withRealMovementBlogFooter_(text, catId){
 }
 function getExpertCourseBlogFooterText_(catId){
   var id = parseInt(catId, 10);
-  if(id === 3) return 'CMT 도수치료 과정\nhttps://breezefeel.github.io/academy#cmt';
+  if(id === 3) return 'CMT 임상 도수치료 과정\nhttps://breezefeel.github.io/academy#cmt';
   if(id === 4) return 'IFC 얼굴교정 과정\nhttps://breezefeel.github.io/academy#ifc';
   if(id === 5) return 'Re:Al 움직임 과정\nhttps://breezefeel.github.io/academy#real';
   return '';
@@ -15581,7 +15581,7 @@ function buildExpertCourseInstaPrompt_(opts){
 }
 
 const DEFAULT_CMT_EXPERT_BLOG_PROMPT = buildExpertCourseBlogPrompt_({
-  audienceIntro: '**CMT 임상도수 전문가 과정** 수강·복습 중인 물리치료사·도수 치료사를 독자로 하는',
+  audienceIntro: '**CMT 임상 도수치료 과정** 수강·복습 중인 물리치료사·도수 치료사를 독자로 하는',
   roleReaders: '평가(촉진·히스토리) 중심 사고를 키우는 현장 치료사·도수 전문가',
   programBlock: '[CMT 맥락]\n' +
     '- 치료 테크닉보다 **평가·판단 순서**가 먼저임을 유지. "왜 그렇게 판단했는가"가 드러나게\n' +

@@ -12624,6 +12624,8 @@ function applySupabaseEntityRows_(rows){
       try { same = syncEntitiesEquivalent_(key, localVal, serverVal); } catch(eSame){}
       if(same){
         payload.syncEntityRevisions[key] = serverRev;
+        // 서버 값이 이 기기 값과 완전히 같으면 올릴 것이 없다. 대기열에 남기면 「남은 N건」이 줄지 않는다.
+        op._dropSameAsServer = true;
         return;
       }
       if(base !== serverRev){
@@ -12692,7 +12694,7 @@ function applySupabaseEntityRows_(rows){
   });
   var quietPrompt = false;
   state.syncOutbox = (state.syncOutbox || []).filter(function(op){
-    if(!op || !op._dropQuietPrompt) return true;
+    if(!op || !(op._dropQuietPrompt || op._dropSameAsServer)) return true;
     quietPrompt = true;
     if(state.syncDirtyEntityKeys) delete state.syncDirtyEntityKeys[op.key];
     return false;
@@ -17228,6 +17230,8 @@ function countRealUnpushedMutations_(){
   (state.syncOutbox || []).forEach(function(op){
     if(!op || !op.key || isDeviceLocalSyncEntityKey_(op.key)) return;
     seen[op.key] = true;
+    // 「나중에」로 보류한 충돌 키는 고르기 전에는 올라가지 않는다. 남은 건수에 넣으면 줄지 않는 숫자가 된다.
+    if(conflictKeyIsSnoozed_(op.key)) return;
     n++;
   });
   Object.keys(state.syncDirtyEntityKeys || {}).forEach(function(k){
@@ -17235,6 +17239,21 @@ function countRealUnpushedMutations_(){
     n++;
   });
   return n;
+}
+/** 사용자가 「나중에」로 보류해 대기열에 남아 있는 충돌 키 수 */
+function countSnoozedHeldOps_(){
+  var n = 0;
+  (state.syncOutbox || []).forEach(function(op){
+    if(!op || !op.key || isDeviceLocalSyncEntityKey_(op.key)) return;
+    if(conflictKeyIsSnoozed_(op.key)) n++;
+  });
+  return n;
+}
+/** 지금 실제로 올릴 수 있는 대기 항목이 있는지. 보류한 충돌 키만 남았으면 false */
+function hasSendableOutboxOps_(){
+  return (state.syncOutbox || []).some(function(op){
+    return op && op.key && !isDeviceLocalSyncEntityKey_(op.key) && !conflictKeyIsSnoozed_(op.key);
+  });
 }
 /** 이전 세션 잔재(794건 루프)는 올리지 않음. 이 세션에서 고친 것만 푸시. */
 function shouldBlockStaleFloodPush_(){
@@ -18380,6 +18399,19 @@ function normalizeSyncOutbox_(raw, opts){
   if(droppedContentful) state.syncNeedsSnapshot = true;
   return Object.keys(byKey).map(function(key){ return byKey[key]; });
 }
+/**
+ * 변경 키는 비교용으로 plan:subgoal:N:step:s1 → step:1 처럼 줄여 오는데, 엔티티 맵의 실제 키는 step:s1 이다.
+ * 줄인 키로 바로 찾으면 값이 없는 것으로 읽혀 단계가 「삭제」로 올라간다. 실제 키를 찾아 돌려준다.
+ */
+function resolveAliasedSyncEntityKey_(entities, key){
+  key = String(key || '');
+  if(!entities || Object.prototype.hasOwnProperty.call(entities, key)) return key;
+  var m = key.match(/^(plan:subgoal:\d+:step:)(\d+)$/);
+  if(m && Object.prototype.hasOwnProperty.call(entities, m[1] + 's' + m[2])) return m[1] + 's' + m[2];
+  var m2 = key.match(/^(plan:subgoal:\d+:step:)s(\d+)$/i);
+  if(m2 && Object.prototype.hasOwnProperty.call(entities, m2[1] + m2[2])) return m2[1] + m2[2];
+  return key;
+}
 function enqueueSyncOutboxChanges_(changedKeys, payload){
   if(!changedKeys || !changedKeys.length) return;
   var entities = collectSyncEntities_(payload || {}, { skipEnsureIds: true });
@@ -18387,6 +18419,7 @@ function enqueueSyncOutboxChanges_(changedKeys, payload){
   if(!Array.isArray(state.syncOutbox)) state.syncOutbox = [];
   changedKeys.forEach(function(key){
     if(isDeviceLocalSyncEntityKey_(key)) return;
+    key = resolveAliasedSyncEntityKey_(entities, key);
     var hasValue = Object.prototype.hasOwnProperty.call(entities, key);
     if(isEmptyDefaultSyncEntity_(key, hasValue ? entities[key] : null)) return;
     var existing = state.syncOutbox.find(function(op){ return op && op.key === key; });
@@ -18422,7 +18455,36 @@ function enqueueSyncOutboxChanges_(changedKeys, payload){
   });
   rebuildDirtyStateFromOutbox_();
 }
+/**
+ * 이전 버전이 단계 s1 을 step:1 「삭제」로 쌓아 둔 줄을 바로잡는다.
+ * 이 기기에 그 단계가 아직 있으면 삭제는 틀린 줄이므로, 그 단계의 올리기로 바꾼다.
+ * 이 기기에서 정말 지운 단계(로컬에 없음)는 건드리지 않는다.
+ */
+function healAliasedStepDeleteOps_(payload){
+  var ops = state.syncOutbox || [];
+  if(!ops.length) return 0;
+  var suspects = ops.filter(function(op){
+    return op && op.deleted && /^plan:subgoal:\d+:step:s?\d+$/i.test(String(op.key));
+  });
+  if(!suspects.length) return 0;
+  var entities = {};
+  try { entities = collectSyncEntities_(payload || {}, { skipEnsureIds: true }) || {}; } catch(eEnt){ return 0; }
+  var dropOld = {};
+  var requeue = [];
+  suspects.forEach(function(op){
+    var actual = resolveAliasedSyncEntityKey_(entities, op.key);
+    if(!Object.prototype.hasOwnProperty.call(entities, actual)) return;
+    dropOld[String(op.key)] = true;
+    if(requeue.indexOf(actual) < 0) requeue.push(actual);
+  });
+  var healed = Object.keys(dropOld).length;
+  if(!healed) return 0;
+  state.syncOutbox = ops.filter(function(op){ return !(op && op.deleted && dropOld[String(op.key)]); });
+  enqueueSyncOutboxChanges_(requeue, payload);
+  return healed;
+}
 function ensureOutboxFromLegacyDirty_(payload){
+  try { healAliasedStepDeleteOps_(payload); } catch(eHealStep){}
   var raw = state.syncOutbox || [];
   var alreadyShaped = raw.length > 0 && raw.every(function(op){ return op && op.key && op.mutationId; });
   state.syncOutbox = normalizeSyncOutbox_(raw, alreadyShaped ? { skipClone: true } : null);
@@ -19269,6 +19331,15 @@ async function plannerGasPushNow_(){
     ensurePlanRowStableIdsInPayload_(body);
     migrateIndexedPlanEntityKeysInPayload_(body, state.syncOutbox);
     var mutations = buildPendingSyncMutations_(body);
+    // 보류한 충돌 키만 남았으면 보낼 것이 없다. 빈 묶음이 전체 저장본 경로로 빠지면
+    // 서버가 거절하면서 「남은 N건」이 줄지 않고 오류 토스트만 반복된다.
+    if(!mutations.length && !state.syncNeedsSnapshot && (state.syncOutbox || []).length && !hasSendableOutboxOps_()){
+      clearPlannerGasRetry_();
+      _syncTransferStartedAt_ = 0;
+      try { clearDividedSaveToast_(); } catch(eHeldToast){}
+      try { updateSyncStatusUI_(); } catch(eHeldUi){}
+      return { ok: true, held: true };
+    }
     var requestDirtyGeneration = plannerDirtyGeneration_;
     var usePatch = mutations.length > 0 && state.syncProtocolVersion >= 2;
     if(usePatch) state.syncNeedsSnapshot = false;
@@ -19573,7 +19644,7 @@ async function plannerGasPushNow_(){
     }
     break;
     }
-    if((state.syncOutbox || []).length && !plannerSyncConflictPending_ && !state._generalUploadOnly && !state._gapUploadActive) schedulePlannerGasPush_(true);
+    if(hasSendableOutboxOps_() && !plannerSyncConflictPending_ && !state._generalUploadOnly && !state._gapUploadActive) schedulePlannerGasPush_(true);
     return { ok: true, revision: lastOkRevision, batches: round };
   } catch(err) {
     console.warn('[GAS push]', err);
@@ -19587,6 +19658,8 @@ async function plannerGasPushNow_(){
     return { ok: false, error: err, slow: slow };
   } finally {
     clearSyncSending_();
+    // 나눠 저장 안내는 전송 중에만 맞는 말이다. 끝난 뒤에는 남기지 않는다.
+    try { if(!hasSendableOutboxOps_()) clearDividedSaveToast_(); } catch(eFinToast){}
     try { updateSyncStatusUI_(); } catch(eFinUi){}
   }
   });
@@ -20196,6 +20269,7 @@ function formatSyncHeaderSub_(info){
   }
   if(info.phase === 'checking') return '서버 확인';
   if(info.phase === 'conflict') return '충돌 선택';
+  if(info.phase === 'held') return '선택 대기 ' + (info.heldCount || 0) + '건';
   if(info.phase === 'pull') return '받을 내용';
   if(info.phase === 'pending'){
     return left || '반영 대기';
@@ -20302,6 +20376,7 @@ function getSyncStatusInfo_(remoteMeta){
   var serverOn = isServerSyncConfigured_();
   var driveOn = hasDriveValidToken_();
   var pendingCount = countPendingSyncItems_();
+  var heldCount = countSnoozedHeldOps_();
   var localPending = hasPendingLocalSyncChanges_();
   var serverPending = serverOn && localPending;
   var drivePending = driveOn && localPending;
@@ -20337,6 +20412,10 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(remoteNewer && !serverPending && !drivePending){
     phase = 'pull';
     overall = 'pending';
+  } else if((serverPending || drivePending) && pendingCount === 0 && heldCount > 0){
+    // 남은 것이 전부 「나중에」로 보류한 충돌뿐이다. 올릴 대기가 아니라 사용자의 선택을 기다리는 상태.
+    phase = 'held';
+    overall = 'warn';
   } else if(serverPending || drivePending || (serverOn && !serverRev && localRev > 0 && pendingCount > 0)){
     phase = 'pending';
     overall = 'pending';
@@ -20413,6 +20492,9 @@ function getSyncStatusInfo_(remoteMeta){
     actionHint = state._surfaceUnmatched && !plannerOutboxHasTeamContent_()
       ? '빈 글이 더 긴 글을 지우지는 않습니다. 다음 저장 때 다시 맞춥니다.'
       : '자동으로 올라갑니다. 오래 멈추면 「동기화」→「지금 동기화」를 누르세요.';
+  } else if(phase === 'held'){
+    summary = '나중에 고르기로 한 충돌 ' + heldCount + '건이 있어요. 고르기 전에는 올라가지 않고, 이 기기 내용은 그대로 둡니다.';
+    actionHint = '화면을 새로고침하면 충돌 선택 창이 다시 열려요. 서버 내용과 이 기기 중 하나를 고르면 이어서 올라갑니다.';
   } else if(phase === 'warn'){
     if(loginRequired){
       summary = '팀 로그인이 필요합니다. 동기화 창에서 로그인한 뒤 Supabase 내용을 받습니다.';
@@ -20446,6 +20528,7 @@ function getSyncStatusInfo_(remoteMeta){
     queuedPush: queuedPush,
     phase: phase,
     pendingCount: pendingCount,
+    heldCount: heldCount,
     sendingNow: sendingNow,
     sendingSnapshot: sendingSnapshot,
     retryInSec: retryInSec,
@@ -20573,7 +20656,7 @@ function updateSyncStatusUI_(){
   btn.classList.add(info.overall);
   if(label) label.textContent = '동기화';
   if(sub) sub.textContent = formatSyncHeaderSub_(info);
-  if(info.overall === 'ok') clearDividedSaveToast_();
+  if(info.overall === 'ok' || info.phase === 'held') clearDividedSaveToast_();
   btn.title = '동기화 및 설정\n' + info.summary +
     (info.actionHint ? '\n\n할 일: ' + info.actionHint : '');
   var generalUpBtn = document.getElementById('btn-sync-general-up');
@@ -20676,8 +20759,8 @@ function renderSyncStatusBodyHTML_(info){
   );
 
   // 2. 이 기기
-  var localBadge = info.transferring || info.phase === 'checking' ? 'syncing' : (info.phase === 'pending' || info.phase === 'queued' || info.phase === 'retry_wait' ? 'pending' : 'ok');
-  var localText = (info.phase === 'transferring' || info.phase === 'retry_wait' || info.phase === 'queued' || info.phase === 'pending' || info.phase === 'checking')
+  var localBadge = info.transferring || info.phase === 'checking' ? 'syncing' : (info.phase === 'pending' || info.phase === 'queued' || info.phase === 'retry_wait' || info.phase === 'held' ? 'pending' : 'ok');
+  var localText = (info.phase === 'transferring' || info.phase === 'retry_wait' || info.phase === 'queued' || info.phase === 'pending' || info.phase === 'checking' || info.phase === 'held')
     ? formatSyncHeaderSub_(info)
     : (info.pendingCount > 0 && (info.serverPending || info.drivePending)
       ? ('남은 ' + info.pendingCount + '건')
@@ -44079,9 +44162,97 @@ function relocateImportedMiscDrafts_(){
   });
   return moved;
 }
+/** 사본 판정용 지문: id·날짜·단계 배치를 뺀 카드 내용 + 채널 본문 전체. 해시가 아니라 원문 그대로 비교한다. */
+function importedCopyFingerprint_(draft){
+  var row = {};
+  ['topic', 'angle', 'pillar', 'rationale', 'writingBrief', 'sourceNote', 'shareMonth', 'articleKind'].forEach(function(key){
+    row[key] = String(draft[key] == null ? '' : draft[key]).trim();
+  });
+  row.collab = (Array.isArray(draft.collab) ? draft.collab : []).map(String).sort();
+  row.channels = (Array.isArray(draft.publishedChannels) ? draft.publishedChannels : []).map(String).sort();
+  var pub = state.published && state.published[draft.id];
+  try {
+    return JSON.stringify([row, state.generatedOnly ? (state.generatedOnly[draft.id] || null) : null, pub ? (pub.content || null) : null]);
+  } catch(eFp){ return ''; }
+}
+/** 사본을 지워도 사용자 작업이 사라지지 않는지: 사진 배경·직접 고친 필드가 없어야 한다. */
+function importedCopyHasOwnWork_(draft){
+  if(draft.drawerUserPlaced) return true;
+  if(typeof draftIsPublished_ === 'function' && draftIsPublished_(draft.id)) return true;
+  if(typeof instaBgByDraft !== 'undefined' && instaBgByDraft[draft.id]) return true;
+  if(typeof threadsBgByDraft !== 'undefined' && threadsBgByDraft[draft.id]) return true;
+  var ov = state.draftBrandOverrides && state.draftBrandOverrides[draft.id];
+  if(ov){
+    var placementOnly = { series: 1, step: 1, roadmapStepId: 1, updatedAt: 1 };
+    if(Object.keys(ov).some(function(k){ return !placementOnly[k] && ov[k] != null && String(ov[k]).trim() !== ''; })) return true;
+  }
+  return false;
+}
+/**
+ * 같은 원고 파일을 두 기기에서 각각 가져오면 같은 글이 다른 id 로 두 장이 된다.
+ * 주제가 같고, 내용·본문이 글자 하나까지 같고, 어느 쪽에도 사용자 작업이 없는 가져오기 사본만 한 장으로 합친다.
+ * 조금이라도 다르면 둘 다 둔다. 합친 목록은 state._importCopyMergeReport 와 콘솔에 남긴다.
+ */
+function mergeIdenticalImportedCopies_(){
+  var report = [];
+  CATEGORIES.forEach(function(cat, catId){
+    var groups = {};
+    (cat.drafts || []).forEach(function(d){
+      if(!d || !d.id || d._syncPlaceholder || !isUserAddedDraftId_(d.id) || !isImportedDraft_(d)) return;
+      if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
+      var key = typeof normalizeTopicKey_ === 'function' ? normalizeTopicKey_(d.topic) : String(d.topic || '').replace(/\s+/g, '').toLowerCase();
+      if(!key) return;
+      (groups[key] = groups[key] || []).push(d);
+    });
+    Object.keys(groups).forEach(function(key){
+      var list = groups[key];
+      if(list.length < 2) return;
+      // 남길 카드: 서버에 이미 올라간 것 → 먼저 만든 것 → id 순
+      list.sort(function(a, b){
+        var ra = (state.syncEntityRevisions && state.syncEntityRevisions['draft:' + a.id]) ? 0 : 1;
+        var rb = (state.syncEntityRevisions && state.syncEntityRevisions['draft:' + b.id]) ? 0 : 1;
+        if(ra !== rb) return ra - rb;
+        var ta = parseIsoMs_(a.createdAt) || 0;
+        var tb = parseIsoMs_(b.createdAt) || 0;
+        if(ta !== tb) return ta - tb;
+        return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
+      });
+      var keep = list[0];
+      if(importedCopyHasOwnWork_(keep)) return;
+      var keepFp = importedCopyFingerprint_(keep);
+      if(!keepFp) return;
+      list.slice(1).forEach(function(dup){
+        if(importedCopyHasOwnWork_(dup)) return;
+        if(importedCopyFingerprint_(dup) !== keepFp) return;
+        report.push({
+          catId: catId,
+          topic: String(dup.topic || ''),
+          keptId: keep.id,
+          keptDate: String(keep.createdAt || '').slice(0, 10),
+          mergedId: dup.id,
+          mergedDate: String(dup.createdAt || '').slice(0, 10)
+        });
+        deleteDraftSilent_(catId, dup.id);
+        if(state.draftBrandOverrides) delete state.draftBrandOverrides[dup.id];
+      });
+    });
+  });
+  if(report.length){
+    state._importCopyMergeReport = (state._importCopyMergeReport || []).concat(report);
+    try { console.info('[가져오기 사본 합침]', JSON.stringify(report)); } catch(eLog){}
+    if(typeof setAppToast === 'function'){
+      var names = report.slice(0, 3).map(function(row){
+        return row.topic.length > 18 ? row.topic.slice(0, 18) + '…' : row.topic;
+      }).join(' / ');
+      setAppToast('내용이 완전히 같은 가져오기 사본 ' + report.length + '장을 한 장으로 합쳤어요.\n' + names + (report.length > 3 ? ' 외 ' + (report.length - 3) + '장' : ''), { duration: 7000, variant: 'ok' });
+    }
+  }
+  return report.length > 0;
+}
 function applyClinicTitleAndImportDrawerRepair_(){
   var changed = false;
   try { if(stripStoredClinicBlogTitles_()) changed = true; } catch(eTitle){}
+  try { if(mergeIdenticalImportedCopies_()) changed = true; } catch(eCopies){}
   try { if(relocateImportedMiscDrafts_()) changed = true; } catch(eMove){}
   if(!changed) return false;
   try {

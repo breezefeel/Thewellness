@@ -249,6 +249,17 @@ var PlannerFieldSync = (function(){
     });
     return { _fieldPatch: true, paths: paths, set: set, base: baseMap };
   }
+  function preserveProseBreaks(text){
+    return String(text == null ? '' : text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  }
+  function baseForContentSend(ownBase, siblingBase, key){
+    if(ownBase && typeof ownBase === 'object') return ownBase;
+    var kind = String(key || '').split(':')[0];
+    if(kind === 'generated' && siblingBase && siblingBase.content && typeof siblingBase.content === 'object' && !Array.isArray(siblingBase.content)){
+      return siblingBase.content;
+    }
+    return null;
+  }
   function planOutboxSend(serverBase, localValue, key, cleared){
     if(!serverBase || typeof serverBase !== 'object'){
       return { mode: 'full', dropOutbox: false, value: localValue, fieldPatch: null };
@@ -607,6 +618,8 @@ var PlannerFieldSync = (function(){
     buildFieldPatch: buildFieldPatch,
     buildValuePatch: buildValuePatch,
     planOutboxSend: planOutboxSend,
+    preserveProseBreaks: preserveProseBreaks,
+    baseForContentSend: baseForContentSend,
     collapseSharedConflicts: collapseSharedConflicts,
     rememberPatchedBase: rememberPatchedBase,
     outsideTabPathsChanged: outsideTabPathsChanged,

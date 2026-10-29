@@ -258,6 +258,29 @@ assert(S.planOutboxSend(
   key
 ).dropOutbox === true, 'unchanged drop is only for a server base');
 
+var lineBreak = 'A문제-1b-SQL\n수정하고 저장했어';
+assert(S.preserveProseBreaks(lineBreak) === lineBreak, 'a single line break stays a line break');
+assert(S.preserveProseBreaks('첫째 문단\n\n둘째 문단') === '첫째 문단\n\n둘째 문단', 'a blank line stays a blank line');
+assert(S.preserveProseBreaks('A문제-1b-SQL\r\n수정하고 저장했어') === lineBreak, 'windows newlines become a real line break');
+var linePatch = S.buildValuePatch(
+  { content: { blog: { problem: 'A문제-1b-SQL' } } },
+  { content: { blog: { problem: lineBreak } } },
+  [],
+  key
+);
+assert(linePatch && linePatch.set['content.blog.problem'] === lineBreak, 'a saved line break is sent as a line break');
+
+var publishedBase = { content: { blog: { problem: '이전' }, images: { gptVisuals: [{ prompt: '옛 안내' }] }, insta: { caption: '같음' }, threads: { body: '같음' } } };
+var withImages = { content: { blog: { problem: '새 문제' }, images: { gptVisuals: [{ prompt: '새 안내' }] }, insta: { caption: '같음' }, threads: { body: '같음' } } };
+var combined = S.planOutboxSend(publishedBase, withImages, key);
+assert(combined.mode === 'patch', 'blog and image edits are one patch');
+assert(combined.fieldPatch.paths.indexOf('content.blog.problem') >= 0, 'the combined patch includes the blog field');
+assert(combined.fieldPatch.paths.join(',').indexOf('images') >= 0, 'the combined patch includes the image field');
+var borrowed = S.baseForContentSend(null, publishedBase, 'generated:' + cardId);
+var follow = S.planOutboxSend(borrowed, withImages.content, 'generated:' + cardId);
+assert(follow.mode === 'patch' && follow.fieldPatch.paths.join(',').indexOf('images') >= 0, 'the image follow-up patches from the sibling base');
+assert(S.baseForContentSend(null, null, 'generated:' + cardId) == null, 'without any server base the follow-up does not invent one');
+
 var seedStart = planner.indexOf('function seedSyncFieldBaseFromState_');
 var seedEnd = planner.indexOf('function describePendingSyncItems_');
 var seedFn = planner.slice(seedStart, seedEnd);

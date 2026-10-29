@@ -503,6 +503,68 @@ var PlannerSyncRules = (function(){
     }
     return String(value).replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').trim();
   }
+  function plannerDuplicateTextSize_(content){
+    try { return JSON.stringify(content || '').length; } catch(eSize){ return 0; }
+  }
+  function plannerFoldDuplicateContent_(dst, src){
+    if(!src || typeof src !== 'object') return dst;
+    Object.keys(src).forEach(function(k){
+      var sv = src[k];
+      if(sv && typeof sv === 'object' && !Array.isArray(sv)){
+        if(!dst[k] || typeof dst[k] !== 'object' || Array.isArray(dst[k])) dst[k] = {};
+        plannerFoldDuplicateContent_(dst[k], sv);
+        return;
+      }
+      if(Array.isArray(sv)){
+        if(!Array.isArray(dst[k]) || !dst[k].length) dst[k] = sv.slice();
+        return;
+      }
+      var ds = dst[k] == null ? '' : String(dst[k]);
+      var ss = sv == null ? '' : String(sv);
+      if(!ss) return;
+      if(!ds){ dst[k] = sv; return; }
+      if(ds === ss || ds.indexOf(ss) >= 0) return;
+      if(ss.indexOf(ds) >= 0){ dst[k] = sv; return; }
+      dst[k] = ds + '\n\n' + ss;
+    });
+    return dst;
+  }
+  function plannerDuplicateCardsMatch_(keep, other){
+    if(keep.workKey && other.workKey) return keep.workKey === other.workKey;
+    var a = '';
+    var b = '';
+    try {
+      a = JSON.stringify(keep.content || null);
+      b = JSON.stringify(other.content || null);
+    } catch(eSame){ return false; }
+    if(a === b) return true;
+    return a === 'null' || a === '{}' || b === 'null' || b === '{}';
+  }
+  function plannerMergeDuplicateGroup(cards){
+    cards = (cards || []).filter(function(card){ return card && card.id; });
+    if(cards.length < 2){
+      return { changed: false, keepId: cards[0] ? cards[0].id : '', retireIds: [], content: cards[0] ? cards[0].content : null };
+    }
+    function score(card){
+      return (plannerDuplicateTextSize_(card.content) > 2 ? 8 : 0) + (card.placeholder ? 0 : 4) + (card.onServer ? 2 : 0);
+    }
+    var sorted = cards.slice().sort(function(a, b){
+      var diff = score(b) - score(a);
+      if(diff) return diff;
+      return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+    });
+    var keep = sorted[0];
+    var content = {};
+    try { content = JSON.parse(JSON.stringify(keep.content || {})); } catch(eCopy){ content = {}; }
+    if(!content || typeof content !== 'object' || Array.isArray(content)) content = {};
+    var retireIds = [];
+    sorted.slice(1).forEach(function(other){
+      if(!plannerDuplicateCardsMatch_(keep, other)) return;
+      plannerFoldDuplicateContent_(content, other.content);
+      retireIds.push(other.id);
+    });
+    return { changed: retireIds.length > 0, keepId: keep.id, retireIds: retireIds, content: content };
+  }
 
   // 프롬프트 충돌. align=같은 내용, adopt-server=사용자가 안 고친 값, ask=양쪽 수정.
   function plannerPromptConflictAction(spec){
@@ -657,6 +719,7 @@ var PlannerSyncRules = (function(){
     plannerKeysLeftBehind: plannerKeysLeftBehind,
     plannerSameKeyList: plannerSameKeyList,
     plannerStripClinicTitlePrefix: plannerStripClinicTitlePrefix,
+    plannerMergeDuplicateGroup: plannerMergeDuplicateGroup,
     PLANNER_SYNC_BLOB_MAX_CHARS: PLANNER_SYNC_BLOB_MAX_CHARS,
     PLANNER_QUOTA_IMAGE_CHARS: PLANNER_QUOTA_IMAGE_CHARS
   };

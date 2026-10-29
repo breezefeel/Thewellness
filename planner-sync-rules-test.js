@@ -374,6 +374,29 @@ assert(leftQueue.length === 2 && leftQueue[0].mutationId === 'm2' && leftQueue[1
   'a journal drops only the confirmed version and keeps a newer one');
 assert(R.plannerApplySyncJournal(queued, { items: [] }).length === 3, 'an empty journal leaves the queue');
 
+var sameCopy = R.plannerMergeDuplicateGroup([
+  { id: 'd6-c1782810860369', topic: '가져온 주제', placeholder: true, createdAt: '2026-10-29T01:00:00.000Z', workKey: 'blog#같은글', content: { blog: { problem: '본문' } } },
+  { id: 'd6-c1782810860370', topic: '가져온 주제', placeholder: true, createdAt: '2026-10-29T02:00:00.000Z', workKey: 'blog#같은글', content: { blog: { problem: '본문', selfCare: '추가' } } }
+]);
+assert(sameCopy.changed && sameCopy.retireIds.length === 1, 'the same card is merged once');
+assert(sameCopy.content.blog.problem === '본문' && sameCopy.content.blog.selfCare === '추가', 'merging keeps both cards text');
+assert(sameCopy.retireIds[0] !== sameCopy.keepId, 'the kept card is not retired');
+var differentWork = R.plannerMergeDuplicateGroup([
+  { id: 'a', placeholder: true, workKey: 'blog#하나', content: { blog: { problem: '하나' } } },
+  { id: 'b', placeholder: true, workKey: 'blog#둘', content: { blog: { problem: '둘' } } }
+]);
+assert(!differentWork.changed && differentWork.retireIds.length === 0, 'different articles are not merged');
+var untitledDifferent = R.plannerMergeDuplicateGroup([
+  { id: 'c1', placeholder: true, workKey: '', content: { blog: { problem: '가' } } },
+  { id: 'c2', placeholder: true, workKey: '', content: { blog: { problem: '나' } } }
+]);
+assert(!untitledDifferent.changed, 'different text without a shared title is not merged');
+var identical = R.plannerMergeDuplicateGroup([
+  { id: 'c3', placeholder: true, workKey: '', content: { blog: { problem: '같음' } } },
+  { id: 'c4', placeholder: true, workKey: '', content: { blog: { problem: '같음' } } }
+]);
+assert(identical.changed && identical.content.blog.problem === '같음', 'identical copies merge and keep the text');
+
 if(failed){
   console.error(failed + ' assertion(s) failed');
   process.exit(1);

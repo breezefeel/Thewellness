@@ -208,6 +208,40 @@ assert(S.nonTabContentChanged(
 assert(planner.indexOf('normalized.devicePaths') >= 0, 'device paths survive outbox restore');
 assert(planner.indexOf('생성이 중단됐습니다. 다시 만들려면 버튼을 누르세요.') >= 0, 'interrupted threads show a manual retry note');
 
+var pendingCard = {
+  content: { blog: { problem: '본문' }, insta: { caption: '캡션' }, instaPending: true, instaPendingEndMs: 9, threads: { body: '', comment: '' } }
+};
+var cleanCard = S.omitDevicePending(pendingCard);
+assert(!cleanCard.content.instaPending && !cleanCard.content.instaPendingEndMs, 'insta pending clocks are omitted');
+assert(S.sendKeyList(pendingCard).indexOf('instaPending') < 0, 'insta pending is not a send key');
+var patchBlog = S.buildValuePatch(
+  { content: { blog: { problem: '이전' }, insta: { caption: '캡션' } } },
+  { content: { blog: { problem: '이후' }, insta: { caption: '캡션' }, instaPending: true } },
+  [],
+  key
+);
+assert(patchBlog && patchBlog.paths.join(',') === 'content.blog.problem', 'only the changed blog field is patched');
+var patchOrder = S.buildValuePatch(
+  { content: { insta: { caption: '같음' }, blog: { problem: '' } } },
+  { content: { blog: {}, insta: { caption: '같음' } } },
+  [],
+  key
+);
+assert(patchOrder && patchOrder.paths.length === 0, 'key order and an empty field are not a patch');
+var patchDraft = S.buildValuePatch(
+  { catId: '1', value: { topic: '이전', roadmapStepId: 's3' } },
+  { catId: '1', value: { topic: '이후', roadmapStepId: 's3' } },
+  [],
+  'draft:d1'
+);
+assert(patchDraft && patchDraft.paths.join(',') === 'value.topic', 'a draft patch sends only the changed field');
+var collapsed = S.collapseSharedConflicts([
+  { key: 'published:' + cardId, paths: ['insta.caption'] },
+  { key: 'generated:' + cardId, paths: ['insta.caption'] }
+]);
+assert(collapsed.length === 1 && collapsed[0].label.indexOf('발행 글·생성 초안') === 0, 'the same caption is one conflict row');
+assert(collapsed[0].indexes.length === 2, 'the one row still applies to both copies');
+
 if(failed){
   console.error(failed + ' failed');
   process.exit(1);

@@ -343,8 +343,37 @@ var PlannerSyncSupabase = (function(){
     });
   }
 
+  var FIELD_PATCH_KEY = 'ht_planner_field_patch_v1';
+  function readFieldPatchFlag_(){
+    if(typeof state !== 'undefined' && state.syncServerFieldPatch === true) return true;
+    try { return localStorage.getItem(FIELD_PATCH_KEY) === '1'; } catch(eFlag){ return false; }
+  }
+  function writeFieldPatchFlag_(on){
+    if(typeof state !== 'undefined') state.syncServerFieldPatch = !!on;
+    try { localStorage.setItem(FIELD_PATCH_KEY, on ? '1' : '0'); } catch(eFlag){}
+  }
+  function probeFieldPatch_(client){
+    if(readFieldPatchFlag_()){
+      if(typeof state !== 'undefined') state.syncServerFieldPatch = true;
+      return Promise.resolve(true);
+    }
+    if(typeof state !== 'undefined' && state._fieldPatchProbed) return Promise.resolve(!!state.syncServerFieldPatch);
+    return client.rpc('planner_apply_batch', { p_rows: [] }).then(function(res){
+      if(typeof state !== 'undefined') state._fieldPatchProbed = true;
+      var data = (res && res.data) || {};
+      var on = !(res && res.error) && !!data.fieldPatch;
+      writeFieldPatchFlag_(on);
+      try { console.info('[칸 저장] 서버 칸 패치', on ? '지원' : '미지원'); } catch(eProbe){}
+      return on;
+    }, function(){
+      if(typeof state !== 'undefined') state._fieldPatchProbed = true;
+      return false;
+    });
+  }
+
   function patch(client, mutations){
-    var sendPatch = !!(typeof state !== 'undefined' && state.syncServerFieldPatch);
+    return probeFieldPatch_(client).then(function(){
+    var sendPatch = readFieldPatchFlag_();
     (mutations || []).forEach(function(mut){
       if(!mut || !mut.key || typeof state === 'undefined') return;
       var editedBag = state._sheetEditedPaths && state._sheetEditedPaths[mut.key];
@@ -421,7 +450,8 @@ var PlannerSyncSupabase = (function(){
           remainingPaths: item.remainingPaths || []
         };
       });
-      if(typeof state !== 'undefined') state.syncServerFieldPatch = !!data.fieldPatch;
+      if(typeof state !== 'undefined') state._fieldPatchProbed = true;
+      writeFieldPatchFlag_(!!data.fieldPatch);
       if(typeof noteSupabaseAcceptedRevisions_ === 'function'){
         noteSupabaseAcceptedRevisions_(accepted.filter(function(item){ return item.status !== 'idempotent'; }));
       }
@@ -452,6 +482,7 @@ var PlannerSyncSupabase = (function(){
         conflicts: conflicts,
         syncCapabilities: CAPS
       };
+    });
     });
   }
 

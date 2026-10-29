@@ -46,9 +46,25 @@ assert(duringEdit.length === 1, 'a newer local version is kept when the ack is f
 var card = { mutationId: 'c1', version: 1, key: 'draft:d1' };
 var body = { mutationId: 'b1', version: 1, key: 'generated:d1' };
 var coupled = R.plannerFilterAckedOutbox([card, body], { ack: { c1: 1 }, sentByKey: {} });
-assert(coupled.length === 2 && coupled[0].key === 'draft:d1', 'card stays while its body is still queued');
+assert(coupled.length === 1 && coupled[0].key === 'generated:d1', 'an accepted card leaves even while its body is still queued');
 var both = R.plannerFilterAckedOutbox([card, body], { ack: { c1: 1, b1: 1 }, sentByKey: {} });
 assert(both.length === 0, 'card leaves once the body is accepted');
+
+var postureSteps = [
+  { id: 's1', title: '운동상식' },
+  { id: 's2', title: '유연성·스트레칭' },
+  { id: 's3', title: '자세·거북목·라운드 숄더' }
+];
+assert(R.plannerSameStepId('3', 's3'), 'numeric step id matches the canonical id');
+assert(!R.plannerSameStepId('3', 's2'), 'a different step id does not match');
+assert(R.plannerCountDraftsForStep(postureSteps, [
+  { roadmapStepId: '3', series: '자세·거북목·라운드 숄더', topic: '거북목' },
+  { roadmapStepId: 's1', topic: '운동' }
+], 's3') === 1, 'posture drawer counts a draft stored as step 3');
+assert(R.plannerCountDraftsForStep(postureSteps, [
+  { series: '자세 거북목 라운드 숄더', topic: '라운드 숄더' }
+], 's3') === 1, 'a missing step id still counts by the drawer name');
+assert(R.plannerTopicDrawerKey('자세·거북목·라운드 숄더') === R.plannerTopicDrawerKey('자세 거북목 라운드 숄더'), 'posture drawer names match');
 
 var many = [];
 for(var i = 0; i < 13; i++) many.push({ key: 'draft:t' + i, mutationId: 'k' + i, version: 1 });
@@ -120,7 +136,7 @@ var heldPair = R.plannerFilterAckedOutbox([cardHeld, bodyHeld], {
   sentByKey: { 'draft:d9': { version: 1 }, 'generated:d9': { version: 1 } },
   holdKeys: { 'generated:d9': true }
 });
-assert(heldPair.length === 2, 'a conflicting body keeps its card queued');
+assert(heldPair.length === 1 && heldPair[0].key === 'generated:d9', 'an accepted card leaves while a conflicting body stays');
 
 var acceptedOnly = R.plannerAcceptedSentByKey([
   { mutationId: 'm1', version: 2, key: 'draft:d1' },

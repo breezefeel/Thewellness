@@ -89,19 +89,12 @@ var PlannerSyncRules = (function(){
       }
       var sent = sentByKey[String(op.key)];
       if(sent) return (parseInt(sent.version, 10) || 1) >= opV;
-      return false;
-    }
-    var keep = {};
-    (ops || []).forEach(function(op){
-      if(op && op.key && !wouldDrop(op)) keep[String(op.key)] = true;
-    });
-    return (ops || []).filter(function(op){
-      if(!wouldDrop(op)) return true;
-      var parsed = plannerDraftBodyId(op && op.key);
-      if(!parsed || parsed.kind !== 'draft') return false;
-      return !!(keep['generated:' + parsed.id] || keep['published:' + parsed.id]);
-    });
+    return false;
   }
+  return (ops || []).filter(function(op){
+    return !wouldDrop(op);
+  });
+}
 
   function plannerIsProtectedDelete(op){
     if(!op || !op.key) return false;
@@ -523,6 +516,33 @@ var PlannerSyncRules = (function(){
     return 'ask';
   }
 
+  function plannerSameStepId(a, b){
+    a = String(a == null ? '' : a).trim();
+    b = String(b == null ? '' : b).trim();
+    if(!a || !b) return false;
+    if(a === b) return true;
+    var na = a.match(/^s?(\d+)$/i);
+    var nb = b.match(/^s?(\d+)$/i);
+    return !!(na && nb && na[1] === nb[1]);
+  }
+  function plannerCountDraftsForStep(steps, drafts, stepId){
+    var title = '';
+    (steps || []).forEach(function(step){
+      if(step && plannerSameStepId(step.id, stepId)) title = String(step.title || '');
+    });
+    var want = plannerTopicDrawerKey(title);
+    var n = 0;
+    (drafts || []).forEach(function(d){
+      if(!d) return;
+      var sid = String(d.roadmapStepId || '').trim();
+      if(sid && plannerSameStepId(sid, stepId)){
+        n++;
+        return;
+      }
+      if(!sid && want && plannerTopicDrawerKey(d.series || d.topic || '') === want) n++;
+    });
+    return n;
+  }
   function plannerTopicDrawerKey(title){
     return String(title || '')
       .replace(/^\d+\s*단계\s*[·ㆍ・․.\-–—]\s*/, '')
@@ -631,6 +651,8 @@ var PlannerSyncRules = (function(){
     plannerNormalizePromptText: plannerNormalizePromptText,
     plannerPromptConflictAction: plannerPromptConflictAction,
     plannerTopicDrawerKey: plannerTopicDrawerKey,
+    plannerSameStepId: plannerSameStepId,
+    plannerCountDraftsForStep: plannerCountDraftsForStep,
     plannerImportNeedsMove: plannerImportNeedsMove,
     plannerKeysLeftBehind: plannerKeysLeftBehind,
     plannerSameKeyList: plannerSameKeyList,

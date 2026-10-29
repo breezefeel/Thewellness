@@ -10967,7 +10967,9 @@ window.updateTopicDraftField_ = function(draftId, field, value){
   var d = (cat.drafts || []).find(function(x){ return x && x.id === draftId; });
   if(!d) return;
   var raw = String(value || '');
-  d[field] = field === 'rationale' ? stripTopicRationaleStepPrefix_(raw) : raw;
+  var nextField = field === 'rationale' ? stripTopicRationaleStepPrefix_(raw) : raw;
+  if(String(d[field] || '') === nextField) return;
+  d[field] = nextField;
   stampDraftActivity_(d);
   if(topicFieldSaveTimer_) clearTimeout(topicFieldSaveTimer_);
   topicFieldSaveTimer_ = setTimeout(function(){
@@ -17080,6 +17082,18 @@ function setSyncEntity_(payload, key, wrapped){
     return;
   }
   var id = parts.slice(1).join(':');
+  if((parts[0] === 'published' || parts[0] === 'generated') && !missing){
+    var syncKey = parts[0] + ':' + id;
+    if(typeof rememberSyncFieldBase_ === 'function') rememberSyncFieldBase_(syncKey, wrapped);
+    var editing = state.selectedId === id && state._sheetDomDirty && typeof PlannerFieldSync !== 'undefined';
+    var editedPaths = state._sheetEditedPaths && state._sheetEditedPaths[syncKey];
+    var current = parts[0] === 'published'
+      ? (payload.published && payload.published[id])
+      : (payload.generatedOnly && payload.generatedOnly[id]);
+    if(editing && editedPaths && editedPaths.length && current){
+      wrapped = PlannerFieldSync.keepEditingFields(current, wrapped, syncKey, editedPaths);
+    }
+  }
   if(parts[0] === 'published'){
     if(!payload.published) payload.published = {};
     if(missing) delete payload.published[id];
@@ -17093,7 +17107,7 @@ function setSyncEntity_(payload, key, wrapped){
 function normalizeDraftRowForSync_(draft){
   if(!draft || typeof draft !== 'object') return draft;
   var row = {};
-  ['id','topic','angle','series','step','pillar','rationale','writingBrief','roadmapStepId',
+  ['id','topic','angle','series','step','pillar','rationale','writingBrief','roadmapStepId','reviewHold','programCatId',
     'shareMonth','createdAt','sourceNote','collab','youtubeAnalysis','updatedAt','activityAt','publishedChannels','dailyShareKind',
     'dailyThought','dailyWho','dailyWhat','dailyBody','articleKind','previousRoadmapStepId',
     'previousSeries','miscLocked','importDrawerSettled','drawerUserPlaced','articleFlow'].forEach(function(k){
@@ -18483,6 +18497,48 @@ function resolveAliasedSyncEntityKey_(entities, key){
   if(m2 && Object.prototype.hasOwnProperty.call(entities, m2[1] + m2[2])) return m2[1] + m2[2];
   return key;
 }
+function reviewHoldSkipsSyncKey_(key){
+  var m = String(key || '').match(/^(draft|published|generated):(.+)$/);
+  if(!m || typeof findDraftByIdAnywhere_ !== 'function') return false;
+  var draft = findDraftByIdAnywhere_(m[2]);
+  if(!draft || !draft.reviewHold) return false;
+  if(m[1] === 'draft' && state._reviewLockSync) return false;
+  return true;
+}
+function rememberSyncFieldBase_(key, value, patch){
+  if(key.indexOf('published:') !== 0 && key.indexOf('generated:') !== 0) return;
+  if(!state.syncFieldBase) state.syncFieldBase = {};
+  if(patch && patch.paths && typeof PlannerFieldSync !== 'undefined'){
+    state.syncFieldBase[key] = PlannerFieldSync.rememberPatchedBase(state.syncFieldBase[key], patch);
+    return;
+  }
+  if(value) state.syncFieldBase[key] = cloneSyncValue_(value);
+}
+function noteSheetEditedPaths_(draftId, tab){
+  if(!draftId || typeof PlannerFieldSync === 'undefined') return;
+  var paths = PlannerFieldSync.pathsForTab(tab);
+  if(tab === 'images') paths = paths.concat(['reelFile']);
+  if(!state._sheetEditedPaths) state._sheetEditedPaths = {};
+  ['published:' + draftId, 'generated:' + draftId].forEach(function(key){
+    var cur = state._sheetEditedPaths[key] || [];
+    paths.forEach(function(p){ if(cur.indexOf(p) < 0) cur.push(p); });
+    state._sheetEditedPaths[key] = cur;
+  });
+}
+function shapeSyncedContentValue_(key, localValue){
+  if(!localValue || typeof PlannerFieldSync === 'undefined') return { value: localValue, fieldPatch: null };
+  if(key.indexOf('published:') !== 0 && key.indexOf('generated:') !== 0) return { value: localValue, fieldPatch: null };
+  var base = state.syncFieldBase && state.syncFieldBase[key];
+  if(!base){
+    try { console.info('[칸 저장] 기준 없음', key); } catch(eLog){}
+    return { value: localValue, fieldPatch: null };
+  }
+  var edited = state._sheetEditedPaths && state._sheetEditedPaths[key];
+  var merged = PlannerFieldSync.mergeChangedOntoBase(base, localValue, key, edited);
+  var patch = PlannerFieldSync.buildFieldPatch(base, merged, key);
+  try { console.info('[칸 저장]', key, patch && patch.paths ? patch.paths.join(',') : '변경 없음'); } catch(eLog2){}
+  return { value: merged, fieldPatch: patch };
+}
 function enqueueSyncOutboxChanges_(changedKeys, payload){
   if(!changedKeys || !changedKeys.length) return;
   var entities = collectSyncEntities_(payload || {}, { skipEnsureIds: true });
@@ -18491,11 +18547,14 @@ function enqueueSyncOutboxChanges_(changedKeys, payload){
   changedKeys.forEach(function(key){
     if(isDeviceLocalSyncEntityKey_(key)) return;
     key = resolveAliasedSyncEntityKey_(entities, key);
+    if(reviewHoldSkipsSyncKey_(key)) return;
     var hasValue = Object.prototype.hasOwnProperty.call(entities, key);
     if(isEmptyDefaultSyncEntity_(key, hasValue ? entities[key] : null)) return;
+    var shaped = hasValue ? shapeSyncedContentValue_(key, entities[key]) : { value: null, fieldPatch: null };
     var existing = state.syncOutbox.find(function(op){ return op && op.key === key; });
     if(existing){
-      existing.value = hasValue ? cloneSyncValue_(entities[key]) : null;
+      existing.value = hasValue ? cloneSyncValue_(shaped.value) : null;
+      existing.fieldPatch = shaped.fieldPatch || null;
       existing.deleted = !hasValue;
       existing.updatedAt = times[key] || new Date().toISOString();
       bumpOutboxOpVersion_(existing);
@@ -18504,7 +18563,8 @@ function enqueueSyncOutboxChanges_(changedKeys, payload){
         mutationId: makePlannerMutationId_(),
         version: 1,
         key: key,
-        value: hasValue ? cloneSyncValue_(entities[key]) : null,
+        value: hasValue ? cloneSyncValue_(shaped.value) : null,
+        fieldPatch: shaped.fieldPatch || null,
         deleted: !hasValue,
         baseEntityRevision: Object.prototype.hasOwnProperty.call(state.syncEntityRevisions || {}, key)
           ? (parseInt(state.syncEntityRevisions[key], 10) || 0)
@@ -22360,6 +22420,7 @@ function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts, opts
       }
       return;
     }
+    if(opts.fromUser) narrowKeptConflictLocals_(real);
     forceOutboxOverwriteBase_(real);
     state.syncDirty = true;
     plannerSyncConflictPending_ = null;
@@ -22385,7 +22446,7 @@ function autoResolveConflictsKeepLocal_(local, remote, serverRevision, conflicts
 var CONFLICT_FIELD_LABELS_ = {
   title: '제목', importTitle: '제목', headline: '제목',
   draft: '본문', body: '본문', explanation: '본문', problem: '본문', selfCare: '본문', caption: '본문', text: '본문',
-  hook: '본문', empathyLead: '본문', empathyBullets: '본문', comment: '본문', cta: '본문', finalText: '본문',
+  hook: '본문', empathyLead: '본문', empathyBullets: '본문', comment: '댓글', cta: '본문', finalText: '본문',
   status: '상태', state: '상태', publishState: '상태', published: '상태',
   scheduledDate: '날짜', scheduledAt: '날짜', date: '날짜', publishedAt: '날짜', activityAt: '날짜', createdAt: '날짜', plannedDate: '날짜',
   topic: '주제', angle: '각도', series: '시리즈', pillar: '필러', roadmapStepId: '단계', step: '단계',
@@ -22423,6 +22484,74 @@ function conflictDiffFields_(localVal, remoteVal){
   });
   return labels;
 }
+function assignNarrowedCard_(id, key, narrowed){
+  var pub = state.published && state.published[id];
+  var gen = state.generatedOnly && state.generatedOnly[id];
+  var shared = !!(pub && gen && pub.content && pub.content === gen);
+  if(key.indexOf('published:') === 0){
+    if(!state.published) state.published = {};
+    state.published[id] = narrowed;
+    if(shared && narrowed && narrowed.content) state.generatedOnly[id] = narrowed.content;
+  } else {
+    if(!state.generatedOnly) state.generatedOnly = {};
+    state.generatedOnly[id] = narrowed;
+    if(shared && state.published && state.published[id]) state.published[id].content = narrowed;
+  }
+  return shared;
+}
+function narrowKeptConflictLocals_(conflicts){
+  if(typeof PlannerFieldSync === 'undefined') return;
+  var done = {};
+  (conflicts || []).forEach(function(conflict){
+    var key = String(conflict && conflict.key || '');
+    if(key.indexOf('published:') !== 0 && key.indexOf('generated:') !== 0) return;
+    if(!conflict.remote) return;
+    var id = key.slice(key.indexOf(':') + 1);
+    if(done[id]) return;
+    var edited = []
+      .concat((state._sheetEditedPaths && state._sheetEditedPaths['published:' + id]) || [])
+      .concat((state._sheetEditedPaths && state._sheetEditedPaths['generated:' + id]) || []);
+    var narrowed = PlannerFieldSync.mergeChangedOntoBase(conflict.remote, conflict.local, key, edited);
+    if(!narrowed) return;
+    var shared = assignNarrowedCard_(id, key, narrowed);
+    (conflicts || []).forEach(function(other){
+      if(!other) return;
+      if(other.key === 'published:' + id && state.published && state.published[id]) other.local = state.published[id];
+      if(other.key === 'generated:' + id && state.generatedOnly && state.generatedOnly[id]) other.local = state.generatedOnly[id];
+    });
+    (state.syncOutbox || []).forEach(function(op){
+      if(!op) return;
+      var opId = String(op.key || '').slice(String(op.key || '').indexOf(':') + 1);
+      if(opId !== id) return;
+      if(op.key.indexOf('published:') !== 0 && op.key.indexOf('generated:') !== 0) return;
+      var live = op.key.indexOf('published:') === 0 ? state.published[id] : state.generatedOnly[id];
+      if(!live) return;
+      var remote = null;
+      (conflicts || []).forEach(function(other){
+        if(other && other.key === op.key) remote = other.remote;
+      });
+      if(!remote && state.syncFieldBase) remote = state.syncFieldBase[op.key];
+      op.value = cloneSyncValue_(live);
+      op.fieldPatch = remote ? PlannerFieldSync.buildFieldPatch(remote, live, op.key) : null;
+    });
+    if(shared) done[id] = true;
+  });
+}
+function conflictFieldCompareHTML_(conflict){
+  if(typeof PlannerFieldSync === 'undefined') return '';
+  var key = String(conflict && conflict.key || '');
+  if(key.indexOf('published:') !== 0 && key.indexOf('generated:') !== 0) return '';
+  var rows = [];
+  try { rows = PlannerFieldSync.describeDiff(conflict.local, conflict.remote, key); } catch(eDiff){ rows = []; }
+  if(!rows.length) return '';
+  return '<div class="sync-conflict-fields" style="font-size:12px;line-height:1.45;margin:6px 0">' +
+    rows.slice(0, 8).map(function(row){
+      return '<div style="margin:4px 0"><b>' + escapeHtml(row.path) + '</b><br>이 기기: ' + escapeHtml(row.local || '(빈 칸)') +
+        '<br>서버: ' + escapeHtml(row.remote || '(빈 칸)') + '</div>';
+    }).join('') +
+    (rows.length > 8 ? '<div>외 ' + (rows.length - 8) + '칸</div>' : '') +
+    '<div style="color:#6B7280">이 기기를 고르면 위에 보인 칸만 이 기기 값으로 두고, 나머지 칸은 서버 값을 유지합니다.</div></div>';
+}
 function conflictDiffLineHTML_(conflict){
   var labels = [];
   try { labels = conflictDiffFields_(conflict.local, conflict.remote); } catch(eDiff){ labels = []; }
@@ -22453,7 +22582,7 @@ function renderPlannerConflictUi_(pending){
         ? '<div class="sync-conflict-name-sub" style="font-size:11px;color:#B45309;margin-top:4px;">이 기기 초안 본문이 있어요. 「이 기기」 권장.</div>'
         : '';
       return '<div class="sync-conflict-item">' +
-        '<div class="sync-conflict-name">' + escapeHtml(plannerConflictLabel_(conflict.key)) + '</div>' + conflictDiffLineHTML_(conflict) + hint +
+        '<div class="sync-conflict-name">' + escapeHtml(plannerConflictLabel_(conflict.key)) + '</div>' + conflictDiffLineHTML_(conflict) + conflictFieldCompareHTML_(conflict) + hint +
         '<div class="sync-conflict-options">' +
           '<label class="sync-conflict-option"><input type="radio" name="sync-conflict-' + i + '" value="remote"' + remoteChecked + '>' +
             '<span><strong>서버 기준' + escapeHtml(remoteBy) + '</strong><span class="sync-conflict-preview">' + escapeHtml(plannerConflictPreview_(conflict.remote)) + '</span></span></label>' +
@@ -23642,7 +23771,9 @@ function collectExtraDrafts(){
         articleKind: d.articleKind,
         previousRoadmapStepId: d.previousRoadmapStepId,
         previousSeries: d.previousSeries,
-        miscLocked: d.miscLocked
+        miscLocked: d.miscLocked,
+        reviewHold: d.reviewHold ? true : undefined,
+        programCatId: d.programCatId != null ? d.programCatId : undefined
       });
     });
   });
@@ -23683,6 +23814,8 @@ function mergeExtraDrafts(byCat){
       if(d.dailyBody) merged.dailyBody = d.dailyBody;
       if(Array.isArray(d.collab) && d.collab.length) merged.collab = d.collab.slice();
       if(d.miscLocked) merged.miscLocked = true;
+      if(d.reviewHold) merged.reviewHold = true;
+      if(d.programCatId != null) merged.programCatId = d.programCatId;
       if(d.importDrawerSettled) merged.importDrawerSettled = true;
       if(d.drawerUserPlaced) merged.drawerUserPlaced = true;
       if(merged && !merged.previousRoadmapStepId) delete merged.previousRoadmapStepId;
@@ -30237,6 +30370,9 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
           renderMoveDraftStepChipsHTML_(cat.id, d.id) +
         '</div>' +
         '<button type="button" class="draft-card-delete-mini draft-card-link-mini" title="이 카드 주소 복사" onclick="event.stopPropagation();copyCardLink_(\'' + jsAttrString_(d.id) + '\')">링크 복사</button>' +
+        '<button type="button" class="draft-card-delete-mini" title="검토 중에는 이 카드를 대기열에 올리지 않습니다" onclick="event.stopPropagation();toggleDraftReviewHold_(\'' + jsAttrString_(d.id) + '\')">' + (d.reviewHold ? '검토 해제' : '검토 중') + '</button>' +
+        '<button type="button" class="draft-card-delete-mini" title="카드 번호와 내용은 유지하고 프로그램만 옮깁니다" onclick="event.stopPropagation();openMoveDraftProgram_(\'' + jsAttrString_(d.id) + '\',' + cat.id + ')">프로그램 이동</button>' +
+        '<button type="button" class="draft-card-delete-mini" title="이 기기에만 남기는 최근 5개" onclick="event.stopPropagation();openCardRevisions_(\'' + jsAttrString_(d.id) + '\')">이전 버전</button>' +
         '<button type="button" class="draft-card-delete-mini" title="이 주제 카드 삭제" onclick="event.stopPropagation();deleteDraft(' + cat.id + ',\'' + d.id + '\')">삭제</button>' +
         orderBtns +
       '</div>' +
@@ -40723,6 +40859,13 @@ function normalizeThreadsSnsBlock_(raw){
   var comment = String(raw.comment != null ? raw.comment : '').trim();
   var legacyText = String(raw.text != null ? raw.text : raw.summary || '').trim();
   if(!body && legacyText) body = legacyText;
+  if(typeof PlannerFieldSync !== 'undefined'){
+    var splitThreads = PlannerFieldSync.splitThreadComment(body, comment);
+    if(splitThreads.merged){
+      body = splitThreads.body;
+      comment = splitThreads.comment;
+    }
+  }
   if(!body && !comment) return null;
   return { body: body, comment: comment, text: body };
 }
@@ -41353,13 +41496,9 @@ window.onSheetFieldInput_ = function(ta){
 };
 var _sheetQuietSaveTimer_ = 0;
 function noteSheetDraftActivity_(){
-  var draftId = state.selectedId;
-  var draft = findDraftByIdAnywhere_(draftId);
-  if(!draft) return;
-  var before = getDraftListDateInfo_(draft);
-  stampDraftActivity_(draft);
-  var after = getDraftListDateInfo_(draft);
-  if(before.label !== after.label || before.edited !== after.edited) paintDraftListDate_(draftId);
+  if(state._revisionArmed || !state.selectedId) return;
+  state._revisionArmed = true;
+  pushCardRevision_(state.selectedId);
 }
 function scheduleSheetQuietSave_(){
   if(_sheetQuietSaveTimer_) clearTimeout(_sheetQuietSaveTimer_);
@@ -41380,10 +41519,13 @@ function flushSheetQuietSaveBody_(){
   state._sheetDomDirty = false;
   var content = getDraftContent_(draftId);
   if(!content) return;
+  var beforeFp = typeof PlannerFieldSync !== 'undefined' ? PlannerFieldSync.historySnapshot(content).fp : '';
   applySheetEditsForTab_(content, state.activeTab);
+  var afterFp = typeof PlannerFieldSync !== 'undefined' ? PlannerFieldSync.historySnapshot(content).fp : beforeFp;
   var sectionChanged = sheetSectionLayoutChanged_;
   var draft = findDraftByIdAnywhere_(draftId);
-  if(draft) stampDraftActivity_(draft);
+  if(draft && (typeof PlannerFieldSync === 'undefined' || beforeFp !== afterFp)) stampDraftActivity_(draft);
+  state._revisionArmed = false;
   if(!state.published[draftId]) state.published[draftId] = {};
   state.published[draftId].content = content;
   state.generatedOnly[draftId] = content;
@@ -41880,7 +42022,7 @@ function saveFocusedDraftChange_(draftId){
   }
 }
 function stampDraftActivity_(draft){
-  if(!draft) return;
+  if(!draft || draft.reviewHold) return;
   var now = new Date().toISOString();
   if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerNoteDraftActivity){
     var noted = PlannerSyncRules.plannerNoteDraftActivity(draft, now);
@@ -41912,10 +42054,176 @@ function paintDraftListDate_(draftId){
     }
   }
 }
+var CARD_REVISIONS_LS_ = 'ht_card_revisions_v1';
+function readCardRevisionMap_(){
+  try {
+    var raw = localStorage.getItem(CARD_REVISIONS_LS_);
+    var parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch(eRev){ return {}; }
+}
+function writeCardRevisionMap_(map){
+  try { localStorage.setItem(CARD_REVISIONS_LS_, JSON.stringify(map || {})); } catch(eRev){}
+}
+function cardRevisionList_(draftId){
+  var map = readCardRevisionMap_();
+  var list = Array.isArray(map[draftId]) ? map[draftId] : [];
+  if(typeof findDraftByIdAnywhere_ === 'function'){
+    var draft = findDraftByIdAnywhere_(draftId);
+    if(draft && Array.isArray(draft.revisions) && draft.revisions.length && !list.length){
+      list = draft.revisions.slice(0, 5).map(function(rev){
+        var copy = JSON.parse(JSON.stringify(rev));
+        delete copy.reelFile;
+        return copy;
+      });
+      map[draftId] = list;
+      writeCardRevisionMap_(map);
+    }
+    if(draft && draft.revisions) delete draft.revisions;
+  }
+  return list;
+}
+function pushCardRevision_(draftId){
+  var draft = typeof findDraftByIdAnywhere_ === 'function' ? findDraftByIdAnywhere_(draftId) : null;
+  var content = typeof getDraftContent_ === 'function' ? getDraftContent_(draftId) : null;
+  if(!draft || !content || typeof PlannerFieldSync === 'undefined') return;
+  cardRevisionList_(draftId);
+  var snap = PlannerFieldSync.historySnapshot(content);
+  var map = readCardRevisionMap_();
+  var list = Array.isArray(map[draftId]) ? map[draftId] : [];
+  if(list[0] && list[0].fp === snap.fp) return;
+  list.unshift(snap);
+  if(list.length > 5) list.length = 5;
+  map[draftId] = list;
+  writeCardRevisionMap_(map);
+}
+function toggleDraftReviewHold_(draftId){
+  var draft = findDraftByIdAnywhere_(draftId);
+  if(!draft) return;
+  draft.reviewHold = !draft.reviewHold;
+  state._reviewLockSync = true;
+  try {
+    focusSyncOutboxOnDraft_(draftId);
+    save({ driveImmediate: true, gasImmediate: true });
+    ensureDraftSyncKeysQueued_(draftId);
+  } finally {
+    state._reviewLockSync = false;
+    state._syncFocusDraftIds = null;
+  }
+  try { renderMain(); } catch(eRender){}
+  if(typeof setAppToast === 'function'){
+    setAppToast(draft.reviewHold
+      ? '검토 중입니다. 이 카드는 대기열에 올리지 않고, 날짜도 바꾸지 않습니다. 해제는 직접 눌러야 합니다.'
+      : '검토를 해제했습니다.', { duration: 4200, variant: 'ok' });
+  }
+}
+function openMoveDraftProgram_(draftId, fromCat){
+  var old = document.getElementById('move-program-overlay');
+  if(old) old.remove();
+  var opts = '';
+  CATEGORIES.forEach(function(c, i){
+    if(!c || i === fromCat) return;
+    opts += '<option value="' + i + '">' + escapeHtml(c.name || ('프로그램 ' + i)) + '</option>';
+  });
+  var wrap = document.createElement('div');
+  wrap.id = 'move-program-overlay';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:80;display:flex;align-items:flex-end;justify-content:center;padding:16px';
+  wrap.innerHTML = '<div style="background:#fff;border-radius:12px;padding:16px;width:min(420px,100%)">' +
+    '<div style="font-weight:700;margin-bottom:8px">프로그램 이동</div>' +
+    '<p style="font-size:13px;color:#4b5563;margin:0 0 8px">카드 번호와 내용은 그대로 두고, 보이는 프로그램만 바꿉니다.</p>' +
+    '<select id="move-program-select" style="width:100%;font:inherit;padding:8px;min-height:40px">' + opts + '</select>' +
+    '<div style="display:flex;gap:8px;margin-top:12px">' +
+    '<button type="button" id="move-program-go" style="flex:1;min-height:40px">이동</button>' +
+    '<button type="button" id="move-program-cancel" style="flex:1;min-height:40px">취소</button></div></div>';
+  document.body.appendChild(wrap);
+  wrap.querySelector('#move-program-cancel').onclick = function(){ wrap.remove(); };
+  wrap.querySelector('#move-program-go').onclick = function(){
+    var to = parseInt(wrap.querySelector('#move-program-select').value, 10);
+    wrap.remove();
+    moveDraftToProgram_(draftId, fromCat, to);
+  };
+}
+function moveDraftToProgram_(draftId, fromCat, toCat){
+  if(fromCat === toCat || !CATEGORIES[toCat]) return;
+  var from = CATEGORIES[fromCat];
+  var draft = (from && from.drafts || []).filter(function(d){ return d && d.id === draftId; })[0];
+  if(!draft) draft = findDraftByIdAnywhere_(draftId);
+  if(!draft) return;
+  CATEGORIES.forEach(function(cat){
+    if(!cat || !cat.drafts) return;
+    cat.drafts = cat.drafts.filter(function(d){ return !d || d.id !== draftId; });
+  });
+  draft.programCatId = toCat;
+  if(!CATEGORIES[toCat].drafts) CATEGORIES[toCat].drafts = [];
+  CATEGORIES[toCat].drafts.push(draft);
+  try {
+    focusSyncOutboxOnDraft_(draftId);
+    save({ driveImmediate: true, gasImmediate: true });
+    ensureDraftSyncKeysQueued_(draftId);
+  } finally {
+    state._syncFocusDraftIds = null;
+  }
+  try { renderTabs(); renderMain(); } catch(eRender){}
+  if(typeof setAppToast === 'function') setAppToast('프로그램을 옮겼습니다. 카드 번호는 그대로입니다.', { duration: 3600, variant: 'ok' });
+}
+function openCardRevisions_(draftId){
+  var list = cardRevisionList_(draftId);
+  if(!list.length){
+    if(typeof setAppToast === 'function') setAppToast('이전 버전이 없습니다.', { duration: 2800, variant: 'ok' });
+    return;
+  }
+  var old = document.getElementById('card-revision-overlay');
+  if(old) old.remove();
+  var rows = list.slice(0, 5).map(function(rev, i){
+    var when = rev.at ? new Date(rev.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ('버전 ' + (i + 1));
+    var title = rev.blog && rev.blog.title ? String(rev.blog.title).slice(0, 40) : '';
+    return '<button type="button" data-rev="' + i + '" style="display:block;width:100%;text-align:left;margin:0 0 6px;padding:8px;min-height:40px">' +
+      escapeHtml(when + (title ? ' · ' + title : '')) + '</button>';
+  }).join('');
+  var wrap = document.createElement('div');
+  wrap.id = 'card-revision-overlay';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:80;display:flex;align-items:flex-end;justify-content:center;padding:16px';
+  wrap.innerHTML = '<div style="background:#fff;border-radius:12px;padding:16px;width:min(420px,100%);max-height:70vh;overflow:auto">' +
+    '<div style="font-weight:700;margin-bottom:8px">이전 버전</div>' + rows +
+    '<button type="button" id="card-revision-close" style="width:100%;min-height:40px;margin-top:8px">닫기</button></div>';
+  document.body.appendChild(wrap);
+  wrap.querySelector('#card-revision-close').onclick = function(){ wrap.remove(); };
+  wrap.querySelectorAll('[data-rev]').forEach(function(btn){
+    btn.onclick = function(){
+      var index = parseInt(btn.getAttribute('data-rev'), 10);
+      wrap.remove();
+      restoreCardRevision_(draftId, index);
+    };
+  });
+}
+function restoreCardRevision_(draftId, index){
+  var list = cardRevisionList_(draftId);
+  var rev = list[index];
+  if(!rev) return;
+  pushCardRevision_(draftId);
+  var content = getDraftContent_(draftId);
+  if(!content){
+    content = {};
+    if(!state.published[draftId]) state.published[draftId] = {};
+    state.published[draftId].content = content;
+    state.generatedOnly[draftId] = content;
+  }
+  ['blog', 'insta', 'threads', 'thread', 'community', 'news'].forEach(function(k){
+    if(rev[k] !== undefined) content[k] = JSON.parse(JSON.stringify(rev[k]));
+  });
+  ['blog', 'insta', 'threads', 'thread', 'community', 'news', 'images'].forEach(function(tab){
+    noteSheetEditedPaths_(draftId, tab);
+  });
+  saveFocusedDraftChange_(draftId);
+  if(typeof setAppToast === 'function') setAppToast('이전 버전으로 되돌렸습니다.', { duration: 3200, variant: 'ok' });
+}
 function persistDraftContent_(draftId, content){
   flushSheetTitleBackgroundWork_({ save: false });
   var editedDraft = findDraftByIdAnywhere_(draftId);
-  if(editedDraft) stampDraftActivity_(editedDraft);
+  var nextFp = content && typeof PlannerFieldSync !== 'undefined' ? PlannerFieldSync.historySnapshot(content).fp : '';
+  var prevList = editedDraft ? cardRevisionList_(draftId) : [];
+  var prevFp = prevList[0] && prevList[0].fp;
+  if(editedDraft && (!nextFp || !prevFp || nextFp !== prevFp)) stampDraftActivity_(editedDraft);
   alignDraftTopicToBlogTitle_(draftId, content);
   if(!state.published[draftId]) state.published[draftId] = {};
   state.published[draftId].content = content;
@@ -42324,6 +42632,7 @@ function applySheetCommunityEdits_(content){
 
 function applySheetEditsForTab_(content, tab){
   if(!content) return content;
+  if(state.selectedId) noteSheetEditedPaths_(state.selectedId, tab);
   if(tab === 'blog') return applySheetBlogEdits_(content);
   if(tab === 'insta') return applySheetInstaEdits_(content);
   if(tab === 'threads') return applySheetThreadsEdits_(content);
@@ -43040,6 +43349,18 @@ function closeSheet(){
 
 // planner-detail-publish.js — 브랜딩 플래너 detail
 function getCatIdFromDraftId_(draftId){
+  if(draftId && typeof CATEGORIES !== 'undefined'){
+    for(var ci = 0; ci < CATEGORIES.length; ci++){
+      var drafts = CATEGORIES[ci] && CATEGORIES[ci].drafts;
+      if(!drafts) continue;
+      for(var di = 0; di < drafts.length; di++){
+        var row = drafts[di];
+        if(!row || row.id !== draftId) continue;
+        if(row.programCatId != null && CATEGORIES[row.programCatId]) return row.programCatId;
+        return ci;
+      }
+    }
+  }
   var m = String(draftId || '').match(/^d(\d+)-/);
   return m ? parseInt(m[1], 10) : (state.selectedCatId != null ? state.selectedCatId : 0);
 }
@@ -45383,10 +45704,13 @@ function applyImportPiece_(content, piece, catId){
     return;
   }
   if(piece.channel === 'threads'){
+    var threadParts = (typeof PlannerFieldSync !== 'undefined')
+      ? PlannerFieldSync.splitThreadComment(piece.body, '')
+      : { body: piece.body, comment: '' };
     content.threads = {
-      body: piece.body,
-      comment: '',
-      text: piece.body,
+      body: threadParts.body,
+      comment: threadParts.comment,
+      text: threadParts.body,
       importTitle: piece.title,
       account: piece.account || ''
     };

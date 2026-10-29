@@ -16653,6 +16653,7 @@ function syncUntrackedContentFingerprint_(payload){
   delete copy.published;
   delete copy.generatedOnly;
   delete copy.chatgptOpenUrl;
+  delete copy.blogDefaultCategories;
   delete copy.publishRecCurrentTabOnly;
   delete copy.syncRationalesOnBrandSave;
   delete copy.promptRefineMilestones;
@@ -16698,6 +16699,7 @@ function isEmptyDefaultSyncEntity_(key, val){
     v = v.value;
   }
   if(key === 'setting:chatgptOpenUrl') return !String(v == null ? '' : v).trim();
+  if(key === 'setting:blogDefaultCategories') return v == null || typeof v !== 'object';
   if(key === 'setting:publishRecCurrentTabOnly') return !v;
   if(key === 'setting:syncRationalesOnBrandSave') return v == null || v === '' || v === true;
   if(key.indexOf('plan:year:period:') === 0) return !periodHasYearGoalText_(v);
@@ -16761,6 +16763,12 @@ function collectSyncEntities_(payload, opts){
   Object.keys(branding.seriesGoals || {}).forEach(function(key){
     out['branding:seriesGoal:' + key] = branding.seriesGoals[key];
   });
+  if(Object.prototype.hasOwnProperty.call(payload, 'blogDefaultCategories')){
+    var blogCatKey = 'setting:blogDefaultCategories';
+    if(!isEmptyDefaultSyncEntity_(blogCatKey, payload.blogDefaultCategories)){
+      out[blogCatKey] = payload.blogDefaultCategories;
+    }
+  }
   ['chatgptOpenUrl','publishRecCurrentTabOnly','syncRationalesOnBrandSave'].forEach(function(field){
     if(!Object.prototype.hasOwnProperty.call(payload, field)) return;
     var settingKey = 'setting:' + field;
@@ -18249,6 +18257,7 @@ function plannerConflictLabel_(key){
   if(p[0] === 'published') return '발행 글 · ' + p.slice(1).join(':');
   if(p[0] === 'generated') return '생성 초안 · ' + p.slice(1).join(':');
   if(p[0] === 'branding') return '브랜딩 설정 · ' + p.slice(2).join(':');
+  if(p[0] === 'setting' && p[1] === 'blogDefaultCategories') return '블로그 기본 카테고리';
   if(p[0] === 'setting') return '플래너 설정 · ' + p.slice(1).join(':');
   if(p[0] === 'deleted') return '삭제 기록 · ' + p.slice(1).join(':');
   if(p[0] === 'pinned') return '고정 주제 · ' + p.slice(1).join(':');
@@ -18323,6 +18332,7 @@ function getPersistPayload(){
     syncEntityRevisions: state.syncEntityRevisions || {},
     syncEntityTombstones: state.syncEntityTombstones || {},
     chatgptOpenUrl: state.chatgptOpenUrl,
+    blogDefaultCategories: (state.blogDefaultCategories && typeof state.blogDefaultCategories === 'object') ? state.blogDefaultCategories : undefined,
     prompts: state.prompts,
     promptsUpdatedAt: state.promptsUpdatedAt || '',
     promptRefineMilestones: state.promptRefineMilestones || {},
@@ -19005,6 +19015,38 @@ function syncOutboxProgressStamp_(){
     return String(op.mutationId || '') + ':' + String(parseInt(op.version, 10) || 1) + ':' + String(op.baseEntityRevision || 0);
   }).join('|');
 }
+var PLANNER_SYNC_JOURNAL_KEY_ = 'ht_sync_journal_v1';
+function plannerIncrementalJournalEnabled_(){
+  try { return /(?:\?|&)inc=1(?:&|$)/.test(String(location.search || '')); } catch(e){ return false; }
+}
+function readPlannerSyncJournal_(){
+  try {
+    var raw = JSON.parse(localStorage.getItem(PLANNER_SYNC_JOURNAL_KEY_) || '{}');
+    return raw && typeof raw === 'object' ? raw : { items: [] };
+  } catch(e){ return { items: [] }; }
+}
+function recordConfirmedSyncJournal_(ackVer){
+  if(!plannerIncrementalJournalEnabled_()) return;
+  if(typeof PlannerSyncRules === 'undefined' || !PlannerSyncRules.plannerRecordSyncJournal) return;
+  var confirmed = [];
+  Object.keys(ackVer || {}).forEach(function(id){
+    confirmed.push({ mutationId: id, version: ackVer[id] });
+  });
+  if(!confirmed.length) return;
+  try {
+    var next = PlannerSyncRules.plannerRecordSyncJournal(readPlannerSyncJournal_(), confirmed);
+    localStorage.setItem(PLANNER_SYNC_JOURNAL_KEY_, JSON.stringify(next));
+  } catch(e){}
+}
+function applyConfirmedSyncJournal_(){
+  if(!plannerIncrementalJournalEnabled_()) return;
+  if(typeof PlannerSyncRules === 'undefined' || !PlannerSyncRules.plannerApplySyncJournal) return;
+  var before = state.syncOutbox || [];
+  var next = PlannerSyncRules.plannerApplySyncJournal(before, readPlannerSyncJournal_());
+  if(next.length === before.length) return;
+  state.syncOutbox = next;
+  try { rebuildDirtyStateFromOutbox_(); } catch(e){}
+}
 function acknowledgeSyncOutbox_(accepted, sentMutations, holdKeys){
   var ackVer = {};
   (accepted || []).forEach(function(item){
@@ -19046,6 +19088,7 @@ function acknowledgeSyncOutbox_(accepted, sentMutations, holdKeys){
   }
   rebuildDirtyStateFromOutbox_();
   _syncFastAckPending_ = false;
+  try { recordConfirmedSyncJournal_(ackVer); } catch(eJournal){}
 }
 function rotateIdempotentOutbox_(accepted){
   var byId = {};
@@ -20004,6 +20047,11 @@ function mergePlannerPayloads_(local, remote){
   else if(local.prompts != null) out.prompts = local.prompts;
   if(remote.chatgptOpenUrl && !local.chatgptOpenUrl) out.chatgptOpenUrl = remote.chatgptOpenUrl;
   else if(local.chatgptOpenUrl) out.chatgptOpenUrl = local.chatgptOpenUrl;
+  if(local.blogDefaultCategories || remote.blogDefaultCategories){
+    var localBlogCats = (local.blogDefaultCategories && typeof local.blogDefaultCategories === 'object') ? local.blogDefaultCategories : {};
+    var remoteBlogCats = (remote.blogDefaultCategories && typeof remote.blogDefaultCategories === 'object') ? remote.blogDefaultCategories : {};
+    out.blogDefaultCategories = Object.assign({}, preferRemote ? localBlogCats : remoteBlogCats, preferRemote ? remoteBlogCats : localBlogCats);
+  }
   if(remote.dailyAutoLast && (!local.dailyAutoLast || remote.dailyAutoLast > local.dailyAutoLast)) out.dailyAutoLast = remote.dailyAutoLast;
   else if(local.dailyAutoLast) out.dailyAutoLast = local.dailyAutoLast;
   if(local.branding || remote.branding){
@@ -20287,6 +20335,7 @@ function dropEmptyDefaultSyncMutations_(){
     var op = (state.syncOutbox || []).find(function(item){ return item && item.key === k; });
     var val = op ? op.value : (
       k === 'setting:chatgptOpenUrl' ? state.chatgptOpenUrl :
+      k === 'setting:blogDefaultCategories' ? state.blogDefaultCategories :
       k === 'setting:publishRecCurrentTabOnly' ? state.publishRecCurrentTabOnly :
       k === 'setting:syncRationalesOnBrandSave' ? state.syncRationalesOnBrandSave :
       undefined
@@ -23814,6 +23863,10 @@ function applyPersistPayload(s, opts){
     }
   }
   state.chatgptOpenUrl = s.chatgptOpenUrl || '';
+  if(Object.prototype.hasOwnProperty.call(s, 'blogDefaultCategories') && s.blogDefaultCategories && typeof s.blogDefaultCategories === 'object'){
+    state.blogDefaultCategories = Object.assign({}, s.blogDefaultCategories);
+    try { localStorage.setItem('ht_blog_default_cat_v1', JSON.stringify(state.blogDefaultCategories)); } catch(eBlogCat){}
+  }
   state.prompts = s.prompts !== undefined ? s.prompts : null;
   state.promptsUpdatedAt = s.promptsUpdatedAt || '';
   if(s.promptUserEditedKeys && typeof s.promptUserEditedKeys === 'object'){
@@ -25557,6 +25610,8 @@ function applyBootPlannerRaw_(raw){
     try { applyBuiltinDraftBrandSeeds_(); } catch(e3){}
     return;
   }
+  try { applyConfirmedSyncJournal_(); } catch(eJournal){}
+  try { adoptLocalBlogCategoriesIfUnsynced_(); } catch(eBlogCat){}
   try {
     if(state.syncDirty || Object.keys(state.syncDirtyEntityKeys || {}).length){
       state.syncNeedsSnapshot = true;
@@ -25755,7 +25810,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=408').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=413').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -26250,14 +26305,23 @@ function closeApiModalBackdrop(ev){
   closeApiModal();
 }
 window.closeApiModalBackdrop = closeApiModalBackdrop;
-// 네이버 블로그 기본 카테고리 — 프로그램별. 이 기기에 저장(localStorage). 리얼페이스 기본값은 코드에 둔다.
+// 네이버 블로그 기본 카테고리 — 프로그램별. 저장본에 넣어 기기 간에 맞춘다. 리얼페이스 기본값은 코드에 둔다.
 var BLOG_DEFAULT_CATEGORY_KEY_ = 'ht_blog_default_cat_v1';
 var BLOG_DEFAULT_CATEGORY_BUILTIN_ = { 2: '안면비대칭/축소' };
 function readBlogDefaultCategories_(){
+  if(state && state.blogDefaultCategories && typeof state.blogDefaultCategories === 'object'){
+    return state.blogDefaultCategories;
+  }
   try {
     var raw = JSON.parse(localStorage.getItem(BLOG_DEFAULT_CATEGORY_KEY_) || '{}');
     return raw && typeof raw === 'object' ? raw : {};
   } catch(e){ return {}; }
+}
+function adoptLocalBlogCategoriesIfUnsynced_(){
+  if(state.blogDefaultCategories && typeof state.blogDefaultCategories === 'object') return;
+  var local = readBlogDefaultCategories_();
+  if(!local || typeof local !== 'object' || !Object.keys(local).length) return;
+  state.blogDefaultCategories = Object.assign({}, local);
 }
 function getBlogDefaultCategoryForCat_(catId){
   var saved = readBlogDefaultCategories_();
@@ -26289,6 +26353,7 @@ function saveBlogDefaultCategories_(){
     if(v === builtin) return;
     out[id] = v;
   });
+  state.blogDefaultCategories = out;
   try { localStorage.setItem(BLOG_DEFAULT_CATEGORY_KEY_, JSON.stringify(out)); } catch(e){}
 }
 function noteBlogDefaultCategoryOnOpen_(catId){

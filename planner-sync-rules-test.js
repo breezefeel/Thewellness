@@ -374,13 +374,22 @@ assert(leftQueue.length === 2 && leftQueue[0].mutationId === 'm2' && leftQueue[1
   'a journal drops only the confirmed version and keeps a newer one');
 assert(R.plannerApplySyncJournal(queued, { items: [] }).length === 3, 'an empty journal leaves the queue');
 
-var sameCopy = R.plannerMergeDuplicateGroup([
+var sameWorkDifferent = R.plannerMergeDuplicateGroup([
   { id: 'd6-c1782810860369', topic: '가져온 주제', placeholder: true, createdAt: '2026-10-29T01:00:00.000Z', workKey: 'blog#같은글', content: { blog: { problem: '본문' } } },
-  { id: 'd6-c1782810860370', topic: '가져온 주제', placeholder: true, createdAt: '2026-10-29T02:00:00.000Z', workKey: 'blog#같은글', content: { blog: { problem: '본문', selfCare: '추가' } } }
+  { id: 'd6-c1782810860370', topic: '가져온 주제', placeholder: true, createdAt: '2026-10-29T02:00:00.000Z', workKey: 'blog#같은글', content: { blog: { problem: '다른 글', selfCare: '추가' } } }
 ]);
-assert(sameCopy.changed && sameCopy.retireIds.length === 1, 'the same card is merged once');
-assert(sameCopy.content.blog.problem === '본문' && sameCopy.content.blog.selfCare === '추가', 'merging keeps both cards text');
-assert(sameCopy.retireIds[0] !== sameCopy.keepId, 'the kept card is not retired');
+assert(!sameWorkDifferent.changed && sameWorkDifferent.retireIds.length === 0, 'the same work key with different text is not merged');
+var emptyCards = R.plannerMergeDuplicateGroup([
+  { id: 'e1', placeholder: true, content: {} },
+  { id: 'e2', placeholder: true, content: { blog: { problem: '' } } }
+]);
+assert(!emptyCards.changed && emptyCards.retireIds.length === 0, 'empty cards are not merged');
+var movedRefs = R.plannerRetargetDuplicateRefs({
+  keepId: 'd6-keep',
+  retireIds: ['d6-old'],
+  assignments: [{ draftId: 'd6-old', stepId: 's3', order: 1 }]
+});
+assert(movedRefs.ok && movedRefs.assignments.length === 1 && movedRefs.assignments[0].draftId === 'd6-keep' && movedRefs.assignments[0].stepId === 's3', 'assignments move to the kept card');
 var differentWork = R.plannerMergeDuplicateGroup([
   { id: 'a', placeholder: true, workKey: 'blog#하나', content: { blog: { problem: '하나' } } },
   { id: 'b', placeholder: true, workKey: 'blog#둘', content: { blog: { problem: '둘' } } }

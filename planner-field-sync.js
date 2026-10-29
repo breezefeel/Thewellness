@@ -252,10 +252,12 @@ var PlannerFieldSync = (function(){
   function preserveProseBreaks(text){
     return String(text == null ? '' : text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   }
-  function baseForContentSend(ownBase, siblingBase, key){
+  function baseForContentSend(ownBase, siblingBase, key, spec){
     if(ownBase && typeof ownBase === 'object') return ownBase;
+    spec = spec || {};
     var kind = String(key || '').split(':')[0];
-    if(kind === 'generated' && siblingBase && siblingBase.content && typeof siblingBase.content === 'object' && !Array.isArray(siblingBase.content)){
+    var onServer = (parseInt(spec.baseEntityRevision, 10) || 0) > 0 || (parseInt(spec.serverRevision, 10) || 0) > 0;
+    if(kind === 'generated' && onServer && siblingBase && siblingBase.content && typeof siblingBase.content === 'object' && !Array.isArray(siblingBase.content)){
       return siblingBase.content;
     }
     return null;

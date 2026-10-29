@@ -17177,8 +17177,8 @@ function normalizeDraftRowForSync_(draft){
   var SYNC_COMPARE_IGNORED_KEYS_ = { updatedAt: 1, savedAt: 1, order: 1, index: 1, modifiedAt: 1, editedAt: 1, lastEditedAt: 1, lastSavedAt: 1, localSavedAt: 1, syncedAt: 1, threadsPending: 1, threadsPendingStartedAt: 1, threadsPendingEndMs: 1, threadsPendingTopic: 1, threadsPendingCatId: 1, instaPending: 1, instaPendingStartedAt: 1, instaPendingEndMs: 1, instaPendingTopic: 1, instaPendingCatId: 1 };
 function omitEmptyForSyncCompare_(value){
   if(value == null) return undefined;
-  // 줄 끝 공백만 같은 글로 본다. 줄바꿈은 글의 일부라 지우거나 공백으로 바꾸지 않는다.
-  if(typeof value === 'string') return value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/^[ \t]+|[ \t]+$/g, '');
+  // 비교할 때만 앞뒤 줄바꿈·공백을 뺀다. 가운데 줄바꿈은 그대로 둔다.
+  if(typeof value === 'string') return value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/^[ \t\n]+|[ \t\n]+$/g, '');
   if(typeof value !== 'object') return value;
   if(Array.isArray(value)){
     return value.map(omitEmptyForSyncCompare_).filter(function(v){ return v !== undefined; });
@@ -18645,7 +18645,11 @@ function shapeSyncedContentValue_(key, localValue){
     var siblingKey = (baseKey[1] === 'published' ? 'generated:' : 'published:') + baseKey[2];
     if(syncFieldBaseFromServer_(siblingKey)) siblingBase = state.syncFieldBase[siblingKey];
   }
-  var base = PlannerFieldSync.baseForContentSend ? PlannerFieldSync.baseForContentSend(ownBase, siblingBase, key) : ownBase;
+  var queued = (state.syncOutbox || []).find(function(row){ return row && row.key === key; });
+  var base = PlannerFieldSync.baseForContentSend ? PlannerFieldSync.baseForContentSend(ownBase, siblingBase, key, {
+    baseEntityRevision: queued ? (parseInt(queued.baseEntityRevision, 10) || 0) : 0,
+    serverRevision: parseInt((state.syncEntityRevisions || {})[key], 10) || 0
+  }) : ownBase;
   var cleared = state._clearedPaths && state._clearedPaths[key];
   var plan = PlannerFieldSync.planOutboxSend(base, localValue, key, cleared);
   if(plan.mode === 'patch'){
@@ -41513,7 +41517,7 @@ function sheetEditField_(label, id, value, opts){
 }
 
 /**
- * 이미 줄바꿈이 있으면 그대로 둔다. 한 줄로 이어진 글만 문장 경계에 빈 줄을 넣는다.
+ * 줄바꿈이 있으면 세 줄 이상만 두 줄로 줄이고 들여쓰기만 정리한다. 한 줄로 이어진 글만 문장 경계에 빈 줄을 넣는다.
  * 마침표로 나누는 것은 빈 줄이 전혀 없을 때만. 짧은 문장(36자 미만)은 다음 문장과 한 단락.
  * 이미 줄로 나뉜 목록은 불릿 사이에 빈 줄을 끼워 넣지 않는다. 👉 셀프케어는 그대로 둔다.
  */
@@ -41522,7 +41526,7 @@ function ensureProseParagraphBreaks_(text){
     ? PlannerFieldSync.preserveProseBreaks(text)
     : String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   if(!t) return '';
-  if(t.indexOf('\n') >= 0) return t;
+  if(t.indexOf('\n') >= 0) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
   if(/\n[ \t]*\n/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
   if(/(^|\n)\s*👉/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
   if(/(^|\n)\s*(?:[-•*]|\d+[.)])\s/.test(t)) return stripProseParagraphIndents_(t);
@@ -41833,9 +41837,25 @@ function flushSheetQuietSaveBody_(){
   }
   if(sectionChanged) paintSheetAfterSectionSplit_(content);
 }
+var _holdSheetSaveTimer_ = 0;
+function holdSheetSavePush_(){
+  state._holdSheetSavePush = true;
+  if(_holdSheetSaveTimer_) clearTimeout(_holdSheetSaveTimer_);
+  _holdSheetSaveTimer_ = setTimeout(function(){
+    _holdSheetSaveTimer_ = 0;
+    state._holdSheetSavePush = false;
+  }, 2000);
+}
+function clearSheetSaveHold_(){
+  state._holdSheetSavePush = false;
+  if(_holdSheetSaveTimer_){
+    clearTimeout(_holdSheetSaveTimer_);
+    _holdSheetSaveTimer_ = 0;
+  }
+}
 window.onSheetFieldBlur_ = function(ev){
   var next = ev && ev.relatedTarget;
-  if(next && next.closest && next.closest('.btn-save-draft')) state._holdSheetSavePush = true;
+  if(next && next.closest && next.closest('.btn-save-draft')) holdSheetSavePush_();
   if(sheetQuietSaving_ || sheetSectionPainting_) return;
   if(_sheetQuietSaveTimer_){
     clearTimeout(_sheetQuietSaveTimer_);
@@ -43260,28 +43280,29 @@ function enqueueMangoFromBlog_(draftId, catId, topic, blog, draft){
   })();
 }
 
-window.holdSheetSavePush_ = function(){ state._holdSheetSavePush = true; };
 window.onSheetDraftSave_ = function(){
   state._holdSheetSavePush = true;
+  var photoFromBlog = false;
+  var sectionChanged = false;
+  var content = null;
+  var tab = '';
+  try {
   var draftId = state.selectedId;
   if(!draftId){
-    state._holdSheetSavePush = false;
     setAppToast('먼저 초안 카드를 선택해 주세요.', { duration: 3500, variant: 'err' });
     return;
   }
-  var tab = state.activeTab;
-  var content = tab === 'blog' ? ensureSheetBlogOnContent_(draftId) : getDraftContent_(draftId);
+  tab = state.activeTab;
+  content = tab === 'blog' ? ensureSheetBlogOnContent_(draftId) : getDraftContent_(draftId);
   if(!content){
-    state._holdSheetSavePush = false;
     setAppToast('저장할 초안이 없어요. 먼저 초안을 생성해 주세요.', { duration: 4000, variant: 'err' });
     return;
   }
   applySheetEditsForTab_(content, tab);
-  var sectionChanged = sheetSectionLayoutChanged_;
-  var photoFromBlog = tab === 'blog' && refreshTopicPhotoPromptFromBlog_(content, draftId, state.selectedCatId);
+  sectionChanged = sheetSectionLayoutChanged_;
+  photoFromBlog = tab === 'blog' && refreshTopicPhotoPromptFromBlog_(content, draftId, state.selectedCatId);
   if(isDailyShareCategory(state.selectedCatId)) persistSheetDailyFactsToDraft_();
   persistDraftContent_(draftId, content);
-  state._holdSheetSavePush = false;
   try { schedulePlannerGasPush_(true); } catch(eOnePush){}
   if(sectionChanged) paintSheetAfterSectionSplit_(content);
   if(isDailyShareCategory(state.selectedCatId) && tab === 'images'){
@@ -43312,6 +43333,9 @@ window.onSheetDraftSave_ = function(){
     : ('이 기기에 초안을 저장했어요.' + (pendingAfterSave
       ? (' 서버 반영은 아직 ' + pendingAfterSave + '건 남았습니다.')
       : ' 서버 반영을 확인 중입니다.') + ' (발행 아님)'), { duration: photoFromBlog ? 4200 : 5200, variant: 'ok' });
+  } finally {
+    clearSheetSaveHold_();
+  }
 };
 
 /** opts.viaApi: PlannerSocial이 API로 이미 올린 뒤 — 발행 기록·다음 채널 초안만 만들고 복사·앱 이동은 하지 않는다 */
@@ -45883,7 +45907,7 @@ window.openDuplicateCardsReview_ = function(){
   sheet.style.cssText = 'background:#fff;color:#1c1c1e;width:100%;max-width:560px;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));font:14px/1.5 -apple-system,system-ui,sans-serif';
   function esc(t){ return escapeHtml(String(t == null ? '' : t)); }
   var html = '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">중복으로 보이는 카드</b><button type="button" id="dup-cards-close" style="border:0;background:#eee;border-radius:8px;min-height:36px;padding:0 12px">닫기</button></div>' +
-    '<p style="margin:6px 0 12px;color:#555">확인용이에요. 여기서도, 자동으로도 카드를 지우지 않습니다. 지울지는 직접 정하세요.</p>';
+    '<p style="margin:6px 0 12px;color:#555">글이 완전히 같을 때만, 아래 버튼으로 한 장으로 합칠 수 있어요. 자동으로 지우거나 합치지 않습니다.</p>';
   if(!r.groups.length && !r.orphanContent.length) html += '<p>중복으로 보이는 카드가 없어요.</p>';
   r.groups.forEach(function(g){
     var tag = g.level === 'same' ? '<span style="background:#fde2e2;color:#a31;padding:1px 6px;border-radius:6px">같은 날짜</span>' : '<span style="background:#fff3c4;color:#6a5000;padding:1px 6px;border-radius:6px">날짜만 다름</span>';
@@ -45900,12 +45924,23 @@ window.openDuplicateCardsReview_ = function(){
     r.orphanContent.forEach(function(o){ html += '<div style="font-size:13px">' + esc(o.id) + ' · ' + esc(o.topic) + ' → 기존 ' + esc(o.existingId) + '</div>'; });
     html += '</section>';
   }
+  html += '<button type="button" id="dup-cards-merge" style="width:100%;min-height:44px;border-radius:10px;border:0;background:#1c1c1e;color:#fff;margin-bottom:8px">같은 글만 합치기</button>';
   html += '<button type="button" id="dup-cards-copy" style="width:100%;min-height:44px;border-radius:10px;border:1px solid #888;background:#fff">목록 복사</button>';
   sheet.innerHTML = html;
   box.appendChild(sheet);
   box.addEventListener('click', function(ev){ if(ev.target === box) box.remove(); });
   document.body.appendChild(box);
   document.getElementById('dup-cards-close').addEventListener('click', function(){ box.remove(); });
+  document.getElementById('dup-cards-merge').addEventListener('click', function(){
+    if(!window.confirm('글이 완전히 같은 카드만 한 장으로 합칩니다. 글이 다르거나 예약·링크를 옮길 수 없으면 그대로 둡니다.')) return;
+    var changed = false;
+    try { changed = mergeWarnedDuplicateCards_(); } catch(eMerge){ changed = false; }
+    if(changed) persistUserDuplicateMerge_();
+    box.remove();
+    if(typeof setAppToast === 'function'){
+      setAppToast(changed ? '같은 글을 한 장으로 합쳤어요.' : '합칠 수 있는 같은 글이 없어요.', { duration: 3600, variant: changed ? 'ok' : 'err' });
+    }
+  });
   document.getElementById('dup-cards-copy').addEventListener('click', function(){
     var text = JSON.stringify(r, null, 2);
     try { navigator.clipboard.writeText(text).then(function(){ setAppToast('목록을 복사했어요.', { duration: 2400, variant: 'ok' }); }); } catch(eCp){ console.log(text); }
@@ -45943,8 +45978,74 @@ function reportIdenticalImportedCopies_(){
   }
   return false;
 }
+function duplicateAssignmentPlans_(){
+  var plans = [];
+  if(state.pendingSubGoalPlan && Array.isArray(state.pendingSubGoalPlan.assignments)){
+    plans.push(state.pendingSubGoalPlan);
+  }
+  var stored = state.branding && state.branding.subGoalPlans;
+  Object.keys(stored || {}).forEach(function(key){
+    if(stored[key] && Array.isArray(stored[key].assignments)) plans.push(stored[key]);
+  });
+  return plans;
+}
+function duplicateReservations_(){
+  var rows = [];
+  Object.keys(state.published || {}).forEach(function(id){
+    var plan = state.published[id] && state.published[id].channelPlan;
+    if(!plan) return;
+    Object.keys(plan).forEach(function(channel){
+      var item = plan[channel] || {};
+      rows.push({ draftId: id, channel: channel, at: item.at || '', postId: item.postId || '' });
+    });
+  });
+  return rows;
+}
+function duplicateLinks_(){
+  var links = [];
+  try {
+    var hashId = cardLinkIdFromHash_();
+    if(hashId) links.push({ draftId: hashId, kind: 'hash' });
+  } catch(eHash){}
+  if(typeof cardLinkRevealId_ !== 'undefined' && cardLinkRevealId_) links.push({ draftId: cardLinkRevealId_, kind: 'reveal' });
+  return links;
+}
+function applyDuplicateRefMove_(moved){
+  if(!moved || !moved.ok) return;
+  var plans = duplicateAssignmentPlans_();
+  (moved.plans || []).forEach(function(plan, index){
+    if(plans[index]) plans[index].assignments = plan.assignments;
+  });
+  (moved.reservations || []).forEach(function(row){
+    var pub = state.published && state.published[row.draftId];
+    if(!pub || !row.channel) return;
+    if(!pub.channelPlan) pub.channelPlan = {};
+    if(!pub.channelPlan[row.channel]) pub.channelPlan[row.channel] = { at: row.at || '', postId: row.postId || '' };
+  });
+  (moved.links || []).forEach(function(row){
+    if(!row) return;
+    if(row.kind === 'hash'){
+      try {
+        if(cardLinkIdFromHash_() && cardLinkIdFromHash_() !== row.draftId) location.hash = 'card=' + encodeURIComponent(row.draftId);
+      } catch(eHash){}
+    }
+    if(row.kind === 'reveal') cardLinkRevealId_ = row.draftId;
+  });
+}
+function persistUserDuplicateMerge_(){
+  try {
+    var prev = {};
+    try { prev = readPreviousDiskPayloadSync_() || {}; } catch(ePrev){}
+    var now = getPersistPayload();
+    state._enqueueNormalization = true;
+    try { enqueueSyncOutboxChanges_(listChangedSyncEntityKeys_(prev, now), now); }
+    finally { state._enqueueNormalization = false; }
+  } catch(eEnq){}
+  try { save({ driveImmediate: true, gasImmediate: true }); } catch(eSave){}
+  try { renderTabs(); renderMain(); } catch(eRender){}
+}
 function mergeWarnedDuplicateCards_(){
-  if(typeof PlannerSyncRules === 'undefined' || !PlannerSyncRules.plannerMergeDuplicateGroup) return false;
+  if(typeof PlannerSyncRules === 'undefined' || !PlannerSyncRules.plannerMergeDuplicateGroup || !PlannerSyncRules.plannerRetargetDuplicateRefs) return false;
   var groups = findPossibleDuplicateCards_().filter(function(g){ return g.level === 'same'; });
   var changed = false;
   groups.forEach(function(g){
@@ -45957,16 +46058,43 @@ function mergeWarnedDuplicateCards_(){
         placeholder: !!c.placeholder,
         onServer: !!c.onServer,
         createdAt: c.createdAt,
-        workKey: contentWorkKey_(content),
         content: content
       };
     });
     var plan = PlannerSyncRules.plannerMergeDuplicateGroup(cards);
-    if(!plan || !plan.changed || !plan.keepId) return;
-    if(!state.published[plan.keepId] || typeof state.published[plan.keepId] !== 'object') state.published[plan.keepId] = {};
-    state.published[plan.keepId].content = plan.content;
-    state.generatedOnly[plan.keepId] = plan.content;
-    (plan.retireIds || []).forEach(function(id){
+    if(!plan || !plan.changed || !plan.keepId || !(plan.retireIds || []).length) return;
+    var retireSet = {};
+    plan.retireIds.forEach(function(id){ retireSet[id] = true; });
+    var publishedSlice = {};
+    var generatedSlice = {};
+    if(state.published && Object.prototype.hasOwnProperty.call(state.published, plan.keepId)) publishedSlice[plan.keepId] = state.published[plan.keepId];
+    if(state.generatedOnly && Object.prototype.hasOwnProperty.call(state.generatedOnly, plan.keepId)) generatedSlice[plan.keepId] = state.generatedOnly[plan.keepId];
+    plan.retireIds.forEach(function(id){
+      if(state.published && Object.prototype.hasOwnProperty.call(state.published, id)) publishedSlice[id] = state.published[id];
+      if(state.generatedOnly && Object.prototype.hasOwnProperty.call(state.generatedOnly, id)) generatedSlice[id] = state.generatedOnly[id];
+    });
+    var assignmentPlans = duplicateAssignmentPlans_();
+    var moved = PlannerSyncRules.plannerRetargetDuplicateRefs({
+      keepId: plan.keepId,
+      retireIds: plan.retireIds,
+      plans: assignmentPlans.map(function(p, index){ return { key: String(index), assignments: p.assignments }; }),
+      reservations: duplicateReservations_().filter(function(row){ return row.draftId === plan.keepId || retireSet[row.draftId]; }),
+      links: duplicateLinks_().filter(function(row){ return row.draftId === plan.keepId || retireSet[row.draftId]; }),
+      published: publishedSlice,
+      generated: generatedSlice,
+      keepHasPublished: !!(state.published && state.published[plan.keepId])
+    });
+    if(!moved || !moved.ok) return;
+    applyDuplicateRefMove_(moved);
+    if(state.published && state.published[plan.keepId]){
+      state.published[plan.keepId].content = plan.content;
+      state.generatedOnly[plan.keepId] = state.published[plan.keepId].content;
+    } else if(state.generatedOnly){
+      state.generatedOnly[plan.keepId] = plan.content;
+    }
+    plan.retireIds.forEach(function(id){
+      if(state.generatedOnly) delete state.generatedOnly[id];
+      if(state.published && state.published[plan.keepId]) delete state.published[id];
       if(cat) cat.drafts = (cat.drafts || []).filter(function(d){ return !d || d.id !== id; });
       if(!state.deletedDraftIds) state.deletedDraftIds = {};
       if(!state.deletedDraftIds[id]) state.deletedDraftIds[id] = new Date().toISOString();
@@ -45980,7 +46108,6 @@ function applyClinicTitleAndImportDrawerRepair_(){
   try { if(stripStoredClinicBlogTitles_()) changed = true; } catch(eTitle){}
   try { reportIdenticalImportedCopies_(); } catch(eCopies){}
   try { if(relocateImportedMiscDrafts_()) changed = true; } catch(eMove){}
-  try { if(mergeWarnedDuplicateCards_()) changed = true; } catch(eMerge){}
   try { warnIfDuplicateCards_('repair'); } catch(eDupWarn){}
   if(!changed) return false;
   try {

@@ -506,39 +506,68 @@ var PlannerSyncRules = (function(){
   function plannerDuplicateTextSize_(content){
     try { return JSON.stringify(content || '').length; } catch(eSize){ return 0; }
   }
+  function plannerCanonicalDuplicateContent_(value){
+    if(value == null) return null;
+    if(typeof value === 'string') return value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/^[ \t\u00A0\n]+|[ \t\u00A0\n]+$/g, '');
+    if(Array.isArray(value)) return value.map(plannerCanonicalDuplicateContent_);
+    if(typeof value === 'object'){
+      var out = {};
+      Object.keys(value).sort().forEach(function(k){
+        out[k] = plannerCanonicalDuplicateContent_(value[k]);
+      });
+      return out;
+    }
+    return value;
+  }
+  function plannerContentIsEmpty_(content){
+    if(content == null) return true;
+    var blank = true;
+    function walk(v){
+      if(!blank || v == null || v === false) return;
+      if(typeof v === 'string'){
+        if(v.trim()) blank = false;
+        return;
+      }
+      if(Array.isArray(v)){
+        v.forEach(walk);
+        return;
+      }
+      if(typeof v === 'object'){
+        Object.keys(v).forEach(function(k){ walk(v[k]); });
+        return;
+      }
+      blank = false;
+    }
+    walk(content);
+    return blank;
+  }
   function plannerFoldDuplicateContent_(dst, src){
-    if(!src || typeof src !== 'object') return dst;
+    if(!src || typeof src !== 'object' || !dst || typeof dst !== 'object' || Array.isArray(dst)) return dst;
     Object.keys(src).forEach(function(k){
       var sv = src[k];
+      var dv = dst[k];
       if(sv && typeof sv === 'object' && !Array.isArray(sv)){
-        if(!dst[k] || typeof dst[k] !== 'object' || Array.isArray(dst[k])) dst[k] = {};
+        if(dv == null || dv === '') dst[k] = {};
+        if(!dst[k] || typeof dst[k] !== 'object' || Array.isArray(dst[k])) return;
         plannerFoldDuplicateContent_(dst[k], sv);
         return;
       }
       if(Array.isArray(sv)){
-        if(!Array.isArray(dst[k]) || !dst[k].length) dst[k] = sv.slice();
+        if(!Array.isArray(dv) || !dv.length) dst[k] = sv.slice();
         return;
       }
-      var ds = dst[k] == null ? '' : String(dst[k]);
-      var ss = sv == null ? '' : String(sv);
-      if(!ss) return;
-      if(!ds){ dst[k] = sv; return; }
-      if(ds === ss || ds.indexOf(ss) >= 0) return;
-      if(ss.indexOf(ds) >= 0){ dst[k] = sv; return; }
-      dst[k] = ds + '\n\n' + ss;
+      var ds = dv == null ? '' : String(dv);
+      if(ds.trim()) return;
+      if(sv == null || String(sv).trim() === '') return;
+      dst[k] = sv;
     });
     return dst;
   }
   function plannerDuplicateCardsMatch_(keep, other){
-    if(keep.workKey && other.workKey) return keep.workKey === other.workKey;
-    var a = '';
-    var b = '';
+    if(plannerContentIsEmpty_(keep && keep.content) || plannerContentIsEmpty_(other && other.content)) return false;
     try {
-      a = JSON.stringify(keep.content || null);
-      b = JSON.stringify(other.content || null);
+      return JSON.stringify(plannerCanonicalDuplicateContent_(keep.content)) === JSON.stringify(plannerCanonicalDuplicateContent_(other.content));
     } catch(eSame){ return false; }
-    if(a === b) return true;
-    return a === 'null' || a === '{}' || b === 'null' || b === '{}';
   }
   function plannerMergeDuplicateGroup(cards){
     cards = (cards || []).filter(function(card){ return card && card.id; });
@@ -564,6 +593,92 @@ var PlannerSyncRules = (function(){
       retireIds.push(other.id);
     });
     return { changed: retireIds.length > 0, keepId: keep.id, retireIds: retireIds, content: content };
+  }
+  function plannerRetargetDuplicateRefs(spec){
+    spec = spec || {};
+    var keepId = String(spec.keepId || '');
+    var retireIds = {};
+    (spec.retireIds || []).forEach(function(id){
+      id = String(id || '');
+      if(id && id !== keepId) retireIds[id] = true;
+    });
+    if(!keepId || !Object.keys(retireIds).length) return { ok: false, keepId: keepId, retireIds: [] };
+    function moveId(id){
+      id = String(id || '');
+      return retireIds[id] ? keepId : id;
+    }
+    var blocked = false;
+    function retargetAssignments(list){
+      var out = [];
+      var seen = {};
+      (list || []).forEach(function(row){
+        if(!row || !row.draftId){ blocked = true; return; }
+        var nextId = moveId(row.draftId);
+        var prev = seen[nextId];
+        if(prev && String(prev.stepId) !== String(row.stepId)){ blocked = true; return; }
+        if(prev) return;
+        var next = { draftId: nextId, stepId: row.stepId, order: row.order };
+        seen[nextId] = next;
+        out.push(next);
+      });
+      return out;
+    }
+    var assignments = spec.assignments ? retargetAssignments(spec.assignments) : null;
+    var plans = (spec.plans || []).map(function(plan){
+      return { key: plan && plan.key, assignments: retargetAssignments(plan && plan.assignments) };
+    });
+    var reservations = [];
+    var seenRes = {};
+    (spec.reservations || []).forEach(function(row){
+      if(!row || typeof row !== 'object' || !row.draftId || !row.channel){ blocked = true; return; }
+      var nextId = moveId(row.draftId);
+      if(retireIds[row.draftId] && spec.keepHasPublished === false){ blocked = true; return; }
+      var sig = nextId + '|' + String(row.channel);
+      var prev = seenRes[sig];
+      if(prev && (String(prev.at || '') !== String(row.at || '') || String(prev.postId || '') !== String(row.postId || ''))){
+        blocked = true;
+        return;
+      }
+      if(prev) return;
+      var next = { draftId: nextId, channel: row.channel, at: row.at || '', postId: row.postId || '' };
+      seenRes[sig] = next;
+      reservations.push(next);
+    });
+    var links = [];
+    (spec.links || []).forEach(function(row){
+      if(!row || typeof row !== 'object' || !Object.prototype.hasOwnProperty.call(row, 'draftId')){ blocked = true; return; }
+      var next = {};
+      Object.keys(row).forEach(function(k){ next[k] = row[k]; });
+      next.draftId = moveId(row.draftId);
+      links.push(next);
+    });
+    function moveMap(map, allowCreate){
+      var out = {};
+      Object.keys(map || {}).forEach(function(id){
+        if(!retireIds[id]) out[id] = map[id];
+      });
+      Object.keys(retireIds).forEach(function(id){
+        if(!map || !Object.prototype.hasOwnProperty.call(map, id)) return;
+        if(Object.prototype.hasOwnProperty.call(out, keepId)) return;
+        if(!allowCreate){ blocked = true; return; }
+        out[keepId] = map[id];
+      });
+      return out;
+    }
+    var published = moveMap(spec.published, false);
+    var generated = moveMap(spec.generated, true);
+    if(blocked) return { ok: false, keepId: keepId, retireIds: Object.keys(retireIds) };
+    return {
+      ok: true,
+      keepId: keepId,
+      retireIds: Object.keys(retireIds),
+      assignments: assignments,
+      plans: plans,
+      reservations: reservations,
+      links: links,
+      published: published,
+      generated: generated
+    };
   }
 
   // 프롬프트 충돌. align=같은 내용, adopt-server=사용자가 안 고친 값, ask=양쪽 수정.
@@ -720,6 +835,7 @@ var PlannerSyncRules = (function(){
     plannerSameKeyList: plannerSameKeyList,
     plannerStripClinicTitlePrefix: plannerStripClinicTitlePrefix,
     plannerMergeDuplicateGroup: plannerMergeDuplicateGroup,
+    plannerRetargetDuplicateRefs: plannerRetargetDuplicateRefs,
     PLANNER_SYNC_BLOB_MAX_CHARS: PLANNER_SYNC_BLOB_MAX_CHARS,
     PLANNER_QUOTA_IMAGE_CHARS: PLANNER_QUOTA_IMAGE_CHARS
   };

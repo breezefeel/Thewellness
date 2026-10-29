@@ -276,9 +276,16 @@ var combined = S.planOutboxSend(publishedBase, withImages, key);
 assert(combined.mode === 'patch', 'blog and image edits are one patch');
 assert(combined.fieldPatch.paths.indexOf('content.blog.problem') >= 0, 'the combined patch includes the blog field');
 assert(combined.fieldPatch.paths.join(',').indexOf('images') >= 0, 'the combined patch includes the image field');
-var borrowed = S.baseForContentSend(null, publishedBase, 'generated:' + cardId);
+var borrowed = S.baseForContentSend(null, publishedBase, 'generated:' + cardId, { baseEntityRevision: 4 });
 var follow = S.planOutboxSend(borrowed, withImages.content, 'generated:' + cardId);
-assert(follow.mode === 'patch' && follow.fieldPatch.paths.join(',').indexOf('images') >= 0, 'the image follow-up patches from the sibling base');
+assert(follow.mode === 'patch' && follow.fieldPatch.paths.join(',').indexOf('images') >= 0, 'a generated row already on the server can patch from the published base');
+assert(S.baseForContentSend(null, publishedBase, 'generated:' + cardId, { serverRevision: 2 }) != null, 'a stored server revision also allows the borrowed base');
+var unsentGenerated = S.planOutboxSend(
+  S.baseForContentSend(null, publishedBase, 'generated:' + cardId, { baseEntityRevision: 0, serverRevision: 0 }),
+  withImages.content,
+  'generated:' + cardId
+);
+assert(unsentGenerated.mode === 'full', 'generated not on the server sends the whole card');
 assert(S.baseForContentSend(null, null, 'generated:' + cardId) == null, 'without any server base the follow-up does not invent one');
 
 var seedStart = planner.indexOf('function seedSyncFieldBaseFromState_');

@@ -17107,7 +17107,7 @@ function setSyncEntity_(payload, key, wrapped){
 function normalizeDraftRowForSync_(draft){
   if(!draft || typeof draft !== 'object') return draft;
   var row = {};
-  ['id','topic','angle','series','step','pillar','rationale','writingBrief','roadmapStepId','reviewHold','programCatId','revisions',
+  ['id','topic','angle','series','step','pillar','rationale','writingBrief','roadmapStepId','reviewHold','programCatId',
     'shareMonth','createdAt','sourceNote','collab','youtubeAnalysis','updatedAt','activityAt','publishedChannels','dailyShareKind',
     'dailyThought','dailyWho','dailyWhat','dailyBody','articleKind','previousRoadmapStepId',
     'previousSeries','miscLocked','importDrawerSettled','drawerUserPlaced','articleFlow'].forEach(function(k){
@@ -18344,8 +18344,6 @@ function getPersistPayload(){
     syncRevision: state.syncRevision || 0,
     syncEntityUpdatedAt: state.syncEntityUpdatedAt || {},
     syncEntityRevisions: state.syncEntityRevisions || {},
-    syncFieldBase: state.syncFieldBase || {},
-    syncServerFieldPatch: !!state.syncServerFieldPatch,
     syncEntityTombstones: state.syncEntityTombstones || {},
     chatgptOpenUrl: state.chatgptOpenUrl,
     blogDefaultCategories: (state.blogDefaultCategories && typeof state.blogDefaultCategories === 'object') ? state.blogDefaultCategories : undefined,
@@ -18507,10 +18505,14 @@ function reviewHoldSkipsSyncKey_(key){
   if(m[1] === 'draft' && state._reviewLockSync) return false;
   return true;
 }
-function rememberSyncFieldBase_(key, value){
+function rememberSyncFieldBase_(key, value, patch){
   if(key.indexOf('published:') !== 0 && key.indexOf('generated:') !== 0) return;
   if(!state.syncFieldBase) state.syncFieldBase = {};
-  state.syncFieldBase[key] = cloneSyncValue_(value);
+  if(patch && patch.paths && typeof PlannerFieldSync !== 'undefined'){
+    state.syncFieldBase[key] = PlannerFieldSync.rememberPatchedBase(state.syncFieldBase[key], patch);
+    return;
+  }
+  if(value) state.syncFieldBase[key] = cloneSyncValue_(value);
 }
 function noteSheetEditedPaths_(draftId, tab){
   if(!draftId || typeof PlannerFieldSync === 'undefined') return;
@@ -22482,30 +22484,57 @@ function conflictDiffFields_(localVal, remoteVal){
   });
   return labels;
 }
+function assignNarrowedCard_(id, key, narrowed){
+  var pub = state.published && state.published[id];
+  var gen = state.generatedOnly && state.generatedOnly[id];
+  var shared = !!(pub && gen && pub.content && pub.content === gen);
+  if(key.indexOf('published:') === 0){
+    if(!state.published) state.published = {};
+    state.published[id] = narrowed;
+    if(shared && narrowed && narrowed.content) state.generatedOnly[id] = narrowed.content;
+  } else {
+    if(!state.generatedOnly) state.generatedOnly = {};
+    state.generatedOnly[id] = narrowed;
+    if(shared && state.published && state.published[id]) state.published[id].content = narrowed;
+  }
+  return shared;
+}
 function narrowKeptConflictLocals_(conflicts){
   if(typeof PlannerFieldSync === 'undefined') return;
+  var done = {};
   (conflicts || []).forEach(function(conflict){
     var key = String(conflict && conflict.key || '');
     if(key.indexOf('published:') !== 0 && key.indexOf('generated:') !== 0) return;
     if(!conflict.remote) return;
-    var edited = state._sheetEditedPaths && state._sheetEditedPaths[key];
+    var id = key.slice(key.indexOf(':') + 1);
+    if(done[id]) return;
+    var edited = []
+      .concat((state._sheetEditedPaths && state._sheetEditedPaths['published:' + id]) || [])
+      .concat((state._sheetEditedPaths && state._sheetEditedPaths['generated:' + id]) || []);
     var narrowed = PlannerFieldSync.mergeChangedOntoBase(conflict.remote, conflict.local, key, edited);
     if(!narrowed) return;
-    conflict.local = narrowed;
-    var id = key.slice(key.indexOf(':') + 1);
-    if(key.indexOf('published:') === 0){
-      if(!state.published) state.published = {};
-      state.published[id] = narrowed;
-    } else {
-      if(!state.generatedOnly) state.generatedOnly = {};
-      state.generatedOnly[id] = narrowed;
-    }
-    (state.syncOutbox || []).forEach(function(op){
-      if(op && op.key === key){
-        op.value = cloneSyncValue_(narrowed);
-        op.fieldPatch = PlannerFieldSync.buildFieldPatch(conflict.remote, narrowed, key);
-      }
+    var shared = assignNarrowedCard_(id, key, narrowed);
+    (conflicts || []).forEach(function(other){
+      if(!other) return;
+      if(other.key === 'published:' + id && state.published && state.published[id]) other.local = state.published[id];
+      if(other.key === 'generated:' + id && state.generatedOnly && state.generatedOnly[id]) other.local = state.generatedOnly[id];
     });
+    (state.syncOutbox || []).forEach(function(op){
+      if(!op) return;
+      var opId = String(op.key || '').slice(String(op.key || '').indexOf(':') + 1);
+      if(opId !== id) return;
+      if(op.key.indexOf('published:') !== 0 && op.key.indexOf('generated:') !== 0) return;
+      var live = op.key.indexOf('published:') === 0 ? state.published[id] : state.generatedOnly[id];
+      if(!live) return;
+      var remote = null;
+      (conflicts || []).forEach(function(other){
+        if(other && other.key === op.key) remote = other.remote;
+      });
+      if(!remote && state.syncFieldBase) remote = state.syncFieldBase[op.key];
+      op.value = cloneSyncValue_(live);
+      op.fieldPatch = remote ? PlannerFieldSync.buildFieldPatch(remote, live, op.key) : null;
+    });
+    if(shared) done[id] = true;
   });
 }
 function conflictFieldCompareHTML_(conflict){
@@ -23744,8 +23773,7 @@ function collectExtraDrafts(){
         previousSeries: d.previousSeries,
         miscLocked: d.miscLocked,
         reviewHold: d.reviewHold ? true : undefined,
-        programCatId: d.programCatId != null ? d.programCatId : undefined,
-        revisions: Array.isArray(d.revisions) ? d.revisions.slice(0, 20) : undefined
+        programCatId: d.programCatId != null ? d.programCatId : undefined
       });
     });
   });
@@ -23788,7 +23816,6 @@ function mergeExtraDrafts(byCat){
       if(d.miscLocked) merged.miscLocked = true;
       if(d.reviewHold) merged.reviewHold = true;
       if(d.programCatId != null) merged.programCatId = d.programCatId;
-      if(Array.isArray(d.revisions) && d.revisions.length) merged.revisions = d.revisions.slice(0, 20);
       if(d.importDrawerSettled) merged.importDrawerSettled = true;
       if(d.drawerUserPlaced) merged.drawerUserPlaced = true;
       if(merged && !merged.previousRoadmapStepId) delete merged.previousRoadmapStepId;
@@ -23955,8 +23982,6 @@ function applyPersistPayload(s, opts){
   state.syncRevision = parseInt(s.syncRevision, 10) || state.syncRevision || 0;
   state.syncEntityUpdatedAt = Object.assign({}, s.syncEntityUpdatedAt || {});
   state.syncEntityRevisions = Object.assign({}, s.syncEntityRevisions || {});
-  state.syncFieldBase = Object.assign({}, s.syncFieldBase || {});
-  state.syncServerFieldPatch = !!s.syncServerFieldPatch;
   state.syncEntityTombstones = Object.assign({}, s.syncEntityTombstones || {});
   if(s._syncBaseEntityUpdatedAt) state.syncBaseEntityUpdatedAt = Object.assign({}, s._syncBaseEntityUpdatedAt);
   if(s._syncDirty != null) state.syncDirty = !!s._syncDirty;
@@ -30347,7 +30372,7 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
         '<button type="button" class="draft-card-delete-mini draft-card-link-mini" title="이 카드 주소 복사" onclick="event.stopPropagation();copyCardLink_(\'' + jsAttrString_(d.id) + '\')">링크 복사</button>' +
         '<button type="button" class="draft-card-delete-mini" title="검토 중에는 이 카드를 대기열에 올리지 않습니다" onclick="event.stopPropagation();toggleDraftReviewHold_(\'' + jsAttrString_(d.id) + '\')">' + (d.reviewHold ? '검토 해제' : '검토 중') + '</button>' +
         '<button type="button" class="draft-card-delete-mini" title="카드 번호와 내용은 유지하고 프로그램만 옮깁니다" onclick="event.stopPropagation();openMoveDraftProgram_(\'' + jsAttrString_(d.id) + '\',' + cat.id + ')">프로그램 이동</button>' +
-        '<button type="button" class="draft-card-delete-mini" title="최근 20개 저장 전 내용" onclick="event.stopPropagation();openCardRevisions_(\'' + jsAttrString_(d.id) + '\')">이전 버전</button>' +
+        '<button type="button" class="draft-card-delete-mini" title="이 기기에만 남기는 최근 5개" onclick="event.stopPropagation();openCardRevisions_(\'' + jsAttrString_(d.id) + '\')">이전 버전</button>' +
         '<button type="button" class="draft-card-delete-mini" title="이 주제 카드 삭제" onclick="event.stopPropagation();deleteDraft(' + cat.id + ',\'' + d.id + '\')">삭제</button>' +
         orderBtns +
       '</div>' +
@@ -42029,15 +42054,48 @@ function paintDraftListDate_(draftId){
     }
   }
 }
+var CARD_REVISIONS_LS_ = 'ht_card_revisions_v1';
+function readCardRevisionMap_(){
+  try {
+    var raw = localStorage.getItem(CARD_REVISIONS_LS_);
+    var parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch(eRev){ return {}; }
+}
+function writeCardRevisionMap_(map){
+  try { localStorage.setItem(CARD_REVISIONS_LS_, JSON.stringify(map || {})); } catch(eRev){}
+}
+function cardRevisionList_(draftId){
+  var map = readCardRevisionMap_();
+  var list = Array.isArray(map[draftId]) ? map[draftId] : [];
+  if(typeof findDraftByIdAnywhere_ === 'function'){
+    var draft = findDraftByIdAnywhere_(draftId);
+    if(draft && Array.isArray(draft.revisions) && draft.revisions.length && !list.length){
+      list = draft.revisions.slice(0, 5).map(function(rev){
+        var copy = JSON.parse(JSON.stringify(rev));
+        delete copy.reelFile;
+        return copy;
+      });
+      map[draftId] = list;
+      writeCardRevisionMap_(map);
+    }
+    if(draft && draft.revisions) delete draft.revisions;
+  }
+  return list;
+}
 function pushCardRevision_(draftId){
   var draft = typeof findDraftByIdAnywhere_ === 'function' ? findDraftByIdAnywhere_(draftId) : null;
   var content = typeof getDraftContent_ === 'function' ? getDraftContent_(draftId) : null;
   if(!draft || !content || typeof PlannerFieldSync === 'undefined') return;
+  cardRevisionList_(draftId);
   var snap = PlannerFieldSync.historySnapshot(content);
-  if(!draft.revisions) draft.revisions = [];
-  if(draft.revisions[0] && draft.revisions[0].fp === snap.fp) return;
-  draft.revisions.unshift(snap);
-  if(draft.revisions.length > 20) draft.revisions.length = 20;
+  var map = readCardRevisionMap_();
+  var list = Array.isArray(map[draftId]) ? map[draftId] : [];
+  if(list[0] && list[0].fp === snap.fp) return;
+  list.unshift(snap);
+  if(list.length > 5) list.length = 5;
+  map[draftId] = list;
+  writeCardRevisionMap_(map);
 }
 function toggleDraftReviewHold_(draftId){
   var draft = findDraftByIdAnywhere_(draftId);
@@ -42109,15 +42167,14 @@ function moveDraftToProgram_(draftId, fromCat, toCat){
   if(typeof setAppToast === 'function') setAppToast('프로그램을 옮겼습니다. 카드 번호는 그대로입니다.', { duration: 3600, variant: 'ok' });
 }
 function openCardRevisions_(draftId){
-  var draft = findDraftByIdAnywhere_(draftId);
-  var list = (draft && draft.revisions) || [];
+  var list = cardRevisionList_(draftId);
   if(!list.length){
     if(typeof setAppToast === 'function') setAppToast('이전 버전이 없습니다.', { duration: 2800, variant: 'ok' });
     return;
   }
   var old = document.getElementById('card-revision-overlay');
   if(old) old.remove();
-  var rows = list.slice(0, 20).map(function(rev, i){
+  var rows = list.slice(0, 5).map(function(rev, i){
     var when = rev.at ? new Date(rev.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ('버전 ' + (i + 1));
     var title = rev.blog && rev.blog.title ? String(rev.blog.title).slice(0, 40) : '';
     return '<button type="button" data-rev="' + i + '" style="display:block;width:100%;text-align:left;margin:0 0 6px;padding:8px;min-height:40px">' +
@@ -42140,8 +42197,8 @@ function openCardRevisions_(draftId){
   });
 }
 function restoreCardRevision_(draftId, index){
-  var draft = findDraftByIdAnywhere_(draftId);
-  var rev = draft && draft.revisions && draft.revisions[index];
+  var list = cardRevisionList_(draftId);
+  var rev = list[index];
   if(!rev) return;
   pushCardRevision_(draftId);
   var content = getDraftContent_(draftId);
@@ -42151,7 +42208,7 @@ function restoreCardRevision_(draftId, index){
     state.published[draftId].content = content;
     state.generatedOnly[draftId] = content;
   }
-  ['blog', 'insta', 'threads', 'thread', 'community', 'news', 'reelFile'].forEach(function(k){
+  ['blog', 'insta', 'threads', 'thread', 'community', 'news'].forEach(function(k){
     if(rev[k] !== undefined) content[k] = JSON.parse(JSON.stringify(rev[k]));
   });
   ['blog', 'insta', 'threads', 'thread', 'community', 'news', 'images'].forEach(function(tab){
@@ -42164,7 +42221,8 @@ function persistDraftContent_(draftId, content){
   flushSheetTitleBackgroundWork_({ save: false });
   var editedDraft = findDraftByIdAnywhere_(draftId);
   var nextFp = content && typeof PlannerFieldSync !== 'undefined' ? PlannerFieldSync.historySnapshot(content).fp : '';
-  var prevFp = editedDraft && editedDraft.revisions && editedDraft.revisions[0] && editedDraft.revisions[0].fp;
+  var prevList = editedDraft ? cardRevisionList_(draftId) : [];
+  var prevFp = prevList[0] && prevList[0].fp;
   if(editedDraft && (!nextFp || !prevFp || nextFp !== prevFp)) stampDraftActivity_(editedDraft);
   alignDraftTopicToBlogTitle_(draftId, content);
   if(!state.published[draftId]) state.published[draftId] = {};

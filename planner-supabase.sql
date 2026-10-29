@@ -63,31 +63,65 @@ begin
 
   select * into row from public.planner_entities where key = p_key for update;
 
-  -- 바뀐 칸만 합친다. 그 칸이 서버에서 그대로면 덮고, 서버도 그 칸을 고쳤으면 그 칸만 충돌이다.
+  -- 바뀐 칸만 합친다. 판이 다르거나 카드가 삭제됐으면 되살리지 않고 충돌로 답한다.
   if p_value is not null and jsonb_typeof(p_value) = 'object' and coalesce((p_value->>'_fieldPatch')::boolean, false) then
     declare
       current jsonb;
       path_text text;
+      parts text[];
+      depth int;
       server_val jsonb;
       base_val jsonb;
       new_val jsonb;
       applied int := 0;
       conflicted int := 0;
     begin
-      if not found then
+      if found
+        and not coalesce(row.deleted, false)
+        and row.mutation_id is not null
+        and row.mutation_id = p_mutation_id
+        and length(p_mutation_id) > 0
+      then
+        return jsonb_build_object(
+          'status', 'idempotent',
+          'key', p_key,
+          'mutationId', p_mutation_id,
+          'revision', row.revision,
+          'changeSeq', row.change_seq
+        );
+      end if;
+      if not found or coalesce(row.deleted, false) then
         return jsonb_build_object(
           'status', 'conflict', 'key', p_key, 'mutationId', p_mutation_id,
-          'revision', 0, 'value', null, 'deleted', true, 'updatedAt', null
+          'revision', case when found then row.revision else 0 end,
+          'value', case when found then row.value else null end,
+          'deleted', true,
+          'updatedAt', case when found then row.updated_at else null end
+        );
+      end if;
+      if row.revision is distinct from p_base_revision then
+        return jsonb_build_object(
+          'status', 'conflict', 'key', p_key, 'mutationId', p_mutation_id,
+          'revision', row.revision, 'value', row.value, 'deleted', row.deleted, 'updatedAt', row.updated_at
         );
       end if;
       current := case when jsonb_typeof(row.value) = 'object' then row.value else '{}'::jsonb end;
       for path_text in select jsonb_array_elements_text(coalesce(p_value->'paths', '[]'::jsonb))
       loop
-        server_val := current #> string_to_array(path_text, '.');
+        parts := string_to_array(path_text, '.');
+        server_val := current #> parts;
         base_val := p_value->'base'->path_text;
         new_val := p_value->'set'->path_text;
         if server_val is not distinct from base_val or server_val is not distinct from new_val then
-          current := jsonb_set(current, string_to_array(path_text, '.'), coalesce(new_val, 'null'::jsonb), true);
+          if parts is not null and array_length(parts, 1) > 1 then
+            for depth in 1 .. array_length(parts, 1) - 1 loop
+              if current #> parts[1:depth] is null
+                 or jsonb_typeof(current #> parts[1:depth]) is distinct from 'object' then
+                current := jsonb_set(current, parts[1:depth], '{}'::jsonb, true);
+              end if;
+            end loop;
+          end if;
+          current := jsonb_set(current, parts, coalesce(new_val, 'null'::jsonb), true);
           applied := applied + 1;
         else
           conflicted := conflicted + 1;
@@ -103,7 +137,7 @@ begin
       next_rev := row.revision + 1;
       update public.planner_entities
         set value = current,
-            deleted = false,
+            deleted = row.deleted,
             revision = next_rev,
             updated_at = now(),
             mutation_id = nullif(p_mutation_id, ''),
@@ -114,7 +148,7 @@ begin
         'status', case when conflicted > 0 then 'conflict' else 'ok' end,
         'key', p_key, 'mutationId', p_mutation_id, 'revision', next_rev, 'changeSeq', seq,
         'value', case when conflicted > 0 then current else null end,
-        'deleted', false
+        'deleted', row.deleted
       );
     end;
   end if;

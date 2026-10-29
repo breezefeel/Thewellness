@@ -1,5 +1,6 @@
-/* 카드 저장은 바뀐 칸만 서버에 있던 값 위에 얹는다.
- * 빈 칸으로 서버의 다른 칸을 지우지 않는다. 검토 중 카드의 본문 키는 대기열에서 빼는 판단은 planner.js가 한다.
+/* 저장은 이 기기 카드를 바탕으로 한다.
+ * 직접 비우지 않은 빈 칸만 서버 값으로 채운다.
+ * 본문 칸 목록 밖이 바뀌면 칸 패치 대신 카드 전체를 보낸다.
  */
 var PlannerFieldSync = (function(){
   var TAB_PATHS = {
@@ -56,6 +57,76 @@ var PlannerFieldSync = (function(){
     if(String(key).indexOf('published:') === 0 && entity.content && typeof entity.content === 'object') return entity.content;
     return entity;
   }
+  function pathEdited(editedSet, path){
+    if(!path) return false;
+    if(editedSet[path]) return true;
+    var parts = String(path).split('.');
+    var acc = '';
+    for(var i = 0; i < parts.length; i++){
+      acc = acc ? (acc + '.' + parts[i]) : parts[i];
+      if(editedSet[acc]) return true;
+    }
+    return false;
+  }
+  function fillEmptyFromServer(localNode, serverNode, editedSet, prefix){
+    if(pathEdited(editedSet, prefix)) return clone(localNode);
+    if(Array.isArray(serverNode) || Array.isArray(localNode)){
+      if(!filled(localNode) && filled(serverNode)) return clone(serverNode);
+      return clone(localNode);
+    }
+    if(!serverNode || typeof serverNode !== 'object'){
+      if(!filled(localNode) && filled(serverNode)) return clone(serverNode);
+      return clone(localNode);
+    }
+    var out = (localNode && typeof localNode === 'object' && !Array.isArray(localNode)) ? clone(localNode) : {};
+    Object.keys(serverNode).forEach(function(k){
+      var child = prefix ? (prefix + '.' + k) : k;
+      var localChild = (localNode && typeof localNode === 'object') ? localNode[k] : undefined;
+      if(pathEdited(editedSet, child)){
+        if(localChild !== undefined) out[k] = clone(localChild);
+        else delete out[k];
+        return;
+      }
+      if(serverNode[k] && typeof serverNode[k] === 'object' && !Array.isArray(serverNode[k])){
+        out[k] = fillEmptyFromServer(localChild, serverNode[k], editedSet, child);
+        return;
+      }
+      if(!filled(localChild) && filled(serverNode[k])) out[k] = clone(serverNode[k]);
+      else if(localChild !== undefined) out[k] = clone(localChild);
+    });
+    if(localNode && typeof localNode === 'object' && !Array.isArray(localNode)){
+      Object.keys(localNode).forEach(function(k){
+        if(!Object.prototype.hasOwnProperty.call(serverNode, k)) out[k] = clone(localNode[k]);
+      });
+    }
+    return out;
+  }
+  function isTabPath(path, key){
+    var rel = path;
+    if(String(key).indexOf('published:') === 0 && rel.indexOf('content.') === 0) rel = rel.slice('content.'.length);
+    return allPaths().indexOf(rel) >= 0;
+  }
+  function omitTabPaths(node, prefix, key){
+    if(Array.isArray(node)) return clone(node);
+    if(!node || typeof node !== 'object') return node;
+    var out = {};
+    Object.keys(node).forEach(function(k){
+      var child = prefix ? (prefix + '.' + k) : k;
+      if(isTabPath(child, key)) return;
+      var next = omitTabPaths(node[k], child, key);
+      if(next && typeof next === 'object' && !Array.isArray(next) && !Object.keys(next).length) return;
+      if(next !== undefined) out[k] = next;
+    });
+    return out;
+  }
+  function withoutTabPaths(entity, key){
+    if(!entity || typeof entity !== 'object') return entity;
+    return omitTabPaths(entity, '', key);
+  }
+  function outsideTabPathsChanged(baseEntity, mergedEntity, key){
+    if(!baseEntity || typeof baseEntity !== 'object') return true;
+    return !same(withoutTabPaths(baseEntity, key), withoutTabPaths(mergedEntity, key));
+  }
   function changedPaths(baseEntity, localEntity, key, edited){
     var base = contentOf(baseEntity, key) || {};
     var local = contentOf(localEntity, key) || {};
@@ -71,17 +142,15 @@ var PlannerFieldSync = (function(){
     return paths;
   }
   function mergeChangedOntoBase(baseEntity, localEntity, key, edited){
-    if(!baseEntity || typeof baseEntity !== 'object') return localEntity;
-    var out = clone(baseEntity);
-    var baseContent = contentOf(out, key);
-    var localContent = contentOf(localEntity, key);
-    if(!baseContent || !localContent) return localEntity;
-    changedPaths(baseEntity, localEntity, key, edited).forEach(function(p){
-      setPath(baseContent, p, clone(getPath(localContent, p)));
-    });
-    return out;
+    if(!localEntity || typeof localEntity !== 'object') return localEntity;
+    if(!baseEntity || typeof baseEntity !== 'object') return clone(localEntity);
+    var root = String(key).indexOf('published:') === 0 ? 'content.' : '';
+    var editedSet = {};
+    (edited || []).forEach(function(p){ editedSet[root + p] = true; });
+    return fillEmptyFromServer(localEntity, baseEntity, editedSet, '');
   }
   function buildFieldPatch(baseEntity, mergedEntity, key){
+    if(outsideTabPathsChanged(baseEntity, mergedEntity, key)) return null;
     var paths = changedPaths(baseEntity, mergedEntity, key, allPaths());
     if(!paths.length) return null;
     var wrapped = String(key).indexOf('published:') === 0 && baseEntity && baseEntity.content;
@@ -95,6 +164,15 @@ var PlannerFieldSync = (function(){
       base[full] = clone(getPath(contentOf(baseEntity, key), p));
     });
     return { _fieldPatch: true, paths: list, set: set, base: base };
+  }
+  function rememberPatchedBase(baseEntity, patch){
+    var out = clone(baseEntity);
+    if(!out || typeof out !== 'object' || Array.isArray(out)) out = {};
+    (patch && patch.paths || []).forEach(function(p){
+      if(!patch.set || !Object.prototype.hasOwnProperty.call(patch.set, p)) return;
+      setPath(out, p, clone(patch.set[p]));
+    });
+    return out;
   }
   function keepEditingFields(localEntity, remoteEntity, key, edited){
     if(!localEntity || !remoteEntity || !edited || !edited.length) return remoteEntity;
@@ -110,7 +188,7 @@ var PlannerFieldSync = (function(){
   }
   function historySnapshot(content){
     var body = {};
-    ['blog', 'insta', 'threads', 'thread', 'community', 'news', 'reelFile'].forEach(function(k){
+    ['blog', 'insta', 'threads', 'thread', 'community', 'news'].forEach(function(k){
       if(content && content[k] != null) body[k] = clone(content[k]);
     });
     var fp = '';
@@ -176,6 +254,8 @@ var PlannerFieldSync = (function(){
     changedPaths: changedPaths,
     mergeChangedOntoBase: mergeChangedOntoBase,
     buildFieldPatch: buildFieldPatch,
+    rememberPatchedBase: rememberPatchedBase,
+    outsideTabPathsChanged: outsideTabPathsChanged,
     keepEditingFields: keepEditingFields,
     historySnapshot: historySnapshot,
     splitThreadComment: splitThreadComment,

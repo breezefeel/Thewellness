@@ -162,6 +162,49 @@ assert(planInsta.keepOutbox && planInsta.showPaths.length === 1 && planInsta.sho
 assert(planInsta.value.content.blog.problem === 'A블로그2', 'tab B blog takes the server value');
 assert(planInsta.value.content.insta.caption === 'B인스타', 'tab B keeps the insta edit');
 
+var baseOrder = {
+  content: { blog: { title: '제목', problem: '본문' }, insta: { caption: '캡션' } },
+  tabPublished: { blog: '발행', insta: '' },
+  finalTexts: { blog: '최종', insta: '최종2' }
+};
+var localOrder = {
+  finalTexts: { insta: '최종2', blog: '최종' },
+  tabPublished: { insta: '', blog: '발행' },
+  content: { insta: { caption: '캡션' }, blog: { problem: '본문', title: '제목' } }
+};
+assert(S.shouldKeepWholeConflict(baseOrder, localOrder, key) === false, 'key order alone is not a whole-card conflict');
+assert(S.diffTabPaths(baseOrder, localOrder, key).length === 0, 'key order alone is not a tab diff');
+assert(S.planConflictAction({
+  base: baseOrder, local: localOrder, server: baseOrder, key: key,
+  devicePaths: [], sheetPaths: [], clearedPaths: []
+}).action === 'accept-server', 'key order alone does not open a conflict');
+
+var sameBase = { content: { blog: { problem: '서버 본문' }, insta: { caption: '서버 인스타' } } };
+var editedLocal = { content: { blog: { problem: '이 기기 본문' }, insta: { caption: '서버 인스타' } } };
+var planNoPaths = S.planConflictAction({
+  base: sameBase, local: editedLocal, server: sameBase, key: key,
+  devicePaths: [], sheetPaths: [], clearedPaths: []
+});
+assert(planNoPaths.keepOutbox === true && planNoPaths.action === 'ask', 'empty device paths still keep the outbox when tabs differ');
+assert(planNoPaths.showPaths.indexOf('blog.problem') >= 0, 'the differing tab is shown');
+
+var emptyProblem = { content: { blog: { problem: '' }, insta: { caption: '같음' } } };
+var missingProblem = { content: { blog: {}, insta: { caption: '같음' } } };
+var nullProblem = { content: { blog: { problem: null }, insta: { caption: '같음' } } };
+assert(S.diffTabPaths(emptyProblem, missingProblem, key).length === 0, 'empty string and a missing value are the same field');
+assert(S.diffTabPaths(emptyProblem, nullProblem, key).length === 0, 'empty string and null are the same field');
+assert(S.deviceConflictPaths(missingProblem, emptyProblem, key, ['blog.problem'], []).length === 0, 'an empty field is not a conflict path');
+assert(S.wrapperFieldsChanged(
+  { content: { blog: { problem: '본문' } }, tabPublished: { blog: '', insta: null } },
+  { content: { blog: { problem: '본문' } }, tabPublished: { insta: '', blog: undefined } },
+  key
+) === false, 'empty wrapper values are the same');
+assert(S.nonTabContentChanged(
+  { content: { extra: '메모', spare: '', blog: { problem: '본문' } }, note: null },
+  { note: '', content: { blog: { title: '제목', problem: '본문' }, spare: undefined, extra: '메모' } },
+  key
+) === false, 'empty non-tab values are the same');
+
 assert(planner.indexOf('normalized.devicePaths') >= 0, 'device paths survive outbox restore');
 assert(planner.indexOf('생성이 중단됐습니다. 다시 만들려면 버튼을 누르세요.') >= 0, 'interrupted threads show a manual retry note');
 

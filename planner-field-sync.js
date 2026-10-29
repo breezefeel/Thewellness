@@ -49,8 +49,21 @@ var PlannerFieldSync = (function(){
     if(typeof v === 'object') return Object.keys(v).some(function(k){ return filled(v[k]); });
     return true;
   }
+  function canonical(v){
+    if(v == null || v === '') return null;
+    if(Array.isArray(v)) return v.map(canonical);
+    if(typeof v === 'object'){
+      var out = {};
+      Object.keys(v).sort().forEach(function(k){
+        if(v[k] == null || v[k] === '') return;
+        out[k] = canonical(v[k]);
+      });
+      return out;
+    }
+    return v;
+  }
   function same(a, b){
-    try { return JSON.stringify(a) === JSON.stringify(b); } catch(e){ return a === b; }
+    try { return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b)); } catch(e){ return a === b; }
   }
   function contentOf(entity, key){
     if(!entity || typeof entity !== 'object') return null;
@@ -385,17 +398,33 @@ var PlannerFieldSync = (function(){
   }
   function planConflictAction(spec){
     spec = spec || {};
-    var touched = uniquePaths([].concat(spec.devicePaths || [], spec.sheetPaths || []), spec.clearedPaths || []);
+    var fromBase = diffTabPaths(spec.base, spec.local, spec.key);
+    var devicePathsMissing = !Array.isArray(spec.devicePaths);
+    var touched = uniquePaths([].concat(spec.devicePaths || [], spec.sheetPaths || [], fromBase), spec.clearedPaths || []);
     if(shouldKeepWholeConflict(spec.base, spec.local, spec.key)){
       return { action: 'ask', keepOutbox: true, showPaths: null, value: spec.local };
     }
-    if(!touched.length){
+    var serverDiff = diffTabPaths(spec.local, spec.server, spec.key);
+    if(!serverDiff.length){
       return { action: 'accept-server', keepOutbox: false, showPaths: [], value: spec.server };
+    }
+    if(devicePathsMissing || !touched.length){
+      return {
+        action: 'ask',
+        keepOutbox: true,
+        showPaths: serverDiff,
+        value: overlayDeviceEdits(spec.server, spec.local, spec.key, serverDiff, spec.clearedPaths || [])
+      };
     }
     var narrowed = overlayDeviceEdits(spec.server, spec.local, spec.key, touched, []);
     var show = deviceConflictPaths(spec.server, spec.local, spec.key, touched, []);
     if(!show.length){
-      return { action: 'accept-server', keepOutbox: false, showPaths: [], value: narrowed };
+      return {
+        action: 'ask',
+        keepOutbox: true,
+        showPaths: serverDiff,
+        value: overlayDeviceEdits(spec.server, spec.local, spec.key, serverDiff, [])
+      };
     }
     return { action: 'ask', keepOutbox: true, showPaths: show, value: narrowed };
   }
@@ -482,6 +511,8 @@ var PlannerFieldSync = (function(){
     deviceConflictPaths: deviceConflictPaths,
     diffTabPaths: diffTabPaths,
     shouldKeepWholeConflict: shouldKeepWholeConflict,
+    wrapperFieldsChanged: wrapperFieldsChanged,
+    nonTabContentChanged: nonTabContentChanged,
     planConflictAction: planConflictAction,
     clearedPathsBetween: clearedPathsBetween,
     threadBodyHits: threadBodyHits,

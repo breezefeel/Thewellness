@@ -29,7 +29,7 @@ const CATEGORIES = [
       {id:"d2-4", topic:"이중턱이 생기는 세 가지 구조적 이유",                 angle:"피부·지방·골격 요인을 분리해서 설명, 각각의 접근법"},
     ]},
   { id:3, icon:"", name:"CMT 전문가 교육", color:"#1E3A5F", audience:"전문가",
-    sub:"도수치료 전문가 과정",
+    sub:"CMT 임상 도수치료 과정",
     drafts:[
       {id:"d3-0", topic:"촉진(Palpation)이 치료보다 먼저인 이유",               angle:"평가-치료 연결의 핵심, 실전 촉진 훈련의 필요성"},
       {id:"d3-1", topic:"교과서 해부학과 실전 도수치료의 괴리",                 angle:"이론적 지식을 임상 적용으로 전환하는 사고 훈련"},
@@ -13478,7 +13478,7 @@ function getExpertCourseTopicAudienceLine_(catId){
 /** 초안·주제 생성 등에 쓰는 탭별 독자 한 줄 (cat.audience보다 구체적) */
 function getProgramAudienceLine_(catId){
   var id = parseInt(catId, 10);
-  if(id === 3) return 'CMT 임상도수 과정 수강·복습 중인 물리치료사·도수 치료사 (평가·촉진 중심)';
+  if(id === 3) return 'CMT 임상 도수치료 과정 수강·복습 중인 물리치료사·도수 치료사 (평가·촉진 중심)';
   if(id === 4) return 'IFC 얼굴·구조 교육 수강·복습 중인 얼굴·구조 교육 전문가 (미용·도수·물리치료)';
   if(id === 5) return 'Re:Al 움직임 과정 — 강사·트레이너·물리치료사 등 움직임 지도자 (직군 제한 없음 · 강사/회원 호칭)';
   if(id === 0) return '통증·구조 치료에 관심 있는 일반인';
@@ -13693,11 +13693,11 @@ const EXT_NAVER_BLOG_WRITE = 'https://blog.naver.com/PostWriteForm.naver?blogId=
 /** 기본(폴백) — 도수치료·CMT. 실제 이동은 getInstagramUrlForCat_ 사용 */
 const EXT_INSTAGRAM_WEB = 'https://www.instagram.com/dr.park_dc.pt/';
 const EXT_THREADS = 'https://www.threads.com/@dr.park_dc.pt';
-/** 프로그램별 인스타 계정 — 도수·CMT / 페이스·IFC / 무브먼트·움직임 */
+/** 인스타 게시 계정 — 모든 프로그램의 기본 게시 계정은 박준규 계정. 프로그램 계정은 아래 공동작업 계정으로 붙인다. */
 const INSTAGRAM_USER_BY_PROGRAM = {
   park: 'dr.park_dc.pt',
-  face: 'dr.face_ifc',
-  movement: 're.al_movement_official'
+  face: 'dr.park_dc.pt',
+  movement: 'dr.park_dc.pt'
 };
 /** 인스타 발행·복사 시 캡션에 넣는 연결 계정 (콜라보) */
 const INSTAGRAM_COLLAB_USER_BY_PROGRAM = {
@@ -13913,7 +13913,7 @@ function withRealMovementBlogFooter_(text, catId){
 }
 function getExpertCourseBlogFooterText_(catId){
   var id = parseInt(catId, 10);
-  if(id === 3) return 'CMT 도수치료 과정\nhttps://breezefeel.github.io/academy#cmt';
+  if(id === 3) return 'CMT 임상 도수치료 과정\nhttps://breezefeel.github.io/academy#cmt';
   if(id === 4) return 'IFC 얼굴교정 과정\nhttps://breezefeel.github.io/academy#ifc';
   if(id === 5) return 'Re:Al 움직임 과정\nhttps://breezefeel.github.io/academy#real';
   return '';
@@ -14113,12 +14113,15 @@ function withInstagramCollabMention_(text, catId){
   if(textHasInstagramCollabMention_(body, mention)) return body;
   return body ? body + '\n\n' + mention : mention;
 }
-function instagramCollabSheetHtml_(catId){
+/** 계정 칸 표기: 게시 계정과 공동작업 계정을 나눠 보여 준다. */
+function instagramAccountSplitText_(catId){
   var mention = instagramCollabMentionForCat_(catId);
-  if(!mention) return '';
-  return '<div class="cb"><div class="cb-label">연결 계정 (고정 · 발행·복사 시 캡션에 포함)</div>' +
-    '<div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">' +
-    escapeHtml(mention) + '</div></div>';
+  return '게시: @' + getInstagramUsernameForCat_(catId) + ' / 공동작업: ' + (mention || '없음');
+}
+function instagramCollabSheetHtml_(catId){
+  return '<div class="cb"><div class="cb-label">계정 (공동작업 계정은 발행·복사 시 캡션에 포함)</div>' +
+    '<div class="cb-box" data-insta-accounts="1" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">' +
+    escapeHtml(instagramAccountSplitText_(catId)) + '</div></div>';
 }
 /** 예전 초안: carousel이 있으면 캡션에 합쳐 붙여넣기용으로 사용 */
 function formatCarouselKeyPointsForCaption_(carousel){
@@ -14152,7 +14155,7 @@ function getInstaFullPasteText_(ig, catId){
   const mid = hook ? hook + (body ? '\n\n' + body : '') : body;
   const cid = catId != null ? catId : getActiveInstagramCatId_();
   const withCollab = withInstagramCollabMention_(mid, cid);
-  const tags = (ig.hashtags || []).map(function (h){ return '#' + h; }).join(' ');
+  const tags = (ig.hashtags || []).map(function (h){ return '#' + String(h).replace(/^#+/, ''); }).join(' ');
   return (withCollab + (tags ? '\n\n' + tags : '')).trim();
 }
 
@@ -15507,13 +15510,16 @@ problem:
 selfCare:
 👉 먼저 확인: 손을 엉덩이 아래에 넣어 보세요. 뼈 끝이 닿나요?
 
-👉 1. 두 발을 바닥에 두고 골반을 세워, 좌골이 의자 가운데 오게 합니다.
-👉 2. 숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완하는게 중요합니다.
-👉 3. 정수리를 천장 쪽으로 보내 목이 어깨 위에 놓이게 합니다.
+1) 두 발을 바닥에 두고 골반을 세워, 좌골이 의자 가운데 오게 합니다.
+
+2) 숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완하는게 중요합니다.
+
+3) 정수리를 천장 쪽으로 보내 목이 어깨 위에 놓이게 합니다.
 
 시원하다 싶으면 거기서 멈추세요.
-혼자 할 때 실수: 목만 당긴다. 숨을 참는다. 허리를 억지로 젖힌다.
-팔이 저리거나 힘이 빠지면 운동보다 병원 진료가 먼저입니다.
+
+✕ 혼자 할 때 실수: 목만 당긴다. 숨을 참는다. 허리를 억지로 젖힌다.
+✕ 팔이 저리거나 힘이 빠지면 운동보다 병원 진료가 먼저입니다.
 
 explanation:
 살만 느껴진다면 좌골이 앞으로 빠진 상태예요. 바른 자세의 출발점은 아래입니다. 그래서 목만 늘리면 유지가 잘 안 됩니다.
@@ -15526,7 +15532,7 @@ const DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW = `${VOICE_CORE_POINTER}
 [블로그 형식]
 존댓말. **, ---, > 금지. 문단 사이 빈 줄. 같은 결론을 칸마다 반복하지 않는다.
 1. problem: 일상 장면 2~4문장. 자가 점검·병원 안내 없음.
-2. selfCare: 👉 먼저 확인(자가 점검 한 문장) → 👉 1.~4. 3~4단계(자세→숨→목·머리→등). 각 단계는 동작과 이유를 한 절에, 초·회를 포함한다. 단계 사이에만 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 맨 끝 한 줄만 적신호면 병원. 「1단계 —」 표기 금지.
+2. selfCare: 👉 먼저 확인(자가 점검 한 문장) → 1) 2) 3) (4)) 3~4단계(자세→숨→목·머리→등). 번호는 「1)」 형식이고 앞에 👉를 붙이지 않는다. 각 단계는 동작과 이유를 한 절에, 초·회를 포함한다. 항목(먼저 확인·번호 단계) 사이마다 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 주의·실수·적신호 줄은 모두 「✕ 」로 시작한다(예: ✕ 목만 당긴다). 맨 끝 한 줄만 적신호면 병원. 「1단계 —」 표기 금지.
 3. explanation: 맨 앞 1~2문장이 핵심. 그 뒤는 새 이유. 병원·자가 점검 반복 없음.
 4. cta: 「프로필 링크에서 온라인 문진」 하나. 병원 문구 없음. 허브 URL은 주제와 맞을 때 하나 — 허리 ?hub=back · 목 ?hub=neck · 어깨 ?hub=shoulder · 무릎 ?hub=knee · 골반 ?hub=pelvis (기본 ${PROFILE_BRAND_URL})
 5. title: 궁금증 한 줄, 35자 내외. hashtags 6~8개.
@@ -15578,7 +15584,7 @@ function buildExpertCourseInstaPrompt_(opts){
 }
 
 const DEFAULT_CMT_EXPERT_BLOG_PROMPT = buildExpertCourseBlogPrompt_({
-  audienceIntro: '**CMT 임상도수 전문가 과정** 수강·복습 중인 물리치료사·도수 치료사를 독자로 하는',
+  audienceIntro: '**CMT 임상 도수치료 과정** 수강·복습 중인 물리치료사·도수 치료사를 독자로 하는',
   roleReaders: '평가(촉진·히스토리) 중심 사고를 키우는 현장 치료사·도수 전문가',
   programBlock: '[CMT 맥락]\n' +
     '- 치료 테크닉보다 **평가·판단 순서**가 먼저임을 유지. "왜 그렇게 판단했는가"가 드러나게\n' +
@@ -15665,8 +15671,8 @@ const DEFAULT_PROMPTS = {
 프로그램: Real Movement(P-스트레칭·기능운동·자세교정), 리얼 페이스(얼굴 교정·작은얼굴), CMT/IFC/Re:Al 전문가 교육
 프로필·약력: https://breezefeel.github.io/drpark · https://blog.naver.com/allenjoy/120205433765
 ${BLOG_CONTENT_VOICE_RULE}
-인스타(프로그램별): 도수·CMT @dr.park_dc.pt · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트·움직임 @re.al_movement_official
-인스타 연결 계정(시스템이 캡션에 자동 삽입, 본문에 쓰지 말 것): CMT @cmt_academy · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트 @re.al_movement_official (도수치료·Re:Al 과정은 연결 계정 없음)
+인스타 게시 계정: 모든 프로그램 @dr.park_dc.pt
+인스타 공동작업 계정(시스템이 캡션에 자동 삽입, 본문에 쓰지 말 것): CMT @cmt_academy · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트 @re.al_movement_official (도수치료·Re:Al 과정은 공동작업 계정 없음)
 표기: 「리얼무브먼트」붙여 쓰기. 「리얼 페이스」. 「리:얼」 금지. 영문 Re:Al / Re:Al Face는 유지.` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
   categories: {
     0: { // 도수치료
@@ -16598,10 +16604,22 @@ function syncStringHash_(str){
   }
   return (h >>> 0).toString(36) + ':' + str.length;
 }
+// 서버(jsonb)는 객체 키를 정렬해 돌려준다. 키 삽입 순서에 따라 문자열이 달라지면
+// 같은 내용도 「다름」으로 판정돼 충돌 창과 안 줄어드는 남은 건수가 생긴다. 키를 정렬해 비교한다.
+function canonicalizeForFingerprint_(v, depth){
+  if(v === null || typeof v !== 'object' || depth > 60) return v;
+  if(Array.isArray(v)) return v.map(function(x){ return canonicalizeForFingerprint_(x, depth + 1); });
+  if(typeof v.toJSON === 'function') return v.toJSON();
+  var out = {};
+  Object.keys(v).sort().forEach(function(k){
+    if(v[k] !== undefined) out[k] = canonicalizeForFingerprint_(v[k], depth + 1);
+  });
+  return out;
+}
 function syncValueFingerprint_(value){
   if(value === undefined) return '__missing__';
   try {
-    var s = JSON.stringify(value);
+    var s = JSON.stringify(canonicalizeForFingerprint_(value, 0));
     // 대형 초안/발행본 전체 문자열 비교는 부트스트랩에서 메인 스레드를 멈춤
     if(s.length > 2500) return 'h:' + syncStringHash_(s);
     return s;
@@ -17081,15 +17099,19 @@ function normalizeDraftRowForSync_(draft){
   if(imageSig) row.imageSig = imageSig;
   return row;
 }
+// 비교에서만 무시하는 수정 시각 필드. 예약·발행 날짜(scheduledDate, publishedAt 등)는 내용이라 비교에 넣는다.
+var SYNC_COMPARE_IGNORED_KEYS_ = { updatedAt: 1, savedAt: 1, order: 1, index: 1, modifiedAt: 1, editedAt: 1, lastEditedAt: 1, lastSavedAt: 1, localSavedAt: 1, syncedAt: 1 };
 function omitEmptyForSyncCompare_(value){
   if(value == null) return undefined;
+  // 줄 끝 공백·개행 차이만 있는 글은 같은 글로 본다
+  if(typeof value === 'string') return value.replace(/\r\n/g, '\n').trim();
   if(typeof value !== 'object') return value;
   if(Array.isArray(value)){
     return value.map(omitEmptyForSyncCompare_).filter(function(v){ return v !== undefined; });
   }
   var out = {};
   Object.keys(value).forEach(function(k){
-    if(k === 'updatedAt' || k === 'savedAt' || k === 'order' || k === 'index') return;
+    if(SYNC_COMPARE_IGNORED_KEYS_[k]) return;
     var v = omitEmptyForSyncCompare_(value[k]);
     if(v === undefined || v === '' || v === false || v === null) return;
     if(Array.isArray(v) && !v.length) return;
@@ -17101,10 +17123,7 @@ function omitEmptyForSyncCompare_(value){
 function stripSyncVolatileForCompare_(value){
   if(!value || typeof value !== 'object') return value;
   var copy = Array.isArray(value) ? value.slice() : Object.assign({}, value);
-  delete copy.updatedAt;
-  delete copy.savedAt;
-  delete copy.order;
-  delete copy.index;
+  Object.keys(SYNC_COMPARE_IGNORED_KEYS_).forEach(function(k){ delete copy[k]; });
   if(copy.roadmapStepId) copy.roadmapStepId = canonicalizeStepIdForCompare_(copy.roadmapStepId);
   if(copy.previousRoadmapStepId) copy.previousRoadmapStepId = canonicalizeStepIdForCompare_(copy.previousRoadmapStepId);
   if(copy.strategyGuide){
@@ -17113,10 +17132,7 @@ function stripSyncVolatileForCompare_(value){
   }
   if(copy.value && typeof copy.value === 'object' && !Array.isArray(copy.value)){
     copy.value = Object.assign({}, copy.value);
-    delete copy.value.updatedAt;
-    delete copy.value.savedAt;
-    delete copy.value.order;
-    delete copy.value.index;
+    Object.keys(SYNC_COMPARE_IGNORED_KEYS_).forEach(function(k){ delete copy.value[k]; });
     if(copy.value.roadmapStepId) copy.value.roadmapStepId = canonicalizeStepIdForCompare_(copy.value.roadmapStepId);
     if(copy.value.previousRoadmapStepId) copy.value.previousRoadmapStepId = canonicalizeStepIdForCompare_(copy.value.previousRoadmapStepId);
     if(copy.value.strategyGuide){
@@ -20832,6 +20848,10 @@ function renderSyncStatusBodyHTML_(info){
       '</div>';
   }
 
+  // 중복 카드 확인(지우지 않고 목록만)
+  html += '<div class="sync-status-action-hint"><button type="button" class="modal-btn sync-settings-mini-btn" onclick="openDuplicateCardsReview_()">중복 카드 확인</button> ' +
+    '<span style="font-size:12px;opacity:.75">날짜·채널·주제가 같은 카드 목록. 지우지 않아요.</span></div>';
+
   // 1. 사용자 이메일
   html += row(
     '1. 사용자 이메일',
@@ -22304,6 +22324,55 @@ function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts, opts
 function autoResolveConflictsKeepLocal_(local, remote, serverRevision, conflicts){
   keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts);
 }
+/** 충돌한 두 값에서 어느 칸이 다른지. 비교에서 무시하는 시각 필드·빈 칸·줄 끝 공백은 뺀다. */
+var CONFLICT_FIELD_LABELS_ = {
+  title: '제목', importTitle: '제목', headline: '제목',
+  draft: '본문', body: '본문', explanation: '본문', problem: '본문', selfCare: '본문', caption: '본문', text: '본문',
+  hook: '본문', empathyLead: '본문', empathyBullets: '본문', comment: '본문', cta: '본문', finalText: '본문',
+  status: '상태', state: '상태', publishState: '상태', published: '상태',
+  scheduledDate: '날짜', scheduledAt: '날짜', date: '날짜', publishedAt: '날짜', activityAt: '날짜', createdAt: '날짜', plannedDate: '날짜',
+  topic: '주제', angle: '각도', series: '시리즈', pillar: '필러', roadmapStepId: '단계', step: '단계',
+  collab: '공동작업', account: '계정', sourceNote: '메모', rationale: '이유', writingBrief: '작성 메모'
+};
+var CONFLICT_CHANNEL_LABELS_ = { blog: '블로그', insta: '인스타', instagram: '인스타', threads: '쓰레드', news: '소식', community: '커뮤니티' };
+function conflictDiffFields_(localVal, remoteVal){
+  function flatten(v){
+    var out = {};
+    (function walk(x, path){
+      if(x === undefined || x === null) return;
+      if(typeof x === 'object'){
+        Object.keys(x).forEach(function(k){ walk(x[k], path ? path + '.' + k : k); });
+        return;
+      }
+      out[path] = String(x);
+    })(stripSyncVolatileForCompare_(unwrapSyncEntityValue_(v)), '');
+    return out;
+  }
+  var l = flatten(localVal), r = flatten(remoteVal);
+  var paths = {};
+  Object.keys(l).concat(Object.keys(r)).forEach(function(k){ if(l[k] !== r[k]) paths[k] = true; });
+  var labels = [];
+  Object.keys(paths).forEach(function(path){
+    var parts = path.split('.');
+    var leaf = parts[parts.length - 1];
+    if(/^\d+$/.test(leaf) && parts.length > 1) leaf = parts[parts.length - 2];
+    var field = CONFLICT_FIELD_LABELS_[leaf] || leaf;
+    var channel = '';
+    for(var i = 0; i < parts.length - 1; i++){
+      if(CONFLICT_CHANNEL_LABELS_[parts[i]]){ channel = CONFLICT_CHANNEL_LABELS_[parts[i]]; break; }
+    }
+    var label = (channel && field !== '날짜' ? channel + ' ' : '') + field;
+    if(labels.indexOf(label) < 0) labels.push(label);
+  });
+  return labels;
+}
+function conflictDiffLineHTML_(conflict){
+  var labels = [];
+  try { labels = conflictDiffFields_(conflict.local, conflict.remote); } catch(eDiff){ labels = []; }
+  if(!labels.length) return '';
+  var shown = labels.slice(0, 8).join(', ') + (labels.length > 8 ? ' 외 ' + (labels.length - 8) + '칸' : '');
+  return '<div class="sync-conflict-diff" style="font-size:12px;color:#92400E;margin:4px 0">다른 칸: <strong>' + escapeHtml(shown) + '</strong></div>';
+}
 function renderPlannerConflictUi_(pending){
   // 다른 오버레이가 클릭을 가로채지 못하게 전부 닫음 (스크롤 잠금도 함께 해제)
   ['sync-bootstrap-overlay', 'api-modal', 'drive-oauth-busy', 'sync-status-overlay', 'sync-preview-overlay', 'sync-bootstrap-choice-overlay', 'draft-import-overlay'].forEach(function(id){
@@ -22327,7 +22396,7 @@ function renderPlannerConflictUi_(pending){
         ? '<div class="sync-conflict-name-sub" style="font-size:11px;color:#B45309;margin-top:4px;">이 기기 초안 본문이 있어요. 「이 기기」 권장.</div>'
         : '';
       return '<div class="sync-conflict-item">' +
-        '<div class="sync-conflict-name">' + escapeHtml(plannerConflictLabel_(conflict.key)) + '</div>' + hint +
+        '<div class="sync-conflict-name">' + escapeHtml(plannerConflictLabel_(conflict.key)) + '</div>' + conflictDiffLineHTML_(conflict) + hint +
         '<div class="sync-conflict-options">' +
           '<label class="sync-conflict-option"><input type="radio" name="sync-conflict-' + i + '" value="remote"' + remoteChecked + '>' +
             '<span><strong>서버 기준' + escapeHtml(remoteBy) + '</strong><span class="sync-conflict-preview">' + escapeHtml(plannerConflictPreview_(conflict.remote)) + '</span></span></label>' +
@@ -23603,6 +23672,17 @@ function ensureSyncedContentDraftCards_(){
       var cat = CATEGORIES[catId];
       if(!cat) return;
       if(!cat.drafts) cat.drafts = [];
+      // 다른 기기가 같은 원고를 다른 id로 올렸으면, 서버 내용만으로 같은 카드를 또 만들지 않는다.
+      // 내용은 지우지 않고 그대로 두며, 중복 확인 화면에 「카드 없이 남은 원고」로 보인다.
+      var sameWork = findLiveCardWithSameWork_(catId, id, topic, content);
+      if(sameWork){
+        if(!state._dupPlaceholderSkipped) state._dupPlaceholderSkipped = {};
+        if(!state._dupPlaceholderSkipped[id]){
+          state._dupPlaceholderSkipped[id] = { id: id, topic: topic || '', existingId: sameWork.id, catId: catId };
+          try { console.info('[중복 카드 생성 막음]', JSON.stringify(state._dupPlaceholderSkipped[id])); } catch(eLogSkip){}
+        }
+        return;
+      }
       cat.drafts.push({
         id: id,
         topic: topic || '가져온 주제',
@@ -25913,6 +25993,7 @@ window.onload = () => {
         }
         try { document.documentElement.classList.add('planner-ready'); } catch(e7){}
         setTimeout(function(){ try { runDeferredBootMigrations_(); } catch(e){} }, 600);
+        setTimeout(function(){ try { if(!plannerSafeModeBlocksSync_()) warnPassedBlogPlans_(); } catch(eWarnPlan){} }, 5000);
         setTimeout(function(){ try { runPlannerBootstrapSync_(); } catch(e2){} }, 1200);
         if(oauthReturned){
           handleDrivePendingActionAfterRedirect_();
@@ -26150,6 +26231,7 @@ function saveKey() {
   }
   var syncTokEl = document.getElementById('planner-sync-token');
   if(syncTokEl) setPlannerSyncToken_(syncTokEl.value);
+  try { saveBlogDefaultCategories_(); } catch(eBdcS){}
   save();
   closeApiModal();
   updateApiBadge();
@@ -26168,7 +26250,57 @@ function closeApiModalBackdrop(ev){
   closeApiModal();
 }
 window.closeApiModalBackdrop = closeApiModalBackdrop;
+// 네이버 블로그 기본 카테고리 — 프로그램별. 이 기기에 저장(localStorage). 리얼페이스 기본값은 코드에 둔다.
+var BLOG_DEFAULT_CATEGORY_KEY_ = 'ht_blog_default_cat_v1';
+var BLOG_DEFAULT_CATEGORY_BUILTIN_ = { 2: '안면비대칭/축소' };
+function readBlogDefaultCategories_(){
+  try {
+    var raw = JSON.parse(localStorage.getItem(BLOG_DEFAULT_CATEGORY_KEY_) || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch(e){ return {}; }
+}
+function getBlogDefaultCategoryForCat_(catId){
+  var saved = readBlogDefaultCategories_();
+  var id = String(catId);
+  if(Object.prototype.hasOwnProperty.call(saved, id)) return String(saved[id] || '').trim();
+  return BLOG_DEFAULT_CATEGORY_BUILTIN_[id] || '';
+}
+function renderBlogDefaultCategoryInputs_(){
+  var host = document.getElementById('blog-default-cat-list');
+  if(!host) return;
+  host.innerHTML = CATEGORIES.map(function(cat){
+    if(!cat || cat.id > 5) return '';
+    var val = getBlogDefaultCategoryForCat_(cat.id);
+    return '<label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;color:#374151;">' +
+      '<span style="flex:0 0 112px;">' + escapeHtml(cat.name) + '</span>' +
+      '<input class="modal-input" type="text" data-blog-default-cat="' + cat.id + '" value="' + escapeHtml(val) + '" placeholder="카테고리 이름" autocomplete="off" style="margin:0;flex:1;">' +
+      '</label>';
+  }).join('');
+}
+function saveBlogDefaultCategories_(){
+  var host = document.getElementById('blog-default-cat-list');
+  if(!host) return;
+  var out = {};
+  host.querySelectorAll('input[data-blog-default-cat]').forEach(function(inp){
+    var id = inp.getAttribute('data-blog-default-cat');
+    var v = String(inp.value || '').trim();
+    var builtin = BLOG_DEFAULT_CATEGORY_BUILTIN_[id] || '';
+    // 기본값과 같으면 저장하지 않는다. 비운 칸은 「없음」으로 저장해 기본값을 끈다.
+    if(v === builtin) return;
+    out[id] = v;
+  });
+  try { localStorage.setItem(BLOG_DEFAULT_CATEGORY_KEY_, JSON.stringify(out)); } catch(e){}
+}
+function noteBlogDefaultCategoryOnOpen_(catId){
+  var name = getBlogDefaultCategoryForCat_(catId);
+  if(!name || typeof setAppToast !== 'function') return;
+  // 열기 직후 뜨는 다른 안내 토스트가 지나간 뒤에 보이게 한다
+  setTimeout(function(){
+    setAppToast('네이버 에디터에서 카테고리는 「' + name + '」으로 골라 주세요.', { duration: 6000, variant: 'ok' });
+  }, 1800);
+}
 function openApiModal() {
+  try { renderBlogDefaultCategoryInputs_(); } catch(eBdc){}
   document.getElementById('api-input').value = state.apiKey === '__server__' ? '' : state.apiKey;
   document.getElementById('api-input').type = 'password';
   var toggleBtn = document.getElementById('api-key-toggle');
@@ -29440,7 +29572,60 @@ function blogScheduleButtonHTML_(){
   var plan = getChannelPlan_(state.selectedId, 'blog');
   var label = plan ? (opsPlanChipLabel_(plan.at) + ' 수정') : '예약하기';
   var title = plan ? '예약 날짜를 바꿉니다' : '날짜를 고르고 블로그 글쓰기를 엽니다';
-  return '<button type="button" class="btn-save-draft" data-blog-schedule onclick="onBlogSchedule_()" title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
+  var html = '<button type="button" class="btn-save-draft" data-blog-schedule onclick="onBlogSchedule_()" title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
+  if(plan){
+    // 네이버 에디터에서 예약한 글은 플래너가 발행 여부를 알 수 없다. 확인 버튼으로 발행 완료로 바꾼다.
+    var passed = blogPlanDatePassed_(plan);
+    html += '<button type="button" class="btn-save-draft" data-blog-confirm onclick="onBlogPublishConfirm_()" title="네이버에서 발행된 것을 확인했으면 눌러 발행 완료로 바꿉니다"' +
+      (passed ? ' style="border-color:#B45309;color:#B45309;font-weight:700;"' : '') + '>' + (passed ? '확인 필요' : '발행 확인') + '</button>';
+  }
+  return html;
+}
+function blogPlanDatePassed_(plan){
+  return !!(plan && plan.at && opsPlanYmd_(plan.at) && opsPlanYmd_(plan.at) < opsPlanYmd_(new Date()));
+}
+/** 블로그를 예약해 둔 글의 썸네일을 바꾸면, 네이버 예약에는 옛 이미지가 그대로 남는다. 경고만 한다. */
+function warnThumbChangedAfterReserve_(draftId){
+  var pub = state.published && state.published[draftId];
+  if(!pub || (pub.tabPublished && pub.tabPublished.blog)) return false;
+  if(!getChannelPlan_(draftId, 'blog')) return false;
+  if(typeof setAppToast === 'function'){
+    setAppToast('예약에는 옛 이미지가 남아 있어요.\n네이버에서 예약한 글의 썸네일을 직접 바꿔 주세요.', { duration: 7000, variant: 'err' });
+  }
+  return true;
+}
+function onBlogPublishConfirm_(){
+  var draftId = state.selectedId;
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  var plan = getChannelPlan_(draftId, 'blog');
+  if(!plan){ if(typeof setAppToast === 'function') setAppToast('예약된 블로그가 없어요.', { duration: 2500, variant: 'err' }); return; }
+  if(!confirm(opsPlanChipLabel_(plan.at) + ' 예약한 글이 네이버에서 발행됐나요?\n확인하면 발행 완료로 바꿉니다.')) return;
+  try {
+    commitSheetTabPublish_(draftId, catId, 'blog', { skipDom: true, at: plan.at });
+  } catch(eConfirm){
+    if(typeof setAppToast === 'function') setAppToast('발행 확인을 저장하지 못했어요: ' + (eConfirm && eConfirm.message || eConfirm), { duration: 5000, variant: 'err' });
+    return;
+  }
+  var btn = document.querySelector('[data-blog-schedule]');
+  if(btn) btn.textContent = '예약하기';
+  var cbtn = document.querySelector('[data-blog-confirm]');
+  if(cbtn) cbtn.remove();
+  try { paintOpsPlanStrip_(); } catch(ePaint){}
+  if(typeof setAppToast === 'function') setAppToast('발행 완료로 바꿨어요.', { duration: 3000, variant: 'ok' });
+}
+window.onBlogPublishConfirm_ = onBlogPublishConfirm_;
+/** 예약일이 지났는데 발행 확인이 안 된 블로그가 있으면 한 번 알린다. */
+function warnPassedBlogPlans_(){
+  var n = 0;
+  Object.keys(state.published || {}).forEach(function(id){
+    var pub = state.published[id];
+    if(!pub || (pub.tabPublished && pub.tabPublished.blog)) return;
+    if(blogPlanDatePassed_(pub.channelPlan && pub.channelPlan.blog)) n++;
+  });
+  if(n && typeof setAppToast === 'function'){
+    setAppToast('예약일이 지난 블로그 ' + n + '건이 아직 「예약」으로 남아 있어요.\n글을 열어 「발행 확인」을 눌러 주세요.', { duration: 7000, variant: 'ok' });
+  }
+  return n;
 }
 function onBlogSchedule_(){
   var draftId = state.selectedId;
@@ -29461,7 +29646,7 @@ function onBlogSchedule_(){
       setChannelPlan_(draftId, catId, 'blog', when.toISOString(), '');
       var btn = document.querySelector('[data-blog-schedule]');
       if(btn) btn.textContent = opsPlanChipLabel_(when.toISOString()) + ' 수정';
-      if(!existing && content && content.blog) copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId));
+      if(!existing && content && content.blog) copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId), catId);
       if(typeof setAppToast === 'function') setAppToast('블로그 예약 ' + opsPlanChipLabel_(when.toISOString()), { duration: 2500, variant: 'ok' });
     }
   });
@@ -37725,6 +37910,7 @@ async function persistThumbMakerToDraft_(copy){
     save({ skipDriveUpload: true, gasImmediate: false });
   } catch(eSave){}
   try { ensureDraftSyncKeysQueued_(draftId); } catch(eThumbSync){}
+  try { warnThumbChangedAfterReserve_(draftId); } catch(eThumbWarn){}
 
   schedulePersistThumbWorkspace_(true);
   try {
@@ -39358,7 +39544,7 @@ function renderSheetContent(content, opts) {
         sheetEditField_('셀프 케어', 'sheet-blog-selfcare', b.selfCare || '', { rows: 8, help: '👉 먼저 확인 한 줄 · 👉 1.~4. 3~4단계(초·회) · 실수 2~3개 · 단계 사이 빈 줄', regen: 'blog.selfCare', copy: true, stepPreview: true }) +
         sheetEditField_('원리 설명', 'sheet-blog-explanation', b.explanation || '', { rows: 6, regen: 'blog.explanation', copy: true, paragraphs: true }) +
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
-        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
+        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         (isBranchBookingBlogCategory_(blogCatId) ? realMovementBlogFooterSheetHtml_(blogCatId) : expertCourseBlogFooterSheetHtml_(blogCatId)) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>지금 올리기·예약하기</strong>는 글을 복사하고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙고, 버튼으로 날짜를 바꿀 수 있어요. <strong>수정된 블로그 최종본</strong>으로 인스타 캡션이 백그라운드에서 만들어져요.' +
         ((isBranchBookingBlogCategory_(blogCatId) || isExpertCourseCategory(blogCatId)) ? ' 하단 <strong>말미 링크</strong>는 고정으로 붙어요.' : '') + '</p>'
@@ -39372,7 +39558,7 @@ function renderSheetContent(content, opts) {
         sheetEditField_('시연·핵심 포인트', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '손 위치·동작·주의사항 — 한 줄에 하나씩', regen: 'blog.outline', copy: true }) +
         sheetEditField_('원리 설명', 'sheet-blog-draft', b.draft, { rows: 12, help: '본문의 중심. 왜 이렇게 하는지·짧은 메커니즘', regen: 'blog.draft', copy: true, paragraphs: true }) +
         sheetEditField_('마무리', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
-        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분 · 3~5개 권장', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
+        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요 · 3~5개 권장', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         expertCourseBlogFooterSheetHtml_(blogCatId) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>지금 올리기·예약하기</strong>는 저장·복사되고 글쓰기로 이동해요. 하단 <strong>말미 링크</strong>는 해당 과정 안내로 고정해서 붙어요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙습니다.</p>'
       );
@@ -39385,7 +39571,7 @@ function renderSheetContent(content, opts) {
         sheetEditField_('목차 구성', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '한 줄에 소제목 하나씩', regen: 'blog.outline', copy: true }) +
         sheetEditField_('본문 초안', 'sheet-blog-draft', b.draft, { rows: 14, regen: 'blog.draft', copy: true, paragraphs: true }) +
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
-        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
+        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>지금 올리기·예약하기</strong>는 블로그가 저장·복사되고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙습니다.</p>'
       );
     }
@@ -39403,7 +39589,7 @@ function renderSheetContent(content, opts) {
         addSourceHtml + sheetFullCopyBar_() +
         sheetEditField_('첫 줄 후킹', 'sheet-insta-hook', ig.hook, { rows: 2, title: true, regen: 'insta.hook', copy: true }) +
         sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10, regen: 'insta.caption', copy: true, paragraphs: true }) +
-        sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).map(function(h){ return String(h).replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
+        sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
         instagramCollabSheetHtml_(state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId)) +
         '<div data-social-slot="insta"></div>' +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>지금 올리기</strong>는 @dr.park_dc.pt에 바로 게시하고(연결 계정은 공동작업자로 초대), <strong>예약하기</strong>는 고른 시간에 클라우드가 올립니다. 올리면 <strong>수정된 인스타 최종본</strong>으로 쓰레드 초안이 만들어져요. 앱에서 직접 올렸다면 <strong>직접 올림</strong>을 누르세요.</p>'
@@ -39622,11 +39808,28 @@ function ensureNotifyForInstaBg_(){
   } catch(e){}
 }
 
-function copyAndOpenNaverBlog_(text){
-  if(text && navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).catch(function(){});
+/** 첫 줄(제목)을 인용구(blockquote)로, 나머지는 문단으로 — 네이버 에디터에 붙이면 제목이 인용구가 된다. */
+function blogPasteHtmlWithQuotedTitle_(text){
+  var raw = String(text || '').replace(/\r\n/g, '\n').trim();
+  if(!raw) return '';
+  var nl = raw.indexOf('\n');
+  var title = (nl < 0 ? raw : raw.slice(0, nl)).trim();
+  if(!title || title.length > 120) return '';
+  var rest = nl < 0 ? '' : raw.slice(nl + 1).trim();
+  var paras = rest ? rest.split(/\n\s*\n/).map(function(block){
+    return '<p>' + escapeHtml(block.trim()).replace(/\n/g, '<br/>') + '</p>';
+  }).join('') : '';
+  return '<blockquote>' + escapeHtml(title.replace(/^제목\s*[:：]\s*/, '')) + '</blockquote>' + paras;
+}
+function copyAndOpenNaverBlog_(text, catId){
+  if(text){
+    var quotedHtml = '';
+    try { quotedHtml = blogPasteHtmlWithQuotedTitle_(text); } catch(eQuote){ quotedHtml = ''; }
+    if(quotedHtml) writeClipboardRich_(text, quotedHtml, function(){});
+    else if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(function(){});
   }
   openExternalNaverBlog();
+  try { noteBlogDefaultCategoryOnOpen_(catId != null ? catId : state.selectedCatId); } catch(eNote){}
 }
 function startInstaDraftAfterBlogPublish_(draftId, catId, topic, content){
   if(!isBlogInstaCategory(catId) || !content || !content.blog) return;
@@ -40566,14 +40769,17 @@ function sheetFullCopyBar_(){
     '<span class="sheet-fullcopy-hint">구분된 내용을 한 줄씩 띄워 복사해요</span></div>';
 }
 
+/** 해시태그 입력을 나눈다. 사용자가 넣은 #은 지우지 않고 그대로 둔다(#태그 → #태그, 태그 → 태그). */
+function parseHashtagInput_(text){
+  return (String(text || '').match(/#?[^\s,#]+/g) || []).map(function(t){ return t.trim(); }).filter(Boolean);
+}
 window.copySheetField_ = function(id, btn, isHashtags){
   var el = document.getElementById(id);
   if(!el) return;
   var text = String(el.value || '');
   var html = '';
   if(isHashtags){
-    text = text.split(/[\s,#]+/).map(function(t){ return t.replace(/^#/, '').trim(); })
-      .filter(Boolean).map(function(t){ return '#' + t; }).join(' ');
+    text = parseHashtagInput_(text).map(function(t){ return '#' + t.replace(/^#+/, ''); }).join(' ');
   } else if(el.getAttribute('data-selfcare-preview') === '1'){
     html = formatSelfCareStepsHtmlForCopy_(text);
     text = formatSelfCareStepsForCopy_(text);
@@ -41030,22 +41236,52 @@ function parseSelfCareSteps_(text){
 /** 👉 와 빈 줄로 이미 짜인 셀프 케어는 번호를 다시 매기지 않는다 */
 function selfCareKeepsAuthorBreaks_(text){
   var t = String(text || '');
+  if(/(^|\n)\s*\d+\)\s+\S/.test(t) && /\n\s*\n/.test(t)) return true;
   return /(^|\n)\s*👉/.test(t) && /\n\s*\n/.test(t);
+}
+/** 주의·실수 줄 머리표 → 「✕ 」 */
+var SELFCARE_CAUTION_RE_ = /^(?:[⚠❗❌✗✘×✖]\uFE0F?\s*|※\s*|주의\s*[:：]?\s*)/;
+/**
+ * 운동 단계 템플릿: 번호는 1) 2) 3), 항목 사이 빈 줄, 주의 줄은 「✕ 」로 시작.
+ * 예전 「👉 1.」 형식도 같은 모양으로 맞춘다. 내용 문장은 바꾸지 않는다.
+ */
+function normalizeSelfCareTemplate_(text){
+  var lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+  var out = [];
+  var prevKind = '';
+  function blank(){ if(out.length && out[out.length - 1] !== '') out.push(''); }
+  lines.forEach(function(raw){
+    var ln = raw.trim();
+    if(!ln){ blank(); prevKind = ''; return; }
+    var m = ln.match(/^(?:👉\s*)?(\d+)\s*[.)]\s*(.+)$/);
+    if(m){ blank(); out.push(m[1] + ') ' + m[2].trim()); prevKind = 'step'; return; }
+    if(/^✕\s/.test(ln)){ if(prevKind !== 'caution') blank(); out.push(ln); prevKind = 'caution'; return; }
+    if(/^혼자 할 때 실수\s*[:：]/.test(ln)){ if(prevKind !== 'caution') blank(); out.push('✕ ' + ln); prevKind = 'caution'; return; }
+    var cm = ln.match(SELFCARE_CAUTION_RE_);
+    if(cm && ln.length > cm[0].length){
+      if(prevKind !== 'caution') blank();
+      out.push('✕ ' + ln.slice(cm[0].length).trim());
+      prevKind = 'caution';
+      return;
+    }
+    out.push(ln); prevKind = 'text';
+  });
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /** 미리보기처럼 번호 + 단계 사이 빈 줄 — 아파트너·블로그 붙여넣기용 */
 function formatSelfCareStepsForCopy_(text){
   var t = String(text || '').replace(/\r\n/g, '\n').trim();
   if(!t) return '';
-  if(selfCareKeepsAuthorBreaks_(t)) return t.replace(/\n{3,}/g, '\n\n');
+  if(selfCareKeepsAuthorBreaks_(t)) return normalizeSelfCareTemplate_(t);
   var steps = parseSelfCareSteps_(t);
   if(steps.length <= 1){
     var one = String(steps[0] || t).replace(SELFCARE_STEP_STRIP_RE_, '').trim();
-    return one || t;
+    return normalizeSelfCareTemplate_(one || t);
   }
-  return steps.map(function(s, i){
-    return (i + 1) + '. ' + String(s || '').replace(SELFCARE_STEP_STRIP_RE_, '').trim();
-  }).join('\n\n');
+  return normalizeSelfCareTemplate_(steps.map(function(s, i){
+    return (i + 1) + ') ' + String(s || '').replace(SELFCARE_STEP_STRIP_RE_, '').trim();
+  }).join('\n\n'));
 }
 
 /** 리치 에디터 붙여넣기용 — 따라하기 미리보기 카드와 비슷한 HTML */
@@ -41054,7 +41290,7 @@ function formatSelfCareStepsHtmlForCopy_(text){
   if(!t) return '';
   if(selfCareKeepsAuthorBreaks_(t)){
     return '<div style="white-space:pre-wrap;line-height:1.7;font-size:14px;color:#1F2937;word-break:keep-all;">' +
-      escapeHtml(t.replace(/\n{3,}/g, '\n\n')).replace(/\n/g, '<br/>') + '</div>';
+      escapeHtml(normalizeSelfCareTemplate_(t)).replace(/\n/g, '<br/>') + '</div>';
   }
   var steps = parseSelfCareSteps_(t);
   function bodyHtml(s){
@@ -41428,7 +41664,7 @@ window.onSheetTitleSyncTopic_ = function(el){
 function readSheetBlogEdits_(){
   function v(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
   if(!document.getElementById('sheet-blog-title')) return null;
-  var tags = v('sheet-blog-hashtags').split(/[\s,#]+/).map(function(t){ return t.replace(/^#/, '').trim(); }).filter(Boolean);
+  var tags = parseHashtagInput_(v('sheet-blog-hashtags'));
   if(document.getElementById('sheet-blog-problem')){
     return {
       title: v('sheet-blog-title'),
@@ -41468,7 +41704,7 @@ function applySheetBlogEdits_(content){
 function readSheetInstaEdits_(){
   if(!document.getElementById('sheet-insta-hook')) return null;
   function v(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
-  var tags = v('sheet-insta-hashtags').split(/[\s,#]+/).map(function(t){ return t.replace(/^#/, '').trim(); }).filter(Boolean);
+  var tags = parseHashtagInput_(v('sheet-insta-hashtags'));
   return {
     hook: v('sheet-insta-hook'),
     caption: v('sheet-insta-caption'),
@@ -42055,7 +42291,7 @@ window.onSheetPublishComplete = async function(opts){
       var quickText = buildFinalTextForKey_(quickContent, catId, quickResult.key);
       if(tab === 'blog') startInstaDraftAfterBlogPublish_(draftId, catId, (quickContent && quickContent.blog && quickContent.blog.title) || '', quickContent);
       if(!viaApi && tab === 'blog'){
-        copyAndOpenNaverBlog_(quickText);
+        copyAndOpenNaverBlog_(quickText, catId);
         setAppToast(isPhoneOrTablet()
           ? '수정본 저장 · 복사 · 글쓰기 앱으로 이동'
           : '수정본 저장 · 복사 · 글쓰기 페이지로 이동', { duration: 3600, variant: 'ok' });
@@ -42102,7 +42338,7 @@ window.onSheetPublishComplete = async function(opts){
       state.activeTab = 'insta';
       setOpenDetailHash_(draftId, catId, 'insta');
       startInstaDraftAfterBlogPublish_(draftId, catId, draft ? draft.topic : '', content);
-      copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId));
+      copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId), catId);
       renderSheetContent(getDraftContent_(draftId) || content);
       renderTabs();
       renderMain();
@@ -44430,72 +44666,226 @@ function importedCopyHasOwnWork_(draft){
   }
   return false;
 }
+/** 채널별 본문이 들어 있는지만 본다. 내용이 아니라 어느 채널에 글이 있는지의 모양. */
+function contentChannelSig_(content){
+  if(!content || typeof content !== 'object') return '';
+  var parts = [];
+  var blog = content.blog;
+  if(blog && (blog.title || blog.draft || blog.explanation || blog.problem || blog.selfCare || blog.hook)) parts.push('blog');
+  var ig = content.insta;
+  if(ig && (ig.caption || ig.hook || ig.text)) parts.push('instagram');
+  var th = content.threads;
+  if(th && (th.body || th.text || th.comment)) parts.push('threads');
+  var news = content.news;
+  if(news) ['naver', 'kakao', 'karrot'].forEach(function(slot){
+    var item = news[slot];
+    if(item && (item.title || item.body || item.cta)) parts.push('sonsik:' + slot);
+  });
+  return parts.sort().join(',');
+}
+function dupTopicKey_(topic){
+  return typeof normalizeTopicKey_ === 'function' ? normalizeTopicKey_(topic) : String(topic || '').replace(/\s+/g, '').toLowerCase();
+}
+/** 채널별 제목까지 포함한 같은 원고 판별 키. 서버 내용으로 만든 카드는 주제가 블로그 제목이라 주제만으로는 못 맞춘다. */
+function contentWorkKey_(content){
+  var sig = contentChannelSig_(content);
+  if(!sig) return '';
+  var t = [];
+  function norm(v){ return String(v == null ? '' : v).replace(/\s+/g, '').toLowerCase(); }
+  var b = content.blog || {}; t.push(norm(b.importTitle || b.title));
+  var ig = content.insta || {}; t.push(norm(ig.importTitle || ig.hook));
+  var th = content.threads || {}; t.push(norm(th.importTitle));
+  var n = content.news || {};
+  ['naver', 'kakao', 'karrot'].forEach(function(slot){ var it = n[slot] || {}; t.push(norm(it.importTitle || it.title)); });
+  var joined = t.join('|');
+  return /[^|]/.test(joined) ? sig + '#' + joined : '';
+}
+function findLiveCardWithSameWork_(catId, selfId, topic, content){
+  var cat = CATEGORIES[catId];
+  var want = contentWorkKey_(content);
+  if(!cat || !want) return null;
+  var found = null;
+  (cat.drafts || []).forEach(function(d){
+    if(found || !d || !d.id || d.id === selfId || d._syncPlaceholder) return;
+    if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
+    var own = null;
+    try { own = getDraftContent_(d.id); } catch(eOwn){ own = null; }
+    if(contentWorkKey_(own) === want) found = d;
+  });
+  return found;
+}
+function dupCardDateLabel_(d){
+  try {
+    if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerDraftListDate) return PlannerSyncRules.plannerDraftListDate(d).label;
+  } catch(eLbl){}
+  return String((d && d.createdAt) || '').slice(5, 10);
+}
 /**
- * 같은 원고 파일을 두 기기에서 각각 가져오면 같은 글이 다른 id 로 두 장이 된다.
- * 주제가 같고, 내용·본문이 글자 하나까지 같고, 어느 쪽에도 사용자 작업이 없는 가져오기 사본만 한 장으로 합친다.
- * 조금이라도 다르면 둘 다 둔다. 합친 목록은 state._importCopyMergeReport 와 콘솔에 남긴다.
+ * 중복으로 보이는 카드 묶음. 지우지 않고 목록만 만든다.
+ * level 'same'  = 프로그램·주제·날짜·채널이 모두 같음(경고 대상)
+ * level 'similar' = 프로그램·주제·채널은 같고 날짜만 다름(확인용)
  */
-function mergeIdenticalImportedCopies_(){
+function findPossibleDuplicateCards_(){
+  var strict = {};
+  var loose = {};
+  CATEGORIES.forEach(function(cat, catId){
+    (cat.drafts || []).forEach(function(d){
+      if(!d || !d.id || !d.topic) return;
+      if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
+      var content = null;
+      try { content = getDraftContent_(d.id); } catch(eC){ content = null; }
+      var sig = contentChannelSig_(content);
+      var tk = dupTopicKey_(d.topic);
+      if(!tk) return;
+      var date = dupCardDateLabel_(d);
+      var row = { d: d, catId: catId, sig: sig, date: date };
+      var sk = catId + '|' + tk + '|' + date + '|' + sig;
+      (strict[sk] = strict[sk] || []).push(row);
+      if(sig){
+        var lk = catId + '|' + tk + '|' + sig;
+        (loose[lk] = loose[lk] || []).push(row);
+      }
+    });
+  });
+  var groups = [];
+  var inSame = {};
+  function mk(level, list){
+    return {
+      level: level,
+      catId: list[0].catId,
+      program: (CATEGORIES[list[0].catId] && CATEGORIES[list[0].catId].name) || '',
+      topic: list[0].d.topic,
+      channels: list[0].sig,
+      cards: list.map(function(r){
+        var d = r.d;
+        var ent = state.syncEntityRevisions || {};
+        return {
+          id: d.id,
+          date: r.date,
+          createdAt: String(d.createdAt || ''),
+          step: String(d.roadmapStepId || ''),
+          placeholder: !!d._syncPlaceholder,
+          published: (typeof draftIsPublished_ === 'function') ? !!draftIsPublished_(d.id) : false,
+          onServer: !!ent['draft:' + d.id]
+        };
+      })
+    };
+  }
+  Object.keys(strict).forEach(function(k){
+    if(strict[k].length < 2) return;
+    strict[k].forEach(function(r){ inSame[r.d.id] = true; });
+    groups.push(mk('same', strict[k]));
+  });
+  Object.keys(loose).forEach(function(k){
+    var list = loose[k];
+    var dates = {};
+    list.forEach(function(r){ dates[r.date] = true; });
+    if(list.length < 2 || Object.keys(dates).length < 2) return;
+    groups.push(mk('similar', list));
+  });
+  return groups;
+}
+function plannerDuplicateCardReport_(){
+  var groups = findPossibleDuplicateCards_();
+  var orphans = Object.keys(state._dupPlaceholderSkipped || {}).map(function(id){ return state._dupPlaceholderSkipped[id]; });
+  return { groups: groups, orphanContent: orphans };
+}
+window.plannerListDuplicateCards_ = function(){
+  var r = plannerDuplicateCardReport_();
+  try { console.table(r.groups.map(function(g){ return { 구분: g.level, 프로그램: g.program, 주제: g.topic, 채널: g.channels, 카드: g.cards.map(function(c){ return c.id + '(' + c.date + ')'; }).join(' / ') }; })); } catch(eT){}
+  return r;
+};
+var _dupWarnSig_ = '';
+/** 날짜·채널·주제가 같은 카드가 두 장 이상이면 한 번 알린다(같은 상태에서는 반복하지 않음). */
+function warnIfDuplicateCards_(reason){
+  var same = findPossibleDuplicateCards_().filter(function(g){ return g.level === 'same'; });
+  var sig = same.map(function(g){ return g.cards.map(function(c){ return c.id; }).sort().join('+'); }).sort().join('|');
+  if(!sig){ _dupWarnSig_ = ''; return 0; }
+  if(sig === _dupWarnSig_) return same.length;
+  _dupWarnSig_ = sig;
+  try { console.warn('[같은 카드 두 장]', reason, JSON.stringify(same.map(function(g){ return { topic: g.topic, date: g.cards[0].date, ids: g.cards.map(function(c){ return c.id; }) }; }))); } catch(eW){}
+  if(typeof setAppToast === 'function'){
+    setAppToast('날짜·채널·주제가 같은 카드가 ' + same.length + '곳에서 두 장씩 있어요. 지우지 않았어요.\n동기화 상태 ▸ 중복 카드 확인에서 볼 수 있어요.', { duration: 8000, variant: 'err' });
+  }
+  return same.length;
+}
+window.openDuplicateCardsReview_ = function(){
+  var old = document.getElementById('dup-cards-overlay');
+  if(old) old.remove();
+  var r = plannerDuplicateCardReport_();
+  var box = document.createElement('div');
+  box.id = 'dup-cards-overlay';
+  box.style.cssText = 'position:fixed;inset:0;z-index:2147482000;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center';
+  var sheet = document.createElement('div');
+  sheet.style.cssText = 'background:#fff;color:#1c1c1e;width:100%;max-width:560px;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));font:14px/1.5 -apple-system,system-ui,sans-serif';
+  function esc(t){ return escapeHtml(String(t == null ? '' : t)); }
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">중복으로 보이는 카드</b><button type="button" id="dup-cards-close" style="border:0;background:#eee;border-radius:8px;min-height:36px;padding:0 12px">닫기</button></div>' +
+    '<p style="margin:6px 0 12px;color:#555">확인용이에요. 여기서도, 자동으로도 카드를 지우지 않습니다. 지울지는 직접 정하세요.</p>';
+  if(!r.groups.length && !r.orphanContent.length) html += '<p>중복으로 보이는 카드가 없어요.</p>';
+  r.groups.forEach(function(g){
+    var tag = g.level === 'same' ? '<span style="background:#fde2e2;color:#a31;padding:1px 6px;border-radius:6px">같은 날짜</span>' : '<span style="background:#fff3c4;color:#6a5000;padding:1px 6px;border-radius:6px">날짜만 다름</span>';
+    html += '<section style="border:1px solid #ddd;border-radius:10px;padding:10px;margin-bottom:10px"><div>' + tag + ' <b>' + esc(g.program) + '</b> · ' + esc(g.topic) + '</div>' +
+      '<div style="color:#666;font-size:12px;margin:2px 0 6px">채널: ' + esc(g.channels || '(본문 없음)') + '</div>';
+    g.cards.forEach(function(c){
+      html += '<div style="font-size:13px;padding:4px 0;border-top:1px dashed #e5e5e5">' + esc(c.date) + ' · ' + esc(c.id) +
+        ' · 단계 ' + esc(c.step || '-') + (c.published ? ' · 발행됨' : '') + (c.onServer ? ' · 서버에 있음' : ' · 이 기기에만') + (c.placeholder ? ' · 서버 내용만으로 생긴 카드' : '') + '</div>';
+    });
+    html += '</section>';
+  });
+  if(r.orphanContent.length){
+    html += '<section style="border:1px solid #ddd;border-radius:10px;padding:10px;margin-bottom:10px"><b>카드 없이 남은 원고</b><div style="color:#666;font-size:12px;margin:2px 0 6px">같은 카드가 이미 있어 새 카드를 만들지 않았어요. 원고는 지우지 않았습니다.</div>';
+    r.orphanContent.forEach(function(o){ html += '<div style="font-size:13px">' + esc(o.id) + ' · ' + esc(o.topic) + ' → 기존 ' + esc(o.existingId) + '</div>'; });
+    html += '</section>';
+  }
+  html += '<button type="button" id="dup-cards-copy" style="width:100%;min-height:44px;border-radius:10px;border:1px solid #888;background:#fff">목록 복사</button>';
+  sheet.innerHTML = html;
+  box.appendChild(sheet);
+  box.addEventListener('click', function(ev){ if(ev.target === box) box.remove(); });
+  document.body.appendChild(box);
+  document.getElementById('dup-cards-close').addEventListener('click', function(){ box.remove(); });
+  document.getElementById('dup-cards-copy').addEventListener('click', function(){
+    var text = JSON.stringify(r, null, 2);
+    try { navigator.clipboard.writeText(text).then(function(){ setAppToast('목록을 복사했어요.', { duration: 2400, variant: 'ok' }); }); } catch(eCp){ console.log(text); }
+  });
+};
+/**
+ * 같은 원고 파일을 두 기기에서 각각 가져오면 같은 글이 다른 id 로 두 장이 된다(새로 가져올 때는 같은 id를 쓰도록 고쳤다).
+ * 이미 생긴 사본은 지우지 않는다. 완전히 같은 사본만 state._importCopyMergeReport 와 콘솔에 남긴다.
+ */
+function reportIdenticalImportedCopies_(){
   var report = [];
   CATEGORIES.forEach(function(cat, catId){
     var groups = {};
     (cat.drafts || []).forEach(function(d){
       if(!d || !d.id || d._syncPlaceholder || !isUserAddedDraftId_(d.id) || !isImportedDraft_(d)) return;
       if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
-      var key = typeof normalizeTopicKey_ === 'function' ? normalizeTopicKey_(d.topic) : String(d.topic || '').replace(/\s+/g, '').toLowerCase();
+      var key = dupTopicKey_(d.topic);
       if(!key) return;
       (groups[key] = groups[key] || []).push(d);
     });
     Object.keys(groups).forEach(function(key){
       var list = groups[key];
       if(list.length < 2) return;
-      // 남길 카드: 서버에 이미 올라간 것 → 먼저 만든 것 → id 순
-      list.sort(function(a, b){
-        var ra = (state.syncEntityRevisions && state.syncEntityRevisions['draft:' + a.id]) ? 0 : 1;
-        var rb = (state.syncEntityRevisions && state.syncEntityRevisions['draft:' + b.id]) ? 0 : 1;
-        if(ra !== rb) return ra - rb;
-        var ta = parseIsoMs_(a.createdAt) || 0;
-        var tb = parseIsoMs_(b.createdAt) || 0;
-        if(ta !== tb) return ta - tb;
-        return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
-      });
-      var keep = list[0];
-      if(importedCopyHasOwnWork_(keep)) return;
-      var keepFp = importedCopyFingerprint_(keep);
-      if(!keepFp) return;
+      var fp0 = importedCopyFingerprint_(list[0]);
+      if(!fp0) return;
       list.slice(1).forEach(function(dup){
-        if(importedCopyHasOwnWork_(dup)) return;
-        if(importedCopyFingerprint_(dup) !== keepFp) return;
-        report.push({
-          catId: catId,
-          topic: String(dup.topic || ''),
-          keptId: keep.id,
-          keptDate: String(keep.createdAt || '').slice(0, 10),
-          mergedId: dup.id,
-          mergedDate: String(dup.createdAt || '').slice(0, 10)
-        });
-        deleteDraftSilent_(catId, dup.id);
-        if(state.draftBrandOverrides) delete state.draftBrandOverrides[dup.id];
+        if(importedCopyFingerprint_(dup) !== fp0) return;
+        report.push({ catId: catId, topic: String(dup.topic || ''), idA: list[0].id, idB: dup.id, dateA: String(list[0].createdAt || '').slice(0, 10), dateB: String(dup.createdAt || '').slice(0, 10) });
       });
     });
   });
+  state._importCopyMergeReport = report;
   if(report.length){
-    state._importCopyMergeReport = (state._importCopyMergeReport || []).concat(report);
-    try { console.info('[가져오기 사본 합침]', JSON.stringify(report)); } catch(eLog){}
-    if(typeof setAppToast === 'function'){
-      var names = report.slice(0, 3).map(function(row){
-        return row.topic.length > 18 ? row.topic.slice(0, 18) + '…' : row.topic;
-      }).join(' / ');
-      setAppToast('내용이 완전히 같은 가져오기 사본 ' + report.length + '장을 한 장으로 합쳤어요.\n' + names + (report.length > 3 ? ' 외 ' + (report.length - 3) + '장' : ''), { duration: 7000, variant: 'ok' });
-    }
+    try { console.info('[내용이 같은 가져오기 사본(지우지 않음)]', JSON.stringify(report)); } catch(eLog){}
   }
-  return report.length > 0;
+  return false;
 }
 function applyClinicTitleAndImportDrawerRepair_(){
   var changed = false;
   try { if(stripStoredClinicBlogTitles_()) changed = true; } catch(eTitle){}
-  try { if(mergeIdenticalImportedCopies_()) changed = true; } catch(eCopies){}
+  try { reportIdenticalImportedCopies_(); } catch(eCopies){}
   try { if(relocateImportedMiscDrafts_()) changed = true; } catch(eMove){}
+  try { warnIfDuplicateCards_('repair'); } catch(eDupWarn){}
   if(!changed) return false;
   try {
     var prev = {};
@@ -44588,6 +44978,19 @@ function applyImportPiece_(content, piece, catId){
     };
   }
 }
+/** 같은 프로그램·같은 주제를 두 기기에서 가져와도 같은 id가 되게 한다(다른 id면 서버에서 두 장이 된다). */
+function importDeterministicDraftId_(catId, topic){
+  var key = importNormKey_(topic);
+  if(!key) return '';
+  var h1 = 2166136261, h2 = 5381, i;
+  for(i = 0; i < key.length; i++){
+    var c = key.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
+    h2 = (Math.imul(h2, 33) + c) >>> 0;
+  }
+  var tail = String(h1 % 1000000).padStart(6, '0') + String(h2 % 100000).padStart(5, '0');
+  return 'd' + catId + '-c17' + tail;
+}
 function applyDraftImportBatch_(drafts){
   var pieceCount = 0;
   var firstCat = null;
@@ -44599,7 +45002,11 @@ function applyDraftImportBatch_(drafts){
     var draft = findImportDraftByTopic_(group.catId, group.topic);
     if(!draft){
       created = true;
-      var id = 'd' + group.catId + '-c' + String(Date.now() + pieceCount);
+      var id = importDeterministicDraftId_(group.catId, group.topic);
+      // 이미 같은 id가 있거나(다른 주제와 충돌) 지운 기록이 있으면 예전 방식 id를 쓴다
+      var idTaken = !id || (state.deletedDraftIds && state.deletedDraftIds[id]) ||
+        CATEGORIES.some(function(c){ return (c.drafts || []).some(function(row){ return row && row.id === id; }); });
+      if(idTaken) id = 'd' + group.catId + '-c' + String(Date.now() + pieceCount);
       while((cat.drafts || []).some(function(row){ return row && row.id === id; })) id += 'x';
       var iso = importPlannedIso_(group.date) || new Date().toISOString();
       draft = {
@@ -44662,6 +45069,7 @@ function applyDraftImportBatch_(drafts){
       try { placeImportedDraftOnTopic_(draft, group.catId); } catch(ePlace){}
     }
   });
+  try { warnIfDuplicateCards_('import'); } catch(eDupW){}
   return { count: pieceCount, catId: firstCat };
 }
 function renderDraftImportPreview_(view, parseError){
@@ -44693,7 +45101,15 @@ function renderDraftImportPreview_(view, parseError){
       html += '<input type="checkbox" data-import-index="' + item.index + '"' + (item.ok ? ' checked' : ' disabled') + '>';
       html += '<span><strong>' + escapeHtml(item.channelLabel || '채널') + '</strong> ' + escapeHtml(item.title || '(제목 없음)');
       var meta = [];
-      if(item.account) meta.push(item.account);
+      if(item.channel === 'instagram'){
+        // 파일의 account가 박준규 계정이 아니면 프로그램 계정이라 공동작업으로 본다
+        var postUser = 'dr.park_dc.pt';
+        var acct = String(item.account || '').replace(/^@+/, '').trim();
+        var collabs = (item.collab && item.collab.length) ? item.collab.slice() : [];
+        if(acct && acct.toLowerCase() !== postUser && collabs.map(function(h){ return String(h).replace(/^@+/, '').toLowerCase(); }).indexOf(acct.toLowerCase()) < 0 && !collabs.length) collabs.push(acct);
+        if(!collabs.length){ var m = instagramCollabMentionForCat_(item.catId); if(m) collabs.push(m); }
+        meta.push('게시: @' + postUser + ' / 공동작업: ' + (collabs.length ? collabs.map(function(h){ return '@' + String(h).replace(/^@+/, ''); }).join(' ') : '없음'));
+      } else if(item.account) meta.push(item.account);
       if(item.scheduledDate) meta.push(item.scheduledDate);
       if(meta.length) html += '<em>' + escapeHtml(meta.join(' · ')) + '</em>';
       if(item.collab && item.collab.length){

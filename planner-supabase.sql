@@ -75,6 +75,8 @@ begin
       new_val jsonb;
       applied int := 0;
       conflicted int := 0;
+      applied_paths jsonb := '[]'::jsonb;
+      remaining_paths jsonb := '[]'::jsonb;
     begin
       if found
         and not coalesce(row.deleted, false)
@@ -123,15 +125,18 @@ begin
           end if;
           current := jsonb_set(current, parts, coalesce(new_val, 'null'::jsonb), true);
           applied := applied + 1;
+          applied_paths := applied_paths || jsonb_build_array(path_text);
         else
           conflicted := conflicted + 1;
+          remaining_paths := remaining_paths || jsonb_build_array(path_text);
         end if;
       end loop;
       if applied = 0 then
         return jsonb_build_object(
           'status', case when conflicted > 0 then 'conflict' else 'idempotent' end,
           'key', p_key, 'mutationId', p_mutation_id, 'revision', row.revision,
-          'changeSeq', row.change_seq, 'value', row.value, 'deleted', row.deleted, 'updatedAt', row.updated_at
+          'changeSeq', row.change_seq, 'value', row.value, 'deleted', row.deleted, 'updatedAt', row.updated_at,
+          'appliedPaths', applied_paths, 'remainingPaths', remaining_paths
         );
       end if;
       next_rev := row.revision + 1;
@@ -145,10 +150,12 @@ begin
         where key = p_key
         returning revision, change_seq into next_rev, seq;
       return jsonb_build_object(
-        'status', case when conflicted > 0 then 'conflict' else 'ok' end,
+        'status', case when conflicted > 0 then 'partial' else 'ok' end,
         'key', p_key, 'mutationId', p_mutation_id, 'revision', next_rev, 'changeSeq', seq,
-        'value', case when conflicted > 0 then current else null end,
-        'deleted', row.deleted
+        'value', current,
+        'deleted', row.deleted,
+        'appliedPaths', applied_paths,
+        'remainingPaths', remaining_paths
       );
     end;
   end if;
@@ -247,6 +254,9 @@ begin
       coalesce(item->>'mutationId', '')
     );
     if one->>'status' = 'conflict' then
+      conflicts := conflicts || jsonb_build_array(one);
+    elsif one->>'status' = 'partial' then
+      accepted := accepted || jsonb_build_array(one);
       conflicts := conflicts || jsonb_build_array(one);
     elsif one->>'status' = 'ok' or one->>'status' = 'idempotent' then
       accepted := accepted || jsonb_build_array(one);

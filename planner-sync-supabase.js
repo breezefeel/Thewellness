@@ -345,6 +345,13 @@ var PlannerSyncSupabase = (function(){
 
   function patch(client, mutations){
     var sendPatch = !!(typeof state !== 'undefined' && state.syncServerFieldPatch);
+    (mutations || []).forEach(function(mut){
+      if(!mut || !mut.key || typeof state === 'undefined') return;
+      var editedBag = state._sheetEditedPaths && state._sheetEditedPaths[mut.key];
+      var clearedBag = state._clearedPaths && state._clearedPaths[mut.key];
+      mut.sentEditedPaths = editedBag ? editedBag.slice() : [];
+      mut.sentClearedPaths = clearedBag ? clearedBag.slice() : [];
+    });
     var body = (mutations || []).map(function(mut){
       var asPatch = !!(sendPatch && mut && mut.fieldPatch && !mut.deleted);
       return {
@@ -379,7 +386,12 @@ var PlannerSyncSupabase = (function(){
           key: item.key || (sent && sent.key) || '',
           entityRevision: parseInt(item.revision, 10) || 0,
           version: sent ? (parseInt(sent.version, 10) || 1) : 1,
-          status: item.status || 'ok'
+          status: item.status || 'ok',
+          value: item.value,
+          appliedPaths: item.appliedPaths || [],
+          remainingPaths: item.remainingPaths || [],
+          sentEditedPaths: sent && Array.isArray(sent.sentEditedPaths) ? sent.sentEditedPaths.slice() : null,
+          sentClearedPaths: sent && Array.isArray(sent.sentClearedPaths) ? sent.sentClearedPaths.slice() : null
         };
       });
       var conflicts = (data.conflicts || []).map(function(item){
@@ -392,18 +404,27 @@ var PlannerSyncSupabase = (function(){
           serverValue: item.value,
           serverDeleted: !!item.deleted,
           serverEntityRevision: parseInt(item.revision, 10) || 0,
-          serverUpdatedAt: item.updatedAt || ''
+          serverUpdatedAt: item.updatedAt || '',
+          appliedPaths: item.appliedPaths || [],
+          remainingPaths: item.remainingPaths || []
         };
       });
       if(typeof state !== 'undefined') state.syncServerFieldPatch = !!data.fieldPatch;
       if(typeof noteSupabaseAcceptedRevisions_ === 'function'){
         noteSupabaseAcceptedRevisions_(accepted.filter(function(item){ return item.status !== 'idempotent'; }));
       }
+      accepted.forEach(function(item){
+        if(typeof clearSheetPathsAfterAccept_ === 'function') clearSheetPathsAfterAccept_(item);
+      });
       if(typeof rememberSyncFieldBase_ === 'function'){
         accepted.forEach(function(item){
           var pack = sentById[item.mutationId];
           var sent = pack && pack.mut;
           if(!sent || sent.deleted) return;
+          if(item.status === 'partial'){
+            if(item.value && typeof item.value === 'object') rememberSyncFieldBase_(item.key, item.value);
+            return;
+          }
           if(data.fieldPatch && pack.asPatch && sent.fieldPatch) rememberSyncFieldBase_(item.key, null, sent.fieldPatch);
           else if(sent.value) rememberSyncFieldBase_(item.key, sent.value);
         });

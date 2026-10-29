@@ -18582,11 +18582,20 @@ function reviewHoldSkipsSyncKey_(key){
 function rememberSyncFieldBase_(key, value, patch){
   if(!key) return;
   if(!state.syncFieldBase) state.syncFieldBase = {};
+  if(!state.syncFieldBaseFromServer) state.syncFieldBaseFromServer = {};
   if(patch && patch.paths && typeof PlannerFieldSync !== 'undefined'){
+    if(!state.syncFieldBase[key]) return;
     state.syncFieldBase[key] = PlannerFieldSync.rememberPatchedBase(state.syncFieldBase[key], patch);
+    state.syncFieldBaseFromServer[key] = true;
     return;
   }
-  if(value) state.syncFieldBase[key] = cloneSyncValue_(value);
+  if(value){
+    state.syncFieldBase[key] = cloneSyncValue_(value);
+    state.syncFieldBaseFromServer[key] = true;
+  }
+}
+function syncFieldBaseFromServer_(key){
+  return !!(state.syncFieldBaseFromServer && state.syncFieldBaseFromServer[key] && state.syncFieldBase && state.syncFieldBase[key]);
 }
 function noteSheetEditedPaths_(draftId, tab){
   if(!draftId || typeof PlannerFieldSync === 'undefined') return;
@@ -18622,26 +18631,26 @@ function rememberOutboxDevicePaths_(op, key, localValue){
   op.devicePaths = PlannerFieldSync.diffTabPaths(base, localValue, key);
 }
 function shapeSyncedContentValue_(key, localValue){
-  if(!localValue || typeof localValue !== 'object' || typeof PlannerFieldSync === 'undefined' || !PlannerFieldSync.buildValuePatch){
+  if(!localValue || typeof localValue !== 'object' || typeof PlannerFieldSync === 'undefined' || !PlannerFieldSync.planOutboxSend){
     return { value: localValue, fieldPatch: null };
   }
   if(key.indexOf('published:') === 0 || key.indexOf('generated:') === 0){
     localValue = PlannerFieldSync.omitDevicePending(localValue);
   }
   var keyList = PlannerFieldSync.sendKeyList(localValue);
-  var base = state.syncFieldBase && state.syncFieldBase[key];
-  if(!base){
-    try { console.info('[칸 저장]', key, '카드 전체', keyList); } catch(eLog){}
-    return { value: localValue, fieldPatch: null };
-  }
+  var base = syncFieldBaseFromServer_(key) ? state.syncFieldBase[key] : null;
   var cleared = state._clearedPaths && state._clearedPaths[key];
-  var patch = PlannerFieldSync.buildValuePatch(base, localValue, cleared, key);
-  if(patch && patch.paths && patch.paths.length){
-    try { console.info('[칸 저장]', key, patch.paths.join(',')); } catch(eLog2){}
-    return { value: localValue, fieldPatch: patch };
+  var plan = PlannerFieldSync.planOutboxSend(base, localValue, key, cleared);
+  if(plan.mode === 'patch'){
+    try { console.info('[칸 저장]', key, plan.fieldPatch.paths.join(',')); } catch(eLog2){}
+    return { value: localValue, fieldPatch: plan.fieldPatch };
   }
-  try { console.info('[칸 저장]', key, '변화 없음'); } catch(eLog3){}
-  return { value: localValue, fieldPatch: null, unchanged: true };
+  if(plan.mode === 'unchanged'){
+    try { console.info('[칸 저장]', key, '변화 없음'); } catch(eLog3){}
+    return { value: localValue, fieldPatch: null, unchanged: true };
+  }
+  try { console.info('[칸 저장]', key, '카드 전체', keyList); } catch(eLog){}
+  return { value: localValue, fieldPatch: null };
 }
 function enqueueSyncOutboxChanges_(changedKeys, payload){
   if(!changedKeys || !changedKeys.length) return;
@@ -18656,7 +18665,7 @@ function enqueueSyncOutboxChanges_(changedKeys, payload){
     if(isEmptyDefaultSyncEntity_(key, hasValue ? entities[key] : null)) return;
     var shaped = hasValue ? shapeSyncedContentValue_(key, entities[key]) : { value: null, fieldPatch: null };
     var existing = state.syncOutbox.find(function(op){ return op && op.key === key; });
-    if(shaped.unchanged){
+    if(shaped.unchanged && syncFieldBaseFromServer_(key)){
       if(existing){
         state.syncOutbox = state.syncOutbox.filter(function(op){ return op !== existing; });
       }
@@ -20534,26 +20543,8 @@ function dropEmptyDefaultSyncMutations_(){
   return removed;
 }
 function seedSyncFieldBaseFromState_(){
-  if(!state.syncFieldBase) state.syncFieldBase = {};
-  var queued = {};
-  (state.syncOutbox || []).forEach(function(op){ if(op && op.key) queued[op.key] = true; });
-  function put(key, value){
-    if(!key || !value || queued[key] || state.syncFieldBase[key]) return;
-    var stored = value;
-    if((key.indexOf('published:') === 0 || key.indexOf('generated:') === 0) &&
-        typeof PlannerFieldSync !== 'undefined' && PlannerFieldSync.omitDevicePending){
-      stored = PlannerFieldSync.omitDevicePending(value);
-    }
-    state.syncFieldBase[key] = cloneSyncValue_(stored);
-  }
-  Object.keys(state.published || {}).forEach(function(id){ put('published:' + id, state.published[id]); });
-  Object.keys(state.generatedOnly || {}).forEach(function(id){ put('generated:' + id, state.generatedOnly[id]); });
-  (typeof CATEGORIES !== 'undefined' ? CATEGORIES : []).forEach(function(cat, catId){
-    (cat && cat.drafts || []).forEach(function(d){
-      if(!d || !d.id) return;
-      put('draft:' + d.id, { catId: String(catId), value: d });
-    });
-  });
+  // 기준값은 서버가 내려 준 값과 서버가 받아 준 저장만 채운다.
+  // 이 기기에만 있는 값은 기준값이 아니므로, 없으면 카드 전체를 보낸다.
 }
 function describePendingSyncItems_(){
   return (state.syncOutbox || []).filter(function(op){
@@ -21105,6 +21096,10 @@ function renderSyncStatusBodyHTML_(info){
       ? '개인 Claude API로 동작 중입니다. 서버 키를 쓰면 직원 브라우저에 키가 남지 않습니다.'
       : '서버 CLAUDE_API_KEY 또는 개인 API 키가 필요합니다.');
   var html = '<div class="sync-status-summary ' + (info.overall === 'ok' ? '' : info.overall) + '">' + escapeHtml(info.summary) + '</div>';
+  if(!state._fieldPatchProbed && typeof PlannerSyncSupabase !== 'undefined' && PlannerSyncSupabase.fieldPatchDisplay){
+    html += '<div class="sync-status-row-meta">칸 단위 저장은 이번 실행에서 서버를 확인한 뒤에 씁니다.' +
+      (PlannerSyncSupabase.fieldPatchDisplay() ? ' 지난번 표시는 지원이었습니다.' : '') + '</div>';
+  }
   if(info.actionHint){
     html += '<div class="sync-status-action-hint">' +
       '<strong>할 일</strong> ' + escapeHtml(info.actionHint) +

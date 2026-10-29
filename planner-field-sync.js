@@ -249,6 +249,16 @@ var PlannerFieldSync = (function(){
     });
     return { _fieldPatch: true, paths: paths, set: set, base: baseMap };
   }
+  function planOutboxSend(serverBase, localValue, key, cleared){
+    if(!serverBase || typeof serverBase !== 'object'){
+      return { mode: 'full', dropOutbox: false, value: localValue, fieldPatch: null };
+    }
+    var patch = buildValuePatch(serverBase, localValue, cleared, key);
+    if(patch && patch.paths && patch.paths.length){
+      return { mode: 'patch', dropOutbox: false, value: localValue, fieldPatch: patch };
+    }
+    return { mode: 'unchanged', dropOutbox: true, value: localValue, fieldPatch: null };
+  }
   function collapseSharedConflicts(rows){
     var groups = {};
     var order = [];
@@ -596,6 +606,7 @@ var PlannerFieldSync = (function(){
     mergeChangedOntoBase: mergeChangedOntoBase,
     buildFieldPatch: buildFieldPatch,
     buildValuePatch: buildValuePatch,
+    planOutboxSend: planOutboxSend,
     collapseSharedConflicts: collapseSharedConflicts,
     rememberPatchedBase: rememberPatchedBase,
     outsideTabPathsChanged: outsideTabPathsChanged,

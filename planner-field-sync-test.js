@@ -242,6 +242,42 @@ var collapsed = S.collapseSharedConflicts([
 assert(collapsed.length === 1 && collapsed[0].label.indexOf('발행 글·생성 초안') === 0, 'the same caption is one conflict row');
 assert(collapsed[0].indexes.length === 2, 'the one row still applies to both copies');
 
+var unsentLocal = { content: { blog: { problem: '서버에 아직 없음' }, insta: { caption: '같음' } } };
+var beforePull = S.planOutboxSend(null, unsentLocal, key);
+assert(beforePull.mode === 'full' && beforePull.dropOutbox === false, 'no server base keeps the outbox and sends the whole card');
+assert(beforePull.value.content.blog.problem === '서버에 아직 없음', 'the unsent field is still in the full card');
+var afterPull = S.planOutboxSend(
+  { content: { blog: { problem: '' }, insta: { caption: '같음' } } },
+  unsentLocal,
+  key
+);
+assert(afterPull.mode === 'patch' && afterPull.fieldPatch.paths.indexOf('content.blog.problem') >= 0, 'a server base sends the unsent field');
+assert(S.planOutboxSend(
+  { content: { blog: { problem: '서버에 아직 없음' }, insta: { caption: '같음' } } },
+  unsentLocal,
+  key
+).dropOutbox === true, 'unchanged drop is only for a server base');
+
+var seedStart = planner.indexOf('function seedSyncFieldBaseFromState_');
+var seedEnd = planner.indexOf('function describePendingSyncItems_');
+var seedFn = planner.slice(seedStart, seedEnd);
+assert(seedFn.indexOf('state.published') < 0 && seedFn.indexOf('state.generatedOnly') < 0, 'boot does not copy this device into the base');
+assert(planner.indexOf('syncFieldBaseFromServer_') >= 0, 'unchanged outbox drops require a server base');
+assert(planner.indexOf('shaped.unchanged && syncFieldBaseFromServer_') >= 0, 'an unconfirmed base does not delete the outbox');
+
+var supaCtx = {
+  console: console,
+  setTimeout: function(){},
+  localStorage: { getItem: function(){ return null; }, setItem: function(){} }
+};
+vm.createContext(supaCtx);
+vm.runInContext(supa, supaCtx);
+var Supa = supaCtx.PlannerSyncSupabase;
+assert(Supa.fieldPatchStorageKey('https://example.supabase.co').indexOf('https://example.supabase.co') >= 0, 'the display flag key includes the server url');
+assert(Supa.fieldPatchSendDecision({ sessionConfirmed: false, storedDisplay: true }) === 'full', 'a stored support flag does not send a patch before this session confirms');
+assert(Supa.fieldPatchSendDecision({ sessionConfirmed: true }) === 'patch', 'this session confirmation may send a patch');
+assert(supa.indexOf('p_rows: []') >= 0, 'each session probes with an empty save');
+
 if(failed){
   console.error(failed + ' failed');
   process.exit(1);

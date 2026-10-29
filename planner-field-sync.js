@@ -143,20 +143,38 @@ var PlannerFieldSync = (function(){
     });
     return paths;
   }
-  function entityPathSet(list, key){
-    var root = String(key).indexOf('published:') === 0 ? 'content.' : '';
+  function publishedOuterPath(path, samples){
+    var text = String(path || '');
+    if(!text || text === 'content' || text.indexOf('content.') === 0) return false;
+    var head = text.split('.')[0];
+    var saw = false;
+    var onOuter = false;
+    var inContent = false;
+    (samples || []).forEach(function(ent){
+      if(!ent || typeof ent !== 'object' || Array.isArray(ent)) return;
+      var content = ent.content;
+      if(!content || typeof content !== 'object' || Array.isArray(content)) return;
+      saw = true;
+      if(Object.prototype.hasOwnProperty.call(ent, head)) onOuter = true;
+      if(Object.prototype.hasOwnProperty.call(content, head)) inContent = true;
+    });
+    return saw && onOuter && !inContent;
+  }
+  function entityPathSet(list, key, localEntity, baseEntity){
+    var published = String(key).indexOf('published:') === 0;
+    var samples = [localEntity, baseEntity];
     var set = {};
     (list || []).forEach(function(p){
       if(!p) return;
-      if(root && /^(tabPublished|finalTexts|savedAt|channelPlan|date|promptData|catId|topic)(\.|$)/.test(p)) set[p] = true;
-      else set[root + p] = true;
+      if(!published || p === 'content' || String(p).indexOf('content.') === 0 || publishedOuterPath(p, samples)) set[p] = true;
+      else set['content.' + p] = true;
     });
     return set;
   }
   function mergeChangedOntoBase(baseEntity, localEntity, key, edited, cleared){
     if(!localEntity || typeof localEntity !== 'object') return localEntity;
     if(!baseEntity || typeof baseEntity !== 'object') return clone(localEntity);
-    return fillEmptyFromServer(localEntity, baseEntity, entityPathSet(edited, key), entityPathSet(cleared, key), '');
+    return fillEmptyFromServer(localEntity, baseEntity, entityPathSet(edited, key, localEntity, baseEntity), entityPathSet(cleared, key, localEntity, baseEntity), '');
   }
   function buildFieldPatch(baseEntity, mergedEntity, key, cleared){
     if(outsideTabPathsChanged(baseEntity, mergedEntity, key)) return null;

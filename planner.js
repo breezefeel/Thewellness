@@ -11735,8 +11735,9 @@ function clearSheetPathsAfterAccept_(item){
     removeListedPaths_(state._clearedPaths, key, item.appliedPaths || []);
     return;
   }
-  if(state._sheetEditedPaths) delete state._sheetEditedPaths[key];
-  if(state._clearedPaths) delete state._clearedPaths[key];
+  if(!Array.isArray(item.sentEditedPaths) && !Array.isArray(item.sentClearedPaths)) return;
+  removeListedPaths_(state._sheetEditedPaths, key, item.sentEditedPaths || []);
+  removeListedPaths_(state._clearedPaths, key, item.sentClearedPaths || []);
 }
 function noteSupabaseAcceptedRevisions_(accepted){
   if(!state.syncEntityRevisions) state.syncEntityRevisions = {};
@@ -18919,7 +18920,7 @@ function queueSyncBlobMutations_(blobs){
   });
 }
 function toPlannerSyncMutation_(op){
-  return {
+  var mut = {
     mutationId: op.mutationId,
     version: parseInt(op.version, 10) || 1,
     key: op.key,
@@ -18929,6 +18930,8 @@ function toPlannerSyncMutation_(op){
     baseEntityRevision: parseInt(op.baseEntityRevision, 10) || 0,
     updatedAt: op.updatedAt || new Date().toISOString()
   };
+  Object.defineProperty(mut, 'fieldPatch', { value: op.fieldPatch || null, enumerable: false, writable: true });
+  return mut;
 }
 function syncMutationBytes_(mut){
   try {
@@ -44990,12 +44993,8 @@ if(isThreadCategory(catId)){
   delete content.insta;
   delete content.threads;
 }
-if(typeof PlannerFieldSync !== 'undefined'){
-  var dropped = beforeCleanup ? PlannerFieldSync.clearedPathsBetween(beforeCleanup, content) : [];
-  if(isThreadCategory(catId)) dropped = dropped.concat(['community', 'blog', 'insta']);
-  else if(isHeiljagyaeCategory(catId)) dropped = dropped.concat(['blog', 'insta', 'thread']);
-  else dropped = dropped.concat(['community', 'thread', 'insta', 'threads']);
-  noteClearedPaths_(jobDraftId, dropped);
+if(beforeCleanup && typeof PlannerFieldSync !== 'undefined'){
+  noteClearedPaths_(jobDraftId, PlannerFieldSync.clearedPathsBetween(beforeCleanup, content));
 }
 
 scrubNonManualPainWordInValue_(content, catId);

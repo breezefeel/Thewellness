@@ -205,6 +205,103 @@ var PlannerFieldSync = (function(){
     });
     return { _fieldPatch: true, paths: list, set: set, base: base };
   }
+  function buildValuePatch(baseEntity, localEntity, cleared, key){
+    if(!baseEntity || typeof baseEntity !== 'object' || Array.isArray(baseEntity)) return null;
+    if(!localEntity || typeof localEntity !== 'object' || Array.isArray(localEntity)) return null;
+    var localClean = omitDevicePending(localEntity);
+    var baseClean = omitDevicePending(baseEntity);
+    var paths = [];
+    function walk(baseNode, localNode, prefix){
+      if(same(baseNode, localNode)) return;
+      var baseObj = baseNode && typeof baseNode === 'object' && !Array.isArray(baseNode);
+      var localObj = localNode && typeof localNode === 'object' && !Array.isArray(localNode);
+      if(!baseObj || !localObj){
+        if(prefix) paths.push(prefix);
+        return;
+      }
+      var names = {};
+      Object.keys(baseNode).forEach(function(k){ names[k] = true; });
+      Object.keys(localNode).forEach(function(k){ names[k] = true; });
+      Object.keys(names).sort().forEach(function(k){
+        if(DEVICE_PENDING_KEYS[k] || PATCH_SKIP_KEYS[k]) return;
+        walk(baseNode[k], localNode[k], prefix ? (prefix + '.' + k) : k);
+      });
+    }
+    walk(baseClean, localClean, '');
+    var seen = {};
+    paths.forEach(function(p){ seen[p] = true; });
+    (cleared || []).forEach(function(p){
+      p = String(p || '');
+      if(!p) return;
+      if(String(key).indexOf('published:') === 0 && p.indexOf('content.') !== 0 && p.indexOf('tabPublished') !== 0 && p.indexOf('finalTexts') !== 0){
+        p = 'content.' + p;
+      }
+      if(!seen[p]){
+        seen[p] = true;
+        paths.push(p);
+      }
+    });
+    var set = {};
+    var baseMap = {};
+    paths.forEach(function(p){
+      set[p] = clone(getPath(localClean, p));
+      baseMap[p] = clone(getPath(baseClean, p));
+    });
+    return { _fieldPatch: true, paths: paths, set: set, base: baseMap };
+  }
+  function planOutboxSend(serverBase, localValue, key, cleared){
+    if(!serverBase || typeof serverBase !== 'object'){
+      return { mode: 'full', dropOutbox: false, value: localValue, fieldPatch: null };
+    }
+    var patch = buildValuePatch(serverBase, localValue, cleared, key);
+    if(patch && patch.paths && patch.paths.length){
+      return { mode: 'patch', dropOutbox: false, value: localValue, fieldPatch: patch };
+    }
+    return { mode: 'unchanged', dropOutbox: true, value: localValue, fieldPatch: null };
+  }
+  function collapseSharedConflicts(rows){
+    var groups = {};
+    var order = [];
+    (rows || []).forEach(function(row, index){
+      var key = String(row && row.key || '');
+      var kind = key.split(':')[0];
+      var id = key.indexOf(':') >= 0 ? key.slice(key.indexOf(':') + 1) : key;
+      var bucket = (kind === 'published' || kind === 'generated') ? id : ('row:' + index);
+      if(!groups[bucket]){
+        groups[bucket] = [];
+        order.push(bucket);
+      }
+      groups[bucket].push({ index: index, key: key, kind: kind, paths: (row.paths || []).slice().sort().join('|') });
+    });
+    var show = [];
+    order.forEach(function(bucket){
+      var list = groups[bucket];
+      var published = null;
+      var generated = null;
+      list.forEach(function(item){
+        if(item.kind === 'published') published = item;
+        if(item.kind === 'generated') generated = item;
+      });
+      if(published && generated && published.paths && generated.paths && published.paths === generated.paths){
+        show.push({
+          indexes: [published.index, generated.index],
+          key: published.key,
+          label: '발행 글·생성 초안 · ' + bucket
+        });
+        return;
+      }
+      list.forEach(function(item){
+        var name = item.kind === 'published' ? '발행 글' : (item.kind === 'generated' ? '생성 초안' : item.key);
+        var id = item.key.indexOf(':') >= 0 ? item.key.slice(item.key.indexOf(':') + 1) : '';
+        show.push({
+          indexes: [item.index],
+          key: item.key,
+          label: id && (item.kind === 'published' || item.kind === 'generated') ? (name + ' · ' + id) : name
+        });
+      });
+    });
+    return show;
+  }
   function rememberPatchedBase(baseEntity, patch){
     var out = clone(baseEntity);
     if(!out || typeof out !== 'object' || Array.isArray(out)) out = {};
@@ -279,7 +376,17 @@ var PlannerFieldSync = (function(){
     threadsPendingStartedAt: 1,
     threadsPendingEndMs: 1,
     threadsPendingTopic: 1,
-    threadsPendingCatId: 1
+    threadsPendingCatId: 1,
+    instaPending: 1,
+    instaPendingStartedAt: 1,
+    instaPendingEndMs: 1,
+    instaPendingTopic: 1,
+    instaPendingCatId: 1
+  };
+  var PATCH_SKIP_KEYS = {
+    updatedAt: 1, savedAt: 1, order: 1, index: 1,
+    modifiedAt: 1, editedAt: 1, lastEditedAt: 1, lastSavedAt: 1,
+    localSavedAt: 1, syncedAt: 1
   };
   function omitDevicePending(entity){
     if(!entity || typeof entity !== 'object') return entity;
@@ -498,6 +605,9 @@ var PlannerFieldSync = (function(){
     changedPaths: changedPaths,
     mergeChangedOntoBase: mergeChangedOntoBase,
     buildFieldPatch: buildFieldPatch,
+    buildValuePatch: buildValuePatch,
+    planOutboxSend: planOutboxSend,
+    collapseSharedConflicts: collapseSharedConflicts,
     rememberPatchedBase: rememberPatchedBase,
     outsideTabPathsChanged: outsideTabPathsChanged,
     keepEditingFields: keepEditingFields,

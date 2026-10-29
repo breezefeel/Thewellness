@@ -343,8 +343,51 @@ var PlannerSyncSupabase = (function(){
     });
   }
 
+  function fieldPatchStorageKey(url){
+    var base = url != null ? url : ((typeof PLANNER_SUPABASE_URL === 'string') ? PLANNER_SUPABASE_URL : '');
+    return 'ht_planner_field_patch_v1:' + String(base || '');
+  }
+  function fieldPatchSendDecision(spec){
+    spec = spec || {};
+    if(spec.sessionConfirmed === true) return 'patch';
+    return 'full';
+  }
+  function readFieldPatchDisplay_(){
+    try { return localStorage.getItem(fieldPatchStorageKey()) === '1'; } catch(eFlag){ return false; }
+  }
+  function writeFieldPatchDisplay_(on){
+    try { localStorage.setItem(fieldPatchStorageKey(), on ? '1' : '0'); } catch(eFlag){}
+  }
+  function sessionFieldPatchConfirmed_(){
+    return typeof state !== 'undefined' && state._fieldPatchProbed === true && state.syncServerFieldPatch === true;
+  }
+  var fieldPatchProbePromise = null;
+  function probeFieldPatch_(client){
+    if(typeof state !== 'undefined' && state._fieldPatchProbed) return Promise.resolve(sessionFieldPatchConfirmed_());
+    if(fieldPatchProbePromise) return fieldPatchProbePromise;
+    fieldPatchProbePromise = client.rpc('planner_apply_batch', { p_rows: [] }).then(function(res){
+      var data = (res && res.data) || {};
+      var on = !(res && res.error) && !!data.fieldPatch;
+      if(typeof state !== 'undefined'){
+        state._fieldPatchProbed = true;
+        state.syncServerFieldPatch = on;
+      }
+      writeFieldPatchDisplay_(on);
+      try { console.info('[칸 저장] 서버 칸 패치', on ? '지원' : '미지원'); } catch(eProbe){}
+      return on;
+    }, function(){
+      if(typeof state !== 'undefined'){
+        state._fieldPatchProbed = true;
+        state.syncServerFieldPatch = false;
+      }
+      return false;
+    });
+    return fieldPatchProbePromise;
+  }
+
   function patch(client, mutations){
-    var sendPatch = !!(typeof state !== 'undefined' && state.syncServerFieldPatch);
+    if(!(typeof state !== 'undefined' && state._fieldPatchProbed)) probeFieldPatch_(client);
+    var sendPatch = fieldPatchSendDecision({ sessionConfirmed: sessionFieldPatchConfirmed_() }) === 'patch';
     (mutations || []).forEach(function(mut){
       if(!mut || !mut.key || typeof state === 'undefined') return;
       var editedBag = state._sheetEditedPaths && state._sheetEditedPaths[mut.key];
@@ -421,7 +464,11 @@ var PlannerSyncSupabase = (function(){
           remainingPaths: item.remainingPaths || []
         };
       });
-      if(typeof state !== 'undefined') state.syncServerFieldPatch = !!data.fieldPatch;
+      if(typeof state !== 'undefined'){
+        state._fieldPatchProbed = true;
+        state.syncServerFieldPatch = !!data.fieldPatch;
+      }
+      writeFieldPatchDisplay_(!!data.fieldPatch);
       if(typeof noteSupabaseAcceptedRevisions_ === 'function'){
         noteSupabaseAcceptedRevisions_(accepted.filter(function(item){ return item.status !== 'idempotent'; }));
       }
@@ -519,16 +566,20 @@ var PlannerSyncSupabase = (function(){
   setTimeout(function(){
     if(!configured()) return;
     getClient().then(function(client){
-      return client.auth.getSession();
-    }).then(function(res){
-      var session = res && res.data && res.data.session;
-      cachedEmail = session && session.user && session.user.email ? session.user.email : '';
-      try { if(typeof updateSyncStatusUI_ === 'function') updateSyncStatusUI_(); } catch(e){}
+      return client.auth.getSession().then(function(res){
+        var session = res && res.data && res.data.session;
+        cachedEmail = session && session.user && session.user.email ? session.user.email : '';
+        if(session) probeFieldPatch_(client);
+        try { if(typeof updateSyncStatusUI_ === 'function') updateSyncStatusUI_(); } catch(e){}
+      });
     }).catch(function(){});
   }, 0);
 
   return {
     configured: configured,
+    fieldPatchStorageKey: fieldPatchStorageKey,
+    fieldPatchSendDecision: fieldPatchSendDecision,
+    fieldPatchDisplay: readFieldPatchDisplay_,
     /** 팀 로그인된 Supabase 클라이언트 (인스타·쓰레드 미디어 업로드·게시 요청용) */
     client: sessionClient,
     cachedEmail: function(){ return cachedEmail; },

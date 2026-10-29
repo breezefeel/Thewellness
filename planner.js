@@ -6098,7 +6098,12 @@ function getDraftsForPendingSubGoalStep_(catId, stepId){
   var sid = String(stepId);
   var list = [];
   (p.assignments || []).forEach(function(a){
-    if(!a || !a.draftId || String(a.stepId || '') !== sid) return;
+    if(!a || !a.draftId) return;
+    var same = String(a.stepId || '') === sid;
+    if(!same && typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerSameStepId){
+      same = PlannerSyncRules.plannerSameStepId(a.stepId, sid);
+    }
+    if(!same) return;
     var d = (cat.drafts || []).find(function(x){ return x && x.id === a.draftId; });
     if(d) list.push({ draft: d, order: parseInt(a.order, 10) || 999 });
   });
@@ -6879,6 +6884,14 @@ function findPlanStepIdByTitle_(plan, title){
   var i;
   for(i = 0; i < plan.steps.length; i++){
     if(String(plan.steps[i].title || '').trim() === title) return String(plan.steps[i].id);
+  }
+  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerTopicDrawerKey){
+    var wantKey = PlannerSyncRules.plannerTopicDrawerKey(title);
+    if(wantKey){
+      for(i = 0; i < plan.steps.length; i++){
+        if(PlannerSyncRules.plannerTopicDrawerKey(plan.steps[i].title) === wantKey) return String(plan.steps[i].id);
+      }
+    }
   }
   var m = title.match(/(\d+)\s*단계/);
   if(m){
@@ -17108,6 +17121,7 @@ function setSyncEntity_(payload, key, wrapped){
       payload.extraDraftsByCat[cat].push(cloneSyncValue_(wrapped.value));
       if(payload.deletedDraftIds) delete payload.deletedDraftIds[draftId];
     }
+    if(!missing && wrapped && typeof rememberSyncFieldBase_ === 'function') rememberSyncFieldBase_('draft:' + draftId, wrapped);
     return;
   }
   var id = parts.slice(1).join(':');
@@ -17117,7 +17131,12 @@ function setSyncEntity_(payload, key, wrapped){
       stripThreadsPendingFields_(wrapped);
       if(wrapped.content) stripThreadsPendingFields_(wrapped.content);
     }
-    if(typeof rememberSyncFieldBase_ === 'function') rememberSyncFieldBase_(syncKey, wrapped);
+    if(typeof rememberSyncFieldBase_ === 'function'){
+      var baseWrapped = (typeof PlannerFieldSync !== 'undefined' && PlannerFieldSync.omitDevicePending)
+        ? PlannerFieldSync.omitDevicePending(wrapped)
+        : wrapped;
+      rememberSyncFieldBase_(syncKey, baseWrapped);
+    }
     var editing = state.selectedId === id && state._sheetDomDirty && typeof PlannerFieldSync !== 'undefined';
     var editedPaths = state._sheetEditedPaths && state._sheetEditedPaths[syncKey];
     var current = parts[0] === 'published'
@@ -17155,7 +17174,7 @@ function normalizeDraftRowForSync_(draft){
   return row;
 }
 // 비교에서만 무시하는 수정 시각 필드. 예약·발행 날짜(scheduledDate, publishedAt 등)는 내용이라 비교에 넣는다.
-var SYNC_COMPARE_IGNORED_KEYS_ = { updatedAt: 1, savedAt: 1, order: 1, index: 1, modifiedAt: 1, editedAt: 1, lastEditedAt: 1, lastSavedAt: 1, localSavedAt: 1, syncedAt: 1, threadsPending: 1, threadsPendingStartedAt: 1, threadsPendingEndMs: 1, threadsPendingTopic: 1, threadsPendingCatId: 1 };
+  var SYNC_COMPARE_IGNORED_KEYS_ = { updatedAt: 1, savedAt: 1, order: 1, index: 1, modifiedAt: 1, editedAt: 1, lastEditedAt: 1, lastSavedAt: 1, localSavedAt: 1, syncedAt: 1, threadsPending: 1, threadsPendingStartedAt: 1, threadsPendingEndMs: 1, threadsPendingTopic: 1, threadsPendingCatId: 1, instaPending: 1, instaPendingStartedAt: 1, instaPendingEndMs: 1, instaPendingTopic: 1, instaPendingCatId: 1 };
 function omitEmptyForSyncCompare_(value){
   if(value == null) return undefined;
   // 줄 끝 공백·개행 차이만 있는 글은 같은 글로 본다
@@ -18561,13 +18580,22 @@ function reviewHoldSkipsSyncKey_(key){
   return true;
 }
 function rememberSyncFieldBase_(key, value, patch){
-  if(key.indexOf('published:') !== 0 && key.indexOf('generated:') !== 0) return;
+  if(!key) return;
   if(!state.syncFieldBase) state.syncFieldBase = {};
+  if(!state.syncFieldBaseFromServer) state.syncFieldBaseFromServer = {};
   if(patch && patch.paths && typeof PlannerFieldSync !== 'undefined'){
+    if(!state.syncFieldBase[key]) return;
     state.syncFieldBase[key] = PlannerFieldSync.rememberPatchedBase(state.syncFieldBase[key], patch);
+    state.syncFieldBaseFromServer[key] = true;
     return;
   }
-  if(value) state.syncFieldBase[key] = cloneSyncValue_(value);
+  if(value){
+    state.syncFieldBase[key] = cloneSyncValue_(value);
+    state.syncFieldBaseFromServer[key] = true;
+  }
+}
+function syncFieldBaseFromServer_(key){
+  return !!(state.syncFieldBaseFromServer && state.syncFieldBaseFromServer[key] && state.syncFieldBase && state.syncFieldBase[key]);
 }
 function noteSheetEditedPaths_(draftId, tab){
   if(!draftId || typeof PlannerFieldSync === 'undefined') return;
@@ -18603,24 +18631,26 @@ function rememberOutboxDevicePaths_(op, key, localValue){
   op.devicePaths = PlannerFieldSync.diffTabPaths(base, localValue, key);
 }
 function shapeSyncedContentValue_(key, localValue){
-  if(!localValue || typeof PlannerFieldSync === 'undefined') return { value: localValue, fieldPatch: null };
-  if(key.indexOf('published:') !== 0 && key.indexOf('generated:') !== 0) return { value: localValue, fieldPatch: null };
-  localValue = PlannerFieldSync.omitDevicePending(localValue);
-  var keyList = PlannerFieldSync.sendKeyList(localValue);
-  var base = state.syncFieldBase && state.syncFieldBase[key];
-  if(!base){
-    try { console.info('[칸 저장]', key, '카드 전체', keyList); } catch(eLog){}
+  if(!localValue || typeof localValue !== 'object' || typeof PlannerFieldSync === 'undefined' || !PlannerFieldSync.planOutboxSend){
     return { value: localValue, fieldPatch: null };
   }
-  var edited = state._sheetEditedPaths && state._sheetEditedPaths[key];
+  if(key.indexOf('published:') === 0 || key.indexOf('generated:') === 0){
+    localValue = PlannerFieldSync.omitDevicePending(localValue);
+  }
+  var keyList = PlannerFieldSync.sendKeyList(localValue);
+  var base = syncFieldBaseFromServer_(key) ? state.syncFieldBase[key] : null;
   var cleared = state._clearedPaths && state._clearedPaths[key];
-  var merged = PlannerFieldSync.mergeChangedOntoBase(base, localValue, key, edited, cleared);
-  merged = PlannerFieldSync.omitDevicePending(merged);
-  var patch = PlannerFieldSync.buildFieldPatch(base, merged, key, cleared);
-  try {
-    console.info('[칸 저장]', key, patch && patch.paths ? patch.paths.join(',') : ('카드 전체 ' + keyList));
-  } catch(eLog2){}
-  return { value: merged, fieldPatch: patch };
+  var plan = PlannerFieldSync.planOutboxSend(base, localValue, key, cleared);
+  if(plan.mode === 'patch'){
+    try { console.info('[칸 저장]', key, plan.fieldPatch.paths.join(',')); } catch(eLog2){}
+    return { value: localValue, fieldPatch: plan.fieldPatch };
+  }
+  if(plan.mode === 'unchanged'){
+    try { console.info('[칸 저장]', key, '변화 없음'); } catch(eLog3){}
+    return { value: localValue, fieldPatch: null, unchanged: true };
+  }
+  try { console.info('[칸 저장]', key, '카드 전체', keyList); } catch(eLog){}
+  return { value: localValue, fieldPatch: null };
 }
 function enqueueSyncOutboxChanges_(changedKeys, payload){
   if(!changedKeys || !changedKeys.length) return;
@@ -18635,6 +18665,12 @@ function enqueueSyncOutboxChanges_(changedKeys, payload){
     if(isEmptyDefaultSyncEntity_(key, hasValue ? entities[key] : null)) return;
     var shaped = hasValue ? shapeSyncedContentValue_(key, entities[key]) : { value: null, fieldPatch: null };
     var existing = state.syncOutbox.find(function(op){ return op && op.key === key; });
+    if(shaped.unchanged && syncFieldBaseFromServer_(key)){
+      if(existing){
+        state.syncOutbox = state.syncOutbox.filter(function(op){ return op !== existing; });
+      }
+      return;
+    }
     if(existing){
       existing.value = hasValue ? cloneSyncValue_(shaped.value) : null;
       existing.fieldPatch = shaped.fieldPatch || null;
@@ -19235,6 +19271,7 @@ function acknowledgeSyncOutbox_(accepted, sentMutations, holdKeys){
   }
   rebuildDirtyStateFromOutbox_();
   _syncFastAckPending_ = false;
+  try { console.info('[대기열] 반영 후', describePendingSyncItems_().join(' | ') || '없음'); } catch(eLeft){}
   try { recordConfirmedSyncJournal_(ackVer); } catch(eJournal){}
 }
 function rotateIdempotentOutbox_(accepted){
@@ -19259,13 +19296,21 @@ function acknowledgeSyncBatch_(accepted, sentMutations, conflicts){
   var holdKeys = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConflictHoldKeys)
     ? PlannerSyncRules.plannerConflictHoldKeys(conflicts)
     : {};
+  (accepted || []).forEach(function(item){
+    if(!item || !item.key || item.status === 'partial') return;
+    delete holdKeys[String(item.key)];
+    var rev = parseInt(item.entityRevision, 10) || 0;
+    if(!rev) return;
+    (state.syncOutbox || []).forEach(function(op){
+      if(op && op.key === item.key) op.baseEntityRevision = rev;
+    });
+  });
   if(!accepted){
     acknowledgeSyncOutbox_(null, sentMutations, holdKeys);
     return;
   }
-  var ok = accepted.filter(function(item){ return !item || item.status !== 'idempotent'; });
-  rotateIdempotentOutbox_(accepted);
-  acknowledgeSyncOutbox_(ok, sentMutations, holdKeys);
+  var leaving = accepted.filter(function(item){ return item && item.status !== 'partial'; });
+  acknowledgeSyncOutbox_(leaving, sentMutations, holdKeys);
 }
 function overlayOutboxOnPayload_(payload, opts){
   var onlyKeys = opts && opts.onlyKeys;
@@ -20497,6 +20542,19 @@ function dropEmptyDefaultSyncMutations_(){
   }
   return removed;
 }
+function seedSyncFieldBaseFromState_(){
+  // 기준값은 서버가 내려 준 값과 서버가 받아 준 저장만 채운다.
+  // 이 기기에만 있는 값은 기준값이 아니므로, 없으면 카드 전체를 보낸다.
+}
+function describePendingSyncItems_(){
+  return (state.syncOutbox || []).filter(function(op){
+    return op && op.key && !isDeviceLocalSyncEntityKey_(op.key) && !conflictKeyIsSnoozed_(op.key);
+  }).map(function(op){
+    var topic = '';
+    try { topic = pendingSyncValueTopic_(op.value) || ''; } catch(eTopic){}
+    return String(op.key) + (topic ? '(' + topic + ')' : '') + (op.deleted ? ' 삭제' : '');
+  });
+}
 function countPendingSyncItems_(){
   try { dropEmptyDefaultSyncMutations_(); } catch(eDropCnt){}
   var n = countRealUnpushedMutations_();
@@ -21038,6 +21096,10 @@ function renderSyncStatusBodyHTML_(info){
       ? '개인 Claude API로 동작 중입니다. 서버 키를 쓰면 직원 브라우저에 키가 남지 않습니다.'
       : '서버 CLAUDE_API_KEY 또는 개인 API 키가 필요합니다.');
   var html = '<div class="sync-status-summary ' + (info.overall === 'ok' ? '' : info.overall) + '">' + escapeHtml(info.summary) + '</div>';
+  if(!state._fieldPatchProbed && typeof PlannerSyncSupabase !== 'undefined' && PlannerSyncSupabase.fieldPatchDisplay){
+    html += '<div class="sync-status-row-meta">칸 단위 저장은 이번 실행에서 서버를 확인한 뒤에 씁니다.' +
+      (PlannerSyncSupabase.fieldPatchDisplay() ? ' 지난번 표시는 지원이었습니다.' : '') + '</div>';
+  }
   if(info.actionHint){
     html += '<div class="sync-status-action-hint">' +
       '<strong>할 일</strong> ' + escapeHtml(info.actionHint) +
@@ -22684,7 +22746,20 @@ function renderPlannerConflictUi_(pending){
     var hidden = Math.max(0, (pending.conflicts || []).length - conflicts.length);
     var remoteBy = remote.lastModifiedBy ? ' · ' + remote.lastModifiedBy : '';
     var localBy = getPlannerEmployeeId_() ? ' · ' + getPlannerEmployeeId_() : '';
-    var html = conflicts.map(function(conflict, i){
+    var groups = (typeof PlannerFieldSync !== 'undefined' && PlannerFieldSync.collapseSharedConflicts)
+      ? PlannerFieldSync.collapseSharedConflicts(conflicts.map(function(conflict){
+          var only = conflictOnlyPaths_(conflict);
+          var paths = [];
+          if(only && only.length) paths = only.slice();
+          else {
+            try { paths = conflictDiffFields_(conflict.local, conflict.remote); } catch(ePaths){ paths = []; }
+          }
+          return { key: conflict.key, paths: paths };
+        }))
+      : conflicts.map(function(conflict, i){ return { indexes: [i], key: conflict.key, label: plannerConflictLabel_(conflict.key) }; });
+    var html = groups.map(function(group){
+      var i = group.indexes[0];
+      var conflict = conflicts[i];
       var key = String(conflict.key || '');
       var preferLocal = (key.indexOf('generated:') === 0 || key.indexOf('published:') === 0) &&
         hasUsableAiDraftContent_(unwrapSyncEntityValue_(conflict.local)) &&
@@ -22695,7 +22770,7 @@ function renderPlannerConflictUi_(pending){
         ? '<div class="sync-conflict-name-sub" style="font-size:11px;color:#B45309;margin-top:4px;">이 기기 초안 본문이 있어요. 「이 기기」 권장.</div>'
         : '';
       return '<div class="sync-conflict-item">' +
-        '<div class="sync-conflict-name">' + escapeHtml(plannerConflictLabel_(conflict.key)) + '</div>' + conflictDiffLineHTML_(conflict) + conflictFieldCompareHTML_(conflict) + hint +
+        '<div class="sync-conflict-name">' + escapeHtml(group.label || plannerConflictLabel_(conflict.key)) + '</div>' + conflictDiffLineHTML_(conflict) + conflictFieldCompareHTML_(conflict) + hint +
         '<div class="sync-conflict-options">' +
           '<label class="sync-conflict-option"><input type="radio" name="sync-conflict-' + i + '" value="remote"' + remoteChecked + '>' +
             '<span><strong>서버 기준' + escapeHtml(remoteBy) + '</strong><span class="sync-conflict-preview">' + escapeHtml(plannerConflictPreview_(conflict.remote)) + '</span></span></label>' +
@@ -23064,7 +23139,22 @@ window.applyPlannerConflictChoices_ = async function(){
 
   // 라디오 선택을 모달 DOM이 사라지기 전에 스냅샷
   var choices = (pending.conflicts || []).map(function(conflict, i){
-    var picked = document.querySelector('input[name="sync-conflict-' + i + '"]:checked');
+    var owner = i;
+    if(typeof PlannerFieldSync !== 'undefined' && PlannerFieldSync.collapseSharedConflicts){
+      var groups = PlannerFieldSync.collapseSharedConflicts((pending.conflicts || []).map(function(row){
+        var only = conflictOnlyPaths_(row);
+        var paths = [];
+        if(only && only.length) paths = only.slice();
+        else {
+          try { paths = conflictDiffFields_(row.local, row.remote); } catch(eChoicePaths){ paths = []; }
+        }
+        return { key: row.key, paths: paths };
+      }));
+      groups.forEach(function(group){
+        if(group.indexes.indexOf(i) >= 0) owner = group.indexes[0];
+      });
+    }
+    var picked = document.querySelector('input[name="sync-conflict-' + owner + '"]:checked');
     var useLocal = pending._forceAllLocal || !picked || picked.value === 'local';
     return { conflict: conflict, useLocal: useLocal };
   });
@@ -24228,6 +24318,7 @@ function applyPersistPayload(s, opts){
     state._pendingHeavyRepair = true;
     state._pendingBootMigrations = true;
     try { if(applyClinicTitleAndImportDrawerRepair_()) state._clinicRepairNeedsSave = true; } catch(eClinicFast){}
+    try { seedSyncFieldBaseFromState_(); } catch(eSeedBase){}
     return;
   }
   var migOpts = opts && opts.authoritativeAdopt
@@ -43186,7 +43277,10 @@ window.onSheetDraftSave_ = function(){
     }, 1400);
   }
   var pendingAfterSave = 0;
+  var pendingNames = [];
   try { pendingAfterSave = countPendingSyncItems_(); } catch(ePendToast){ pendingAfterSave = (state.syncOutbox || []).length; }
+  try { pendingNames = describePendingSyncItems_(); } catch(ePendNames){ pendingNames = []; }
+  try { console.info('[대기열]', pendingAfterSave, pendingNames.join(' | ') || '없음'); } catch(ePendLog){}
   setAppToast(photoFromBlog
     ? '저장했어요. 수정한 블로그에 맞춰 이미지 안내를 다시 썼어요.'
     : ('이 기기에 초안을 저장했어요.' + (pendingAfterSave

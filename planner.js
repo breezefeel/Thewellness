@@ -19005,6 +19005,38 @@ function syncOutboxProgressStamp_(){
     return String(op.mutationId || '') + ':' + String(parseInt(op.version, 10) || 1) + ':' + String(op.baseEntityRevision || 0);
   }).join('|');
 }
+var PLANNER_SYNC_JOURNAL_KEY_ = 'ht_sync_journal_v1';
+function plannerIncrementalJournalEnabled_(){
+  try { return /(?:\?|&)inc=1(?:&|$)/.test(String(location.search || '')); } catch(e){ return false; }
+}
+function readPlannerSyncJournal_(){
+  try {
+    var raw = JSON.parse(localStorage.getItem(PLANNER_SYNC_JOURNAL_KEY_) || '{}');
+    return raw && typeof raw === 'object' ? raw : { items: [] };
+  } catch(e){ return { items: [] }; }
+}
+function recordConfirmedSyncJournal_(ackVer){
+  if(!plannerIncrementalJournalEnabled_()) return;
+  if(typeof PlannerSyncRules === 'undefined' || !PlannerSyncRules.plannerRecordSyncJournal) return;
+  var confirmed = [];
+  Object.keys(ackVer || {}).forEach(function(id){
+    confirmed.push({ mutationId: id, version: ackVer[id] });
+  });
+  if(!confirmed.length) return;
+  try {
+    var next = PlannerSyncRules.plannerRecordSyncJournal(readPlannerSyncJournal_(), confirmed);
+    localStorage.setItem(PLANNER_SYNC_JOURNAL_KEY_, JSON.stringify(next));
+  } catch(e){}
+}
+function applyConfirmedSyncJournal_(){
+  if(!plannerIncrementalJournalEnabled_()) return;
+  if(typeof PlannerSyncRules === 'undefined' || !PlannerSyncRules.plannerApplySyncJournal) return;
+  var before = state.syncOutbox || [];
+  var next = PlannerSyncRules.plannerApplySyncJournal(before, readPlannerSyncJournal_());
+  if(next.length === before.length) return;
+  state.syncOutbox = next;
+  try { rebuildDirtyStateFromOutbox_(); } catch(e){}
+}
 function acknowledgeSyncOutbox_(accepted, sentMutations, holdKeys){
   var ackVer = {};
   (accepted || []).forEach(function(item){
@@ -19046,6 +19078,7 @@ function acknowledgeSyncOutbox_(accepted, sentMutations, holdKeys){
   }
   rebuildDirtyStateFromOutbox_();
   _syncFastAckPending_ = false;
+  try { recordConfirmedSyncJournal_(ackVer); } catch(eJournal){}
 }
 function rotateIdempotentOutbox_(accepted){
   var byId = {};
@@ -25557,6 +25590,7 @@ function applyBootPlannerRaw_(raw){
     try { applyBuiltinDraftBrandSeeds_(); } catch(e3){}
     return;
   }
+  try { applyConfirmedSyncJournal_(); } catch(eJournal){}
   try {
     if(state.syncDirty || Object.keys(state.syncDirtyEntityKeys || {}).length){
       state.syncNeedsSnapshot = true;
@@ -25755,7 +25789,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=408').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=412').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){

@@ -343,6 +343,21 @@ assert(R.plannerStripClinicTitlePrefix('[약수/인천] [약수/인천] 모니�
 assert(R.plannerStripClinicTitlePrefix('접두어 없는 제목') === '접두어 없는 제목',
   'a title without the prefix stays as written');
 
+var journal = R.plannerRecordSyncJournal({ items: [] }, [
+  { mutationId: 'm1', version: 2 },
+  { mutationId: 'm1', version: 1 }
+]);
+assert(journal.items.length === 1 && journal.items[0].v === 2, 'a journal keeps the higher confirmed version');
+var queued = [
+  { mutationId: 'm1', version: 2, key: 'draft:a' },
+  { mutationId: 'm2', version: 1, key: 'draft:b' },
+  { mutationId: 'm1', version: 3, key: 'draft:a2' }
+];
+var leftQueue = R.plannerApplySyncJournal(queued, journal);
+assert(leftQueue.length === 2 && leftQueue[0].mutationId === 'm2' && leftQueue[1].version === 3,
+  'a journal drops only the confirmed version and keeps a newer one');
+assert(R.plannerApplySyncJournal(queued, { items: [] }).length === 3, 'an empty journal leaves the queue');
+
 if(failed){
   console.error(failed + ' assertion(s) failed');
   process.exit(1);

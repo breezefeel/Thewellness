@@ -49,8 +49,21 @@ var PlannerFieldSync = (function(){
     if(typeof v === 'object') return Object.keys(v).some(function(k){ return filled(v[k]); });
     return true;
   }
+  function canonical(v){
+    if(v == null || v === '') return null;
+    if(Array.isArray(v)) return v.map(canonical);
+    if(typeof v === 'object'){
+      var out = {};
+      Object.keys(v).sort().forEach(function(k){
+        if(v[k] == null || v[k] === '') return;
+        out[k] = canonical(v[k]);
+      });
+      return out;
+    }
+    return v;
+  }
   function same(a, b){
-    try { return JSON.stringify(a) === JSON.stringify(b); } catch(e){ return a === b; }
+    try { return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b)); } catch(e){ return a === b; }
   }
   function contentOf(entity, key){
     if(!entity || typeof entity !== 'object') return null;
@@ -261,19 +274,189 @@ var PlannerFieldSync = (function(){
     walk(before, after, prefix || '');
     return out;
   }
+  var DEVICE_PENDING_KEYS = {
+    threadsPending: 1,
+    threadsPendingStartedAt: 1,
+    threadsPendingEndMs: 1,
+    threadsPendingTopic: 1,
+    threadsPendingCatId: 1
+  };
+  function omitDevicePending(entity){
+    if(!entity || typeof entity !== 'object') return entity;
+    var out = clone(entity);
+    function strip(node){
+      if(!node || typeof node !== 'object' || Array.isArray(node)) return;
+      Object.keys(DEVICE_PENDING_KEYS).forEach(function(k){ delete node[k]; });
+    }
+    strip(out);
+    strip(out.content);
+    return out;
+  }
+  function sendKeyList(entity){
+    if(!entity || typeof entity !== 'object') return '';
+    var content = (entity.content && typeof entity.content === 'object' && !Array.isArray(entity.content)) ? entity.content : entity;
+    return Object.keys(content).filter(function(k){ return !DEVICE_PENDING_KEYS[k]; }).sort().join(',');
+  }
+  function shouldResumeThreadsJob(reason){
+    return reason === 'button';
+  }
+  function uniquePaths(edited, cleared){
+    var seen = {};
+    var out = [];
+    function add(list){
+      (list || []).forEach(function(p){
+        p = String(p || '');
+        if(!p || seen[p]) return;
+        seen[p] = true;
+        out.push(p);
+      });
+    }
+    add(edited);
+    add(cleared);
+    return out;
+  }
+  function deletePath(obj, path){
+    var parts = String(path || '').split('.');
+    var cur = obj;
+    for(var i = 0; i < parts.length - 1; i++){
+      if(!cur || typeof cur !== 'object') return;
+      cur = cur[parts[i]];
+    }
+    if(cur && typeof cur === 'object') delete cur[parts[parts.length - 1]];
+  }
+  function pathCovers(touched, path){
+    if(!path) return false;
+    if(touched[path]) return true;
+    var parts = String(path).split('.');
+    var acc = '';
+    for(var i = 0; i < parts.length; i++){
+      acc = acc ? (acc + '.' + parts[i]) : parts[i];
+      if(touched[acc]) return true;
+    }
+    return false;
+  }
+  function overlayDeviceEdits(serverEntity, localEntity, key, edited, cleared){
+    if(!localEntity || typeof localEntity !== 'object') return clone(serverEntity);
+    if(!serverEntity || typeof serverEntity !== 'object') return clone(localEntity);
+    var out = clone(localEntity);
+    var outNode = contentOf(out, key);
+    var serverNode = contentOf(serverEntity, key);
+    if(!outNode || typeof outNode !== 'object' || !serverNode || typeof serverNode !== 'object') return out;
+    var touched = {};
+    uniquePaths(edited, cleared).forEach(function(p){ touched[p] = true; });
+    allPaths().forEach(function(p){
+      if(pathCovers(touched, p)) return;
+      var val = getPath(serverNode, p);
+      if(val === undefined) deletePath(outNode, p);
+      else setPath(outNode, p, clone(val));
+    });
+    return out;
+  }
+  function diffTabPaths(baseEntity, localEntity, key){
+    if(!baseEntity || typeof baseEntity !== 'object') return [];
+    var base = contentOf(baseEntity, key) || {};
+    var local = contentOf(localEntity, key) || {};
+    var paths = [];
+    allPaths().forEach(function(p){
+      if(!same(getPath(base, p), getPath(local, p))) paths.push(p);
+    });
+    return paths;
+  }
+  var WRAPPER_IGNORE = {
+    content: 1, updatedAt: 1, savedAt: 1, order: 1, index: 1,
+    modifiedAt: 1, editedAt: 1, lastEditedAt: 1, lastSavedAt: 1,
+    localSavedAt: 1, syncedAt: 1,
+    threadsPending: 1, threadsPendingStartedAt: 1, threadsPendingEndMs: 1,
+    threadsPendingTopic: 1, threadsPendingCatId: 1
+  };
+  function wrapperFieldsChanged(baseEntity, localEntity, key){
+    if(String(key).indexOf('published:') !== 0) return false;
+    if(!baseEntity || !localEntity || typeof baseEntity !== 'object' || typeof localEntity !== 'object') return false;
+    var names = {};
+    Object.keys(baseEntity).forEach(function(k){ if(!WRAPPER_IGNORE[k]) names[k] = true; });
+    Object.keys(localEntity).forEach(function(k){ if(!WRAPPER_IGNORE[k]) names[k] = true; });
+    return Object.keys(names).some(function(k){ return !same(baseEntity[k], localEntity[k]); });
+  }
+  function nonTabContentChanged(baseEntity, localEntity, key){
+    if(!baseEntity || !localEntity) return false;
+    function strip(node){
+      var copy = withoutTabPaths(node, key);
+      if(!copy || typeof copy !== 'object' || Array.isArray(copy)) return copy;
+      Object.keys(WRAPPER_IGNORE).forEach(function(k){ delete copy[k]; });
+      if(copy.content && typeof copy.content === 'object'){
+        Object.keys(WRAPPER_IGNORE).forEach(function(k){ delete copy.content[k]; });
+      }
+      return copy;
+    }
+    return !same(strip(baseEntity), strip(localEntity));
+  }
+  function shouldKeepWholeConflict(baseEntity, localEntity, key){
+    if(!baseEntity || typeof baseEntity !== 'object') return true;
+    if(wrapperFieldsChanged(baseEntity, localEntity, key)) return true;
+    if(nonTabContentChanged(baseEntity, localEntity, key)) return true;
+    return false;
+  }
+  function planConflictAction(spec){
+    spec = spec || {};
+    var fromBase = diffTabPaths(spec.base, spec.local, spec.key);
+    var devicePathsMissing = !Array.isArray(spec.devicePaths);
+    var touched = uniquePaths([].concat(spec.devicePaths || [], spec.sheetPaths || [], fromBase), spec.clearedPaths || []);
+    if(shouldKeepWholeConflict(spec.base, spec.local, spec.key)){
+      return { action: 'ask', keepOutbox: true, showPaths: null, value: spec.local };
+    }
+    var serverDiff = diffTabPaths(spec.local, spec.server, spec.key);
+    if(!serverDiff.length){
+      return { action: 'accept-server', keepOutbox: false, showPaths: [], value: spec.server };
+    }
+    if(devicePathsMissing || !touched.length){
+      return {
+        action: 'ask',
+        keepOutbox: true,
+        showPaths: serverDiff,
+        value: overlayDeviceEdits(spec.server, spec.local, spec.key, serverDiff, spec.clearedPaths || [])
+      };
+    }
+    var narrowed = overlayDeviceEdits(spec.server, spec.local, spec.key, touched, []);
+    var show = deviceConflictPaths(spec.server, spec.local, spec.key, touched, []);
+    if(!show.length){
+      return {
+        action: 'ask',
+        keepOutbox: true,
+        showPaths: serverDiff,
+        value: overlayDeviceEdits(spec.server, spec.local, spec.key, serverDiff, [])
+      };
+    }
+    return { action: 'ask', keepOutbox: true, showPaths: show, value: narrowed };
+  }
+  function deviceConflictPaths(serverEntity, localEntity, key, edited, cleared){
+    var localNode = contentOf(localEntity, key) || {};
+    var serverNode = contentOf(serverEntity, key) || {};
+    return uniquePaths(edited, cleared).filter(function(p){
+      return !same(getPath(localNode, p), getPath(serverNode, p));
+    });
+  }
+  function pathListed(allow, path){
+    if(allow[path]) return true;
+    var parts = String(path || '').split('.');
+    var acc = '';
+    for(var i = 0; i < parts.length; i++){
+      acc = acc ? (acc + '.' + parts[i]) : parts[i];
+      if(allow[acc]) return true;
+    }
+    return false;
+  }
   function describeDiff(localEntity, remoteEntity, key, onlyPaths){
     var allow = null;
-    if(onlyPaths && onlyPaths.length){
+    if(Array.isArray(onlyPaths)){
       allow = {};
       onlyPaths.forEach(function(p){
         var rel = String(p || '');
         if(String(key).indexOf('published:') === 0 && rel.indexOf('content.') === 0) rel = rel.slice('content.'.length);
-        allow[rel] = true;
-        allow[String(p || '')] = true;
+        if(rel) allow[rel] = true;
       });
     }
     return changedPaths(remoteEntity, localEntity, key, allPaths()).filter(function(p){
-      return !allow || allow[p];
+      return !allow || pathListed(allow, p);
     }).map(function(p){
       return {
         path: p,
@@ -321,6 +504,16 @@ var PlannerFieldSync = (function(){
     historySnapshot: historySnapshot,
     splitThreadComment: splitThreadComment,
     describeDiff: describeDiff,
+    omitDevicePending: omitDevicePending,
+    sendKeyList: sendKeyList,
+    shouldResumeThreadsJob: shouldResumeThreadsJob,
+    overlayDeviceEdits: overlayDeviceEdits,
+    deviceConflictPaths: deviceConflictPaths,
+    diffTabPaths: diffTabPaths,
+    shouldKeepWholeConflict: shouldKeepWholeConflict,
+    wrapperFieldsChanged: wrapperFieldsChanged,
+    nonTabContentChanged: nonTabContentChanged,
+    planConflictAction: planConflictAction,
     clearedPathsBetween: clearedPathsBetween,
     threadBodyHits: threadBodyHits,
     publishedTouchedOn: publishedTouchedOn

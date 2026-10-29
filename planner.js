@@ -17177,8 +17177,8 @@ function normalizeDraftRowForSync_(draft){
   var SYNC_COMPARE_IGNORED_KEYS_ = { updatedAt: 1, savedAt: 1, order: 1, index: 1, modifiedAt: 1, editedAt: 1, lastEditedAt: 1, lastSavedAt: 1, localSavedAt: 1, syncedAt: 1, threadsPending: 1, threadsPendingStartedAt: 1, threadsPendingEndMs: 1, threadsPendingTopic: 1, threadsPendingCatId: 1, instaPending: 1, instaPendingStartedAt: 1, instaPendingEndMs: 1, instaPendingTopic: 1, instaPendingCatId: 1 };
 function omitEmptyForSyncCompare_(value){
   if(value == null) return undefined;
-  // 줄 끝 공백·개행 차이만 있는 글은 같은 글로 본다
-  if(typeof value === 'string') return value.replace(/\r\n/g, '\n').trim();
+  // 비교할 때만 앞뒤 줄바꿈·공백을 뺀다. 가운데 줄바꿈은 그대로 둔다.
+  if(typeof value === 'string') return value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/^[ \t\n]+|[ \t\n]+$/g, '');
   if(typeof value !== 'object') return value;
   if(Array.isArray(value)){
     return value.map(omitEmptyForSyncCompare_).filter(function(v){ return v !== undefined; });
@@ -18638,7 +18638,18 @@ function shapeSyncedContentValue_(key, localValue){
     localValue = PlannerFieldSync.omitDevicePending(localValue);
   }
   var keyList = PlannerFieldSync.sendKeyList(localValue);
-  var base = syncFieldBaseFromServer_(key) ? state.syncFieldBase[key] : null;
+  var ownBase = syncFieldBaseFromServer_(key) ? state.syncFieldBase[key] : null;
+  var siblingBase = null;
+  var baseKey = String(key || '').match(/^(published|generated):(.+)$/);
+  if(baseKey){
+    var siblingKey = (baseKey[1] === 'published' ? 'generated:' : 'published:') + baseKey[2];
+    if(syncFieldBaseFromServer_(siblingKey)) siblingBase = state.syncFieldBase[siblingKey];
+  }
+  var queued = (state.syncOutbox || []).find(function(row){ return row && row.key === key; });
+  var base = PlannerFieldSync.baseForContentSend ? PlannerFieldSync.baseForContentSend(ownBase, siblingBase, key, {
+    baseEntityRevision: queued ? (parseInt(queued.baseEntityRevision, 10) || 0) : 0,
+    serverRevision: parseInt((state.syncEntityRevisions || {})[key], 10) || 0
+  }) : ownBase;
   var cleared = state._clearedPaths && state._clearedPaths[key];
   var plan = PlannerFieldSync.planOutboxSend(base, localValue, key, cleared);
   if(plan.mode === 'patch'){
@@ -40481,13 +40492,13 @@ function renderSheetContent(content, opts) {
   var socialTab = (tab === 'insta' || tab === 'threads') && isBlogInstaCategory(state.selectedCatId) && typeof PlannerSocial !== 'undefined';
   var blogPlanTab = tab === 'blog';
   setSheetActionsHtml_(socialTab
-    ? '<button type="button" class="btn-save-draft" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' + PlannerSocial.actionsHTML(tab)
+    ? '<button type="button" class="btn-save-draft" onpointerdown="holdSheetSavePush_()" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' + PlannerSocial.actionsHTML(tab)
     : blogPlanTab
-      ? '<button type="button" class="btn-save-draft" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
+      ? '<button type="button" class="btn-save-draft" onpointerdown="holdSheetSavePush_()" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
         '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
         blogScheduleButtonHTML_() +
         '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">지금 올리기</button>'
-      : '<button type="button" class="btn-save-draft" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
+      : '<button type="button" class="btn-save-draft" onpointerdown="holdSheetSavePush_()" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
         '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
         (isDailyImages ? '' : '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">발행완료</button>')
   );
@@ -40827,11 +40838,11 @@ function shouldShowInstaPending_(content, draftId){
 }
 function getSheetThreadsBodyFromDom_(){
   var el = document.getElementById('sheet-threads-body');
-  return el ? String(el.value || '').trim() : '';
+  return el ? sheetFieldText_(el) : '';
 }
 function getSheetThreadsCommentFromDom_(){
   var el = document.getElementById('sheet-threads-comment');
-  return el ? String(el.value || '').trim() : '';
+  return el ? sheetFieldText_(el) : '';
 }
 function getSheetThreadsTextFromDom_(){
   return getSheetThreadsBodyFromDom_();
@@ -41498,7 +41509,7 @@ function sheetEditField_(label, id, value, opts){
     (opts.regen ? ';onSheetFieldInput_(this)' : '') +
     (opts.stepPreview ? ';renderSelfCareStepsPreview_(this)' : '') +
     (opts.syncTopic ? ';onSheetTitleSyncTopic_(this)' : '');
-  var onblur = ' onblur="onSheetFieldBlur_(this)' + (opts.syncTopic ? ';flushSheetTitleBackgroundWork_()' : '') + '"';
+  var onblur = ' onblur="onSheetFieldBlur_(event)' + (opts.syncTopic ? ';flushSheetTitleBackgroundWork_()' : '') + '"';
   var previewAttr = opts.stepPreview ? ' data-selfcare-preview="1"' : '';
   var previewHost = opts.stepPreview ? '<div class="selfcare-steps" data-steps-for="' + id + '"></div>' : '';
   return '<div class="' + wrapCls + '"><div class="cb-label">' + escapeHtml(label) + tools + '</div>' + help +
@@ -41506,13 +41517,16 @@ function sheetEditField_(label, id, value, opts){
 }
 
 /**
- * 빈 줄이 있으면 그 단락·댓글 경계와 줄바꿈을 유지한다.
+ * 줄바꿈이 있으면 세 줄 이상만 두 줄로 줄이고 들여쓰기만 정리한다. 한 줄로 이어진 글만 문장 경계에 빈 줄을 넣는다.
  * 마침표로 나누는 것은 빈 줄이 전혀 없을 때만. 짧은 문장(36자 미만)은 다음 문장과 한 단락.
  * 이미 줄로 나뉜 목록은 불릿 사이에 빈 줄을 끼워 넣지 않는다. 👉 셀프케어는 그대로 둔다.
  */
 function ensureProseParagraphBreaks_(text){
-  var t = String(text || '').replace(/\r\n/g, '\n').trim();
+  var t = (typeof PlannerFieldSync !== 'undefined' && PlannerFieldSync.preserveProseBreaks)
+    ? PlannerFieldSync.preserveProseBreaks(text)
+    : String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   if(!t) return '';
+  if(t.indexOf('\n') >= 0) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
   if(/\n[ \t]*\n/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
   if(/(^|\n)\s*👉/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
   if(/(^|\n)\s*(?:[-•*]|\d+[.)])\s/.test(t)) return stripProseParagraphIndents_(t);
@@ -41816,14 +41830,32 @@ function flushSheetQuietSaveBody_(){
   state.generatedOnly[draftId] = content;
   paintDraftListDate_(draftId);
   focusSyncOutboxOnDraft_(draftId);
-  try { save({ gasImmediate: false, driveImmediate: false }); }
+  try { save({ gasImmediate: false, driveImmediate: false, skipGasPush: true }); }
   finally {
     try { ensureDraftSyncKeysQueued_(draftId); } catch(eQuiet){}
     state._syncFocusDraftIds = null;
   }
   if(sectionChanged) paintSheetAfterSectionSplit_(content);
 }
-window.onSheetFieldBlur_ = function(){
+var _holdSheetSaveTimer_ = 0;
+function holdSheetSavePush_(){
+  state._holdSheetSavePush = true;
+  if(_holdSheetSaveTimer_) clearTimeout(_holdSheetSaveTimer_);
+  _holdSheetSaveTimer_ = setTimeout(function(){
+    _holdSheetSaveTimer_ = 0;
+    state._holdSheetSavePush = false;
+  }, 2000);
+}
+function clearSheetSaveHold_(){
+  state._holdSheetSavePush = false;
+  if(_holdSheetSaveTimer_){
+    clearTimeout(_holdSheetSaveTimer_);
+    _holdSheetSaveTimer_ = 0;
+  }
+}
+window.onSheetFieldBlur_ = function(ev){
+  var next = ev && ev.relatedTarget;
+  if(next && next.closest && next.closest('.btn-save-draft')) holdSheetSavePush_();
   if(sheetQuietSaving_ || sheetSectionPainting_) return;
   if(_sheetQuietSaveTimer_){
     clearTimeout(_sheetQuietSaveTimer_);
@@ -42294,13 +42326,14 @@ function ensureDraftSyncKeysQueued_(draftId){
   enqueueSyncOutboxChanges_(keys, payload);
   state.syncDirty = true;
   state._sessionUserEdit = true;
+  if(state._holdSheetSavePush) return;
   if(plannerSyncBootstrapReady_ && !plannerSyncConflictPending_ && !plannerBootstrapChoicePending_){
     try { schedulePlannerGasPush_(true); } catch(ePush){}
   }
 }
 function saveFocusedDraftChange_(draftId){
   focusSyncOutboxOnDraft_(draftId);
-  try { save({ driveImmediate: true, gasImmediate: true }); }
+  try { save({ driveImmediate: true, gasImmediate: true, skipGasPush: true }); }
   finally {
     try { ensureDraftSyncKeysQueued_(draftId); } catch(eQueue){}
     state._syncFocusDraftIds = null;
@@ -42671,8 +42704,15 @@ window.onSheetTitleSyncTopic_ = function(el){
   scheduleSheetTitleBackgroundWork_(state.selectedId, title);
 };
 
+function sheetFieldText_(el){
+  if(!el) return '';
+  var raw = String(el.value || '');
+  if(typeof PlannerFieldSync !== 'undefined' && PlannerFieldSync.preserveProseBreaks) raw = PlannerFieldSync.preserveProseBreaks(raw);
+  else raw = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return raw.replace(/^[ \t\u00A0]+|[ \t\u00A0]+$/g, '');
+}
 function readSheetBlogEdits_(){
-  function v(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
+  function v(id){ return sheetFieldText_(document.getElementById(id)); }
   if(!document.getElementById('sheet-blog-title')) return null;
   var tags = parseHashtagInput_(v('sheet-blog-hashtags'));
   if(document.getElementById('sheet-blog-problem')){
@@ -42716,7 +42756,7 @@ function applySheetBlogEdits_(content){
 
 function readSheetInstaEdits_(){
   if(!document.getElementById('sheet-insta-hook')) return null;
-  function v(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
+  function v(id){ return sheetFieldText_(document.getElementById(id)); }
   var tags = parseHashtagInput_(v('sheet-insta-hashtags'));
   return {
     hook: v('sheet-insta-hook'),
@@ -42742,8 +42782,8 @@ function applySheetThreadsEdits_(content){
   var commentEl = document.getElementById('sheet-threads-comment');
   if(!bodyEl && !commentEl) return content;
   if(!content.threads) content.threads = { body: '', comment: '', text: '' };
-  if(bodyEl) content.threads.body = String(bodyEl.value || '').trim();
-  if(commentEl) content.threads.comment = String(commentEl.value || '').trim();
+  if(bodyEl) content.threads.body = sheetFieldText_(bodyEl);
+  if(commentEl) content.threads.comment = sheetFieldText_(commentEl);
   content.threads.text = content.threads.body || '';
   return content;
 }
@@ -42766,11 +42806,11 @@ function applySheetImageEdits_(content){
       if(isNaN(idx) || !gpt[idx]) return;
       var overlayField = el.getAttribute('data-overlay-field');
       if(overlayField){
-        gpt[idx][overlayField] = String(el.value || '').trim();
+        gpt[idx][overlayField] = sheetFieldText_(el);
         return;
       }
       if(el.id && el.id.indexOf('sheet-image-prompt-') === 0){
-        gpt[idx].prompt = String(el.value || '').trim();
+        gpt[idx].prompt = sheetFieldText_(el);
       }
     });
   }
@@ -42879,14 +42919,14 @@ function applySheetThreadEdits_(content){
   if(!titleEl && !bodyEl) return content;
   var th = normalizeThreadBlock(content.thread) || { topicTitle: '', summary: '' };
   if(titleEl) th.topicTitle = String(titleEl.value || '').trim();
-  if(bodyEl) th.summary = String(bodyEl.value || '').trim();
+  if(bodyEl) th.summary = sheetFieldText_(bodyEl);
   content.thread = th;
   return content;
 }
 
 function readSheetCommunityEdits_(){
   if(!document.getElementById('sheet-community-title')) return null;
-  function v(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
+  function v(id){ return sheetFieldText_(document.getElementById(id)); }
   return {
     title: v('sheet-community-title'),
     problem: v('sheet-community-problem'),
@@ -42936,9 +42976,9 @@ function applySheetNewsEdits_(content){
   var t = document.getElementById('sheet-news-title');
   var b = document.getElementById('sheet-news-body');
   var c = document.getElementById('sheet-news-cta');
-  if(t) item.title = t.value;
-  if(b) item.body = b.value;
-  if(c) item.cta = c.value;
+  if(t) item.title = sheetFieldText_(t);
+  if(b) item.body = sheetFieldText_(b);
+  if(c) item.cta = sheetFieldText_(c);
   return content;
 }
 
@@ -43241,22 +43281,29 @@ function enqueueMangoFromBlog_(draftId, catId, topic, blog, draft){
 }
 
 window.onSheetDraftSave_ = function(){
+  state._holdSheetSavePush = true;
+  var photoFromBlog = false;
+  var sectionChanged = false;
+  var content = null;
+  var tab = '';
+  try {
   var draftId = state.selectedId;
   if(!draftId){
     setAppToast('먼저 초안 카드를 선택해 주세요.', { duration: 3500, variant: 'err' });
     return;
   }
-  var tab = state.activeTab;
-  var content = tab === 'blog' ? ensureSheetBlogOnContent_(draftId) : getDraftContent_(draftId);
+  tab = state.activeTab;
+  content = tab === 'blog' ? ensureSheetBlogOnContent_(draftId) : getDraftContent_(draftId);
   if(!content){
     setAppToast('저장할 초안이 없어요. 먼저 초안을 생성해 주세요.', { duration: 4000, variant: 'err' });
     return;
   }
   applySheetEditsForTab_(content, tab);
-  var sectionChanged = sheetSectionLayoutChanged_;
-  var photoFromBlog = tab === 'blog' && refreshTopicPhotoPromptFromBlog_(content, draftId, state.selectedCatId);
+  sectionChanged = sheetSectionLayoutChanged_;
+  photoFromBlog = tab === 'blog' && refreshTopicPhotoPromptFromBlog_(content, draftId, state.selectedCatId);
   if(isDailyShareCategory(state.selectedCatId)) persistSheetDailyFactsToDraft_();
   persistDraftContent_(draftId, content);
+  try { schedulePlannerGasPush_(true); } catch(eOnePush){}
   if(sectionChanged) paintSheetAfterSectionSplit_(content);
   if(isDailyShareCategory(state.selectedCatId) && tab === 'images'){
     var stSave = ensureThumbMakerState_();
@@ -43286,6 +43333,9 @@ window.onSheetDraftSave_ = function(){
     : ('이 기기에 초안을 저장했어요.' + (pendingAfterSave
       ? (' 서버 반영은 아직 ' + pendingAfterSave + '건 남았습니다.')
       : ' 서버 반영을 확인 중입니다.') + ' (발행 아님)'), { duration: photoFromBlog ? 4200 : 5200, variant: 'ok' });
+  } finally {
+    clearSheetSaveHold_();
+  }
 };
 
 /** opts.viaApi: PlannerSocial이 API로 이미 올린 뒤 — 발행 기록·다음 채널 초안만 만들고 복사·앱 이동은 하지 않는다 */
@@ -45857,7 +45907,7 @@ window.openDuplicateCardsReview_ = function(){
   sheet.style.cssText = 'background:#fff;color:#1c1c1e;width:100%;max-width:560px;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));font:14px/1.5 -apple-system,system-ui,sans-serif';
   function esc(t){ return escapeHtml(String(t == null ? '' : t)); }
   var html = '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">중복으로 보이는 카드</b><button type="button" id="dup-cards-close" style="border:0;background:#eee;border-radius:8px;min-height:36px;padding:0 12px">닫기</button></div>' +
-    '<p style="margin:6px 0 12px;color:#555">확인용이에요. 여기서도, 자동으로도 카드를 지우지 않습니다. 지울지는 직접 정하세요.</p>';
+    '<p style="margin:6px 0 12px;color:#555">글이 완전히 같을 때만, 아래 버튼으로 한 장으로 합칠 수 있어요. 자동으로 지우거나 합치지 않습니다.</p>';
   if(!r.groups.length && !r.orphanContent.length) html += '<p>중복으로 보이는 카드가 없어요.</p>';
   r.groups.forEach(function(g){
     var tag = g.level === 'same' ? '<span style="background:#fde2e2;color:#a31;padding:1px 6px;border-radius:6px">같은 날짜</span>' : '<span style="background:#fff3c4;color:#6a5000;padding:1px 6px;border-radius:6px">날짜만 다름</span>';
@@ -45874,12 +45924,23 @@ window.openDuplicateCardsReview_ = function(){
     r.orphanContent.forEach(function(o){ html += '<div style="font-size:13px">' + esc(o.id) + ' · ' + esc(o.topic) + ' → 기존 ' + esc(o.existingId) + '</div>'; });
     html += '</section>';
   }
+  html += '<button type="button" id="dup-cards-merge" style="width:100%;min-height:44px;border-radius:10px;border:0;background:#1c1c1e;color:#fff;margin-bottom:8px">같은 글만 합치기</button>';
   html += '<button type="button" id="dup-cards-copy" style="width:100%;min-height:44px;border-radius:10px;border:1px solid #888;background:#fff">목록 복사</button>';
   sheet.innerHTML = html;
   box.appendChild(sheet);
   box.addEventListener('click', function(ev){ if(ev.target === box) box.remove(); });
   document.body.appendChild(box);
   document.getElementById('dup-cards-close').addEventListener('click', function(){ box.remove(); });
+  document.getElementById('dup-cards-merge').addEventListener('click', function(){
+    if(!window.confirm('글이 완전히 같은 카드만 한 장으로 합칩니다. 글이 다르거나 예약·링크를 옮길 수 없으면 그대로 둡니다.')) return;
+    var changed = false;
+    try { changed = mergeWarnedDuplicateCards_(); } catch(eMerge){ changed = false; }
+    if(changed) persistUserDuplicateMerge_();
+    box.remove();
+    if(typeof setAppToast === 'function'){
+      setAppToast(changed ? '같은 글을 한 장으로 합쳤어요.' : '합칠 수 있는 같은 글이 없어요.', { duration: 3600, variant: changed ? 'ok' : 'err' });
+    }
+  });
   document.getElementById('dup-cards-copy').addEventListener('click', function(){
     var text = JSON.stringify(r, null, 2);
     try { navigator.clipboard.writeText(text).then(function(){ setAppToast('목록을 복사했어요.', { duration: 2400, variant: 'ok' }); }); } catch(eCp){ console.log(text); }
@@ -45916,6 +45977,152 @@ function reportIdenticalImportedCopies_(){
     try { console.info('[내용이 같은 가져오기 사본(지우지 않음)]', JSON.stringify(report)); } catch(eLog){}
   }
   return false;
+}
+function duplicateAssignmentPlans_(){
+  var plans = [];
+  if(state.pendingSubGoalPlan && Array.isArray(state.pendingSubGoalPlan.assignments)){
+    plans.push(state.pendingSubGoalPlan);
+  }
+  var stored = state.branding && state.branding.subGoalPlans;
+  Object.keys(stored || {}).forEach(function(key){
+    if(stored[key] && Array.isArray(stored[key].assignments)) plans.push(stored[key]);
+  });
+  return plans;
+}
+function duplicateReservations_(){
+  var rows = [];
+  Object.keys(state.published || {}).forEach(function(id){
+    var plan = state.published[id] && state.published[id].channelPlan;
+    if(!plan) return;
+    Object.keys(plan).forEach(function(channel){
+      var item = plan[channel] || {};
+      rows.push({ draftId: id, channel: channel, at: item.at || '', postId: item.postId || '' });
+    });
+  });
+  return rows;
+}
+function duplicateLinks_(){
+  var links = [];
+  try {
+    var hashId = cardLinkIdFromHash_();
+    if(hashId) links.push({ draftId: hashId, kind: 'hash' });
+  } catch(eHash){}
+  if(typeof cardLinkRevealId_ !== 'undefined' && cardLinkRevealId_) links.push({ draftId: cardLinkRevealId_, kind: 'reveal' });
+  return links;
+}
+function applyDuplicateRefMove_(moved){
+  if(!moved || !moved.ok) return;
+  var plans = duplicateAssignmentPlans_();
+  (moved.plans || []).forEach(function(plan, index){
+    if(plans[index]) plans[index].assignments = plan.assignments;
+  });
+  (moved.reservations || []).forEach(function(row){
+    var pub = state.published && state.published[row.draftId];
+    if(!pub || !row.channel) return;
+    if(!pub.channelPlan) pub.channelPlan = {};
+    if(!pub.channelPlan[row.channel]) pub.channelPlan[row.channel] = { at: row.at || '', postId: row.postId || '' };
+  });
+  (moved.links || []).forEach(function(row){
+    if(!row) return;
+    if(row.kind === 'hash'){
+      try {
+        if(cardLinkIdFromHash_() && cardLinkIdFromHash_() !== row.draftId) location.hash = 'card=' + encodeURIComponent(row.draftId);
+      } catch(eHash){}
+    }
+    if(row.kind === 'reveal') cardLinkRevealId_ = row.draftId;
+  });
+  function applyIdMap_(stateKey, next){
+    if(!next) return;
+    if(!state[stateKey] || typeof state[stateKey] !== 'object') state[stateKey] = {};
+    (moved.retireIds || []).forEach(function(id){ delete state[stateKey][id]; });
+    if(Object.prototype.hasOwnProperty.call(next, moved.keepId)) state[stateKey][moved.keepId] = next[moved.keepId];
+  }
+  applyIdMap_('draftBrandOverrides', moved.brandOverrides);
+  applyIdMap_('pinnedDraftIds', moved.pinned);
+}
+function persistUserDuplicateMerge_(){
+  try {
+    var prev = {};
+    try { prev = readPreviousDiskPayloadSync_() || {}; } catch(ePrev){}
+    var now = getPersistPayload();
+    state._enqueueNormalization = true;
+    try { enqueueSyncOutboxChanges_(listChangedSyncEntityKeys_(prev, now), now); }
+    finally { state._enqueueNormalization = false; }
+  } catch(eEnq){}
+  try { save({ driveImmediate: true, gasImmediate: true }); } catch(eSave){}
+  try { renderTabs(); renderMain(); } catch(eRender){}
+}
+function mergeWarnedDuplicateCards_(){
+  if(typeof PlannerSyncRules === 'undefined' || !PlannerSyncRules.plannerMergeDuplicateGroup || !PlannerSyncRules.plannerRetargetDuplicateRefs) return false;
+  var groups = findPossibleDuplicateCards_().filter(function(g){ return g.level === 'same'; });
+  var changed = false;
+  groups.forEach(function(g){
+    var cat = CATEGORIES[g.catId];
+    var cards = (g.cards || []).map(function(c){
+      var content = null;
+      try { content = getDraftContent_(c.id); } catch(eContent){ content = null; }
+      return {
+        id: c.id,
+        placeholder: !!c.placeholder,
+        onServer: !!c.onServer,
+        createdAt: c.createdAt,
+        content: content
+      };
+    });
+    var plan = PlannerSyncRules.plannerMergeDuplicateGroup(cards);
+    if(!plan || !plan.changed || !plan.keepId || !(plan.retireIds || []).length) return;
+    var retireSet = {};
+    plan.retireIds.forEach(function(id){ retireSet[id] = true; });
+    var publishedSlice = {};
+    var generatedSlice = {};
+    if(state.published && Object.prototype.hasOwnProperty.call(state.published, plan.keepId)) publishedSlice[plan.keepId] = state.published[plan.keepId];
+    if(state.generatedOnly && Object.prototype.hasOwnProperty.call(state.generatedOnly, plan.keepId)) generatedSlice[plan.keepId] = state.generatedOnly[plan.keepId];
+    plan.retireIds.forEach(function(id){
+      if(state.published && Object.prototype.hasOwnProperty.call(state.published, id)) publishedSlice[id] = state.published[id];
+      if(state.generatedOnly && Object.prototype.hasOwnProperty.call(state.generatedOnly, id)) generatedSlice[id] = state.generatedOnly[id];
+    });
+    var brandSlice = {};
+    var pinSlice = {};
+    function takeId_(src, dest, id){
+      if(src && Object.prototype.hasOwnProperty.call(src, id)) dest[id] = src[id];
+    }
+    takeId_(state.draftBrandOverrides, brandSlice, plan.keepId);
+    takeId_(state.pinnedDraftIds, pinSlice, plan.keepId);
+    plan.retireIds.forEach(function(id){
+      takeId_(state.draftBrandOverrides, brandSlice, id);
+      takeId_(state.pinnedDraftIds, pinSlice, id);
+    });
+    var assignmentPlans = duplicateAssignmentPlans_();
+    var moved = PlannerSyncRules.plannerRetargetDuplicateRefs({
+      keepId: plan.keepId,
+      retireIds: plan.retireIds,
+      plans: assignmentPlans.map(function(p, index){ return { key: String(index), assignments: p.assignments }; }),
+      reservations: duplicateReservations_().filter(function(row){ return row.draftId === plan.keepId || retireSet[row.draftId]; }),
+      links: duplicateLinks_().filter(function(row){ return row.draftId === plan.keepId || retireSet[row.draftId]; }),
+      published: publishedSlice,
+      generated: generatedSlice,
+      brandOverrides: brandSlice,
+      pinned: pinSlice,
+      keepHasPublished: !!(state.published && state.published[plan.keepId])
+    });
+    if(!moved || !moved.ok) return;
+    applyDuplicateRefMove_(moved);
+    if(state.published && state.published[plan.keepId]){
+      state.published[plan.keepId].content = plan.content;
+      state.generatedOnly[plan.keepId] = state.published[plan.keepId].content;
+    } else if(state.generatedOnly){
+      state.generatedOnly[plan.keepId] = plan.content;
+    }
+    plan.retireIds.forEach(function(id){
+      if(state.generatedOnly) delete state.generatedOnly[id];
+      if(state.published && state.published[plan.keepId]) delete state.published[id];
+      if(cat) cat.drafts = (cat.drafts || []).filter(function(d){ return !d || d.id !== id; });
+      if(!state.deletedDraftIds) state.deletedDraftIds = {};
+      if(!state.deletedDraftIds[id]) state.deletedDraftIds[id] = new Date().toISOString();
+    });
+    changed = true;
+  });
+  return changed;
 }
 function applyClinicTitleAndImportDrawerRepair_(){
   var changed = false;

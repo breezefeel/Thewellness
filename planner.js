@@ -17113,6 +17113,10 @@ function setSyncEntity_(payload, key, wrapped){
   var id = parts.slice(1).join(':');
   if((parts[0] === 'published' || parts[0] === 'generated') && !missing){
     var syncKey = parts[0] + ':' + id;
+    if(wrapped && typeof wrapped === 'object'){
+      stripThreadsPendingFields_(wrapped);
+      if(wrapped.content) stripThreadsPendingFields_(wrapped.content);
+    }
     if(typeof rememberSyncFieldBase_ === 'function') rememberSyncFieldBase_(syncKey, wrapped);
     var editing = state.selectedId === id && state._sheetDomDirty && typeof PlannerFieldSync !== 'undefined';
     var editedPaths = state._sheetEditedPaths && state._sheetEditedPaths[syncKey];
@@ -17151,7 +17155,7 @@ function normalizeDraftRowForSync_(draft){
   return row;
 }
 // 비교에서만 무시하는 수정 시각 필드. 예약·발행 날짜(scheduledDate, publishedAt 등)는 내용이라 비교에 넣는다.
-var SYNC_COMPARE_IGNORED_KEYS_ = { updatedAt: 1, savedAt: 1, order: 1, index: 1, modifiedAt: 1, editedAt: 1, lastEditedAt: 1, lastSavedAt: 1, localSavedAt: 1, syncedAt: 1 };
+var SYNC_COMPARE_IGNORED_KEYS_ = { updatedAt: 1, savedAt: 1, order: 1, index: 1, modifiedAt: 1, editedAt: 1, lastEditedAt: 1, lastSavedAt: 1, localSavedAt: 1, syncedAt: 1, threadsPending: 1, threadsPendingStartedAt: 1, threadsPendingEndMs: 1, threadsPendingTopic: 1, threadsPendingCatId: 1 };
 function omitEmptyForSyncCompare_(value){
   if(value == null) return undefined;
   // 줄 끝 공백·개행 차이만 있는 글은 같은 글로 본다
@@ -17175,6 +17179,10 @@ function stripSyncVolatileForCompare_(value){
   if(!value || typeof value !== 'object') return value;
   var copy = Array.isArray(value) ? value.slice() : Object.assign({}, value);
   Object.keys(SYNC_COMPARE_IGNORED_KEYS_).forEach(function(k){ delete copy[k]; });
+  if(copy.content && typeof copy.content === 'object' && !Array.isArray(copy.content)){
+    copy.content = Object.assign({}, copy.content);
+    Object.keys(SYNC_COMPARE_IGNORED_KEYS_).forEach(function(k){ delete copy.content[k]; });
+  }
   if(copy.roadmapStepId) copy.roadmapStepId = canonicalizeStepIdForCompare_(copy.roadmapStepId);
   if(copy.previousRoadmapStepId) copy.previousRoadmapStepId = canonicalizeStepIdForCompare_(copy.previousRoadmapStepId);
   if(copy.strategyGuide){
@@ -18566,16 +18574,21 @@ function noteClearedPaths_(draftId, paths){
 function shapeSyncedContentValue_(key, localValue){
   if(!localValue || typeof PlannerFieldSync === 'undefined') return { value: localValue, fieldPatch: null };
   if(key.indexOf('published:') !== 0 && key.indexOf('generated:') !== 0) return { value: localValue, fieldPatch: null };
+  localValue = PlannerFieldSync.omitDevicePending(localValue);
+  var keyList = PlannerFieldSync.sendKeyList(localValue);
   var base = state.syncFieldBase && state.syncFieldBase[key];
   if(!base){
-    try { console.info('[칸 저장] 기준 없음', key); } catch(eLog){}
+    try { console.info('[칸 저장]', key, '카드 전체', keyList); } catch(eLog){}
     return { value: localValue, fieldPatch: null };
   }
   var edited = state._sheetEditedPaths && state._sheetEditedPaths[key];
   var cleared = state._clearedPaths && state._clearedPaths[key];
   var merged = PlannerFieldSync.mergeChangedOntoBase(base, localValue, key, edited, cleared);
+  merged = PlannerFieldSync.omitDevicePending(merged);
   var patch = PlannerFieldSync.buildFieldPatch(base, merged, key, cleared);
-  try { console.info('[칸 저장]', key, patch && patch.paths ? patch.paths.join(',') : '변경 없음'); } catch(eLog2){}
+  try {
+    console.info('[칸 저장]', key, patch && patch.paths ? patch.paths.join(',') : ('카드 전체 ' + keyList));
+  } catch(eLog2){}
   return { value: merged, fieldPatch: patch };
 }
 function enqueueSyncOutboxChanges_(changedKeys, payload){
@@ -22555,7 +22568,9 @@ function narrowKeptConflictLocals_(conflicts){
     var cleared = []
       .concat((state._clearedPaths && state._clearedPaths['published:' + id]) || [])
       .concat((state._clearedPaths && state._clearedPaths['generated:' + id]) || []);
-    var narrowed = PlannerFieldSync.mergeChangedOntoBase(conflict.remote, conflict.local, key, edited, cleared);
+    var narrowed = PlannerFieldSync.overlayDeviceEdits
+      ? PlannerFieldSync.overlayDeviceEdits(conflict.remote, conflict.local, key, edited, cleared)
+      : PlannerFieldSync.mergeChangedOntoBase(conflict.remote, conflict.local, key, edited, cleared);
     if(!narrowed) return;
     var shared = assignNarrowedCard_(id, key, narrowed);
     (conflicts || []).forEach(function(other){
@@ -22581,12 +22596,18 @@ function narrowKeptConflictLocals_(conflicts){
     if(shared) done[id] = true;
   });
 }
+function conflictOnlyPaths_(conflict){
+  if(conflict && Array.isArray(conflict.devicePaths)) return conflict.devicePaths;
+  if(conflict && conflict.remainingPaths && conflict.remainingPaths.length) return conflict.remainingPaths;
+  return null;
+}
 function conflictFieldCompareHTML_(conflict){
   if(typeof PlannerFieldSync === 'undefined') return '';
   var key = String(conflict && conflict.key || '');
   if(key.indexOf('published:') !== 0 && key.indexOf('generated:') !== 0) return '';
+  var only = conflictOnlyPaths_(conflict);
   var rows = [];
-  try { rows = PlannerFieldSync.describeDiff(conflict.local, conflict.remote, key, conflict.remainingPaths); } catch(eDiff){ rows = []; }
+  try { rows = PlannerFieldSync.describeDiff(conflict.local, conflict.remote, key, only); } catch(eDiff){ rows = []; }
   if(!rows.length) return '';
   return '<div class="sync-conflict-fields" style="font-size:12px;line-height:1.45;margin:6px 0">' +
     rows.slice(0, 8).map(function(row){
@@ -22598,11 +22619,12 @@ function conflictFieldCompareHTML_(conflict){
 }
 function conflictDiffLineHTML_(conflict){
   var labels = [];
-  if(conflict && conflict.remainingPaths && conflict.remainingPaths.length && typeof PlannerFieldSync !== 'undefined'){
+  var only = conflictOnlyPaths_(conflict);
+  if(only && typeof PlannerFieldSync !== 'undefined'){
     try {
-      labels = PlannerFieldSync.describeDiff(conflict.local, conflict.remote, conflict.key, conflict.remainingPaths).map(function(row){ return row.path; });
+      labels = PlannerFieldSync.describeDiff(conflict.local, conflict.remote, conflict.key, only).map(function(row){ return row.path; });
     } catch(eLeft){ labels = []; }
-  } else {
+  } else if(!only) {
     try { labels = conflictDiffFields_(conflict.local, conflict.remote); } catch(eDiff){ labels = []; }
   }
   if(!labels.length) return '';
@@ -22861,6 +22883,51 @@ function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
     if(isPromptSyncKey_(conflict.key) && promptConflictAction_(conflict.key, conflict.local, conflict.remote, findOutboxOp_(conflict.key)) !== 'ask') return false;
     return !shouldSkipPlannerConflict_(conflict.key, conflict.local, conflict.remote);
   });
+  var kept = [];
+  var droppedUnedited = false;
+  var narrowedAny = false;
+  conflicts.forEach(function(conflict){
+    var key = String(conflict && conflict.key || '');
+    var contentKey = key.indexOf('published:') === 0 || key.indexOf('generated:') === 0;
+    if(!contentKey || !conflict.remote || typeof PlannerFieldSync === 'undefined' || !PlannerFieldSync.overlayDeviceEdits){
+      kept.push(conflict);
+      return;
+    }
+    var edited = (state._sheetEditedPaths && state._sheetEditedPaths[key]) || [];
+    var cleared = (state._clearedPaths && state._clearedPaths[key]) || [];
+    var localSnap = cloneSyncValue_(conflict.local);
+    var remoteSnap = cloneSyncValue_(conflict.remote);
+    var narrowed = PlannerFieldSync.overlayDeviceEdits(remoteSnap, localSnap, key, edited, cleared);
+    var show = PlannerFieldSync.deviceConflictPaths(remoteSnap, localSnap, key, edited, cleared);
+    conflict.local = narrowed;
+    conflict.devicePaths = show;
+    var id = key.slice(key.indexOf(':') + 1);
+    assignNarrowedCard_(id, key, narrowed);
+    narrowedAny = true;
+    (state.syncOutbox || []).forEach(function(op){
+      if(op && op.key === key) op.value = cloneSyncValue_(narrowed);
+    });
+    if(show.length){
+      kept.push(conflict);
+      return;
+    }
+    if(typeof rememberSyncFieldBase_ === 'function') rememberSyncFieldBase_(key, remoteSnap);
+    var rev = parseInt(conflict.serverEntityRevision, 10) || 0;
+    if(rev){
+      if(!state.syncEntityRevisions) state.syncEntityRevisions = {};
+      state.syncEntityRevisions[key] = rev;
+    }
+    state.syncOutbox = (state.syncOutbox || []).filter(function(op){ return !(op && op.key === key); });
+    if(state.syncDirtyEntityKeys) delete state.syncDirtyEntityKeys[key];
+    droppedUnedited = true;
+  });
+  if(droppedUnedited){
+    try { rebuildDirtyStateFromOutbox_(); } catch(eDrop){}
+  }
+  conflicts = kept;
+  if(narrowedAny){
+    try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true }); } catch(eAdopt){}
+  }
   if(!conflicts.length) return false;
   plannerSyncConflictPending_ = {
     mode: 'outbox',
@@ -40636,7 +40703,7 @@ function syncThreadsDraftFromDom_(content, draftId){
   content.threads.body = bodyText;
   content.threads.comment = commentText;
   content.threads.text = bodyText;
-  clearThreadsPendingMeta_(content);
+  clearThreadsPendingMeta_(content, draftId);
   return content;
 }
 
@@ -40645,7 +40712,7 @@ function threadsContentReady_(content){
 }
 function shouldShowThreadsPending_(content, draftId){
   if(hasThreadsDraftText_(content, draftId)) return false;
-  return !!(content && (content.threadsPending || threadsBgByDraft[draftId]));
+  return !!(threadsPendingMetaByDraft[draftId] || threadsBgByDraft[draftId]);
 }
 function refreshSheetIfViewingDraft_(draftId, catId, tab){
   if(state.selectedId !== draftId) return;
@@ -40858,15 +40925,8 @@ function getThreadsBgJob_(draftId){
   if(job === true) return { startedMs: Date.now(), endMs: Date.now() + THREADS_BG_ESTIMATE_MS };
   return job;
 }
-function setThreadsPendingMeta_(content, draftId, catId, topic, startedMs, endMs){
-  if(!content) return;
-  content.threadsPending = true;
-  content.threadsPendingStartedAt = startedMs;
-  content.threadsPendingEndMs = endMs;
-  content.threadsPendingTopic = topic || '';
-  content.threadsPendingCatId = catId;
-}
-function clearThreadsPendingMeta_(content){
+var threadsPendingMetaByDraft = {};
+function stripThreadsPendingFields_(content){
   if(!content) return;
   delete content.threadsPending;
   delete content.threadsPendingStartedAt;
@@ -40874,13 +40934,27 @@ function clearThreadsPendingMeta_(content){
   delete content.threadsPendingTopic;
   delete content.threadsPendingCatId;
 }
+function setThreadsPendingMeta_(content, draftId, catId, topic, startedMs, endMs){
+  if(draftId){
+    threadsPendingMetaByDraft[draftId] = {
+      startedMs: startedMs,
+      endMs: endMs,
+      topic: topic || '',
+      catId: catId
+    };
+  }
+  stripThreadsPendingFields_(content);
+}
+function clearThreadsPendingMeta_(content, draftId){
+  if(draftId) delete threadsPendingMetaByDraft[draftId];
+  stripThreadsPendingFields_(content);
+}
 function getThreadsPendingEndMs_(content, draftId){
   var job = getThreadsBgJob_(draftId);
   if(job && job.endMs) return job.endMs;
-  var endMs = parseInt(content && content.threadsPendingEndMs, 10);
-  if(endMs) return endMs;
-  var startedMs = parseInt(content && content.threadsPendingStartedAt, 10);
-  return startedMs ? startedMs + THREADS_BG_ESTIMATE_MS : Date.now() + THREADS_BG_ESTIMATE_MS;
+  var meta = threadsPendingMetaByDraft[draftId];
+  if(meta && meta.endMs) return meta.endMs;
+  return Date.now() + THREADS_BG_ESTIMATE_MS;
 }
 function getThreadsPendingCountdownText_(content, draftId){
   var activeJob = !!getThreadsBgJob_(draftId);
@@ -40902,7 +40976,7 @@ function updateThreadsPendingCountdown_(){
   var el = document.getElementById('threads-pending-countdown');
   if(!el || !state.selectedId) return;
   var content = getDraftContent_(state.selectedId);
-  if(!content || !content.threadsPending) return;
+  if(!threadsPendingMetaByDraft[state.selectedId] && !getThreadsBgJob_(state.selectedId)) return;
   el.textContent = getThreadsPendingCountdownText_(content, state.selectedId);
 }
 function normalizeThreadsSnsBlock_(raw){
@@ -41059,7 +41133,7 @@ function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
       var content = getDraftContent_(draftId);
       if(content){
         content.threads = threads;
-        clearThreadsPendingMeta_(content);
+        clearThreadsPendingMeta_(content, draftId);
         persistDraftContent_(draftId, content);
       }
       delete threadsBgByDraft[draftId];
@@ -41084,7 +41158,7 @@ function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
           var retryStartMs = Date.now();
           setThreadsPendingMeta_(failContent, draftId, catId, topic, retryStartMs, retryStartMs + THREADS_BG_ESTIMATE_MS);
         } else {
-          clearThreadsPendingMeta_(failContent);
+          clearThreadsPendingMeta_(failContent, draftId);
         }
         persistDraftContent_(draftId, failContent);
         if(state.selectedId === draftId){
@@ -41115,49 +41189,18 @@ function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
   })();
 }
 function reconcileThreadsPendingJobs_(reason){
-  if(!state.apiKey || genActiveJob || genPendingCount > 0) return false;
-  var now = Date.now();
-  var candidates = [];
-  (CATEGORIES || []).forEach(function(cat){
-    if(!isBlogInstaCategory(cat.id)) return;
-    (cat.drafts || []).forEach(function(d){
-      var content = getDraftContent_(d.id);
-      if(!content || !content.threadsPending || hasThreadsDraftText_(content, d.id) || !instaContentReady_(content) || threadsBgByDraft[d.id]) return;
-      var startedMs = parseInt(content.threadsPendingStartedAt, 10) || 0;
-      if(startedMs && now - startedMs > THREADS_PENDING_RESTART_WINDOW_MS){
-        clearThreadsPendingMeta_(content);
-        persistDraftContent_(d.id, content);
-        return;
-      }
-      candidates.push({
-        draftId: d.id,
-        catId: cat.id,
-        topic: d.topic || content.threadsPendingTopic || '',
-        insta: content.insta,
-        startedMs: startedMs
+  if(typeof PlannerFieldSync !== 'undefined' && !PlannerFieldSync.shouldResumeThreadsJob(reason)){
+    (CATEGORIES || []).forEach(function(cat){
+      (cat.drafts || []).forEach(function(d){
+        var content = getDraftContent_(d.id);
+        if(!content) return;
+        stripThreadsPendingFields_(content);
+        if(content.content) stripThreadsPendingFields_(content.content);
       });
     });
-  });
-  if(!candidates.length) return false;
-  candidates.sort(function(a, b){
-    if(a.draftId === state.selectedId) return -1;
-    if(b.draftId === state.selectedId) return 1;
-    return (b.startedMs || 0) - (a.startedMs || 0);
-  });
-  var job = candidates[0];
-  enqueueThreadsFromInsta_(job.draftId, job.catId, job.topic, job.insta, { resume: true });
-  if(state.selectedId === job.draftId){
-    state.selectedCatId = job.catId;
-    state.activeTab = 'threads';
-    setOpenDetailHash_(job.draftId, job.catId, 'threads');
-    var content = getDraftContent_(job.draftId);
-    var ov = document.getElementById('detail-overlay');
-    if(content && ov && ov.classList.contains('open')) renderSheetContent(content);
+    return false;
   }
-  if(reason && reason !== 'load' && typeof setAppToast === 'function'){
-    setAppToast('중단됐던 쓰레드 글 생성을 다시 이어서 시작했어요.', { duration: 4500, variant: 'ok' });
-  }
-  return true;
+  return false;
 }
 
 
@@ -43203,7 +43246,7 @@ window.onSheetPublishComplete = async function(opts){
     var thContent = getDraftContent_(draftId);
     if(thContent) syncThreadsDraftFromDom_(thContent, draftId);
     if(hasThreadsDraftText_(thContent, draftId)){
-      clearThreadsPendingMeta_(thContent);
+      clearThreadsPendingMeta_(thContent, draftId);
       delete threadsBgByDraft[draftId];
       persistDraftContent_(draftId, thContent);
     }

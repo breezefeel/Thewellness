@@ -261,19 +261,98 @@ var PlannerFieldSync = (function(){
     walk(before, after, prefix || '');
     return out;
   }
+  var DEVICE_PENDING_KEYS = {
+    threadsPending: 1,
+    threadsPendingStartedAt: 1,
+    threadsPendingEndMs: 1,
+    threadsPendingTopic: 1,
+    threadsPendingCatId: 1
+  };
+  function omitDevicePending(entity){
+    if(!entity || typeof entity !== 'object') return entity;
+    var out = clone(entity);
+    function strip(node){
+      if(!node || typeof node !== 'object' || Array.isArray(node)) return;
+      Object.keys(DEVICE_PENDING_KEYS).forEach(function(k){ delete node[k]; });
+    }
+    strip(out);
+    strip(out.content);
+    return out;
+  }
+  function sendKeyList(entity){
+    if(!entity || typeof entity !== 'object') return '';
+    var content = (entity.content && typeof entity.content === 'object' && !Array.isArray(entity.content)) ? entity.content : entity;
+    return Object.keys(content).filter(function(k){ return !DEVICE_PENDING_KEYS[k]; }).sort().join(',');
+  }
+  function shouldResumeThreadsJob(reason){
+    return reason === 'button';
+  }
+  function uniquePaths(edited, cleared){
+    var seen = {};
+    var out = [];
+    function add(list){
+      (list || []).forEach(function(p){
+        p = String(p || '');
+        if(!p || seen[p]) return;
+        seen[p] = true;
+        out.push(p);
+      });
+    }
+    add(edited);
+    add(cleared);
+    return out;
+  }
+  function deletePath(obj, path){
+    var parts = String(path || '').split('.');
+    var cur = obj;
+    for(var i = 0; i < parts.length - 1; i++){
+      if(!cur || typeof cur !== 'object') return;
+      cur = cur[parts[i]];
+    }
+    if(cur && typeof cur === 'object') delete cur[parts[parts.length - 1]];
+  }
+  function overlayDeviceEdits(serverEntity, localEntity, key, edited, cleared){
+    if(!serverEntity || typeof serverEntity !== 'object') return clone(localEntity);
+    var out = clone(serverEntity);
+    var outNode = contentOf(out, key);
+    var localNode = contentOf(localEntity, key);
+    if(!outNode || typeof outNode !== 'object') return out;
+    uniquePaths(edited, cleared).forEach(function(p){
+      var val = localNode ? getPath(localNode, p) : undefined;
+      if(val === undefined) deletePath(outNode, p);
+      else setPath(outNode, p, clone(val));
+    });
+    return out;
+  }
+  function deviceConflictPaths(serverEntity, localEntity, key, edited, cleared){
+    var localNode = contentOf(localEntity, key) || {};
+    var serverNode = contentOf(serverEntity, key) || {};
+    return uniquePaths(edited, cleared).filter(function(p){
+      return !same(getPath(localNode, p), getPath(serverNode, p));
+    });
+  }
+  function pathListed(allow, path){
+    if(allow[path]) return true;
+    var parts = String(path || '').split('.');
+    var acc = '';
+    for(var i = 0; i < parts.length; i++){
+      acc = acc ? (acc + '.' + parts[i]) : parts[i];
+      if(allow[acc]) return true;
+    }
+    return false;
+  }
   function describeDiff(localEntity, remoteEntity, key, onlyPaths){
     var allow = null;
-    if(onlyPaths && onlyPaths.length){
+    if(Array.isArray(onlyPaths)){
       allow = {};
       onlyPaths.forEach(function(p){
         var rel = String(p || '');
         if(String(key).indexOf('published:') === 0 && rel.indexOf('content.') === 0) rel = rel.slice('content.'.length);
-        allow[rel] = true;
-        allow[String(p || '')] = true;
+        if(rel) allow[rel] = true;
       });
     }
     return changedPaths(remoteEntity, localEntity, key, allPaths()).filter(function(p){
-      return !allow || allow[p];
+      return !allow || pathListed(allow, p);
     }).map(function(p){
       return {
         path: p,
@@ -321,6 +400,11 @@ var PlannerFieldSync = (function(){
     historySnapshot: historySnapshot,
     splitThreadComment: splitThreadComment,
     describeDiff: describeDiff,
+    omitDevicePending: omitDevicePending,
+    sendKeyList: sendKeyList,
+    shouldResumeThreadsJob: shouldResumeThreadsJob,
+    overlayDeviceEdits: overlayDeviceEdits,
+    deviceConflictPaths: deviceConflictPaths,
     clearedPathsBetween: clearedPathsBetween,
     threadBodyHits: threadBodyHits,
     publishedTouchedOn: publishedTouchedOn

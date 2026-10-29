@@ -368,6 +368,18 @@ var PlannerSyncSupabase = (function(){
       if(mut && mut.mutationId) sentById[mut.mutationId] = { mut: mut, asPatch: !!(body[i] && body[i]._asPatch) };
     });
     body.forEach(function(row){ delete row._asPatch; });
+    body.forEach(function(row){
+      try {
+        if(row.value && row.value._fieldPatch){
+          console.info('[칸 저장]', row.key, (row.value.paths || []).join(','));
+        } else {
+          var names = (typeof PlannerFieldSync !== 'undefined' && PlannerFieldSync.sendKeyList)
+            ? PlannerFieldSync.sendKeyList(row.value)
+            : '';
+          console.info('[칸 저장]', row.key, '카드 전체', names);
+        }
+      } catch(eSendLog){}
+    });
     return client.rpc('planner_apply_batch', { p_rows: body }).then(function(res){
       raiseIfSupabaseError(res.error, '항목을 저장하지 못했습니다.');
       var data = res.data || {};

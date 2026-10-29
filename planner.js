@@ -46031,6 +46031,14 @@ function applyDuplicateRefMove_(moved){
     }
     if(row.kind === 'reveal') cardLinkRevealId_ = row.draftId;
   });
+  function applyIdMap_(stateKey, next){
+    if(!next) return;
+    if(!state[stateKey] || typeof state[stateKey] !== 'object') state[stateKey] = {};
+    (moved.retireIds || []).forEach(function(id){ delete state[stateKey][id]; });
+    if(Object.prototype.hasOwnProperty.call(next, moved.keepId)) state[stateKey][moved.keepId] = next[moved.keepId];
+  }
+  applyIdMap_('draftBrandOverrides', moved.brandOverrides);
+  applyIdMap_('pinnedDraftIds', moved.pinned);
 }
 function persistUserDuplicateMerge_(){
   try {
@@ -46073,6 +46081,17 @@ function mergeWarnedDuplicateCards_(){
       if(state.published && Object.prototype.hasOwnProperty.call(state.published, id)) publishedSlice[id] = state.published[id];
       if(state.generatedOnly && Object.prototype.hasOwnProperty.call(state.generatedOnly, id)) generatedSlice[id] = state.generatedOnly[id];
     });
+    var brandSlice = {};
+    var pinSlice = {};
+    function takeId_(src, dest, id){
+      if(src && Object.prototype.hasOwnProperty.call(src, id)) dest[id] = src[id];
+    }
+    takeId_(state.draftBrandOverrides, brandSlice, plan.keepId);
+    takeId_(state.pinnedDraftIds, pinSlice, plan.keepId);
+    plan.retireIds.forEach(function(id){
+      takeId_(state.draftBrandOverrides, brandSlice, id);
+      takeId_(state.pinnedDraftIds, pinSlice, id);
+    });
     var assignmentPlans = duplicateAssignmentPlans_();
     var moved = PlannerSyncRules.plannerRetargetDuplicateRefs({
       keepId: plan.keepId,
@@ -46082,6 +46101,8 @@ function mergeWarnedDuplicateCards_(){
       links: duplicateLinks_().filter(function(row){ return row.draftId === plan.keepId || retireSet[row.draftId]; }),
       published: publishedSlice,
       generated: generatedSlice,
+      brandOverrides: brandSlice,
+      pinned: pinSlice,
       keepHasPublished: !!(state.published && state.published[plan.keepId])
     });
     if(!moved || !moved.ok) return;

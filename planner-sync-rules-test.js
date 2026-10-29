@@ -390,6 +390,27 @@ var movedRefs = R.plannerRetargetDuplicateRefs({
   assignments: [{ draftId: 'd6-old', stepId: 's3', order: 1 }]
 });
 assert(movedRefs.ok && movedRefs.assignments.length === 1 && movedRefs.assignments[0].draftId === 'd6-keep' && movedRefs.assignments[0].stepId === 's3', 'assignments move to the kept card');
+var tabOnly = R.plannerRetargetDuplicateRefs({
+  keepId: 'keep',
+  retireIds: ['old'],
+  published: {
+    keep: { content: { blog: { problem: '같음' } }, updatedAt: '2026-10-29T01:00:00.000Z' },
+    old: { content: { blog: { problem: '같음' } }, updatedAt: '2026-10-29T02:00:00.000Z', tabPublished: { blog: '2026-10-29T03:00:00.000Z' } }
+  }
+});
+assert(!tabOnly.ok, 'a retiring card with its own tabPublished is not merged');
+var brandMove = R.plannerRetargetDuplicateRefs({
+  keepId: 'keep',
+  retireIds: ['old'],
+  brandOverrides: { old: { series: '시리즈', topic: '가져온 주제' } }
+});
+assert(brandMove.ok && brandMove.brandOverrides.keep.series === '시리즈' && !brandMove.brandOverrides.old, 'brand settings only on the retiring card move to the kept card');
+var brandDiff = R.plannerRetargetDuplicateRefs({
+  keepId: 'keep',
+  retireIds: ['old'],
+  brandOverrides: { keep: { series: '가' }, old: { series: '나' } }
+});
+assert(!brandDiff.ok, 'different brand settings are not merged');
 var differentWork = R.plannerMergeDuplicateGroup([
   { id: 'a', placeholder: true, workKey: 'blog#하나', content: { blog: { problem: '하나' } } },
   { id: 'b', placeholder: true, workKey: 'blog#둘', content: { blog: { problem: '둘' } } }

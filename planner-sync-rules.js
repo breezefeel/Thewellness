@@ -652,6 +652,72 @@ var PlannerSyncRules = (function(){
       next.draftId = moveId(row.draftId);
       links.push(next);
     });
+    var publishedMetaSkip_ = { content: 1, updatedAt: 1, savedAt: 1, modifiedAt: 1, editedAt: 1, lastEditedAt: 1, lastSavedAt: 1, localSavedAt: 1, syncedAt: 1 };
+    function sortedClone_(value){
+      if(value == null || typeof value !== 'object') return value;
+      if(Array.isArray(value)) return value.map(sortedClone_);
+      var out = {};
+      Object.keys(value).sort().forEach(function(k){ out[k] = sortedClone_(value[k]); });
+      return out;
+    }
+    function sameSorted_(a, b){
+      try { return JSON.stringify(sortedClone_(a)) === JSON.stringify(sortedClone_(b)); }
+      catch(eSort){ return false; }
+    }
+    function publishedMeta_(row){
+      var out = {};
+      if(!row || typeof row !== 'object') return out;
+      Object.keys(row).forEach(function(k){
+        if(publishedMetaSkip_[k]) return;
+        out[k] = row[k];
+      });
+      return out;
+    }
+    function movePublished(map){
+      var out = {};
+      Object.keys(map || {}).forEach(function(id){
+        if(!retireIds[id]) out[id] = map[id];
+      });
+      Object.keys(retireIds).forEach(function(id){
+        if(!map || !Object.prototype.hasOwnProperty.call(map, id)) return;
+        if(!Object.prototype.hasOwnProperty.call(out, keepId)){ blocked = true; return; }
+        if(!sameSorted_(publishedMeta_(out[keepId]), publishedMeta_(map[id]))) blocked = true;
+      });
+      return out;
+    }
+    function moveBrand(map){
+      var out = {};
+      Object.keys(map || {}).forEach(function(id){
+        if(!retireIds[id]) out[id] = map[id];
+      });
+      Object.keys(retireIds).forEach(function(id){
+        if(!map || !Object.prototype.hasOwnProperty.call(map, id)) return;
+        if(!Object.prototype.hasOwnProperty.call(out, keepId)){
+          out[keepId] = map[id];
+          return;
+        }
+        if(!sameSorted_(out[keepId], map[id])) blocked = true;
+      });
+      return out;
+    }
+    function movePinned(map){
+      map = map || {};
+      var out = {};
+      Object.keys(map).forEach(function(id){
+        if(id !== keepId && !retireIds[id]) out[id] = map[id];
+      });
+      var marked = Object.prototype.hasOwnProperty.call(map, keepId);
+      var mark = marked ? map[keepId] : undefined;
+      Object.keys(retireIds).forEach(function(id){
+        if(!Object.prototype.hasOwnProperty.call(map, id)) return;
+        if(!marked){
+          marked = true;
+          mark = map[id];
+        }
+      });
+      if(marked) out[keepId] = mark;
+      return out;
+    }
     function moveMap(map, allowCreate){
       var out = {};
       Object.keys(map || {}).forEach(function(id){
@@ -665,8 +731,10 @@ var PlannerSyncRules = (function(){
       });
       return out;
     }
-    var published = moveMap(spec.published, false);
+    var published = movePublished(spec.published);
     var generated = moveMap(spec.generated, true);
+    var brandOverrides = moveBrand(spec.brandOverrides);
+    var pinned = movePinned(spec.pinned);
     if(blocked) return { ok: false, keepId: keepId, retireIds: Object.keys(retireIds) };
     return {
       ok: true,
@@ -677,7 +745,9 @@ var PlannerSyncRules = (function(){
       reservations: reservations,
       links: links,
       published: published,
-      generated: generated
+      generated: generated,
+      brandOverrides: brandOverrides,
+      pinned: pinned
     };
   }
 

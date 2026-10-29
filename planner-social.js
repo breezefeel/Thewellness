@@ -1,13 +1,15 @@
 /* 인스타·쓰레드 「지금 올리기 · 예약하기」 + 이미지 탭 미디어(Supabase Storage)
- * - 미디어: social-media 버킷 drafts/<초안ID>/ — 이미지 탭에서 올리고, 썸네일 「저장하기」도 여기로 (맨 앞 = 피드 첫 장)
+ * - 미디어: social-media 버킷 drafts/<초안ID>/ — 이미지 탭에서 올리고, 썸네일 「저장하기」도 여기로
+ * - 순서·커버는 같은 폴더의 _layout.json (파일 자체는 지우지 않음). 커버가 없으면 영상(mp4)이 아닌 첫 사진이 썸네일
  * - 게시: social_posts 표에 넣고 Edge Function social-publish 가 올린다. 예약은 1분마다 클라우드가 확인
  * - 게시는 @dr.park_dc.pt 하나로, 프로그램 계정은 공동작업자 (planner.js getInstagramCollabUsernameForCat_)
  * 설치: tools/social_setup.py · 표: planner-social.sql · 함수: supabase/functions/social-publish
  */
 var PlannerSocial = (function(){
   var BUCKET = 'social-media';
-  var cache = {};      // draftId → [{name, path, url, type}]
+  var cache = {};      // draftId → [{name, path, url, type, cover, thumb}]
   var postsCache = {}; // draftId → [social_posts rows]
+  var layoutCache = {}; // draftId → { order: [name], cover: name } | null
 
   function client(){
     if(typeof PlannerSyncSupabase === 'undefined' || !PlannerSyncSupabase.configured()) return Promise.reject(new Error('Supabase 설정이 없어요.'));
@@ -17,6 +19,8 @@ var PlannerSocial = (function(){
   }
   function folder(draftId){ return 'drafts/' + String(draftId || 'none').replace(/[^A-Za-z0-9_-]/g, '_'); }
   function isVideoName(name, mime){ return /^video\//.test(mime || '') || /\.(mp4|mov|m4v|webm)$/i.test(name || ''); }
+  function isMediaFileName(name){ return /\.(jpe?g|png|webp|gif|mp4|mov|m4v|webm)$/i.test(name || ''); }
+  function layoutPath(draftId){ return folder(draftId) + '/_layout.json'; }
 
   /** 인스타 API는 JPEG만 받는다 → 이미지는 JPEG로 바꿔 올린다 (영상은 그대로) */
   function toJpeg(blob){
@@ -38,17 +42,75 @@ var PlannerSocial = (function(){
     });
   }
 
+  function readLayout(sb, draftId){
+    return sb.storage.from(BUCKET).download(layoutPath(draftId)).then(function(res){
+      if(!res || res.error || !res.data) return null;
+      return res.data.text();
+    }).then(function(text){
+      if(!text) return null;
+      try {
+        var obj = JSON.parse(text);
+        if(!obj || typeof obj !== 'object') return null;
+        return {
+          order: Array.isArray(obj.order) ? obj.order.map(String) : [],
+          cover: typeof obj.cover === 'string' ? obj.cover : ''
+        };
+      } catch(e){ return null; }
+    }).catch(function(){ return null; });
+  }
+  function writeLayout(draftId, names, cover){
+    var body = JSON.stringify({ order: names, cover: cover || '' });
+    var blob = new Blob([body], { type: 'application/json' });
+    return client().then(function(sb){
+      return sb.storage.from(BUCKET).upload(layoutPath(draftId), blob, { contentType: 'application/json', upsert: true });
+    }).then(function(res){
+      if(res && res.error) throw new Error(res.error.message);
+    });
+  }
+  /** 저장해 둔 순서를 적용한다. 목록에 없는 이름은 버리고, 새로 생긴 파일은 뒤에 붙인다. */
+  function orderMedia(files, layout){
+    var byName = {};
+    files.forEach(function(f){ byName[f.name] = f; });
+    var used = {};
+    var out = [];
+    var order = layout && Array.isArray(layout.order) ? layout.order : null;
+    if(order){
+      order.forEach(function(name){
+        if(byName[name] && !used[name]){ out.push(byName[name]); used[name] = 1; }
+      });
+    }
+    files.slice().sort(function(a, b){ return a.name < b.name ? -1 : (a.name > b.name ? 1 : 0); }).forEach(function(f){
+      if(!used[f.name]) out.push(f);
+    });
+    var coverName = '';
+    if(layout && layout.cover && byName[layout.cover] && byName[layout.cover].type !== 'VIDEO') coverName = layout.cover;
+    var implicit = '';
+    if(!coverName){
+      for(var i = 0; i < out.length; i++){
+        if(out[i].type !== 'VIDEO'){ implicit = out[i].name; break; }
+      }
+    }
+    out.forEach(function(m){
+      m.cover = !!(coverName && m.name === coverName);
+      m.thumb = coverName ? m.name === coverName : m.name === implicit;
+    });
+    return out;
+  }
   function listMedia(draftId){
     return client().then(function(sb){
       return sb.storage.from(BUCKET).list(folder(draftId), { limit: 100, sortBy: { column: 'name', order: 'asc' } }).then(function(res){
         if(res.error) throw new Error(res.error.message);
-        var list = (res.data || []).filter(function(f){ return f.name && f.name !== '.emptyFolderPlaceholder'; }).map(function(f){
+        var files = (res.data || []).filter(function(f){ return f && isMediaFileName(f.name); }).map(function(f){
           var path = folder(draftId) + '/' + f.name;
           return { name: f.name, path: path, url: sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl,
-            type: isVideoName(f.name, f.metadata && f.metadata.mimetype) ? 'VIDEO' : 'IMAGE' };
+            type: isVideoName(f.name, f.metadata && f.metadata.mimetype) ? 'VIDEO' : 'IMAGE', cover: false, thumb: false };
         });
-        cache[draftId] = list;
-        return list;
+        return readLayout(sb, draftId).then(function(layout){
+          layoutCache[draftId] = layout;
+          var list = orderMedia(files, layout);
+          cache[draftId] = list;
+          return list;
+        });
       });
     });
   }
@@ -77,6 +139,15 @@ var PlannerSocial = (function(){
       var old = list.filter(function(m){ return /^0_thumb_/.test(m.name); }).map(function(m){ return m.path; });
       return old.length ? client().then(function(sb){ return sb.storage.from(BUCKET).remove(old); }) : null;
     }).then(function(){ return upload(draftId, blob, name, { first: true }); })
+      .then(function(newName){
+        return listMedia(draftId).then(function(list){
+          var names = list.map(function(m){ return m.name; }).filter(function(n){ return n !== newName; });
+          names.unshift(newName);
+          var added = list.filter(function(m){ return m.name === newName; })[0];
+          var cover = added && added.type !== 'VIDEO' ? newName : explicitCoverName(list.filter(function(m){ return m.name !== newName; }));
+          return writeLayout(draftId, names, cover);
+        });
+      })
       .then(function(){ if(document.querySelector('[data-social-slot]')) hydrate(); });
   }
 
@@ -86,16 +157,33 @@ var PlannerSocial = (function(){
   function curCat(){ return state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId); }
 
   // ── 화면 ─────────────────────────────────────────────
+  function mediaBtn_(label, onclick, disabled){
+    return '<button type="button" onclick="' + onclick + '"' + (disabled ? ' disabled' : '') +
+      ' style="border:1px solid rgba(15,23,42,.16);background:#fff;border-radius:8px;font-size:12px;line-height:1.2;padding:6px 8px;min-height:32px;cursor:pointer' +
+      (disabled ? ';opacity:.35' : '') + '">' + label + '</button>';
+  }
   function mediaGridHTML(list, editable){
     if(!list.length) return '<div style="font-size:12px;opacity:.7;padding:6px 0">아직 올린 사진·영상이 없어요.</div>';
-    return '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">' + list.map(function(m, i){
+    return '<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">' + list.map(function(m, i){
       var thumb = m.type === 'VIDEO'
         ? '<video src="' + esc(m.url) + '#t=0.5" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover"></video><span style="position:absolute;left:4px;bottom:4px;font-size:10px;background:rgba(0,0,0,.6);color:#fff;border-radius:4px;padding:0 4px">릴스</span>'
         : '<img src="' + esc(m.url) + '" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">';
-      return '<div style="position:relative;width:84px;height:105px;border-radius:8px;overflow:hidden;background:#eef2f7;border:1px solid rgba(15,23,42,.12)">' + thumb +
-        (i === 0 ? '<span style="position:absolute;left:4px;top:4px;font-size:10px;background:#1e3a6e;color:#fff;border-radius:4px;padding:0 4px">첫 장</span>' : '') +
-        (editable ? '<button type="button" title="내려받기" onclick="PlannerSocial.download(' + i + ')" style="position:absolute;right:28px;top:4px;border:0;border-radius:6px;background:rgba(255,255,255,.9);font-size:11px;padding:1px 5px;cursor:pointer">⬇</button>' +
-          '<button type="button" title="삭제" onclick="PlannerSocial.remove(' + i + ')" style="position:absolute;right:4px;top:4px;border:0;border-radius:6px;background:rgba(255,255,255,.9);font-size:11px;padding:1px 5px;cursor:pointer">✕</button>' : '') +
+      var badge = m.cover
+        ? '<span style="position:absolute;left:4px;top:4px;font-size:10px;background:#0F766E;color:#fff;border-radius:4px;padding:0 4px">커버</span>'
+        : (m.thumb ? '<span style="position:absolute;left:4px;top:4px;font-size:10px;background:#1e3a6e;color:#fff;border-radius:4px;padding:0 4px">썸네일</span>' : '');
+      var tools = '';
+      if(editable){
+        tools = '<div style="display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0">' +
+          mediaBtn_('위로', 'PlannerSocial.move(' + i + ',-1)', i === 0) +
+          mediaBtn_('아래로', 'PlannerSocial.move(' + i + ',1)', i === list.length - 1) +
+          (m.type === 'VIDEO' ? '' : mediaBtn_(m.cover ? '커버 해제' : '커버로 지정', 'PlannerSocial.setCover(' + i + ')', false)) +
+          mediaBtn_('받기', 'PlannerSocial.download(' + i + ')', false) +
+          mediaBtn_('삭제', 'PlannerSocial.remove(' + i + ')', false) +
+        '</div>';
+      }
+      return '<div style="display:flex;gap:8px;align-items:flex-start;width:100%">' +
+        '<div style="position:relative;width:84px;height:105px;flex:0 0 auto;border-radius:8px;overflow:hidden;background:#eef2f7;border:1px solid rgba(15,23,42,.12)">' + thumb + badge + '</div>' +
+        tools +
       '</div>';
     }).join('') + '</div>';
   }
@@ -136,7 +224,7 @@ var PlannerSocial = (function(){
       var mine = (rows || []).filter(function(r){ return kind === 'images' || r.platform === (kind === 'insta' ? 'instagram' : 'threads'); });
       if(kind === 'images'){
         el.innerHTML = '<div class="img-section-title"><span>인스타·쓰레드에 올릴 사진·릴스</span></div>' +
-          '<p style="font-size:12px;color:#6B7280;margin:0 0 6px;line-height:1.55">여기 올린 파일이 인스타 탭 「지금 올리기·예약하기」에 그대로 쓰입니다. <strong>첫 장이 피드</strong>(썸네일 「저장하기」는 자동으로 첫 장). 사진은 JPEG로 바꿔 올리고, 영상은 50MB까지. 여러 장이면 캐러셀(최대 10장).</p>' +
+          '<p style="font-size:12px;color:#6B7280;margin:0 0 6px;line-height:1.55">여기 올린 파일이 인스타 탭 「지금 올리기·예약하기」에 그대로 쓰입니다. 순서는 <strong>위·아래</strong>로 바꿉니다. <strong>커버로 지정</strong>한 사진이 썸네일입니다. 지정하지 않으면 영상(mp4)이 아닌 첫 사진이 썸네일입니다. 사진은 JPEG로 바꿔 올리고, 영상은 50MB까지. 여러 장이면 캐러셀(최대 10장).</p>' +
           '<label class="thumb-maker-photo-btn" style="display:inline-block;cursor:pointer">사진·릴스 올리기<input type="file" accept="image/*,video/*" multiple style="display:none" onchange="PlannerSocial.onPick(this)"></label>' +
           mediaGridHTML(list, true);
       } else if(kind === 'insta'){
@@ -175,10 +263,42 @@ var PlannerSocial = (function(){
       return typeof saveThumbMakerBlob_ === 'function' ? saveThumbMakerBlob_(b, m.name) : null;
     }).catch(function(err){ toast(err.message, 'err'); });
   }
+  function explicitCoverName(list){
+    var hit = (list || []).filter(function(m){ return m && m.cover; })[0];
+    return hit ? hit.name : '';
+  }
+  function persistOrder(draftId, list, coverName){
+    return writeLayout(draftId, list.map(function(m){ return m.name; }), coverName).then(function(){ return hydrate(); });
+  }
+  function move(i, dir){
+    var draftId = curDraft();
+    var list = (cache[draftId] || []).slice();
+    var j = i + dir;
+    if(!list[i] || j < 0 || j >= list.length) return;
+    var tmp = list[i];
+    list[i] = list[j];
+    list[j] = tmp;
+    persistOrder(draftId, list, explicitCoverName(list)).catch(function(err){ toast(err.message, 'err'); });
+  }
+  function setCover(i){
+    var draftId = curDraft();
+    var list = cache[draftId] || [];
+    var m = list[i];
+    if(!m || m.type === 'VIDEO') return;
+    var cover = m.cover ? '' : m.name;
+    persistOrder(draftId, list, cover).catch(function(err){ toast(err.message, 'err'); });
+  }
   function remove(i){
-    var m = (cache[curDraft()] || [])[i];
+    var draftId = curDraft();
+    var list = (cache[draftId] || []).slice();
+    var m = list[i];
     if(!m || !window.confirm('이 파일을 Supabase에서 지울까요?')) return;
-    removeMedia(m.path).then(hydrate).catch(function(err){ toast(err.message, 'err'); });
+    var next = list.filter(function(item){ return item && item.name !== m.name; });
+    var cover = explicitCoverName(list) === m.name ? '' : explicitCoverName(list);
+    removeMedia(m.path).then(function(){
+      if(!layoutCache[draftId] && !cover) return hydrate();
+      return persistOrder(draftId, next, cover);
+    }).catch(function(err){ toast(err.message, 'err'); });
   }
 
   // ── 게시 ─────────────────────────────────────────────
@@ -190,7 +310,9 @@ var PlannerSocial = (function(){
     var tab = platform === 'instagram' ? 'insta' : 'threads';
     applySheetEditsForTab_(content, tab);
     persistDraftContent_(draftId, content);
-    var media = (cache[draftId] || []).map(function(m){ return { url: m.url, path: m.path, type: m.type }; });
+    var media = (cache[draftId] || []).map(function(m){
+      return { url: m.url, path: m.path, type: m.type, cover: !!m.thumb };
+    });
     var cat = CATEGORIES[catId];
     var draft = cat && cat.drafts.find(function(d){ return d.id === draftId; });
     var row = { platform: platform, draft_id: draftId, cat_id: catId, topic: draft ? draft.topic : '' };
@@ -500,7 +622,8 @@ var PlannerSocial = (function(){
   }
   setTimeout(syncPublished, 6000);
 
-  return { hydrate: hydrate, onPick: onPick, download: download, remove: remove, publishNow: publishNow, schedule: schedule,
-    cancel: cancel, actionsHTML: actionsHTML, upload: upload, saveThumb: saveThumb, syncPublished: syncPublished };
+  return { hydrate: hydrate, onPick: onPick, download: download, remove: remove, move: move, setCover: setCover,
+    publishNow: publishNow, schedule: schedule, cancel: cancel, actionsHTML: actionsHTML, upload: upload,
+    saveThumb: saveThumb, syncPublished: syncPublished };
 })();
 window.PlannerSocial = PlannerSocial;

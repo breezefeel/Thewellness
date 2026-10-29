@@ -1,15 +1,15 @@
 /* 브랜딩 플래너 — Service Worker (알림·딥링크·정적 캐시) */
-var PLANNER_CACHE = 'planner-static-v415';
+var PLANNER_CACHE = 'planner-static-v416';
 
 function isPlannerStaticRequest(url){
   if(!url || url.origin !== self.location.origin) return false;
   var path = url.pathname || '';
-  return /\/(planner\.(css|js)|planner-thumbs\.js|planner-sync-config\.js|planner-sync-supabase\.js|planner-sync-rules\.js|planner-import\.js|ops-naver-kw-seed\.js)(\?.*)?$/.test(path);
+  return /\/(planner\.(css|js)|planner-field-sync\.js|planner-thumbs\.js|planner-sync-config\.js|planner-sync-supabase\.js|planner-sync-rules\.js|planner-import\.js|ops-naver-kw-seed\.js)(\?.*)?$/.test(path);
 }
 
 function isPlannerJsRequest(url){
   if(!url || url.origin !== self.location.origin) return false;
-  return /\/(planner\.js|planner-thumbs\.js|planner-sync-config\.js|planner-sync-supabase\.js|planner-sync-rules\.js|planner-import\.js)(\?.*)?$/.test(url.pathname || '');
+  return /\/(planner\.js|planner-field-sync\.js|planner-thumbs\.js|planner-sync-config\.js|planner-sync-supabase\.js|planner-sync-rules\.js|planner-import\.js)(\?.*)?$/.test(url.pathname || '');
 }
 
 self.addEventListener('install', function(event){

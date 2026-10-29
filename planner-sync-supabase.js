@@ -347,7 +347,7 @@ var PlannerSyncSupabase = (function(){
     var body = (mutations || []).map(function(mut){
       return {
         key: mut.key,
-        value: mut.deleted ? null : mut.value,
+        value: mut.deleted ? null : ((state && state.syncServerFieldPatch && mut.fieldPatch) ? mut.fieldPatch : mut.value),
         deleted: !!mut.deleted,
         baseEntityRevision: parseInt(mut.baseEntityRevision, 10) || 0,
         mutationId: mut.mutationId || ''
@@ -391,8 +391,15 @@ var PlannerSyncSupabase = (function(){
           serverUpdatedAt: item.updatedAt || ''
         };
       });
+      if(data.fieldPatch && typeof state !== 'undefined') state.syncServerFieldPatch = true;
       if(typeof noteSupabaseAcceptedRevisions_ === 'function'){
         noteSupabaseAcceptedRevisions_(accepted.filter(function(item){ return item.status !== 'idempotent'; }));
+      }
+      if(typeof rememberSyncFieldBase_ === 'function'){
+        accepted.forEach(function(item){
+          var sent = sentById[item.mutationId];
+          if(sent && sent.value) rememberSyncFieldBase_(item.key, sent.value);
+        });
       }
       var result = conflicts.length ? (accepted.length ? 'partial' : 'conflict') : 'success';
       return {

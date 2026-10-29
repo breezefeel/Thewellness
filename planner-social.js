@@ -1,6 +1,6 @@
 /* 인스타·쓰레드 「지금 올리기 · 예약하기」 + 이미지 탭 미디어(Supabase Storage)
- * - 미디어: social-media 버킷 drafts/<초안ID>/ — 이미지 탭에서 올리고, 썸네일 「저장하기」도 여기로
- * - 순서·커버는 같은 폴더의 _layout.json (파일 자체는 지우지 않음). 커버가 없으면 영상(mp4)이 아닌 첫 사진이 썸네일
+ * - 미디어: social-media 버킷 drafts/<초안ID>/ — 이미지 탭에는 사진만 올린다. 릴스(mp4) 원본은 올리지 않는다.
+ * - 릴스 파일 이름은 카드 content.reelFile 텍스트. 순서·커버는 같은 폴더의 _layout.json. 커버가 없으면 영상이 아닌 첫 사진이 썸네일.
  * - 게시: social_posts 표에 넣고 Edge Function social-publish 가 올린다. 예약은 1분마다 클라우드가 확인
  * - 게시는 @dr.park_dc.pt 하나로, 프로그램 계정은 공동작업자 (planner.js getInstagramCollabUsernameForCat_)
  * 설치: tools/social_setup.py · 표: planner-social.sql · 함수: supabase/functions/social-publish
@@ -201,7 +201,55 @@ var PlannerSocial = (function(){
   }
 
   /** 시트 본문의 <div data-social-slot="images|insta|threads"> 를 채운다 */
+  function readReelFile(draftId){
+    var content = typeof getDraftContent_ === 'function' ? getDraftContent_(draftId) : null;
+    return content && typeof content.reelFile === 'string' ? content.reelFile : '';
+  }
+  function writeReelFile(draftId, text){
+    if(!draftId || typeof state === 'undefined') return false;
+    var next = String(text || '').replace(/\r/g, '').trim();
+    var gen = state.generatedOnly && state.generatedOnly[draftId];
+    var pubWrap = state.published && state.published[draftId];
+    var pub = pubWrap && pubWrap.content;
+    if(!gen && !pub){
+      var created = { reelFile: next };
+      if(!state.published[draftId]) state.published[draftId] = {};
+      state.published[draftId].content = created;
+      if(!state.generatedOnly) state.generatedOnly = {};
+      state.generatedOnly[draftId] = created;
+      return true;
+    }
+    var changed = false;
+    function put(obj){
+      if(!obj || typeof obj !== 'object') return;
+      if(String(obj.reelFile || '') === next) return;
+      obj.reelFile = next;
+      changed = true;
+    }
+    put(gen);
+    if(pub && pub !== gen) put(pub);
+    return changed;
+  }
+  function saveReelFile(value){
+    var draftId = curDraft();
+    if(!draftId) return;
+    if(!writeReelFile(draftId, value)) return;
+    if(typeof saveFocusedDraftChange_ === 'function') saveFocusedDraftChange_(draftId);
+  }
+  function flushReelFile(){
+    var el = document.getElementById('social-reel-file');
+    if(el) saveReelFile(el.value);
+  }
+  function reelFieldHTML(){
+    return '<label for="social-reel-file" style="display:block;font-size:12px;font-weight:700;margin:10px 0 4px">릴스 파일</label>' +
+      '<textarea id="social-reel-file" rows="2" placeholder="1031_인스타_고관절릴스.mp4" ' +
+      'style="width:100%;box-sizing:border-box;font:inherit;font-size:13px;line-height:1.45;padding:8px;border-radius:8px;border:1px solid #cbd5e1" ' +
+      'onchange="PlannerSocial.saveReelFile(this.value)" onblur="PlannerSocial.saveReelFile(this.value)">' +
+      esc(readReelFile(curDraft())) + '</textarea>' +
+      '<p style="font-size:11.5px;color:#6B7280;margin:4px 0 8px;line-height:1.5">원본은 MYBOX 「11. 발행 확인」에 둡니다. 발행 후에는 「발행 완료」로 옮깁니다. 여기에는 이름 또는 경로만 적습니다. 예: 1031_인스타_고관절릴스.mp4</p>';
+  }
   function hydrate(){
+    flushReelFile();
     var draftId = curDraft();
     var slots = document.querySelectorAll('[data-social-slot]');
     if(!draftId || !slots.length) return;
@@ -223,12 +271,16 @@ var PlannerSocial = (function(){
       var kind = el.getAttribute('data-social-slot');
       var mine = (rows || []).filter(function(r){ return kind === 'images' || r.platform === (kind === 'insta' ? 'instagram' : 'threads'); });
       if(kind === 'images'){
-        el.innerHTML = '<div class="img-section-title"><span>인스타·쓰레드에 올릴 사진·릴스</span></div>' +
-          '<p style="font-size:12px;color:#6B7280;margin:0 0 6px;line-height:1.55">여기 올린 파일이 인스타 탭 「지금 올리기·예약하기」에 그대로 쓰입니다. 순서는 <strong>위·아래</strong>로 바꿉니다. <strong>커버로 지정</strong>한 사진이 썸네일입니다. 지정하지 않으면 영상(mp4)이 아닌 첫 사진이 썸네일입니다. 사진은 JPEG로 바꿔 올리고, 영상은 50MB까지. 여러 장이면 캐러셀(최대 10장).</p>' +
-          '<label class="thumb-maker-photo-btn" style="display:inline-block;cursor:pointer">사진·릴스 올리기<input type="file" accept="image/*,video/*" multiple style="display:none" onchange="PlannerSocial.onPick(this)"></label>' +
+        el.innerHTML = '<div class="img-section-title"><span>인스타·쓰레드에 올릴 사진</span></div>' +
+          '<p style="font-size:12px;color:#6B7280;margin:0 0 6px;line-height:1.55">릴스 원본(mp4)은 올리지 않습니다. 사진은 여기서 올리고, 순서는 <strong>위·아래</strong>로 바꿉니다. <strong>커버로 지정</strong>한 사진이 썸네일입니다. 지정하지 않으면 영상(mp4)이 아닌 첫 사진이 썸네일입니다. 여러 장이면 캐러셀(최대 10장).</p>' +
+          reelFieldHTML() +
+          '<label class="thumb-maker-photo-btn" style="display:inline-block;cursor:pointer">사진 올리기<input type="file" accept="image/jpeg,image/png,image/webp,image/*" multiple style="display:none" onchange="PlannerSocial.onPick(this)"></label>' +
           mediaGridHTML(list, true);
       } else if(kind === 'insta'){
-        el.innerHTML = '<div class="ops-kw-preview-head" style="margin-top:4px">올릴 사진·릴스 <span>' + list.length + '개 · 이미지 탭에서 바꿉니다</span></div>' + mediaGridHTML(list, false) + postsHTML(mine);
+        var reelNote = readReelFile(curDraft());
+        el.innerHTML = '<div class="ops-kw-preview-head" style="margin-top:4px">올릴 사진 <span>' + list.length + '개 · 이미지 탭에서 바꿉니다</span></div>' +
+          (reelNote ? '<div style="font-size:12px;line-height:1.5;margin:6px 0">릴스 파일 · ' + esc(reelNote).replace(/\n/g, '<br>') + '</div>' : '') +
+          mediaGridHTML(list, false) + postsHTML(mine);
       } else {
         el.innerHTML = '<label style="display:inline-flex;gap:6px;align-items:center;font-size:12px;margin-top:4px"><input type="checkbox" id="social-threads-media"' + (list.length ? '' : ' disabled') + '> 이미지 탭 사진·영상도 같이 올리기 (' + list.length + '개)</label>' +
           '<div style="font-size:11.5px;opacity:.7;margin-top:2px">댓글 박스의 빈 줄마다 본문 아래 이어지는 댓글로 하나씩 올립니다.</div>' + postsHTML(mine);
@@ -248,13 +300,26 @@ var PlannerSocial = (function(){
   function onPick(input){
     var files = Array.prototype.slice.call((input && input.files) || []);
     var draftId = curDraft();
+    if(input) input.value = '';
     if(!files.length || !draftId) return;
-    toast(files.length + '개 올리는 중…', 'ok', 2500);
+    var videos = files.filter(function(f){ return isVideoName(f.name, f.type); });
+    var images = files.filter(function(f){ return !isVideoName(f.name, f.type); });
+    if(videos.length){
+      var names = videos.map(function(f){ return String(f.name || '').trim(); }).filter(Boolean).join('\n');
+      var el = document.getElementById('social-reel-file');
+      var cur = el ? String(el.value || '').trim() : readReelFile(draftId);
+      if(!cur && names){
+        if(el) el.value = names;
+        saveReelFile(names);
+      }
+      toast('릴스 원본은 올리지 않아요. MYBOX 「11. 발행 확인」에 두고, 파일 이름을 적어 주세요.', 'ok', 5200);
+    }
+    if(!images.length) return;
+    toast(images.length + '장 올리는 중…', 'ok', 2500);
     var chain = Promise.resolve();
-    files.forEach(function(f){ chain = chain.then(function(){ return upload(draftId, f, f.name); }); });
-    chain.then(function(){ toast('Supabase에 올렸어요 (' + files.length + '개)'); hydrate(); })
+    images.forEach(function(f){ chain = chain.then(function(){ return upload(draftId, f, f.name); }); });
+    chain.then(function(){ toast('사진을 올렸어요 (' + images.length + '장)'); hydrate(); })
       .catch(function(err){ toast(err.message, 'err', 6000); hydrate(); });
-    input.value = '';
   }
   function download(i){
     var m = (cache[curDraft()] || [])[i];
@@ -622,7 +687,7 @@ var PlannerSocial = (function(){
   }
   setTimeout(syncPublished, 6000);
 
-  return { hydrate: hydrate, onPick: onPick, download: download, remove: remove, move: move, setCover: setCover,
+  return { hydrate: hydrate, onPick: onPick, download: download, remove: remove, move: move, setCover: setCover, saveReelFile: saveReelFile,
     publishNow: publishNow, schedule: schedule, cancel: cancel, actionsHTML: actionsHTML, upload: upload,
     saveThumb: saveThumb, syncPublished: syncPublished };
 })();

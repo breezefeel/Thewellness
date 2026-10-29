@@ -240,13 +240,45 @@ var PlannerSocial = (function(){
     var el = document.getElementById('social-reel-file');
     if(el) saveReelFile(el.value);
   }
+  var reelFolderAt = 0;
+  function openReelFolder(){
+    var now = Date.now();
+    if(now - reelFolderAt < 1200) return;
+    reelFolderAt = now;
+    var el = document.getElementById('social-reel-file');
+    var name = el ? String(el.value || '') : readReelFile(curDraft());
+    if(typeof isOpsMobileDevice_ === 'function' && isOpsMobileDevice_()){
+      toast('폴더는 네이버 박스가 연결된 데스크탑에서 열립니다.', 'ok', 4200);
+      return;
+    }
+    setTimeout(function(){
+      var box = document.getElementById('social-reel-file');
+      if(box) box.focus();
+    }, 300);
+    fetch('http://127.0.0.1:28765/open-reel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name })
+    }).then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(j){
+        if(!r.ok || j.ok === false) throw new Error((j && j.error) || '폴더를 열지 못했어요');
+        if(String(name || '').trim() && j.found === false) toast('발행 확인 폴더를 열었어요. 그 이름의 파일은 없어요.', 'ok', 4200);
+      });
+    }).catch(function(err){
+      var msg = err && err.message;
+      if(!msg || msg === 'Failed to fetch' || /NetworkError|Load failed|fetch/i.test(msg)){
+        msg = '폴더를 열려면 이 데스크탑에서 광고연결켜기.bat 을 실행해 주세요.';
+      }
+      toast(msg, 'err', 5200);
+    });
+  }
   function reelFieldHTML(){
     return '<label for="social-reel-file" style="display:block;font-size:12px;font-weight:700;margin:10px 0 4px">릴스 파일</label>' +
       '<textarea id="social-reel-file" rows="2" placeholder="1031_인스타_고관절릴스.mp4" ' +
       'style="width:100%;box-sizing:border-box;font:inherit;font-size:13px;line-height:1.45;padding:8px;border-radius:8px;border:1px solid #cbd5e1" ' +
-      'onchange="PlannerSocial.saveReelFile(this.value)" onblur="PlannerSocial.saveReelFile(this.value)">' +
+      'onclick="PlannerSocial.openReelFolder()" onchange="PlannerSocial.saveReelFile(this.value)" onblur="PlannerSocial.saveReelFile(this.value)">' +
       esc(readReelFile(curDraft())) + '</textarea>' +
-      '<p style="font-size:11.5px;color:#6B7280;margin:4px 0 8px;line-height:1.5">원본은 MYBOX 「11. 발행 확인」에 둡니다. 발행 후에는 「발행 완료」로 옮깁니다. 여기에는 이름 또는 경로만 적습니다. 예: 1031_인스타_고관절릴스.mp4</p>';
+      '<p style="font-size:11.5px;color:#6B7280;margin:4px 0 8px;line-height:1.5">칸을 누르면 그 파일이 있는 폴더가 열립니다. 원본은 MYBOX 「11. 발행 확인」에 있고, 발행 후에는 「발행 완료」로 옮깁니다.</p>';
   }
   function hydrate(){
     flushReelFile();
@@ -687,7 +719,7 @@ var PlannerSocial = (function(){
   }
   setTimeout(syncPublished, 6000);
 
-  return { hydrate: hydrate, onPick: onPick, download: download, remove: remove, move: move, setCover: setCover, saveReelFile: saveReelFile,
+  return { hydrate: hydrate, onPick: onPick, download: download, remove: remove, move: move, setCover: setCover, saveReelFile: saveReelFile, openReelFolder: openReelFolder,
     publishNow: publishNow, schedule: schedule, cancel: cancel, actionsHTML: actionsHTML, upload: upload,
     saveThumb: saveThumb, syncPublished: syncPublished };
 })();

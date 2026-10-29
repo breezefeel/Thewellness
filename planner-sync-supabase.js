@@ -379,7 +379,9 @@ var PlannerSyncSupabase = (function(){
           key: item.key || (sent && sent.key) || '',
           entityRevision: parseInt(item.revision, 10) || 0,
           version: sent ? (parseInt(sent.version, 10) || 1) : 1,
-          status: item.status || 'ok'
+          status: item.status || 'ok',
+          appliedPaths: item.appliedPaths || [],
+          remainingPaths: item.remainingPaths || []
         };
       });
       var conflicts = (data.conflicts || []).map(function(item){
@@ -392,13 +394,18 @@ var PlannerSyncSupabase = (function(){
           serverValue: item.value,
           serverDeleted: !!item.deleted,
           serverEntityRevision: parseInt(item.revision, 10) || 0,
-          serverUpdatedAt: item.updatedAt || ''
+          serverUpdatedAt: item.updatedAt || '',
+          appliedPaths: item.appliedPaths || [],
+          remainingPaths: item.remainingPaths || []
         };
       });
       if(typeof state !== 'undefined') state.syncServerFieldPatch = !!data.fieldPatch;
       if(typeof noteSupabaseAcceptedRevisions_ === 'function'){
         noteSupabaseAcceptedRevisions_(accepted.filter(function(item){ return item.status !== 'idempotent'; }));
       }
+      accepted.forEach(function(item){
+        if(typeof clearSheetPathsAfterAccept_ === 'function') clearSheetPathsAfterAccept_(item);
+      });
       if(typeof rememberSyncFieldBase_ === 'function'){
         accepted.forEach(function(item){
           var pack = sentById[item.mutationId];

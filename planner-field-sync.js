@@ -68,8 +68,8 @@ var PlannerFieldSync = (function(){
     }
     return false;
   }
-  function fillEmptyFromServer(localNode, serverNode, editedSet, prefix){
-    if(pathEdited(editedSet, prefix)) return clone(localNode);
+  function fillEmptyFromServer(localNode, serverNode, editedSet, clearedSet, prefix){
+    if(pathEdited(editedSet, prefix) || pathEdited(clearedSet, prefix)) return clone(localNode);
     if(Array.isArray(serverNode) || Array.isArray(localNode)){
       if(!filled(localNode) && filled(serverNode)) return clone(serverNode);
       return clone(localNode);
@@ -82,13 +82,13 @@ var PlannerFieldSync = (function(){
     Object.keys(serverNode).forEach(function(k){
       var child = prefix ? (prefix + '.' + k) : k;
       var localChild = (localNode && typeof localNode === 'object') ? localNode[k] : undefined;
-      if(pathEdited(editedSet, child)){
+      if(pathEdited(editedSet, child) || pathEdited(clearedSet, child)){
         if(localChild !== undefined) out[k] = clone(localChild);
         else delete out[k];
         return;
       }
       if(serverNode[k] && typeof serverNode[k] === 'object' && !Array.isArray(serverNode[k])){
-        out[k] = fillEmptyFromServer(localChild, serverNode[k], editedSet, child);
+        out[k] = fillEmptyFromServer(localChild, serverNode[k], editedSet, clearedSet, child);
         return;
       }
       if(!filled(localChild) && filled(serverNode[k])) out[k] = clone(serverNode[k]);
@@ -127,31 +127,40 @@ var PlannerFieldSync = (function(){
     if(!baseEntity || typeof baseEntity !== 'object') return true;
     return !same(withoutTabPaths(baseEntity, key), withoutTabPaths(mergedEntity, key));
   }
-  function changedPaths(baseEntity, localEntity, key, edited){
+  function changedPaths(baseEntity, localEntity, key, edited, cleared){
     var base = contentOf(baseEntity, key) || {};
     var local = contentOf(localEntity, key) || {};
     var editedMap = {};
+    var clearedMap = {};
     (edited || []).forEach(function(p){ editedMap[p] = true; });
+    (cleared || []).forEach(function(p){ clearedMap[p] = true; });
     var paths = [];
     allPaths().forEach(function(p){
       var b = getPath(base, p);
       var l = getPath(local, p);
       if(same(b, l)) return;
-      if(editedMap[p] || filled(l)) paths.push(p);
+      if(editedMap[p] || clearedMap[p] || filled(l)) paths.push(p);
     });
     return paths;
   }
-  function mergeChangedOntoBase(baseEntity, localEntity, key, edited){
+  function entityPathSet(list, key){
+    var root = String(key).indexOf('published:') === 0 ? 'content.' : '';
+    var set = {};
+    (list || []).forEach(function(p){
+      if(!p) return;
+      if(root && /^(tabPublished|finalTexts|savedAt|channelPlan|date|promptData|catId|topic)(\.|$)/.test(p)) set[p] = true;
+      else set[root + p] = true;
+    });
+    return set;
+  }
+  function mergeChangedOntoBase(baseEntity, localEntity, key, edited, cleared){
     if(!localEntity || typeof localEntity !== 'object') return localEntity;
     if(!baseEntity || typeof baseEntity !== 'object') return clone(localEntity);
-    var root = String(key).indexOf('published:') === 0 ? 'content.' : '';
-    var editedSet = {};
-    (edited || []).forEach(function(p){ editedSet[root + p] = true; });
-    return fillEmptyFromServer(localEntity, baseEntity, editedSet, '');
+    return fillEmptyFromServer(localEntity, baseEntity, entityPathSet(edited, key), entityPathSet(cleared, key), '');
   }
-  function buildFieldPatch(baseEntity, mergedEntity, key){
+  function buildFieldPatch(baseEntity, mergedEntity, key, cleared){
     if(outsideTabPathsChanged(baseEntity, mergedEntity, key)) return null;
-    var paths = changedPaths(baseEntity, mergedEntity, key, allPaths());
+    var paths = changedPaths(baseEntity, mergedEntity, key, allPaths(), cleared);
     if(!paths.length) return null;
     var wrapped = String(key).indexOf('published:') === 0 && baseEntity && baseEntity.content;
     var set = {};
@@ -212,8 +221,42 @@ var PlannerFieldSync = (function(){
     s = String(s || '').replace(/\s+/g, ' ').trim();
     return s.length > 80 ? s.slice(0, 80) + '…' : s;
   }
-  function describeDiff(localEntity, remoteEntity, key){
-    return changedPaths(remoteEntity, localEntity, key, allPaths()).map(function(p){
+  function clearedPathsBetween(before, after, prefix){
+    var out = [];
+    function walk(b, a, path){
+      if(Array.isArray(b) || Array.isArray(a)){
+        if(path && filled(b) && !filled(a)) out.push(path);
+        return;
+      }
+      if(b && typeof b === 'object'){
+        if(!a || typeof a !== 'object'){
+          if(path && filled(b)) out.push(path);
+          return;
+        }
+        Object.keys(b).forEach(function(k){
+          walk(b[k], a[k], path ? path + '.' + k : k);
+        });
+        return;
+      }
+      if(path && filled(b) && !filled(a)) out.push(path);
+    }
+    walk(before, after, prefix || '');
+    return out;
+  }
+  function describeDiff(localEntity, remoteEntity, key, onlyPaths){
+    var allow = null;
+    if(onlyPaths && onlyPaths.length){
+      allow = {};
+      onlyPaths.forEach(function(p){
+        var rel = String(p || '');
+        if(String(key).indexOf('published:') === 0 && rel.indexOf('content.') === 0) rel = rel.slice('content.'.length);
+        allow[rel] = true;
+        allow[String(p || '')] = true;
+      });
+    }
+    return changedPaths(remoteEntity, localEntity, key, allPaths()).filter(function(p){
+      return !allow || allow[p];
+    }).map(function(p){
       return {
         path: p,
         local: brief(getPath(contentOf(localEntity, key) || {}, p)),
@@ -260,6 +303,7 @@ var PlannerFieldSync = (function(){
     historySnapshot: historySnapshot,
     splitThreadComment: splitThreadComment,
     describeDiff: describeDiff,
+    clearedPathsBetween: clearedPathsBetween,
     threadBodyHits: threadBodyHits,
     publishedTouchedOn: publishedTouchedOn
   };

@@ -21302,7 +21302,10 @@ function yieldPlannerBootstrapUi_(message){
   return new Promise(function(resolve){ setTimeout(resolve, 0); });
 }
 async function runPlannerBootstrapInBackground_(){
-  if(plannerSafeModeBlocksSync_()) return;
+  if(plannerSafeModeBlocksSync_()){
+    markCardLinkSyncSettled_();
+    return;
+  }
   try {
     if(!isPlannerEmployeeEmailValid_(getPlannerEmployeeId_())) return;
     if(state._bootstrapChoiceDone || plannerBootstrapChoicePending_) return;
@@ -21449,6 +21452,8 @@ async function runPlannerBootstrapInBackground_(){
         try { schedulePlannerGasPush_(true); } catch(ePushFail){}
       }
     }
+  } finally {
+    markCardLinkSyncSettled_();
   }
 }
 function summarizeBootstrapPayloadLite_(payload){
@@ -22195,7 +22200,10 @@ window.skipPlannerBootstrapChoiceKeepLocal_ = function(){
   updateSyncStatusUI_();
 };
 async function runPlannerBootstrapSync_(){
-  if(plannerSafeModeBlocksSync_()) return;
+  if(plannerSafeModeBlocksSync_()){
+    markCardLinkSyncSettled_();
+    return;
+  }
   if(plannerSyncBootstrapRunning_) return;
   plannerSyncBootstrapRunning_ = true;
   state._bootstrapDeferHeavy = true;
@@ -25810,7 +25818,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=413').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=414').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -26149,6 +26157,7 @@ window.onload = () => {
   });
   startPlannerIdleSync_();
   window.addEventListener('hashchange', onPlannerHashChange_);
+  armCardLinkAfterSync_();
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape'){
       closeTopmostPlannerOverlay_();
@@ -26658,6 +26667,7 @@ function getTopicListMode_(){
 }
 function draftMatchesTopicListMode_(d, catId){
   if(!d || !d.id) return false;
+  if(cardLinkRevealId_ && d.id === cardLinkRevealId_) return true;
   if(getTopicListMode_() === 'plan') return false;
   var onPub = draftShowsOnPublishedList_(d.id, catId);
   if(getTopicListMode_() === 'published') return onPub;
@@ -30226,6 +30236,7 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
         '<div class="card-more-step-chips" title="카테고리(단계) 이동">' +
           renderMoveDraftStepChipsHTML_(cat.id, d.id) +
         '</div>' +
+        '<button type="button" class="draft-card-delete-mini draft-card-link-mini" title="이 카드 주소 복사" onclick="event.stopPropagation();copyCardLink_(\'' + jsAttrString_(d.id) + '\')">링크 복사</button>' +
         '<button type="button" class="draft-card-delete-mini" title="이 주제 카드 삭제" onclick="event.stopPropagation();deleteDraft(' + cat.id + ',\'' + d.id + '\')">삭제</button>' +
         orderBtns +
       '</div>' +
@@ -33748,6 +33759,14 @@ function closeSheetUiOnly_(){
   }, 280);
 }
 function onPlannerHashChange_(){
+  if(cardLinkIdFromHash_()){
+    if(plannerSkipDeepLink_()) return;
+    if(cardLinkSyncSettled_ && cardLinkConsumedId_ !== cardLinkIdFromHash_()){
+      cardLinkConsumedId_ = '';
+      openCardLinkIfReady_();
+    }
+    return;
+  }
   if(plannerSkipDeepLink_()){
     clearOpenDeepLinkHash_();
     return;
@@ -33802,6 +33821,160 @@ function openNextPublishRecommendationFromEntry_(fallbackDraftId, fallbackCatId)
   renderMain();
   return false;
 }
+var cardLinkSyncSettled_ = false;
+var cardLinkConsumedId_ = '';
+var cardLinkRevealId_ = '';
+function jsAttrString_(value){
+  return String(value == null ? '' : value).replace(/\\/g, '\\\\').replace(/'/g, '\\\'');
+}
+function cardLinkIdFromHash_(){
+  var h = String(location.hash || '').replace(/^#/, '');
+  var m = h.match(/^card=(.*)$/);
+  if(!m) return '';
+  var raw = m[1] || '';
+  try { raw = decodeURIComponent(raw); } catch(eDec){}
+  return String(raw).trim();
+}
+function markCardLinkSyncSettled_(){
+  cardLinkSyncSettled_ = true;
+  openCardLinkIfReady_();
+}
+function openCardLinkIfReady_(){
+  var id = cardLinkIdFromHash_();
+  if(!id || cardLinkConsumedId_ === id) return;
+  if(!cardLinkSyncSettled_) return;
+  if(plannerSyncConflictPending_ || plannerBootstrapChoicePending_){
+    setTimeout(openCardLinkIfReady_, 500);
+    return;
+  }
+  cardLinkConsumedId_ = id;
+  openCardByLinkId_(id);
+}
+function armCardLinkAfterSync_(){
+  if(!cardLinkIdFromHash_()) return;
+  var started = Date.now();
+  var tick = function(){
+    if(!cardLinkIdFromHash_() || cardLinkSyncSettled_) return;
+    var waited = Date.now() - started;
+    var busy = plannerSyncBootstrapRunning_ || !!(state && state._bootstrapDeferHeavy);
+    if((waited > 90000 && !busy) || waited > 180000){
+      markCardLinkSyncSettled_();
+      return;
+    }
+    setTimeout(tick, 500);
+  };
+  setTimeout(tick, 500);
+}
+function findCardPlacement_(draftId){
+  var i, j, cat, draft;
+  for(i = 0; i < CATEGORIES.length; i++){
+    cat = CATEGORIES[i];
+    if(!cat || !cat.drafts) continue;
+    for(j = 0; j < cat.drafts.length; j++){
+      draft = cat.drafts[j];
+      if(draft && draft.id === draftId){
+        return { draft: draft, catId: cat.id != null ? cat.id : i };
+      }
+    }
+  }
+  return null;
+}
+function openCardByLinkId_(draftId){
+  var place = findCardPlacement_(draftId);
+  if(!place){
+    if(typeof setAppToast === 'function'){
+      setAppToast('카드를 찾을 수 없어요', { duration: 4200, variant: 'err' });
+    }
+    return;
+  }
+  state.searchQ = '';
+  state.legacyDraftsOpen = true;
+  cardLinkRevealId_ = draftId;
+  try { revealCardStepForLink_(place.catId, draftId); } catch(eStep){}
+  var search = document.querySelector('.search-input');
+  if(search) search.value = '';
+  if(state.currentCat !== place.catId){
+    state.currentCat = place.catId;
+    try { renderTabs(); } catch(eTab){}
+  }
+  try { renderMain(); } catch(eRender){}
+  requestAnimationFrame(function(){
+    var nodes = document.querySelectorAll('.draft-card');
+    var card = null;
+    var n;
+    for(n = 0; n < nodes.length; n++){
+      if(nodes[n].getAttribute('data-draft-id') === draftId){
+        card = nodes[n];
+        break;
+      }
+    }
+    if(card){
+      var block = card.closest('.collapsed');
+      if(block) block.classList.remove('collapsed');
+      if(card.scrollIntoView){
+        try { card.scrollIntoView({ block: 'center' }); } catch(eScroll){
+          try { card.scrollIntoView(true); } catch(eScroll2){}
+        }
+      }
+    }
+    openDetail(place.draft.id, place.catId);
+    cardLinkRevealId_ = '';
+  });
+}
+function revealCardStepForLink_(catId, draftId){
+  var plan = null;
+  try { plan = getEffectiveSubGoalPlan_(catId); } catch(ePlan){}
+  if(!plan) return;
+  var stepId = SUBGOAL_MISC_ID;
+  var assignments = plan.assignments || [];
+  var i;
+  for(i = 0; i < assignments.length; i++){
+    if(assignments[i] && assignments[i].draftId === draftId && assignments[i].stepId){
+      stepId = assignments[i].stepId;
+      break;
+    }
+  }
+  if(!state.collapsedSubGoalSteps) state.collapsedSubGoalSteps = {};
+  var key = subGoalStepKey_(catId, stepId);
+  if(state.collapsedSubGoalSteps[key]) state.collapsedSubGoalSteps[key] = false;
+}
+function cardLinkUrl_(draftId){
+  return location.origin + location.pathname + location.search + '#card=' + encodeURIComponent(draftId);
+}
+function copyTextFallback_(text){
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.top = '0';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch(eCopy){ ok = false; }
+  ta.remove();
+  return ok;
+}
+function copyCardLink_(draftId, ev){
+  if(ev){
+    ev.preventDefault();
+    ev.stopPropagation();
+  }
+  var url = cardLinkUrl_(draftId);
+  function done(ok){
+    if(typeof setAppToast === 'function'){
+      setAppToast(ok ? '카드 링크를 복사했어요.' : '링크를 복사하지 못했어요.', { duration: 2800, variant: ok ? 'ok' : 'err' });
+    }
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(function(){ done(true); }, function(){
+      done(copyTextFallback_(url));
+    });
+    return;
+  }
+  done(copyTextFallback_(url));
+}
+window.copyCardLink_ = copyCardLink_;
 function consumeDeepLinkFromHash_(){
   if(plannerSkipDeepLink_()){
     clearOpenDeepLinkHash_();

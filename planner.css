@@ -1698,6 +1698,7 @@ pointer-events: auto;
 .draft-card-refresh-mini,
 .draft-card-tidy-mini,
 .draft-card-delete-mini,
+.draft-card-link-mini,
 .draft-card-order-mini {
 font-size: 9px;
 font-weight: 800;

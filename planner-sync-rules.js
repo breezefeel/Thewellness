@@ -25,6 +25,52 @@ var PlannerSyncRules = (function(){
     return { kind: m[1], id: m[2] };
   }
 
+  function plannerNormalizeSyncJournal(raw){
+    var byId = {};
+    var list = raw && raw.items;
+    if(!Array.isArray(list)) return { items: [] };
+    list.forEach(function(row){
+      if(!row || !row.id) return;
+      var id = String(row.id);
+      var v = parseInt(row.v, 10) || 1;
+      if(byId[id] == null || v >= byId[id]) byId[id] = v;
+    });
+    var items = Object.keys(byId).map(function(id){ return { id: id, v: byId[id] }; });
+    if(items.length > 300) items = items.slice(items.length - 300);
+    return { items: items };
+  }
+
+  function plannerRecordSyncJournal(journal, confirmed){
+    var next = plannerNormalizeSyncJournal(journal);
+    (confirmed || []).forEach(function(row){
+      if(!row || !row.mutationId) return;
+      var id = String(row.mutationId);
+      var v = parseInt(row.version, 10) || 1;
+      var found = false;
+      next.items.forEach(function(item){
+        if(item.id !== id) return;
+        found = true;
+        if(v >= item.v) item.v = v;
+      });
+      if(!found) next.items.push({ id: id, v: v });
+    });
+    if(next.items.length > 300) next.items = next.items.slice(next.items.length - 300);
+    return next;
+  }
+
+  function plannerApplySyncJournal(ops, journal){
+    var map = {};
+    plannerNormalizeSyncJournal(journal).items.forEach(function(item){
+      map[item.id] = item.v;
+    });
+    return (ops || []).filter(function(op){
+      if(!op || !op.mutationId) return true;
+      var acked = map[String(op.mutationId)];
+      if(acked == null) return true;
+      return (parseInt(op.version, 10) || 1) > acked;
+    });
+  }
+
   function plannerFilterAckedOutbox(ops, ctx){
     ctx = ctx || {};
     var ack = ctx.ack || {};
@@ -555,6 +601,9 @@ var PlannerSyncRules = (function(){
     plannerIsAuthFailure: plannerIsAuthFailure,
     plannerNextMutation: plannerNextMutation,
     plannerFilterAckedOutbox: plannerFilterAckedOutbox,
+    plannerNormalizeSyncJournal: plannerNormalizeSyncJournal,
+    plannerRecordSyncJournal: plannerRecordSyncJournal,
+    plannerApplySyncJournal: plannerApplySyncJournal,
     plannerIsProtectedDelete: plannerIsProtectedDelete,
     plannerSelectSyncBatch: plannerSelectSyncBatch,
     plannerIncrementalCursor: plannerIncrementalCursor,

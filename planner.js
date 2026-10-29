@@ -25755,7 +25755,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=408').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=412').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -34041,6 +34041,175 @@ function getGeneralBlogProblemText_(b){
   if(b.hook && String(b.hook).trim()) return String(b.hook).trim();
   return '';
 }
+var BLOG_SECTION_LABELS_ = {
+  '제목': 'title',
+  'title': 'title',
+  '문제제기': 'problem',
+  '공감': 'problem',
+  '셀프케어': 'selfCare',
+  '셀프케어(해결책)': 'selfCare',
+  '해결책': 'selfCare',
+  '해결책제시': 'selfCare',
+  '따라하기': 'selfCare',
+  '원리설명': 'explanation',
+  '원리': 'explanation',
+  '마무리': 'cta',
+  '마무리cta': 'cta',
+  'cta': 'cta',
+  '해시태그': 'hashtags',
+  'hashtags': 'hashtags',
+  'hashtag': 'hashtags'
+};
+function blogSectionHeadingKey_(line){
+  var raw = String(line || '').replace(/\u00a0/g, ' ').trim();
+  if(!raw || raw.length > 48) return null;
+  raw = raw.replace(/^#{1,6}\s+/, '');
+  raw = raw.replace(/^\d+\s*[\.)]\s+/, '');
+  raw = raw.replace(/^[*_「『【\[]+|[*_」』】\]]+$/g, '');
+  raw = raw.replace(/^[*_]+|[*_]+$/g, '');
+  var inline = '';
+  var sameLine = raw.match(/^(.{2,24}?)\s*[:：]\s*(\S.*)$/);
+  if(sameLine){
+    raw = sameLine[1].trim();
+    inline = sameLine[2].trim();
+  } else {
+    raw = raw.replace(/[:：]\s*$/, '').trim();
+  }
+  raw = raw.replace(/\s+/g, '');
+  var key = BLOG_SECTION_LABELS_[raw] || BLOG_SECTION_LABELS_[raw.toLowerCase()];
+  if(!key) return null;
+  return { key: key, inline: inline };
+}
+function blogSectionHeadingCount_(text){
+  var n = 0;
+  String(text || '').replace(/\r\n/g, '\n').split('\n').forEach(function(line){
+    if(blogSectionHeadingKey_(line)) n += 1;
+  });
+  return n;
+}
+function splitPlainIntoBlogSections_(text){
+  var lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+  var hits = [];
+  lines.forEach(function(line, idx){
+    var hit = blogSectionHeadingKey_(line);
+    if(hit) hits.push({ key: hit.key, inline: hit.inline, idx: idx });
+  });
+  if(hits.length < 2) return null;
+  var out = { title: '', problem: '', selfCare: '', explanation: '', cta: '', hashtags: [] };
+  var preamble = lines.slice(0, hits[0].idx).join('\n').trim();
+  hits.forEach(function(hit, i){
+    var end = hits[i + 1] ? hits[i + 1].idx : lines.length;
+    var body = lines.slice(hit.idx + 1, end).join('\n').trim();
+    if(hit.inline) body = (hit.inline + (body ? '\n' + body : '')).trim();
+    if(hit.key === 'hashtags'){
+      out.hashtags = (typeof parseHashtagInput_ === 'function') ? parseHashtagInput_(body) : [];
+      return;
+    }
+    out[hit.key] = out[hit.key] ? (out[hit.key] + '\n\n' + body).trim() : body;
+  });
+  if(!out.title && preamble && preamble.indexOf('\n') < 0 && preamble.length <= 80) out.title = preamble;
+  var bodyCount = ['problem', 'selfCare', 'explanation', 'cta'].filter(function(key){
+    return String(out[key] || '').trim();
+  }).length;
+  if(bodyCount < 1) return null;
+  return out;
+}
+function rememberSectionBlob_(blog){
+  var best = '';
+  ['draft', 'explanation', 'problem', 'selfCare', 'hook'].forEach(function(key){
+    var text = String(blog && blog[key] || '');
+    if(blogSectionHeadingCount_(text) >= 2 && text.length > best.length) best = text;
+  });
+  return best;
+}
+function distributeBlogSections_(blog, opts){
+  opts = opts || {};
+  if(!blog || typeof blog !== 'object') return false;
+  var order = ['explanation', 'problem', 'selfCare', 'hook', 'draft'];
+  var sourceKey = '';
+  var i;
+  for(i = 0; i < order.length; i++){
+    if(blogSectionHeadingCount_(blog[order[i]]) >= 2){
+      sourceKey = order[i];
+      break;
+    }
+  }
+  if(!sourceKey) return false;
+  if(sourceKey === 'draft'){
+    var settled = ['problem', 'selfCare', 'explanation'].filter(function(key){
+      var text = String(blog[key] || '').trim();
+      return text && blogSectionHeadingCount_(text) < 2;
+    }).length;
+    if(settled >= 2) return false;
+  }
+  var parts = splitPlainIntoBlogSections_(blog[sourceKey]);
+  if(!parts) return false;
+  var original = String(blog[sourceKey]);
+  var changed = false;
+  ['title', 'problem', 'selfCare', 'explanation', 'cta'].forEach(function(key){
+    if(!parts[key]) return;
+    var current = String(blog[key] || '').trim();
+    var replace = key === sourceKey || !current || blogSectionHeadingCount_(blog[key]) >= 2;
+    if(!replace) return;
+    if(String(blog[key] || '') !== parts[key]) changed = true;
+    blog[key] = parts[key];
+  });
+  if(parts.hashtags && parts.hashtags.length && !(blog.hashtags && blog.hashtags.length)){
+    blog.hashtags = parts.hashtags.slice();
+    changed = true;
+  }
+  if(opts.keepDraft !== false && sourceKey !== 'draft' && !String(blog.draft || '').trim()){
+    blog.draft = original;
+    changed = true;
+  }
+  return changed;
+}
+function blogForSheet_(blog, catId){
+  var base = normalizeBlogBlock(blog, catId) || {};
+  var src = (blog && typeof blog === 'object') ? blog : {};
+  var copy = {
+    title: src.title != null ? String(src.title) : (base.title || ''),
+    problem: src.problem != null ? String(src.problem) : '',
+    selfCare: src.selfCare != null ? String(src.selfCare) : '',
+    explanation: src.explanation != null ? String(src.explanation) : (base.explanation || ''),
+    cta: src.cta != null ? String(src.cta) : (base.cta || ''),
+    hashtags: Array.isArray(src.hashtags) ? src.hashtags.slice() : (Array.isArray(base.hashtags) ? base.hashtags.slice() : []),
+    hook: src.hook != null ? String(src.hook) : (base.hook || ''),
+    outline: Array.isArray(src.outline) ? src.outline.slice() : (Array.isArray(base.outline) ? base.outline.slice() : []),
+    draft: src.draft != null ? String(src.draft) : (base.draft || '')
+  };
+  distributeBlogSections_(copy);
+  return copy;
+}
+function communityForSheet_(raw){
+  var base = normalizeCommunityBlock(raw) || {};
+  var src = (raw && typeof raw === 'object') ? raw : {};
+  var copy = {
+    title: src.title != null ? String(src.title) : (base.title || ''),
+    problem: src.problem != null ? String(src.problem) : (base.problem || ''),
+    selfCare: src.selfCare != null ? String(src.selfCare) : (base.selfCare || ''),
+    explanation: src.explanation != null ? String(src.explanation) : (base.explanation || ''),
+    empathyLead: base.empathyLead || '',
+    empathyBullets: Array.isArray(base.empathyBullets) ? base.empathyBullets.slice() : []
+  };
+  distributeBlogSections_(copy, { keepDraft: false });
+  return copy;
+}
+var sheetSectionLayoutChanged_ = false;
+var sheetSectionPainting_ = false;
+var sheetQuietSaving_ = false;
+function paintSheetAfterSectionSplit_(content){
+  if(!sheetSectionLayoutChanged_ || sheetSectionPainting_) return;
+  sheetSectionPainting_ = true;
+  sheetSectionLayoutChanged_ = false;
+  try {
+    var active = document.activeElement;
+    if(active && active.blur) active.blur();
+    renderSheetContent(content);
+  } finally {
+    sheetSectionPainting_ = false;
+  }
+}
 function stripClinicBlogTitlePrefix_(title){
   if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerStripClinicTitlePrefix){
     return PlannerSyncRules.plannerStripClinicTitlePrefix(title);
@@ -39534,7 +39703,7 @@ function renderSheetContent(content, opts) {
     }
   } else if(tab==='blog'){
     const blogCatId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
-    const b = normalizeBlogBlock(content.blog, blogCatId) || content.blog || {};
+    const b = blogForSheet_(content.blog, blogCatId);
     if(blogUsesStructuredGeneralFormat_(blogCatId, b)){
       bodyHTML = composeSheetTabLayout_(tab,
         addSourceHtml + sheetFullCopyBar_() +
@@ -39642,7 +39811,7 @@ function renderSheetContent(content, opts) {
       bodyHTML = tabsHTML + `<p class="empty-note" style="padding:12px 0;">커뮤니티 초안이 없어요. 초안을 다시 생성하면 함께 만들어져요.</p>
         <button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin-top:8px;">초안 다시 생성</button>`;
     } else {
-      const coNorm = normalizeCommunityBlock(co);
+      const coNorm = communityForSheet_(co);
       const problemText = getCommunityProblemText_(coNorm);
       bodyHTML = composeSheetTabLayout_(tab,
         addSourceHtml + sheetFullCopyBar_() +
@@ -40960,6 +41129,13 @@ function scheduleSheetQuietSave_(){
 }
 function flushSheetQuietSave_(){
   _sheetQuietSaveTimer_ = 0;
+  if(sheetQuietSaving_) return;
+  if(!state._sheetDomDirty) return;
+  sheetQuietSaving_ = true;
+  try { flushSheetQuietSaveBody_(); }
+  finally { sheetQuietSaving_ = false; }
+}
+function flushSheetQuietSaveBody_(){
   if(!state._sheetDomDirty) return;
   var draftId = state.selectedId;
   if(!draftId) return;
@@ -40967,6 +41143,7 @@ function flushSheetQuietSave_(){
   var content = getDraftContent_(draftId);
   if(!content) return;
   applySheetEditsForTab_(content, state.activeTab);
+  var sectionChanged = sheetSectionLayoutChanged_;
   var draft = findDraftByIdAnywhere_(draftId);
   if(draft) stampDraftActivity_(draft);
   if(!state.published[draftId]) state.published[draftId] = {};
@@ -40979,8 +41156,10 @@ function flushSheetQuietSave_(){
     try { ensureDraftSyncKeysQueued_(draftId); } catch(eQuiet){}
     state._syncFocusDraftIds = null;
   }
+  if(sectionChanged) paintSheetAfterSectionSplit_(content);
 }
 window.onSheetFieldBlur_ = function(){
+  if(sheetQuietSaving_ || sheetSectionPainting_) return;
   if(_sheetQuietSaveTimer_){
     clearTimeout(_sheetQuietSaveTimer_);
     _sheetQuietSaveTimer_ = 0;
@@ -41691,7 +41870,10 @@ function applySheetBlogEdits_(content){
   var edits = readSheetBlogEdits_();
   if(!edits) return content;
   var prevTitle = String(content.blog.title || '').trim();
+  var backup = rememberSectionBlob_(content.blog);
   Object.assign(content.blog, edits);
+  if(backup && !String(content.blog.draft || '').trim()) content.blog.draft = backup;
+  if(distributeBlogSections_(content.blog)) sheetSectionLayoutChanged_ = true;
   var nextTitle = String(content.blog.title || '').trim();
   if(nextTitle && nextTitle !== prevTitle){
     var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
@@ -41892,6 +42074,7 @@ function applySheetCommunityEdits_(content){
   content.community.problem = edits.problem;
   content.community.selfCare = edits.selfCare;
   content.community.explanation = edits.explanation;
+  if(distributeBlogSections_(content.community, { keepDraft: false })) sheetSectionLayoutChanged_ = true;
   var nextTitle = String(content.community.title || '').trim();
   if(nextTitle && nextTitle !== prevTitle){
     var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
@@ -42238,9 +42421,11 @@ window.onSheetDraftSave_ = function(){
     return;
   }
   applySheetEditsForTab_(content, tab);
+  var sectionChanged = sheetSectionLayoutChanged_;
   var photoFromBlog = tab === 'blog' && refreshTopicPhotoPromptFromBlog_(content, draftId, state.selectedCatId);
   if(isDailyShareCategory(state.selectedCatId)) persistSheetDailyFactsToDraft_();
   persistDraftContent_(draftId, content);
+  if(sectionChanged) paintSheetAfterSectionSplit_(content);
   if(isDailyShareCategory(state.selectedCatId) && tab === 'images'){
     var stSave = ensureThumbMakerState_();
     if(stSave.bgDataUrl && typeof persistThumbMakerToDraft_ === 'function'){
@@ -44934,6 +45119,7 @@ function applyImportPiece_(content, piece, catId){
       importTitle: piece.title,
       account: piece.account || ''
     };
+    distributeBlogSections_(content.blog);
     if(isHeiljagyaeCategory(catId)){
       content.community = {
         title: piece.title,
@@ -44943,6 +45129,7 @@ function applyImportPiece_(content, piece, catId){
         explanation: piece.body,
         selfCare: ''
       };
+      distributeBlogSections_(content.community, { keepDraft: false });
     }
     return;
   }
@@ -45056,6 +45243,7 @@ function applyDraftImportBatch_(drafts){
         explanation: first.body,
         selfCare: ''
       };
+      distributeBlogSections_(content.community, { keepDraft: false });
     }
     state.generatedOnly[draft.id] = content;
     if(!state.published[draft.id] || typeof state.published[draft.id] !== 'object') state.published[draft.id] = {};

@@ -311,18 +311,93 @@ var PlannerFieldSync = (function(){
     }
     if(cur && typeof cur === 'object') delete cur[parts[parts.length - 1]];
   }
+  function pathCovers(touched, path){
+    if(!path) return false;
+    if(touched[path]) return true;
+    var parts = String(path).split('.');
+    var acc = '';
+    for(var i = 0; i < parts.length; i++){
+      acc = acc ? (acc + '.' + parts[i]) : parts[i];
+      if(touched[acc]) return true;
+    }
+    return false;
+  }
   function overlayDeviceEdits(serverEntity, localEntity, key, edited, cleared){
+    if(!localEntity || typeof localEntity !== 'object') return clone(serverEntity);
     if(!serverEntity || typeof serverEntity !== 'object') return clone(localEntity);
-    var out = clone(serverEntity);
+    var out = clone(localEntity);
     var outNode = contentOf(out, key);
-    var localNode = contentOf(localEntity, key);
-    if(!outNode || typeof outNode !== 'object') return out;
-    uniquePaths(edited, cleared).forEach(function(p){
-      var val = localNode ? getPath(localNode, p) : undefined;
+    var serverNode = contentOf(serverEntity, key);
+    if(!outNode || typeof outNode !== 'object' || !serverNode || typeof serverNode !== 'object') return out;
+    var touched = {};
+    uniquePaths(edited, cleared).forEach(function(p){ touched[p] = true; });
+    allPaths().forEach(function(p){
+      if(pathCovers(touched, p)) return;
+      var val = getPath(serverNode, p);
       if(val === undefined) deletePath(outNode, p);
       else setPath(outNode, p, clone(val));
     });
     return out;
+  }
+  function diffTabPaths(baseEntity, localEntity, key){
+    if(!baseEntity || typeof baseEntity !== 'object') return [];
+    var base = contentOf(baseEntity, key) || {};
+    var local = contentOf(localEntity, key) || {};
+    var paths = [];
+    allPaths().forEach(function(p){
+      if(!same(getPath(base, p), getPath(local, p))) paths.push(p);
+    });
+    return paths;
+  }
+  var WRAPPER_IGNORE = {
+    content: 1, updatedAt: 1, savedAt: 1, order: 1, index: 1,
+    modifiedAt: 1, editedAt: 1, lastEditedAt: 1, lastSavedAt: 1,
+    localSavedAt: 1, syncedAt: 1,
+    threadsPending: 1, threadsPendingStartedAt: 1, threadsPendingEndMs: 1,
+    threadsPendingTopic: 1, threadsPendingCatId: 1
+  };
+  function wrapperFieldsChanged(baseEntity, localEntity, key){
+    if(String(key).indexOf('published:') !== 0) return false;
+    if(!baseEntity || !localEntity || typeof baseEntity !== 'object' || typeof localEntity !== 'object') return false;
+    var names = {};
+    Object.keys(baseEntity).forEach(function(k){ if(!WRAPPER_IGNORE[k]) names[k] = true; });
+    Object.keys(localEntity).forEach(function(k){ if(!WRAPPER_IGNORE[k]) names[k] = true; });
+    return Object.keys(names).some(function(k){ return !same(baseEntity[k], localEntity[k]); });
+  }
+  function nonTabContentChanged(baseEntity, localEntity, key){
+    if(!baseEntity || !localEntity) return false;
+    function strip(node){
+      var copy = withoutTabPaths(node, key);
+      if(!copy || typeof copy !== 'object' || Array.isArray(copy)) return copy;
+      Object.keys(WRAPPER_IGNORE).forEach(function(k){ delete copy[k]; });
+      if(copy.content && typeof copy.content === 'object'){
+        Object.keys(WRAPPER_IGNORE).forEach(function(k){ delete copy.content[k]; });
+      }
+      return copy;
+    }
+    return !same(strip(baseEntity), strip(localEntity));
+  }
+  function shouldKeepWholeConflict(baseEntity, localEntity, key){
+    if(!baseEntity || typeof baseEntity !== 'object') return true;
+    if(wrapperFieldsChanged(baseEntity, localEntity, key)) return true;
+    if(nonTabContentChanged(baseEntity, localEntity, key)) return true;
+    return false;
+  }
+  function planConflictAction(spec){
+    spec = spec || {};
+    var touched = uniquePaths([].concat(spec.devicePaths || [], spec.sheetPaths || []), spec.clearedPaths || []);
+    if(shouldKeepWholeConflict(spec.base, spec.local, spec.key)){
+      return { action: 'ask', keepOutbox: true, showPaths: null, value: spec.local };
+    }
+    if(!touched.length){
+      return { action: 'accept-server', keepOutbox: false, showPaths: [], value: spec.server };
+    }
+    var narrowed = overlayDeviceEdits(spec.server, spec.local, spec.key, touched, []);
+    var show = deviceConflictPaths(spec.server, spec.local, spec.key, touched, []);
+    if(!show.length){
+      return { action: 'accept-server', keepOutbox: false, showPaths: [], value: narrowed };
+    }
+    return { action: 'ask', keepOutbox: true, showPaths: show, value: narrowed };
   }
   function deviceConflictPaths(serverEntity, localEntity, key, edited, cleared){
     var localNode = contentOf(localEntity, key) || {};
@@ -405,6 +480,9 @@ var PlannerFieldSync = (function(){
     shouldResumeThreadsJob: shouldResumeThreadsJob,
     overlayDeviceEdits: overlayDeviceEdits,
     deviceConflictPaths: deviceConflictPaths,
+    diffTabPaths: diffTabPaths,
+    shouldKeepWholeConflict: shouldKeepWholeConflict,
+    planConflictAction: planConflictAction,
     clearedPathsBetween: clearedPathsBetween,
     threadBodyHits: threadBodyHits,
     publishedTouchedOn: publishedTouchedOn

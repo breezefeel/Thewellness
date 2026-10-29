@@ -100,6 +100,71 @@ assert(planner.indexOf("console.info('[칸 저장]', key, '카드 전체'") >= 0
 var supa = fs.readFileSync(path.join(__dirname, 'planner-sync-supabase.js'), 'utf8');
 assert(supa.indexOf("'카드 전체'") >= 0, 'the send path logs a full card');
 
+var baseAi = {
+  content: { blog: { problem: '', title: '' }, insta: { caption: '원래 인스타' }, threads: { body: '원래 쓰레드', comment: '' } }
+};
+var localAi = {
+  content: { blog: { problem: 'AI가 채운 본문', title: 'AI 제목' }, insta: { caption: '원래 인스타' }, threads: { body: '원래 쓰레드', comment: '' } }
+};
+var serverAi = {
+  content: { blog: { problem: '서버 본문', title: '서버 제목' }, insta: { caption: '원래 인스타' }, threads: { body: '원래 쓰레드', comment: '' } }
+};
+var aiPaths = S.diffTabPaths(baseAi, localAi, key);
+assert(aiPaths.indexOf('blog.problem') >= 0 && aiPaths.indexOf('blog.title') >= 0, 'AI fill is stored as device paths without sheet edits');
+var planAi = S.planConflictAction({
+  base: baseAi, local: localAi, server: serverAi, key: key,
+  devicePaths: aiPaths, sheetPaths: [], clearedPaths: []
+});
+assert(planAi.keepOutbox && planAi.action === 'ask', 'AI conflict keeps the outbox and opens the dialog');
+assert(planAi.showPaths.indexOf('blog.problem') >= 0, 'AI conflict lists blog.problem');
+
+var planRefresh = S.planConflictAction({
+  base: null, local: localAi, server: serverAi, key: key,
+  devicePaths: [], sheetPaths: [], clearedPaths: []
+});
+assert(planRefresh.keepOutbox && planRefresh.action === 'ask' && planRefresh.showPaths == null, 'refresh with no base keeps the outbox');
+assert(planRefresh.value.content.blog.problem === 'AI가 채운 본문', 'refresh keeps the unsent blog');
+
+var baseStatus = {
+  content: { blog: { problem: '같은' }, insta: { caption: '같은' }, threads: { body: '', comment: '' } },
+  tabPublished: {}
+};
+var localStatus = {
+  content: { blog: { problem: '같은' }, insta: { caption: '같은' }, threads: { body: '', comment: '' } },
+  tabPublished: { blog: '2026-10-29' }
+};
+var serverStatus = {
+  content: { blog: { problem: '서버 본문' }, insta: { caption: '같은' }, threads: { body: '', comment: '' } },
+  tabPublished: {}
+};
+assert(S.diffTabPaths(baseStatus, localStatus, key).length === 0, 'publish status is not a tab path');
+var planStatus = S.planConflictAction({
+  base: baseStatus, local: localStatus, server: serverStatus, key: key,
+  devicePaths: [], sheetPaths: [], clearedPaths: []
+});
+assert(planStatus.keepOutbox && planStatus.action === 'ask' && planStatus.showPaths == null, 'status-only change is not discarded');
+var statusKept = S.overlayDeviceEdits(serverStatus, localStatus, key, [], []);
+assert(statusKept.tabPublished.blog === '2026-10-29', 'this device keeps publish status');
+assert(statusKept.content.blog.problem === '서버 본문', 'untouched blog takes the server value');
+
+var planInsta = S.planConflictAction({
+  base: {
+    content: { blog: { problem: 'A블로그1' }, insta: { caption: '원래 인스타' }, threads: { body: '원래 쓰레드', comment: '' } }
+  },
+  local: tabB,
+  server: server,
+  key: key,
+  devicePaths: ['insta.caption'],
+  sheetPaths: [],
+  clearedPaths: []
+});
+assert(planInsta.keepOutbox && planInsta.showPaths.length === 1 && planInsta.showPaths[0] === 'insta.caption', 'tab B dialog is only insta.caption');
+assert(planInsta.value.content.blog.problem === 'A블로그2', 'tab B blog takes the server value');
+assert(planInsta.value.content.insta.caption === 'B인스타', 'tab B keeps the insta edit');
+
+assert(planner.indexOf('normalized.devicePaths') >= 0, 'device paths survive outbox restore');
+assert(planner.indexOf('생성이 중단됐습니다. 다시 만들려면 버튼을 누르세요.') >= 0, 'interrupted threads show a manual retry note');
+
 if(failed){
   console.error(failed + ' failed');
   process.exit(1);

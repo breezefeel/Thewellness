@@ -18505,11 +18505,29 @@ function normalizeSyncOutbox_(raw, opts){
       normalized.conflictResolved = item.conflictResolved;
     }
     if(item.localOnly) normalized.localOnly = true;
+    if(Array.isArray(item.devicePaths)) normalized.devicePaths = item.devicePaths.filter(Boolean).slice();
+    if(Array.isArray(item.clearedPaths)) normalized.clearedPaths = item.clearedPaths.filter(Boolean).slice();
     if(previous){
       normalized.baseEntityRevision = previous.baseEntityRevision;
       if(previous.conflictResolved === 'local') normalized.conflictResolved = 'local';
       else if(!normalized.conflictResolved && previous.conflictResolved) normalized.conflictResolved = previous.conflictResolved;
       if(!item.mutationId) normalized.mutationId = previous.mutationId;
+      if(previous.devicePaths || normalized.devicePaths){
+        var pathSeen = {};
+        normalized.devicePaths = (previous.devicePaths || []).concat(normalized.devicePaths || []).filter(function(p){
+          if(!p || pathSeen[p]) return false;
+          pathSeen[p] = true;
+          return true;
+        });
+      }
+      if(previous.clearedPaths || normalized.clearedPaths){
+        var clearSeen = {};
+        normalized.clearedPaths = (previous.clearedPaths || []).concat(normalized.clearedPaths || []).filter(function(p){
+          if(!p || clearSeen[p]) return false;
+          clearSeen[p] = true;
+          return true;
+        });
+      }
       var mergedVersion = Math.max(previous.version + 1, normalized.version);
       if(mergedVersion > normalized.version && normalized.mutationId === previous.mutationId){
         normalized.mutationId = makePlannerMutationId_();
@@ -18571,6 +18589,19 @@ function noteClearedPaths_(draftId, paths){
     state._clearedPaths[key] = cur;
   });
 }
+function rememberOutboxDevicePaths_(op, key, localValue){
+  if(!op || (String(key).indexOf('published:') !== 0 && String(key).indexOf('generated:') !== 0)) return;
+  var cleared = (state._clearedPaths && state._clearedPaths[key]) || [];
+  var seenClear = {};
+  op.clearedPaths = (op.clearedPaths || []).concat(cleared).filter(function(p){
+    if(!p || seenClear[p]) return false;
+    seenClear[p] = true;
+    return true;
+  });
+  var base = state.syncFieldBase && state.syncFieldBase[key];
+  if(!base || typeof PlannerFieldSync === 'undefined' || !PlannerFieldSync.diffTabPaths) return;
+  op.devicePaths = PlannerFieldSync.diffTabPaths(base, localValue, key);
+}
 function shapeSyncedContentValue_(key, localValue){
   if(!localValue || typeof PlannerFieldSync === 'undefined') return { value: localValue, fieldPatch: null };
   if(key.indexOf('published:') !== 0 && key.indexOf('generated:') !== 0) return { value: localValue, fieldPatch: null };
@@ -18610,6 +18641,7 @@ function enqueueSyncOutboxChanges_(changedKeys, payload){
       existing.deleted = !hasValue;
       existing.updatedAt = times[key] || new Date().toISOString();
       bumpOutboxOpVersion_(existing);
+      if(hasValue) rememberOutboxDevicePaths_(existing, key, entities[key]);
     } else {
       var created = {
         mutationId: makePlannerMutationId_(),
@@ -18624,6 +18656,7 @@ function enqueueSyncOutboxChanges_(changedKeys, payload){
         updatedAt: times[key] || new Date().toISOString()
       };
       if(state._enqueueNormalization) created.normalization = true;
+      if(hasValue) rememberOutboxDevicePaths_(created, key, entities[key]);
       if(state._promptUserEditedPending && isPromptSyncKey_(key)){
         created.userEdited = true;
         rememberPromptUserEdited_(key);
@@ -22553,6 +22586,19 @@ function assignNarrowedCard_(id, key, narrowed){
   }
   return shared;
 }
+function conflictTouchLists_(key){
+  var id = String(key || '').slice(String(key || '').indexOf(':') + 1);
+  var paths = [];
+  var cleared = [];
+  ['published:' + id, 'generated:' + id].forEach(function(one){
+    var op = typeof findOutboxOp_ === 'function' ? findOutboxOp_(one) : null;
+    paths = paths.concat((op && op.devicePaths) || []);
+    paths = paths.concat((state._sheetEditedPaths && state._sheetEditedPaths[one]) || []);
+    cleared = cleared.concat((op && op.clearedPaths) || []);
+    cleared = cleared.concat((state._clearedPaths && state._clearedPaths[one]) || []);
+  });
+  return { paths: paths, cleared: cleared };
+}
 function narrowKeptConflictLocals_(conflicts){
   if(typeof PlannerFieldSync === 'undefined') return;
   var done = {};
@@ -22562,15 +22608,10 @@ function narrowKeptConflictLocals_(conflicts){
     if(!conflict.remote) return;
     var id = key.slice(key.indexOf(':') + 1);
     if(done[id]) return;
-    var edited = []
-      .concat((state._sheetEditedPaths && state._sheetEditedPaths['published:' + id]) || [])
-      .concat((state._sheetEditedPaths && state._sheetEditedPaths['generated:' + id]) || []);
-    var cleared = []
-      .concat((state._clearedPaths && state._clearedPaths['published:' + id]) || [])
-      .concat((state._clearedPaths && state._clearedPaths['generated:' + id]) || []);
+    var touch = conflictTouchLists_(key);
     var narrowed = PlannerFieldSync.overlayDeviceEdits
-      ? PlannerFieldSync.overlayDeviceEdits(conflict.remote, conflict.local, key, edited, cleared)
-      : PlannerFieldSync.mergeChangedOntoBase(conflict.remote, conflict.local, key, edited, cleared);
+      ? PlannerFieldSync.overlayDeviceEdits(conflict.remote, conflict.local, key, touch.paths, touch.cleared)
+      : PlannerFieldSync.mergeChangedOntoBase(conflict.remote, conflict.local, key, touch.paths, touch.cleared);
     if(!narrowed) return;
     var shared = assignNarrowedCard_(id, key, narrowed);
     (conflicts || []).forEach(function(other){
@@ -22875,6 +22916,8 @@ function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
       serverEntityRevision: parseInt(conflict.serverEntityRevision, 10) || 0,
       remainingPaths: conflict.remainingPaths || [],
       appliedPaths: conflict.appliedPaths || [],
+      opDevicePaths: (op && op.devicePaths) || [],
+      opClearedPaths: (op && op.clearedPaths) || [],
       mutationId: conflict.mutationId || (op && op.mutationId) || '',
       version: parseInt(conflict.version, 10) || (op && parseInt(op.version, 10)) || 1
     };
@@ -22889,25 +22932,36 @@ function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
   conflicts.forEach(function(conflict){
     var key = String(conflict && conflict.key || '');
     var contentKey = key.indexOf('published:') === 0 || key.indexOf('generated:') === 0;
-    if(!contentKey || !conflict.remote || typeof PlannerFieldSync === 'undefined' || !PlannerFieldSync.overlayDeviceEdits){
+    if(!contentKey || !conflict.remote || typeof PlannerFieldSync === 'undefined' || !PlannerFieldSync.planConflictAction){
       kept.push(conflict);
       return;
     }
-    var edited = (state._sheetEditedPaths && state._sheetEditedPaths[key]) || [];
-    var cleared = (state._clearedPaths && state._clearedPaths[key]) || [];
     var localSnap = cloneSyncValue_(conflict.local);
     var remoteSnap = cloneSyncValue_(conflict.remote);
-    var narrowed = PlannerFieldSync.overlayDeviceEdits(remoteSnap, localSnap, key, edited, cleared);
-    var show = PlannerFieldSync.deviceConflictPaths(remoteSnap, localSnap, key, edited, cleared);
-    conflict.local = narrowed;
-    conflict.devicePaths = show;
-    var id = key.slice(key.indexOf(':') + 1);
-    assignNarrowedCard_(id, key, narrowed);
-    narrowedAny = true;
-    (state.syncOutbox || []).forEach(function(op){
-      if(op && op.key === key) op.value = cloneSyncValue_(narrowed);
+    var touch = conflictTouchLists_(key);
+    var base = state.syncFieldBase && state.syncFieldBase[key];
+    var plan = PlannerFieldSync.planConflictAction({
+      base: base,
+      local: localSnap,
+      server: remoteSnap,
+      key: key,
+      devicePaths: touch.paths,
+      sheetPaths: [],
+      clearedPaths: touch.cleared
     });
-    if(show.length){
+    if(plan.action === 'ask' && !plan.showPaths){
+      kept.push(conflict);
+      return;
+    }
+    conflict.local = plan.value;
+    if(plan.showPaths) conflict.devicePaths = plan.showPaths;
+    var id = key.slice(key.indexOf(':') + 1);
+    assignNarrowedCard_(id, key, plan.value);
+    narrowedAny = true;
+    (state.syncOutbox || []).forEach(function(opRow){
+      if(opRow && opRow.key === key) opRow.value = cloneSyncValue_(plan.value);
+    });
+    if(plan.keepOutbox){
       kept.push(conflict);
       return;
     }
@@ -40261,6 +40315,10 @@ function renderSheetContent(content, opts) {
     var ths = content.threads;
     if(shouldShowThreadsPending_(content, state.selectedId)){
       bodyHTML = tabsHTML + buildThreadsPendingBox_(content, state.selectedId);
+    } else if(threadsInterruptedByDraft[state.selectedId] && (!ths || !getThreadsBodyText_(ths))){
+      bodyHTML = tabsHTML +
+        '<div class="sheet-insta-pending"><strong>생성이 중단됐습니다. 다시 만들려면 버튼을 누르세요.</strong></div>' +
+        '<button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin-top:12px;">쓰레드 글 만들기</button>';
     } else if(!ths || !getThreadsBodyText_(ths)){
       bodyHTML = tabsHTML +
         '<div class="sheet-insta-pending"><strong>쓰레드 글은 아직 없어요.</strong><br>인스타 탭에서 캡션을 다듬은 뒤 <strong>발행완료</strong>를 누르면, 그 최종본으로 쓰레드 초안이 만들어져요. 인스타 초안이 있으면 아래에서도 만들 수 있어요.</div>' +
@@ -40926,6 +40984,18 @@ function getThreadsBgJob_(draftId){
   return job;
 }
 var threadsPendingMetaByDraft = {};
+var threadsInterruptedByDraft = {};
+var THREADS_LOCAL_PENDING_KEY_ = 'ht_threads_pending_local_v1';
+function readThreadsLocalPending_(){
+  try {
+    var raw = localStorage.getItem(THREADS_LOCAL_PENDING_KEY_);
+    var parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch(ePending){ return {}; }
+}
+function writeThreadsLocalPending_(bag){
+  try { localStorage.setItem(THREADS_LOCAL_PENDING_KEY_, JSON.stringify(bag || {})); } catch(ePending){}
+}
 function stripThreadsPendingFields_(content){
   if(!content) return;
   delete content.threadsPending;
@@ -40942,11 +41012,23 @@ function setThreadsPendingMeta_(content, draftId, catId, topic, startedMs, endMs
       topic: topic || '',
       catId: catId
     };
+    delete threadsInterruptedByDraft[draftId];
+    var bag = readThreadsLocalPending_();
+    bag[draftId] = { startedMs: startedMs, endMs: endMs, topic: topic || '', catId: catId };
+    writeThreadsLocalPending_(bag);
   }
   stripThreadsPendingFields_(content);
 }
 function clearThreadsPendingMeta_(content, draftId){
-  if(draftId) delete threadsPendingMetaByDraft[draftId];
+  if(draftId){
+    delete threadsPendingMetaByDraft[draftId];
+    delete threadsInterruptedByDraft[draftId];
+    var bag = readThreadsLocalPending_();
+    if(bag[draftId]){
+      delete bag[draftId];
+      writeThreadsLocalPending_(bag);
+    }
+  }
   stripThreadsPendingFields_(content);
 }
 function getThreadsPendingEndMs_(content, draftId){
@@ -41189,17 +41271,29 @@ function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
   })();
 }
 function reconcileThreadsPendingJobs_(reason){
-  if(typeof PlannerFieldSync !== 'undefined' && !PlannerFieldSync.shouldResumeThreadsJob(reason)){
-    (CATEGORIES || []).forEach(function(cat){
-      (cat.drafts || []).forEach(function(d){
-        var content = getDraftContent_(d.id);
-        if(!content) return;
-        stripThreadsPendingFields_(content);
-        if(content.content) stripThreadsPendingFields_(content.content);
-      });
+  if(typeof PlannerFieldSync !== 'undefined' && PlannerFieldSync.shouldResumeThreadsJob(reason)) return false;
+  var bag = readThreadsLocalPending_();
+  var changed = false;
+  Object.keys(bag).forEach(function(id){
+    if(threadsBgByDraft[id]) return;
+    threadsInterruptedByDraft[id] = true;
+    delete bag[id];
+    changed = true;
+  });
+  if(changed) writeThreadsLocalPending_(bag);
+  (CATEGORIES || []).forEach(function(cat){
+    (cat.drafts || []).forEach(function(d){
+      var content = getDraftContent_(d.id);
+      if(!content) return;
+      var hadPending = !!(content.threadsPending || content.threadsPendingStartedAt || content.threadsPendingEndMs);
+      stripThreadsPendingFields_(content);
+      if(content.content){
+        hadPending = hadPending || !!(content.content.threadsPending || content.content.threadsPendingStartedAt || content.content.threadsPendingEndMs);
+        stripThreadsPendingFields_(content.content);
+      }
+      if(hadPending && !threadsBgByDraft[d.id]) threadsInterruptedByDraft[d.id] = true;
     });
-    return false;
-  }
+  });
   return false;
 }
 

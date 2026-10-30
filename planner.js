@@ -4542,15 +4542,74 @@ function getProgramSeedStrategyGuide_(catId){
   var seed = PROGRAM_INITIAL_PLAN_DRAFTS[String(catId)];
   return seed ? normalizeProgramStrategyGuideTemplate_(String(seed.strategyGuide || '').trim()) : '';
 }
-/** 일반인 궁금증 서랍 개정 — 제목 매칭으로 단계 재정렬·삽입 (글 배정 유지) */
-const CURIOSITY_HUB_PLAN_REV = { '0': 'curiosity-v5', '1': 'curiosity-v4', '2': 'curiosity-v5', '7': 'curiosity-v4' };
+/** 서랍 개정 — 제목 매칭으로 단계 재정렬·삽입 (글 배정 유지). 전문가 과정도 포함 */
+const CURIOSITY_HUB_PLAN_REV = {
+  '0': 'curiosity-v6',
+  '1': 'curiosity-v6',
+  '2': 'curiosity-v6',
+  '3': 'psp-v1',
+  '4': 'psp-v1',
+  '5': 'psp-v1',
+  '7': 'curiosity-v6'
+};
 function curiosityStepTitleKey_(title, catId){
   var t = displaySubGoalStepTitle_(String(title || ''), catId)
     .replace(/[·․.\s\-–—_/]/g, '')
     .toLowerCase();
-  // 생활건강: 옛 「얼굴 셀프운동」→「얼굴 셀프교정」매칭
-  if(String(catId) === '7' && t === '얼굴셀프운동') t = '얼굴셀프교정';
+  var cid = String(catId);
+  if(cid === '7' && t === '얼굴셀프운동') t = '얼굴셀프교정';
+  if(cid === '0'){
+    if(/오래앉아|허리.*뻐근|약수역|작전역/.test(t) && /허리|골반|고관절|앉아|뻐근/.test(t)) t = '허리골반고관절';
+    else if(/약수|작전/.test(t)) t = '';
+  }
+  if(cid === '1'){
+    if(/테스트동기화|삭제예정/.test(t)) t = '';
+    else if(/고관절|접히|코어/.test(t)) t = '코어기능운동';
+    else if(/약수|작전/.test(t)) t = '';
+  }
   return t;
+}
+function guessCanonicalDrawerForOrphan_(catId, leftoverTitle){
+  var seed = getInitialProgramPlanDraft_(catId);
+  if(!seed || !seed.steps) return { id: SUBGOAL_MISC_ID, title: '' };
+  var t = String(leftoverTitle || '');
+  var rules = [];
+  if(catId === 0 || catId === '0'){
+    rules = [
+      [/허리|골반|고관절|앉아|뻐근/, '허리·골반·고관절'],
+      [/목|어깨|등/, '목·등·어깨'],
+      [/팔|다리|무릎|발목|사지/, '사지'],
+      [/전신/, '전신'],
+      [/도수|치료|마사지|오해/, '치료상식']
+    ];
+  } else if(catId === 1 || catId === '1'){
+    rules = [
+      [/코어|기능운동|고관절|접히/, '코어 기능운동'],
+      [/유연|스트레칭/, '유연성·스트레칭'],
+      [/자세|거북|숄더/, '자세·거북목·라운드 숄더'],
+      [/앉|걷|생활습관/, '앉기·걷기 생활습관'],
+      [/운동|움직임/, '운동상식']
+    ];
+  } else if(catId === 2 || catId === '2'){
+    rules = [
+      [/비대칭|한쪽/, '비대칭·한쪽 얼굴'],
+      [/윤곽|이중턱|붓/, '윤곽·이중턱·붓기'],
+      [/턱|씹/, '턱관절·씹기'],
+      [/목|자세/, '목·자세와 얼굴'],
+      [/얼굴/, '얼굴상식']
+    ];
+  }
+  var want = '';
+  for(var i = 0; i < rules.length; i++){
+    if(rules[i][0].test(t)){ want = rules[i][1]; break; }
+  }
+  if(!want) return { id: SUBGOAL_MISC_ID, title: '' };
+  for(var s = 0; s < seed.steps.length; s++){
+    if(curiosityStepTitleKey_(seed.steps[s].title, catId) === curiosityStepTitleKey_(want, catId)){
+      return { id: 's' + (s + 1), title: seed.steps[s].title };
+    }
+  }
+  return { id: SUBGOAL_MISC_ID, title: '' };
 }
 function syncCuriosityHubPlanFromSeed_(catId){
   catId = normalizePendingCatId_(catId);
@@ -4561,7 +4620,6 @@ function syncCuriosityHubPlanFromSeed_(catId){
   var key = String(catId);
   var plan = state.branding.subGoalPlans[key];
   if(!plan || !Array.isArray(plan.steps) || !plan.steps.length) return false;
-  if(plan.hubCustom) return false;
   var seed = getInitialProgramPlanDraft_(catId);
   if(!seed || !seed.steps || !seed.steps.length) return false;
   var titlesAligned = plan.steps.length === seed.steps.length;
@@ -4601,6 +4659,7 @@ function syncCuriosityHubPlanFromSeed_(catId){
     var k = curiosityStepTitleKey_(st.title, catId);
     if(k && !byKey[k]) byKey[k] = st;
   });
+  var claimed = {};
 
   var idMap = {};
   var newSteps = [];
@@ -4632,6 +4691,7 @@ function syncCuriosityHubPlanFromSeed_(catId){
         changed = true;
       }
       delete byKey[k];
+      if(oldId) claimed[oldId] = true;
     } else {
       newSteps.push({
         id: wantId,
@@ -4647,8 +4707,7 @@ function syncCuriosityHubPlanFromSeed_(catId){
 
   var miscLabel = getSubGoalMiscLabel_(plan);
   var keptImportSteps = [];
-  Object.keys(byKey).forEach(function(k){
-    var rs = byKey[k];
+  function relocateOrphanStep_(rs){
     if(!rs) return;
     if(rs.importTopic || String(rs.rationale || '') === '원고 가져오기'){
       keptImportSteps.push(rs);
@@ -4658,14 +4717,24 @@ function syncCuriosityHubPlanFromSeed_(catId){
     changed = true;
     var rid = String(rs.id != null ? rs.id : '').trim();
     if(!rid) return;
+    var guess = guessCanonicalDrawerForOrphan_(catId, rs.title);
+    var destId = guess.id || SUBGOAL_MISC_ID;
+    var destTitle = guess.title || miscLabel;
+    if(destId === SUBGOAL_MISC_ID) destTitle = miscLabel;
     var orphan = getDraftsForSubGoalStep_(catId, rid, { live: true }) || [];
     orphan.forEach(function(d, oi){
       if(!d) return;
-      var miscPeers = getDraftsForSubGoalStep_(catId, SUBGOAL_MISC_ID, { live: true }) || [];
-      var order = miscPeers.length + oi + 1;
-      applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, order, Math.max(order, 1));
-      try { ensurePendingAssignmentForDraft_(catId, SUBGOAL_MISC_ID, order, d.id); } catch(eAsg){}
+      var peers = getDraftsForSubGoalStep_(catId, destId, { live: true }) || [];
+      var order = peers.length + oi + 1;
+      applyDraftRoadmapAssignment_(d, catId, destId, destTitle, order, Math.max(order, 1));
+      try { ensurePendingAssignmentForDraft_(catId, destId, order, d.id); } catch(eAsg){}
     });
+  }
+  plan.steps.forEach(function(st){
+    var sid = st && st.id != null ? String(st.id) : '';
+    if(!sid || claimed[sid]) return;
+    claimed[sid] = true;
+    relocateOrphanStep_(st);
   });
   keptImportSteps.forEach(function(rs){
     var oldId = String(rs && rs.id != null ? rs.id : '').trim();
@@ -4716,6 +4785,7 @@ function syncCuriosityHubPlanFromSeed_(catId){
     }
   }
   plan.hubRev = rev;
+  if(!titlesAligned) delete plan.hubCustom;
   if(changed) plan.updatedAt = new Date().toISOString();
   return changed || !titlesAligned;
 }

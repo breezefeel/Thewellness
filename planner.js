@@ -1,7 +1,7 @@
 // planner.js — 브랜딩 플래너 (배포용 번들)
 
 const CATEGORIES = [
-  { id:0, icon:"", name:"도수치료",       color:"#3A5080", audience:"일반인",
+  { id:0, icon:"", name:"도수치료",       color:"#4A4E92", audience:"일반인",
     sub:"연부 치료 · 관절치료",
     drafts:[
       {id:"d0-0", topic:"허리가 뻐근한 이유, 근육만의 문제가 아닙니다",        angle:"관절 구조와 연부조직이 함께 만들어내는 통증 메커니즘 설명"},
@@ -10,7 +10,7 @@ const CATEGORIES = [
       {id:"d0-3", topic:"연부조직 치료, 어디까지 해야 효과가 날까요?",         angle:"근막·인대·건 각각의 치료 접근과 적절한 치료 횟수 가이드"},
       {id:"d0-4", topic:"목·허리·어깨 중 가장 먼저 치료해야 할 곳은?",        angle:"연쇄 보상 패턴 설명으로 치료 순서의 중요성 강조"},
     ]},
-  { id:1, icon:"", name:"리얼 무브먼트",   color:"#1f1f1f", audience:"일반인",
+  { id:1, icon:"", name:"리얼 무브먼트",   color:"#7ED8D0", audience:"일반인",
     sub:"Re-Alignment Movement Center — 패시브 스트레칭 · 기능운동 · 자세교정",
     drafts:[
       {id:"d1-0", topic:"스트레칭을 매일 해도 왜 몸이 안 풀릴까요?",           angle:"패시브 스트레칭의 올바른 방법과 잘못된 습관 교정"},
@@ -19,7 +19,7 @@ const CATEGORIES = [
       {id:"d1-3", topic:"앉아서 일하는 당신을 위한 3분 루틴",                  angle:"재택·사무직을 위한 척추-고관절 기능운동 시퀀스"},
       {id:"d1-4", topic:"걷기만 해도 자세가 교정된다, 가능한 이야기일까요?",   angle:"보행 패턴과 자세 교정의 연관성, 올바른 걷기 방법"},
     ]},
-  { id:2, icon:"", name:"리얼 페이스",    color:"#9ca98a", audience:"일반인",
+  { id:2, icon:"", name:"리얼 페이스",    color:"#E59AAD", audience:"일반인",
     sub:"리얼 페이스 · 얼굴 교정 · 작은얼굴",
     drafts:[
       {id:"d2-0", topic:"셀카에서 한쪽 얼굴만 작아 보이는 진짜 이유",          angle:"안면비대칭의 원인 — 습관, 교합, 경추 연관성 설명"},
@@ -28,7 +28,7 @@ const CATEGORIES = [
       {id:"d2-3", topic:"얼굴 비대칭 교정, 몇 번 받으면 티가 날까요?",        angle:"실제 케이스 기반 치료 기간 안내 + 기대치 조율"},
       {id:"d2-4", topic:"이중턱이 생기는 세 가지 구조적 이유",                 angle:"피부·지방·골격 요인을 분리해서 설명, 각각의 접근법"},
     ]},
-  { id:3, icon:"", name:"CMT 전문가 교육", color:"#1E3A5F", audience:"전문가",
+  { id:3, icon:"", name:"CMT 전문가 교육", color:"#2A2E66", audience:"전문가",
     sub:"CMT 임상 도수치료 과정",
     drafts:[
       {id:"d3-0", topic:"촉진(Palpation)이 치료보다 먼저인 이유",               angle:"평가-치료 연결의 핵심, 실전 촉진 훈련의 필요성"},
@@ -37,7 +37,7 @@ const CATEGORIES = [
       {id:"d3-3", topic:"CMT에서 관절가동술을 쓰는 타이밍은?",                  angle:"HVLA와 LVLA의 선택 기준, 실전 판단 프레임 공유"},
       {id:"d3-4", topic:"환자가 '좋아졌다'고 할 때 치료사가 확인해야 할 것",   angle:"주관적 개선과 객관적 지표의 차이, 재발 방지 전략"},
     ]},
-  { id:4, icon:"", name:"IFC 얼굴교육",   color:"#7c8a6c", audience:"전문가",
+  { id:4, icon:"", name:"IFC 얼굴교육",   color:"#C45B78", audience:"전문가",
     sub:"얼굴교정 전문가 과정",
     drafts:[
       {id:"d4-0", topic:"IFC 얼굴교정, 단순 마사지와 다른 점은 무엇인가?",     angle:"구조적 접근 vs 표면 접근의 차이, IFC 핵심 원리"},
@@ -46,7 +46,7 @@ const CATEGORIES = [
       {id:"d4-3", topic:"INDIBA와 IFC를 함께 사용할 때의 프로토콜",            angle:"기기와 도수 접근의 시너지 — 순서, 타이밍, 포인트"},
       {id:"d4-4", topic:"얼굴 비대칭 케이스에서 놓치기 쉬운 평가 포인트",      angle:"교합·턱관절·경추 복합 평가 체크리스트 공유"},
     ]},
-  { id:5, icon:"", name:"Re:Al 움직임 과정", color:"#8B1E3D", audience:"전문가",
+  { id:5, icon:"", name:"Re:Al 움직임 과정", color:"#1A9A96", audience:"전문가",
     sub:"Re:Al 움직임 과정 · 전문가 교육",
     drafts:[
       {id:"d5-0", topic:"패시브 스트레칭을 언제, 어떻게 써야 하는가?",          angle:"억제-이완 테크닉의 원리와 임상 적용 타이밍"},
@@ -55,7 +55,7 @@ const CATEGORIES = [
       {id:"d5-3", topic:"고관절 가동성 vs 안정성, 무엇이 먼저인가?",            angle:"기능 사슬(kinetic chain) 관점의 운동 처방 우선순위"},
       {id:"d5-4", topic:"운동 처방 시 환자 순응도를 높이는 커뮤니케이션 전략",  angle:"행동변화 이론 + 동기부여 인터뷰를 운동 지도에 적용"},
     ]},
-  { id:6, icon:"", name:"일상 공유", color:"#3D8B6A", audience:"팔로워·일상",
+  { id:6, icon:"", name:"일상 공유", color:"#8E6BB8", audience:"팔로워·일상",
     sub:"그날의 장면·사람·몸 느낌 — 원본 사진 4:5, 강의 톤 없이",
     drafts:[
       {id:"d6-0", topic:"오늘 폼롤러로 옆구리를 풀었다", angle:"누구와 무엇을 + 오늘 몸 느낌 한 줄"},
@@ -66,7 +66,7 @@ const CATEGORIES = [
       {id:"d6-5", topic:"오늘 찍힌 사진 그대로", angle:"생일 사진 톤 · 꾸민 썸네일 금지"},
       {id:"d6-6", topic:"짧게 남기는 오늘의 몸", angle:"음성 30초 분량 · 문장만 다듬기"},
     ]},
-  { id:7, icon:"", name:"기타", color:"#6F8F80", audience:"입주민",
+  { id:7, icon:"", name:"기타", color:"#8E6BB8", audience:"입주민",
     sub:"생활건강 · 셀프케어 — PAR · P-스트레칭 · 자세 · 기능운동 · 작은얼굴",
     drafts:[
       {id:"d7-0", topic:"앉아만 있어도 목이 뻐근할 때, 먼저 확인해 보면 좋은 한 가지", angle:"거북목이라고 단정 짓기 전에 — 경추·어깨·호흡을 아주 쉽게"},
@@ -78,7 +78,7 @@ const CATEGORIES = [
       {id:"d7-6", topic:"에어컨 켜기 전, 목·어깨가 먼저 뻐근해질 때", angle:"초여름 실내 냉방·창문 바람 — 짧은 호흡·어깨 이완"},
       {id:"d7-7", topic:"꽃가루 시즌, 몸이 무겁고 피곤할 때", angle:"봄 피로·붓기 — 과장 없이 수면·가벼운 움직임·림프 톤"},
     ]},
-  { id:8, icon:"", name:"지점·브랜딩", color:"#6366F1", audience:"운영",
+  { id:8, icon:"", name:"지점·브랜딩", color:"#6B46A8", audience:"운영",
     sub:"플래너 밖 작업 · 지점 오픈 · GEO 체크리스트",
     drafts:[]},
 ];
@@ -14449,130 +14449,125 @@ const MANGO_DETAIL_INTRO_MAX = 2000;
  * 리얼 페이스(2)·IFC(4): FACE × FUNCTION 강의 팔레트(크림·세이지·다크 올리브). */
 const MANGO_PALETTES_BY_CAT = {
   0: {
-    key: 'navy',
+    key: 'indigo',
     label: '도수치료',
-    bg: '#eef1f6',
-    bg2: '#e6ebf3',
-    head: '#1e2a44',
-    point: '#3a5080',
-    card: '#f4f6fa',
-    card2: '#eef1f7',
-    divider: '#1e2a44',
-    desc: '남색·신뢰·임상'
+    bg: '#EEEDF6',
+    bg2: '#E2E1F0',
+    head: '#2A2E66',
+    point: '#4A4E92',
+    card: '#F6F5FB',
+    card2: '#ECEAF6',
+    divider: '#2A2E66',
+    desc: '곤색·신뢰·임상'
   },
   1: {
-    key: 'devon',
+    key: 'teal',
     label: '리얼무브먼트',
-    bg: '#f0efeb',
-    bg2: '#eee9de',
-    head: '#333333',
-    point: '#dc143c',
-    card: '#FAF6F0',
-    card2: '#EDE8DF',
-    divider: '#333333',
-    desc: '아이보리·차콜 주조 · 크림슨은 작은 기호만(면·배경 금지)'
+    bg: '#F0FBFA',
+    bg2: '#E3F6F4',
+    head: '#146E6B',
+    point: '#7ED8D0',
+    card: '#F7FCFB',
+    card2: '#E7F7F5',
+    divider: '#146E6B',
+    desc: '청록·움직임'
   },
   2: {
-    key: 'sage',
+    key: 'rose',
     label: '리얼 페이스',
-    bg: '#faf6ef',
-    bg2: '#eee3d2',
-    head: '#5c5347',
-    point: '#9ca98a',
-    card: '#fffdf8',
-    card2: '#eee3d2',
-    divider: '#7c8a6c',
-    desc: '크림·세이지 · FACE × FUNCTION'
+    bg: '#FDF4F6',
+    bg2: '#F8E6EB',
+    head: '#8E3D52',
+    point: '#E59AAD',
+    card: '#FFF8F9',
+    card2: '#F8E8ED',
+    divider: '#8E3D52',
+    desc: '장미·얼굴'
   },
   3: {
-    key: 'navy-expert',
+    key: 'indigo-expert',
     label: 'CMT Academy',
-    bg: '#E8EDF5',
-    bg2: '#DDE4F0',
-    head: '#0F172A',
-    point: '#4F46E5',
-    card: '#F0F4FA',
-    card2: '#E5EBF5',
-    divider: '#0F172A',
-    desc: '딥 네이비·인디고·교육'
+    bg: '#E8E8F2',
+    bg2: '#DCDCEB',
+    head: '#1A1C40',
+    point: '#2A2E66',
+    card: '#F3F3F8',
+    card2: '#E6E6F2',
+    divider: '#1A1C40',
+    desc: '곤색·교육'
   },
   4: {
-    key: 'sage-expert',
+    key: 'rose-expert',
     label: 'IFC 얼굴교육',
-    bg: '#faf6ef',
-    bg2: '#e4d5bc',
-    head: '#332b23',
-    point: '#7c8a6c',
-    card: '#faf6ef',
-    card2: '#dcc7a8',
-    divider: '#332b23',
-    desc: '다크 올리브·세이지 · IFC 강의톤'
+    bg: '#FBEFF2',
+    bg2: '#F6DDE4',
+    head: '#7A3048',
+    point: '#C45B78',
+    card: '#FFF6F8',
+    card2: '#F8E4EA',
+    divider: '#7A3048',
+    desc: '장미·얼굴교육'
   },
   5: {
-    key: 'devon-expert',
+    key: 'teal-expert',
     label: 'Re:Al 움직임 과정',
-    bg: '#E8E4DC',
-    bg2: '#DDD8CE',
-    head: '#1A1A1A',
-    point: '#9F1239',
-    card: '#F3EFE8',
-    card2: '#E5E0D6',
-    divider: '#1A1A1A',
-    desc: '딥 아이보리·와인·교육'
+    bg: '#E7F5F4',
+    bg2: '#D5EEEC',
+    head: '#0E5C5A',
+    point: '#1A9A96',
+    card: '#F3FBFA',
+    card2: '#E3F4F3',
+    divider: '#0E5C5A',
+    desc: '청록·움직임 교육'
   },
   6: {
-    key: 'green',
+    key: 'violet-daily',
     label: '일상 공유',
-    bg: '#eef7f2',
-    bg2: '#e3f0e9',
-    head: '#1f3d32',
-    point: '#3d8b6a',
-    card: '#f4faf6',
-    card2: '#ebf5ef',
-    divider: '#1f3d32',
-    desc: '소프트 그린·일상'
+    bg: '#F6F1FA',
+    bg2: '#EDE4F5',
+    head: '#4C3568',
+    point: '#8E6BB8',
+    card: '#FBF8FD',
+    card2: '#F0E8F6',
+    divider: '#4C3568',
+    desc: '연보라·생활건강과 같은 계열'
   },
   7: {
-    key: 'green-bright',
+    key: 'violet',
     label: '생활건강 · 기타',
-    bg: '#ECFDF5',
-    bg2: '#D1FAE5',
-    head: '#14532D',
-    point: '#059669',
-    card: '#F0FDF4',
-    card2: '#DCFCE7',
-    divider: '#14532D',
-    desc: '에메랄드·커뮤니티'
+    bg: '#F6F1FA',
+    bg2: '#EDE4F5',
+    head: '#4C3568',
+    point: '#8E6BB8',
+    card: '#FBF8FD',
+    card2: '#F0E8F6',
+    divider: '#4C3568',
+    desc: '연보라·생활'
   },
   8: {
-    key: 'indigo',
+    key: 'violet-ops',
     label: '지점·브랜딩',
-    bg: '#EEF2FF',
-    bg2: '#E0E7FF',
-    head: '#312E81',
-    point: '#6366F1',
-    card: '#F5F7FF',
-    card2: '#EEF2FF',
-    divider: '#312E81',
-    desc: '인디고·운영'
+    bg: '#F3EEF8',
+    bg2: '#E6DCF2',
+    head: '#3D2468',
+    point: '#6B46A8',
+    card: '#F8F4FC',
+    card2: '#EDE4F6',
+    divider: '#3D2468',
+    desc: '보라·운영'
   }
 };
 
-/** 썸네일 스크림 — 프로그램 색
- * 리얼 무브먼트(1): 차콜만 — 크림슨 하단 워시 금지
- * CMT(3): glow는 스틸 블루. 프로그램 색은 네이비
- * Re:Al(5): 차콜 바탕, 와인 glow만 포인트. 프로그램 색 #8B1E3D 는 액센트
- * 기타(7): 차분한 그레이그린
- * 8(지점·브랜딩)은 프로그램이 아니라 스크림을 두지 않는다 */
+/** 썸네일 스크림 — 프로그램 메인색. 8(현황)은 스크림을 두지 않는다 */
 const THUMB_SCRIM_BY_CAT = {
-  0: { tint: '#1e2a44', tint2: '#3A5080', glow: '#3a5080' },
-  1: { tint: '#333333', tint2: '#2a2a2a', glow: '#1f1f1f' },
-  2: { tint: '#332b23', tint2: '#9ca98a', glow: '#7c8a6c' },
-  3: { tint: '#0F172A', tint2: '#1E3A5F', glow: '#3E6A9E' },
-  4: { tint: '#332b23', tint2: '#7c8a6c', glow: '#9ca98a' },
-  5: { tint: '#1A1A1A', tint2: '#2a2a2a', glow: '#8B1E3D' },
-  6: { tint: '#1f3d32', tint2: '#3D8B6A', glow: '#3d8b6a' },
-  7: { tint: '#24332c', tint2: '#6F8F80', glow: '#5F7D70' }
+  0: { tint: '#2A2E66', tint2: '#4A4E92', glow: '#4A4E92' },
+  1: { tint: '#146E6B', tint2: '#1A9A96', glow: '#7ED8D0' },
+  2: { tint: '#6E3040', tint2: '#C45B78', glow: '#E59AAD' },
+  3: { tint: '#1A1C40', tint2: '#2A2E66', glow: '#6A6EAE' },
+  4: { tint: '#5C2436', tint2: '#C45B78', glow: '#E59AAD' },
+  5: { tint: '#0E5C5A', tint2: '#1A9A96', glow: '#7ED8D0' },
+  6: { tint: '#4C3568', tint2: '#8E6BB8', glow: '#C4A8DE' },
+  7: { tint: '#4C3568', tint2: '#8E6BB8', glow: '#C4A8DE' }
 };
 
 function getMangoPaletteForCat_(catId){

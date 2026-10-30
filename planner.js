@@ -83,19 +83,18 @@ const CATEGORIES = [
     drafts:[]},
 ];
 
-/** 상단 카테고리 탭: 두 줄 순서·표시명 (데이터 CATEGORIES 인덱스 기준)
- *  생활건강 = 드롭다운 1칸(7). 서랍: 건강상식~얼굴셀프교정 + 일상 공유(6) + 기타 */
-const CAT_TAB_NAV_ROWS = [[0, 1, 2, 7], [3, 5, 4]];
+/** 상단 탭 두 줄. 1행 CMT·Re:Al·IFC, 2행 도수·리얼무브먼트·리얼페이스·생활건강. 현황(8)은 탭만 */
+const CAT_TAB_NAV_ROWS = [[3, 5, 4], [0, 1, 2, 7]];
 const CAT_TAB_SHORT = {
   0: '도수치료',
-  1: '리얼 무브먼트',
-  2: '리얼 페이스',
-  7: '기타',
-  3: 'CMT 과정',
-  5: 'Re:Al 움직임 과정',
-  4: 'IFC 과정',
+  1: '리얼무브먼트',
+  2: '리얼페이스',
+  7: '생활건강',
+  3: 'CMT',
+  5: 'Re:Al',
+  4: 'IFC',
   6: '일상 공유',
-  8: '블랜딩'
+  8: '현황'
 };
 const CAT_GROUP_GENERAL = [0, 1, 2, 7];
 const LIFE_HEALTH_LABEL = '생활건강';
@@ -10314,7 +10313,6 @@ function renderSubGoalStepBlockHTML_(catId, step, idx, activeId){
           '<span class="subgoal-step-count">' + formatSubGoalStepCountHTML_(drafts, catId) + '</span>' +
         '</span>' +
       '</div>' +
-      '<button type="button" class="subgoal-topic-gen-btn" onclick="event.stopPropagation();' + focusTip + 'openStepTopicSuggest_(' + catId + ',\'' + sid.replace(/'/g, '') + '\')">주제 생성</button>' +
     '</div>';
   html += renderSubGoalStepCardsHTML_(catId, drafts, collapsed);
   html += '</div>';
@@ -26826,69 +26824,50 @@ function updateApiBadge() {
 }
 
 
+function applyCategoryPageTint_(){
+  var catId = state.currentCat;
+  if(isLifeHealthCategory_(catId)) catId = LIFE_HEALTH_HOST_CAT;
+  var cat = CATEGORIES[catId];
+  var color = (cat && cat.color) || '#94A3B8';
+  document.documentElement.style.setProperty('--cat-tint', color);
+}
 function renderTabs() {
-  function groupSelectorHTML(groupLabel, ids, groupKey){
-    var displayCat = getDisplayCatInGroup_(ids, groupKey);
-    var isActive = ids.indexOf(state.currentCat) >= 0 || (groupKey === 'general' && isLifeHealthCategory_(state.currentCat));
-    var activeCount = (displayCat === 7)
-      ? countLifeHealthTopics_()
-      : countUnpublishedTopicsForCat_(displayCat);
-    var hasPending = !!(state.pendingSubGoalPlan && (
-      ids.some(function(id){ return sameCatId_(state.pendingSubGoalPlan.catId, id); }) ||
-      (groupKey === 'general' && isLifeHealthCategory_(state.pendingSubGoalPlan.catId))
+  applyCategoryPageTint_();
+  var items = [
+    { kind:'cat', id:3 },
+    { kind:'cat', id:5 },
+    { kind:'cat', id:4 },
+    { kind:'ops' },
+    { kind:'cat', id:0 },
+    { kind:'cat', id:1 },
+    { kind:'cat', id:2 },
+    { kind:'life', id:7 }
+  ];
+  var html = items.map(function(item){
+    if(item.kind === 'ops'){
+      var opsOn = isOpsManualCategory(state.currentCat);
+      return '<button type="button" class="cat-tab' + (opsOn ? ' active' : '') + '" onclick="selectOpsBranchFromNav_(\'promo\')" aria-pressed="' + (opsOn ? 'true' : 'false') + '">' +
+        '<span class="cat-tab-label">현황</span>' +
+        '<span class="cat-tab-badge" title="오늘 할 일">' + countOpsPromoTodayTasks_() + '</span></button>';
+    }
+    var idx = item.id;
+    var cat = CATEGORIES[idx];
+    var label = CAT_TAB_SHORT[idx] || (cat && cat.name) || '';
+    var on = item.kind === 'life' ? isLifeHealthCategory_(state.currentCat) : sameCatId_(state.currentCat, idx);
+    var count = item.kind === 'life' ? countLifeHealthTopics_() : countUnpublishedTopicsForCat_(idx);
+    var pending = !!(state.pendingSubGoalPlan && (
+      sameCatId_(state.pendingSubGoalPlan.catId, idx) ||
+      (item.kind === 'life' && isLifeHealthCategory_(state.pendingSubGoalPlan.catId))
     ));
-    var options = ids.map(function(idx){
-      var c = CATEGORIES[idx];
-      if(!c) return '';
-      var short = (idx === 7) ? LIFE_HEALTH_LABEL : (CAT_TAB_SHORT[idx] || c.name);
-      var count = (idx === 7) ? countLifeHealthTopics_() : countUnpublishedTopicsForCat_(idx);
-      var pending = state.pendingSubGoalPlan && (
-        sameCatId_(state.pendingSubGoalPlan.catId, idx) ||
-        (idx === 7 && isLifeHealthCategory_(state.pendingSubGoalPlan.catId))
-      );
-      return '<option value="' + idx + '"' + (displayCat === idx ? ' selected' : '') + '>' +
-        short + ' · ' + count + (pending ? ' • 대기' : '') + '</option>';
-    }).join('');
-    return '<div class="cat-group-select-wrap' + (isActive ? ' active' : '') + '" role="button" tabindex="0" onclick="activateCatGroup_(\'' + groupKey + '\', event)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();activateCatGroup_(\'' + groupKey + '\', event);}">' +
-      '<span class="cat-group-dot' + (isActive ? ' on' : '') + (hasPending ? ' pending' : '') + '" aria-hidden="true"></span>' +
-      '<span class="cat-group-label">' + groupLabel + '</span>' +
-      '<select class="cat-group-select" onclick="event.stopPropagation()" onchange="selectCatFromGroupNav_(parseInt(this.value,10))" aria-label="' + groupLabel + ' 프로그램 선택">' +
-      options +
-      '</select>' +
-      '<span class="cat-group-badge" title="준비 글과 완료 글의 합">' + activeCount + '</span>' +
-    '</div>';
-  }
-  function opsGroupSelectorHTML(){
-    var om = getOpsManualState_();
-    var isActive = isOpsManualCategory(state.currentCat);
-    var displayBranch = om.activeBranch;
-    var promoToday = countOpsPromoTodayTasks_();
-    var branchProg = countOpsManualProgress_(displayBranch);
-    var activeCount = displayBranch === 'promo' ? promoToday : Math.max(0, branchProg.total - branchProg.done);
-    var options = CAT_GROUP_OPS.map(function(opt){
-      var bp = countOpsManualProgress_(opt.branch);
-      var count = opt.branch === 'promo' ? promoToday : Math.max(0, bp.total - bp.done);
-      return '<option value="' + opt.branch + '"' + (displayBranch === opt.branch ? ' selected' : '') + '>' +
-        opt.label + ' · ' + count + '</option>';
-    }).join('');
-    return '<div class="cat-group-select-wrap cat-group-ops' + (isActive ? ' active' : '') + '" role="button" tabindex="0" onclick="activateCatGroup_(\'ops\', event)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();activateCatGroup_(\'ops\', event);}">' +
-      '<span class="cat-group-dot' + (isActive ? ' on ops-dot' : '') + '" aria-hidden="true"></span>' +
-      '<span class="cat-group-label">블랜딩</span>' +
-      '<select class="cat-group-select" onclick="event.stopPropagation()" onchange="selectOpsBranchFromNav_(this.value)" aria-label="블랜딩 선택">' +
-      options +
-      '</select>' +
-      '<span class="cat-group-badge" title="현재 지점의 미완료 항목 수">' + activeCount + '</span>' +
-    '</div>';
-  }
-  var html =
-    groupSelectorHTML('일반인용', CAT_GROUP_GENERAL, 'general') +
-    groupSelectorHTML('전문가용', CAT_GROUP_EXPERT, 'expert') +
-    opsGroupSelectorHTML();
+    var go = item.kind === 'life' ? lifeHealthLandingCat_() : idx;
+    return '<button type="button" class="cat-tab' + (on ? ' active' : '') + (pending ? ' has-pending-plan' : '') + '" onclick="selectCat(' + go + ')" aria-pressed="' + (on ? 'true' : 'false') + '">' +
+      '<span class="cat-tab-label">' + label + '</span>' +
+      '<span class="cat-tab-badge" title="준비 글과 완료 글의 합">' + count + '</span></button>';
+  }).join('');
   document.getElementById('cat-tabs-grid').innerHTML = html;
   var promptBtn = document.getElementById('btn-prompt-settings');
   if(promptBtn) promptBtn.style.display = isOpsManualCategory(state.currentCat) ? 'none' : '';
 }
-
 function activateCatGroup_(groupKey, ev){
   if(ev){
     if(ev.target && ev.target.closest && ev.target.closest('select')) return;
@@ -29714,8 +29693,15 @@ function renderOpsManualMainHTML_(){
   if(branch === 'promo') return renderOpsPromoMainHTML_();
   var prog = countOpsManualProgress_(branch);
   var branchLabel = (CAT_GROUP_OPS.find(function(o){ return o.branch === branch; }) || {}).label || OPS_BRANCH_LABELS[branch] || branch;
+  var branchSwitch = '<label class="ops-branch-switch"><span>화면</span><select onchange="selectOpsBranchFromNav_(this.value)" aria-label="지점 셋팅 화면">' +
+    CAT_GROUP_OPS.map(function(opt){
+      var name = opt.branch === 'promo' ? '현황' : (opt.label + ' 셋팅');
+      return '<option value="' + opt.branch + '"' + (branch === opt.branch ? ' selected' : '') + '>' + name + '</option>';
+    }).join('') +
+  '</select></label>';
   var intro = '<div class="ops-manual-intro">' +
     '<div class="ops-manual-title">블랜딩 · 오픈 셋팅 · ' + escapeHtml(branchLabel) + '</div>' +
+    branchSwitch +
     '<p class="ops-manual-desc">' + escapeHtml(OPS_BRANCH_HINTS[branch] || '') + '</p>' +
     '<div class="ops-manual-progress"><span class="ops-manual-progress-label">진행</span><span class="ops-manual-progress-num">' + prog.done + ' / ' + prog.total + '</span></div>' +
   '</div>';
@@ -29814,7 +29800,7 @@ function renderOpsManualMainHTML_(){
       '<ol class="ops-check-list">' + itemsHtml + '</ol>' +
     '</details>';
   }).join('');
-  var foot = '<p class="ops-manual-foot">체크와 작성 내용은 이 기기·Drive·서버 동기화에 저장됩니다. 지점은 상단 「블랜딩」에서 바꿀 수 있어요.</p>';
+  var foot = '<p class="ops-manual-foot">체크와 작성 내용은 이 기기·Drive·서버 동기화에 저장됩니다. 다른 지점 셋팅은 위 「화면」에서 바꿉니다.</p>';
   return '<div class="ops-manual-wrap">' + intro + newMeta +
     '<div class="ops-sections">' + sections + '</div>' + foot +
   '</div>';
@@ -29847,8 +29833,10 @@ function renderOpsPromoMainHTML_(){
       return '<button type="button" role="tab" aria-selected="' + (on ? 'true' : 'false') + '" onclick="setOpsPromoTab_(\'' + x.id + '\')" style="flex:1;appearance:none;border:0;border-radius:10px;padding:10px 12px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;' +
         (on ? 'background:#1e3a6e;color:#fff;box-shadow:0 1px 3px rgba(15,23,42,.18)' : 'background:transparent;color:#1e3a6e') + '">' + x.label + '</button>';
     }).join('') + '</div>';
+  var setupJump = '<button type="button" class="ops-setup-link" onclick="selectOpsBranchFromNav_(\'yaksu\')">지점 셋팅</button>';
   var intro = '<div class="ops-manual-intro">' +
     '<div class="ops-manual-title">블랜딩 · 현황 · ' + escapeHtml(cur.label) + '</div>' +
+    setupJump +
     '<p class="ops-manual-desc">' + escapeHtml(scope.desc || '') + ' — 오늘·이번 주 할 일을 정리합니다.</p>' +
   '</div>';
   return '<div class="ops-manual-wrap">' + tabs + intro +
@@ -30790,7 +30778,7 @@ function createEmptyNewItem_(catId){
     date: '', topic: '', catId: typeof catId === 'number' ? catId : 0,
     dailyShareKind: 'scene', dailyThought: '',
     dailyWho: '', dailyWhat: '', dailyBody: '',
-    articleKind: '', articleKindLocked: false,
+    articleKind: '', articleKindLocked: false, stepId: '',
     refImages: [], refImage: null, refNote: '', imageAnalyzing: false, imageAnalysisWait: null,
     flowProposals: [], selectedFlowIdx: 0, flowProposalsLoading: false,
     flowProposalsReady: false, cachedYoutubeAnalysis: '', _cachedFlowYoutubeUrl: '',
@@ -32655,6 +32643,12 @@ function renderAddForm(){
     })
     .filter(Boolean)
     .join('');
+  const drawerSteps = listNewItemDrawers_(catId);
+  const drawerId = resolveNewItemStepId_(catId);
+  if(state.newItem.stepId !== drawerId) state.newItem.stepId = drawerId;
+  const drawerOpts = drawerSteps.map(function(step){
+    return '<option value="' + escapeHtml(String(step.id)) + '"' + (String(step.id) === drawerId ? ' selected' : '') + '>' + escapeHtml(String(step.title || '')) + '</option>';
+  }).join('');
   const imgNames = (state.newItem.refImages || []).map(function(img){ return img && img.name ? img.name : ''; }).filter(Boolean);
   const imgWait = analyzing && state.newItem.imageAnalysisWait ? state.newItem.imageAnalysisWait : null;
   const imgLeftSec = imgWait ? getCountdownSec_(imgWait.startedAt, imgWait.estimateSec) : 0;
@@ -32675,7 +32669,7 @@ function renderAddForm(){
     ? '미카닥 <strong>개인 계정</strong>용입니다. <strong>사진을 올리면 누구와 · 무엇을 · 몸 느낌을 채웁니다.</strong> 직접 적어도 되고, 이번 달 주제만 여러 개 받으려면 아래 주제 추천을 쓰세요. 글은 그 재료만 다듬습니다.'
     : (isExpert
       ? '글의 성격을 고른 뒤, 주제와 원하는 흐름을 적습니다. <strong>자유</strong>는 적어 둔 순서를 살리고, 복기·안내·모집은 각 규칙의 3단을 씁니다.'
-      : '추가한 주제는 <strong>선택한 카테고리 탭</strong>의 <strong>「기타 주제」</strong> 그룹에 카드로 생깁니다. (하위 목표가 없는 탭은 전체 목록 맨 아래)'));
+      : '추가한 주제는 <strong>선택한 카테고리</strong>의 <strong>고른 서랍</strong>에 카드로 생깁니다.'));
   const articleKind = (!isDaily && !isThought) ? getNewItemArticleKind_() : '';
   const kindDef = articleKind ? getArticleKindDef_(articleKind, catId) : null;
   const kwLabel = isExpert ? '테크닉 · 개념' : '키워드 · 아이디어';
@@ -32705,7 +32699,8 @@ function renderAddForm(){
       '<div class="form-field"><label class="form-label">오늘 몸 느낌</label>' +
       '<textarea id="new-item-daily-body" class="form-input form-textarea" rows="2" oninput="onNewItemDailyField_(\'dailyBody\', this)" placeholder="예: 나도 이쪽이 굳더라">' + escapeHtml(state.newItem.dailyBody || '') + '</textarea>' +
       '<div style="font-size:11px;color:#9CA3AF;margin-top:4px;">세 칸이 본문 재료입니다. 사진으로 채운 뒤 고칠 수 있어요. 없는 이야기는 만들지 않습니다.</div></div>')
-    : ('<div class="form-field"><label class="form-label">' + kwLabel + '</label>' +
+    : ('<div class="form-field"><div class="add-kw-head"><label class="form-label">' + kwLabel + '</label>' +
+      '<button type="button" class="add-kw-suggest" id="btn-suggest-keywords" onclick="suggestNewItemKeywords_()">제안하기</button></div>' +
       '<textarea id="new-item-topic-input" class="form-input form-textarea" rows="6" oninput="onNewItemTopicInput_(this)" placeholder="' + kwPlaceholder + '">' + escapeHtml(state.newItem.topic) + '</textarea>' +
       '<div style="font-size:11px;color:#9CA3AF;margin-top:4px;">' + kwHint + '</div></div>'));
   const refNoteLabel = hasPhoto ? '사진·영상 분석 내용 · 참고 메모' : (isThought ? '풀어 쓸 장면 (선택)' : (isDaily ? '참고 메모 (선택)' : (isExpert ? '핵심 포인트 · 영상 메모' : '참고 영상 · 메모 (선택)')));
@@ -32808,11 +32803,17 @@ function renderAddForm(){
   return `<div class="add-form-layout"><div class="add-form">
     <div class="form-title">새 주제 추가</div>
     <p style="font-size:12px;color:#6B7280;line-height:1.55;margin-bottom:12px;">${addIntro}</p>
-    <div class="form-field">
-      <label class="form-label">카테고리</label>
-      <select class="form-select" onchange="setNewCat(this.value)">${catOpts}</select>
-      <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">독자: <strong>${getProgramAudienceLine_(catId)}</strong> (카테고리에 맞게 자동)</div>
+    <div class="add-cat-drawer-row">
+      <div class="form-field">
+        <label class="form-label">카테고리</label>
+        <select class="form-select" onchange="setNewCat(this.value)">${catOpts}</select>
+      </div>
+      <div class="form-field">
+        <label class="form-label">서랍</label>
+        <select class="form-select" onchange="setNewDrawer(this.value)" ${drawerOpts ? '' : 'disabled'}>${drawerOpts || '<option value="">서랍 없음</option>'}</select>
+      </div>
     </div>
+    <div style="font-size:11px;color:#9CA3AF;margin:-6px 0 14px;">독자: <strong>${getProgramAudienceLine_(catId)}</strong> (카테고리에 맞게 자동)</div>
     ${(!isDaily && !isThought) ? articleKindToggleHtml_(catId) : ''}
     ${dailyKindHtml}
     ${dailyFactsHtml}
@@ -33064,14 +33065,94 @@ function bindNewItemFlowInputs_(){
     });
   });
 }
+function listNewItemDrawers_(catId){
+  var plan = peekSubGoalPlan_(catId);
+  return ((plan && plan.steps) || []).filter(function(step){
+    if(!step || step.id == null) return false;
+    var id = String(step.id);
+    if(id === SUBGOAL_MISC_ID) return false;
+    return !!String(step.title || '').trim();
+  });
+}
+function resolveNewItemStepId_(catId){
+  var steps = listNewItemDrawers_(catId);
+  var cur = state.newItem && state.newItem.stepId != null ? String(state.newItem.stepId) : '';
+  for(var i = 0; i < steps.length; i++){
+    if(String(steps[i].id) === cur) return cur;
+  }
+  return steps.length ? String(steps[0].id) : '';
+}
 function setNewCat(v){
   try { flushNewItemFieldsFromDom_(); } catch(eFlush){}
   state.newItem.catId = parseInt(v, 10);
   state.newItem.articleKindLocked = false;
   state.newItem.articleKind = listArticleKindsForCat_(state.newItem.catId)[0] || '';
+  state.newItem.stepId = '';
+  state.newItem.stepId = resolveNewItemStepId_(state.newItem.catId);
   resetNewItemFlowProposals_();
   renderMain({ force: true });
 }
+function setNewDrawer(v){
+  try { flushNewItemFieldsFromDom_(); } catch(eFlush){}
+  state.newItem.stepId = String(v || '');
+  resetNewItemFlowProposals_();
+  renderMain({ force: true });
+}
+window.setNewDrawer = setNewDrawer;
+function assignUserAddedDraftToChosenStep_(draft, catId){
+  var stepId = resolveNewItemStepId_(catId);
+  if(!stepId) return assignUserAddedDraftToMisc_(draft, catId);
+  var plan = peekSubGoalPlan_(catId);
+  var step = null;
+  ((plan && plan.steps) || []).forEach(function(s){
+    if(s && String(s.id) === stepId) step = s;
+  });
+  if(!step) return assignUserAddedDraftToMisc_(draft, catId);
+  var peers = getDraftsForSubGoalStep_(catId, stepId, { live: true })
+    .filter(function(d){ return d && d.id !== draft.id; });
+  var order = peers.length + 1;
+  applyDraftRoadmapAssignment_(draft, catId, stepId, String(step.title || ''), order, order);
+  return true;
+}
+window.suggestNewItemKeywords_ = async function(){
+  var btn = document.getElementById('btn-suggest-keywords');
+  if(btn && btn.disabled) return;
+  try { flushNewItemFieldsFromDom_(); } catch(eFlush){}
+  var catId = state.newItem.catId;
+  var cat = CATEGORIES[catId];
+  if(!cat) return;
+  var stepId = resolveNewItemStepId_(catId);
+  var stepTitle = '';
+  listNewItemDrawers_(catId).forEach(function(step){
+    if(String(step.id) === stepId) stepTitle = String(step.title || '');
+  });
+  var kind = (!isDailyShareCategory(catId)) ? getNewItemArticleKind_() : '';
+  var kindDef = kind ? getArticleKindDef_(kind, catId) : null;
+  var kindLabel = kindDef ? (kindDef.label || kind) : '';
+  var kindNote = kindDef ? (kindDef.summary || kindDef.detail || '') : '';
+  var avoid = (cat.drafts || []).map(function(d){ return d && d.topic ? String(d.topic) : ''; }).filter(Boolean).slice(0, 30);
+  var prompt = '브랜딩 플래너에 넣을 글 아이디어 5개를 제안하세요.\n' +
+    '카테고리: ' + cat.name + '\n' +
+    '서랍: ' + (stepTitle || '(없음)') + '\n' +
+    (kindLabel ? ('글의 성격: ' + kindLabel + (kindNote ? ' — ' + kindNote : '') + '\n') : '') +
+    '독자: ' + getProgramAudienceLine_(catId) + '\n' +
+    '각 줄은 그 서랍 안에서 바로 글로 풀 수 있는 키워드 또는 한 줄 아이디어입니다.\n' +
+    '5줄만. 번호·불릿·설명 없이 한 줄에 하나씩. 서로 겹치지 않게.\n' +
+    (avoid.length ? ('이미 있는 주제와 겹치지 마세요:\n' + avoid.map(function(t){ return '- ' + t; }).join('\n')) : '');
+  if(btn){ btn.disabled = true; btn.textContent = '제안 중…'; }
+  try {
+    var text = await callClaudePlanner_(prompt, { maxTokens: 500 });
+    var lines = String(text || '').split(/\r?\n/).map(function(line){
+      return line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim();
+    }).filter(Boolean).slice(0, 5);
+    if(lines.length < 5) throw new Error('제안이 5줄보다 적어요');
+    state.newItem.topic = lines.join('\n');
+    renderMain({ force: true });
+  } catch(err){
+    if(btn){ btn.disabled = false; btn.textContent = '제안하기'; }
+    alert((err && err.message) ? err.message : '키워드를 제안하지 못했어요');
+  }
+};
 
 window.runNewItemFlowAction = async function(){
   var ready = !!state.newItem.flowProposalsReady && !!getSelectedNewItemFlow_();
@@ -33180,7 +33261,7 @@ window.addDraft = async function(){
       };
       draft.articleKind = getNewItemArticleKind_() || '';
     }
-    assignUserAddedDraftToMisc_(draft, state.newItem.catId);
+    assignUserAddedDraftToChosenStep_(draft, state.newItem.catId);
     if(!draft.articleKind) draft.articleKind = getNewItemArticleKind_() || '';
     if(sourceNote) draft.sourceNote = sourceNote;
     if(isDaily){
@@ -34873,9 +34954,6 @@ function stripClinicBlogTitlePrefix_(title){
   return t;
 }
 function clinicBranchLabel_(catId){
-  var id = Number(catId);
-  if(id === 1) return '약수·인천';
-  if(id === 2) return '인천점';
   return '';
 }
 function clinicBranchLabelSheetHtml_(catId){

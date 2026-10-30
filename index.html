@@ -71,8 +71,8 @@
 })();
 </script>
 <!-- CSS는 비차단 로드 — 렌더 막지 않음 -->
-<link rel="stylesheet" href="planner.css?v=402" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="planner.css?v=402"></noscript>
+<link rel="stylesheet" href="planner.css?v=416" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="planner.css?v=416"></noscript>
 <!-- 서비스워커는 head에서 등록하지 않음 — 문서 이동이 SW 대기(수십 초)에 걸리지 않게 함 -->
 </head>
 <body>
@@ -108,6 +108,11 @@
       <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">이미지 작업 주소 (선택)</div>
       <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:8px;">장면 작업을 열 주소입니다. 비우면 저장된 기본 주소로 열립니다.</div>
       <input class="modal-input" type="url" id="chatgpt-open-url" placeholder="https://" autocomplete="off" />
+    </div>
+    <div style="margin-top:14px;padding-top:14px;border-top:1px solid #E5E7EB;">
+      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">네이버 블로그 기본 카테고리</div>
+      <div style="font-size:11px;color:#6B7280;line-height:1.55;margin-bottom:8px;">프로그램별로 발행할 때 고를 카테고리입니다. 같은 계정으로 쓰는 기기끼리 맞춰집니다. 리얼 페이스는 「안면비대칭/축소」가 기본입니다.</div>
+      <div id="blog-default-cat-list"></div>
     </div>
     <div style="margin-top:14px;padding-top:14px;border-top:1px solid #E5E7EB;">
       <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px;">직원 이메일 (필수)</div>
@@ -292,6 +297,7 @@
     <div class="sync-conflict-actions">
       <button type="button" class="modal-btn" id="sync-conflict-apply">선택한 쪽으로 맞추기</button>
       <button type="button" class="modal-btn" id="sync-conflict-keep-local" style="background:#F3F4F6;color:#374151;margin-top:8px;">이 기기 기준으로 맞추기</button>
+      <button type="button" class="modal-btn" id="sync-conflict-later" style="background:#fff;color:#6B7280;margin-top:8px;">나중에</button>
     </div>
   </div>
 </div>
@@ -409,6 +415,28 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="draft-import-overlay" role="dialog" aria-modal="true" aria-labelledby="draft-import-title" onclick="closeDraftImport_(event)">
+  <div class="modal-box draft-import-box" onclick="event.stopPropagation()">
+    <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <div class="modal-title" id="draft-import-title" style="margin:0;">원고 가져오기</div>
+      <button type="button" class="prompt-modal-close" onclick="closeDraftImport_()" aria-label="닫기">×</button>
+    </div>
+    <p class="modal-desc">JSON을 붙여 넣거나 .json / .md 파일을 고르세요. 체크한 글만 초안으로 저장합니다. 예약하거나 발행하지 않습니다.</p>
+    <label class="draft-import-file">파일 선택
+      <input id="draft-import-file" type="file" accept=".json,.md,.markdown,application/json,text/markdown,text/plain" onchange="onDraftImportFile_(this)">
+    </label>
+    <textarea id="draft-import-text" rows="6" placeholder='[{"topic":"","program":"도수치료","channel":"instagram","account":"","title":"","body":"","hookType":"","sourceLinks":[],"collab":["dr.face_ifc"],"scheduledDate":"2026-11-03"}]'></textarea>
+    <div class="draft-import-tools">
+      <button type="button" class="modal-btn" onclick="previewDraftImport_()">미리보기</button>
+    </div>
+    <div id="draft-import-preview"></div>
+    <div class="draft-import-actions">
+      <button type="button" class="modal-btn" id="draft-import-commit" onclick="commitDraftImport_()" disabled>선택한 초안 저장</button>
+      <button type="button" class="modal-btn-ghost" onclick="closeDraftImport_()">닫기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 앱 루트: JS 로딩 전에도 inert 로 잠그지 않음 (3분 대기 체감 원인) -->
 <div id="planner-app-root">
 <div class="planner-head">
@@ -436,6 +464,9 @@
   <div id="gen-status-bar" class="gen-status-bar"></div>
   <div class="cat-tabs-grid" id="cat-tabs-grid"></div>
 </div>
+<div class="draft-import-launch">
+  <button type="button" id="btn-import-drafts" onclick="openDraftImport_()">원고 가져오기</button>
+</div>
 
 <div id="app-toast" class="app-toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
@@ -450,11 +481,13 @@
 <script src="ops-channel-review-seed.js?v=1"></script>
 <script src="planner-reel.js?v=27"></script>
 <script src="planner-sync-config.js?v=1"></script>
-<script src="planner-sync-rules.js?v=400"></script>
-<script src="planner-sync-supabase.js?v=395"></script>
-<script src="planner.js?v=404" defer></script>
+<script src="planner-sync-rules.js?v=417"></script>
+<script src="planner-import.js?v=405"></script>
+<script src="planner-sync-supabase.js?v=399"></script>
+<script src="planner-field-sync.js?v=11"></script>
+<script src="planner.js?v=430" defer></script>
 <script src="planner-thumbs.js?v=399" defer></script>
-<script src="planner-social.js?v=6" defer></script>
+<script src="planner-social.js?v=9" defer></script>
 <script>
 function openLinksModal_(){
   var o = document.getElementById('links-modal-overlay');

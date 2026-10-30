@@ -29,7 +29,7 @@ const CATEGORIES = [
       {id:"d2-4", topic:"이중턱이 생기는 세 가지 구조적 이유",                 angle:"피부·지방·골격 요인을 분리해서 설명, 각각의 접근법"},
     ]},
   { id:3, icon:"", name:"CMT 전문가 교육", color:"#2A2E66", audience:"전문가",
-    sub:"CMT 임상 도수치료 과정",
+    sub:"도수치료 전문가 과정",
     drafts:[
       {id:"d3-0", topic:"촉진(Palpation)이 치료보다 먼저인 이유",               angle:"평가-치료 연결의 핵심, 실전 촉진 훈련의 필요성"},
       {id:"d3-1", topic:"교과서 해부학과 실전 도수치료의 괴리",                 angle:"이론적 지식을 임상 적용으로 전환하는 사고 훈련"},
@@ -4574,26 +4574,7 @@ function syncCuriosityHubPlanFromSeed_(catId){
       }
     }
   }
-  var importExtrasOnly = plan.steps.length >= seed.steps.length;
-  if(importExtrasOnly){
-    for(var pi = 0; pi < seed.steps.length; pi++){
-      if(curiosityStepTitleKey_(plan.steps[pi] && plan.steps[pi].title, catId) !==
-         curiosityStepTitleKey_(seed.steps[pi] && seed.steps[pi].title, catId)){
-        importExtrasOnly = false;
-        break;
-      }
-    }
-  }
-  if(importExtrasOnly){
-    for(var ei = seed.steps.length; ei < plan.steps.length; ei++){
-      var extraStep = plan.steps[ei];
-      if(!extraStep || !(extraStep.importTopic || String(extraStep.rationale || '') === '원고 가져오기')){
-        importExtrasOnly = false;
-        break;
-      }
-    }
-  }
-  if(String(plan.hubRev || '') === rev && (titlesAligned || importExtrasOnly)) return false;
+  if(String(plan.hubRev || '') === rev && titlesAligned) return false;
 
   var byKey = {};
   plan.steps.forEach(function(st){
@@ -4646,15 +4627,9 @@ function syncCuriosityHubPlanFromSeed_(catId){
   });
 
   var miscLabel = getSubGoalMiscLabel_(plan);
-  var keptImportSteps = [];
   Object.keys(byKey).forEach(function(k){
     var rs = byKey[k];
     if(!rs) return;
-    if(rs.importTopic || String(rs.rationale || '') === '원고 가져오기'){
-      keptImportSteps.push(rs);
-      changed = true;
-      return;
-    }
     changed = true;
     var rid = String(rs.id != null ? rs.id : '').trim();
     if(!rid) return;
@@ -4665,34 +4640,6 @@ function syncCuriosityHubPlanFromSeed_(catId){
       var order = miscPeers.length + oi + 1;
       applyDraftRoadmapAssignment_(d, catId, SUBGOAL_MISC_ID, miscLabel, order, Math.max(order, 1));
       try { ensurePendingAssignmentForDraft_(catId, SUBGOAL_MISC_ID, order, d.id); } catch(eAsg){}
-    });
-  });
-  keptImportSteps.forEach(function(rs){
-    var oldId = String(rs && rs.id != null ? rs.id : '').trim();
-    var used = {};
-    newSteps.forEach(function(st){ if(st && st.id != null) used[String(st.id)] = true; });
-    var wantId = oldId;
-    if(!wantId || used[wantId]){
-      var n = newSteps.length + 1;
-      wantId = 's' + n;
-      while(used[wantId]){
-        n++;
-        wantId = 's' + n;
-      }
-    }
-    if(oldId && oldId !== wantId){
-      idMap[oldId] = wantId;
-      if(/^\d+$/.test(oldId)) idMap['s' + oldId] = wantId;
-      var bare = oldId.replace(/^s/i, '');
-      if(bare && bare !== oldId) idMap[bare] = wantId;
-    }
-    newSteps.push({
-      id: wantId,
-      title: rs.title || '',
-      summary: rs.summary || '',
-      rationale: rs.rationale || '원고 가져오기',
-      importTopic: true,
-      pinned: !!rs.pinned
     });
   });
 
@@ -4749,7 +4696,6 @@ function repairIncompleteSubGoalPlan_(catId){
       title: (s && s.title) || '',
       summary: (s && s.summary) || '',
       rationale: (s && s.rationale) || '',
-      importTopic: !!(s && (s.importTopic || String(s.rationale || '') === '원고 가져오기')),
       pinned: !!(s && s.pinned)
     };
   });
@@ -6097,12 +6043,7 @@ function getDraftsForPendingSubGoalStep_(catId, stepId){
   var sid = String(stepId);
   var list = [];
   (p.assignments || []).forEach(function(a){
-    if(!a || !a.draftId) return;
-    var same = String(a.stepId || '') === sid;
-    if(!same && typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerSameStepId){
-      same = PlannerSyncRules.plannerSameStepId(a.stepId, sid);
-    }
-    if(!same) return;
+    if(!a || !a.draftId || String(a.stepId || '') !== sid) return;
     var d = (cat.drafts || []).find(function(x){ return x && x.id === a.draftId; });
     if(d) list.push({ draft: d, order: parseInt(a.order, 10) || 999 });
   });
@@ -6610,13 +6551,6 @@ function rebuildPendingProgramAssignments_(payload, oldSteps){
   });
   if(!payload.assignments.length) payload.assignments = newAssignments;
 }
-function draftsShownWithoutPlan_(cat){
-  var all = (cat && cat.drafts) || [];
-  if(state.legacyDraftsOpen) return all;
-  return all.filter(function(d){
-    return d && d.id && (d.rationale === '원고 가져오기' || String(d.sourceNote || '').indexOf('원고 가져오기') === 0);
-  });
-}
 function getVisibleDraftsInMain_(catId){
   var cat = CATEGORIES[catId];
   if(!cat || !cat.drafts) return [];
@@ -6633,10 +6567,6 @@ function getVisibleDraftsInMain_(catId){
     if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
     seen[d.id] = true;
     out.push(d);
-  }
-  if(!plan || !plan.steps || !plan.steps.length){
-    draftsShownWithoutPlan_(cat).forEach(pushDraft);
-    return out;
   }
   if(plan && plan.steps && plan.steps.length){
     plan.steps.forEach(function(step){
@@ -6883,14 +6813,6 @@ function findPlanStepIdByTitle_(plan, title){
   var i;
   for(i = 0; i < plan.steps.length; i++){
     if(String(plan.steps[i].title || '').trim() === title) return String(plan.steps[i].id);
-  }
-  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerTopicDrawerKey){
-    var wantKey = PlannerSyncRules.plannerTopicDrawerKey(title);
-    if(wantKey){
-      for(i = 0; i < plan.steps.length; i++){
-        if(PlannerSyncRules.plannerTopicDrawerKey(plan.steps[i].title) === wantKey) return String(plan.steps[i].id);
-      }
-    }
   }
   var m = title.match(/(\d+)\s*단계/);
   if(m){
@@ -8481,64 +8403,12 @@ function formatYearPeriodCreatedLabel_(iso){
     return d.getFullYear() + '.' + (d.getMonth() + 1) + '.' + d.getDate();
   } catch(e){ return '—'; }
 }
-function sheetScrollBox_(el){
-  var body = document.getElementById('sheet-body');
-  if(body && el && body.contains(el)) return body;
-  return null;
-}
-var _sheetScrollGuardUntil_ = 0;
-function armSheetScrollGuard_(box){
-  if(box && box.scrollTop > 8) box._plannerHoldScroll = box.scrollTop;
-  _sheetScrollGuardUntil_ = Date.now() + 420;
-}
-function restoreSheetScrollIfJumped_(){
-  if(Date.now() > _sheetScrollGuardUntil_) return;
-  var box = document.getElementById('sheet-body');
-  if(!box || !isSheetEditFocused_()) return;
-  var top = box._plannerHoldScroll || 0;
-  if(top > 24 && box.scrollTop < 8) box.scrollTop = top;
-}
-function holdSheetScroll_(box, top){
-  if(!box || !(top > 24)) return;
-  box._plannerHoldScroll = top;
-  armSheetScrollGuard_(box);
-  [0, 40, 120, 280].forEach(function(ms){
-    var run = function(){ restoreSheetScrollIfJumped_(); };
-    if(ms === 0) requestAnimationFrame(run);
-    else setTimeout(run, ms);
-  });
-}
-function bindSheetEditScrollGuard_(){
-  if(window.__sheetEditScrollGuard) return;
-  window.__sheetEditScrollGuard = true;
-  var box = document.getElementById('sheet-body');
-  if(box){
-    box.addEventListener('scroll', function(){
-      if(box.scrollTop > 8) box._plannerHoldScroll = box.scrollTop;
-    }, { passive: true });
-  }
-  document.addEventListener('focusin', function(ev){
-    var t = ev.target;
-    if(!t || !t.classList || !t.classList.contains('sheet-edit')) return;
-    var scroller = document.getElementById('sheet-body');
-    if(scroller && scroller.scrollTop > 8) scroller._plannerHoldScroll = scroller.scrollTop;
-    armSheetScrollGuard_(scroller);
-  });
-  if(window.visualViewport){
-    window.visualViewport.addEventListener('resize', restoreSheetScrollIfJumped_);
-    window.visualViewport.addEventListener('scroll', restoreSheetScrollIfJumped_);
-  }
-}
 function autoGrowTextarea_(ta){
   if(!ta || ta.nodeName !== 'TEXTAREA') return;
   if(ta._growRaf) return;
   ta._growRaf = requestAnimationFrame(function(){
     ta._growRaf = 0;
     if(!ta.isConnected) return;
-    var box = sheetScrollBox_(ta);
-    var top = box ? box.scrollTop : 0;
-    var anchor = 0;
-    if(box) anchor = ta.getBoundingClientRect().top - box.getBoundingClientRect().top;
     ta.style.height = 'auto';
     ta.style.overflowY = 'hidden';
     var style = window.getComputedStyle(ta);
@@ -8551,13 +8421,6 @@ function autoGrowTextarea_(ta){
     var minH = Math.ceil(lineH * minRows + pad + border);
     var next = Math.max(minH, ta.scrollHeight + 2);
     ta.style.height = next + 'px';
-    if(!box) return;
-    var nextAnchor = ta.getBoundingClientRect().top - box.getBoundingClientRect().top;
-    var restored = top + (nextAnchor - anchor);
-    if(restored < 0) restored = 0;
-    box.scrollTop = restored;
-    if(restored > 8) box._plannerHoldScroll = restored;
-    holdSheetScroll_(box, restored);
   });
 }
 function autoGrowTextareas_(rootEl){
@@ -10474,9 +10337,7 @@ function renderProgramRoadmapHTML_(catId){
     '</div>';
   }
   if(!plan || !plan.steps.length){
-    var importedOnly = draftsShownWithoutPlan_(cat);
-    var shownDrafts = importedOnly;
-    var legacyCards = sortDraftsForTopicDisplay_(filterDraftsByTopicListMode_(shownDrafts, catId), catId).map(function(d){
+    var legacyCards = sortDraftsForTopicDisplay_(filterDraftsByTopicListMode_(cat.drafts || [], catId), catId).map(function(d){
       return draftCardHTML(d, cat, false, cat.drafts.indexOf(d), false);
     }).join('');
     var draftCount = (cat.drafts || []).filter(function(d){ return d && d.id; }).length;
@@ -10493,7 +10354,7 @@ function renderProgramRoadmapHTML_(catId){
       html += '<button type="button" class="program-legacy-toggle" onclick="toggleLegacyDrafts_()">' +
         (state.legacyDraftsOpen ? '기존 주제 숨기기' : '기존 주제 ' + draftCount + '개 보기') +
       '</button>';
-      if(legacyCards && (state.legacyDraftsOpen || importedOnly.length)){
+      if(state.legacyDraftsOpen && legacyCards){
         html += '<div class="subgoal-step-cards legacy">' + legacyCards + '</div>';
       }
     }
@@ -10978,9 +10839,7 @@ window.updateTopicDraftField_ = function(draftId, field, value){
   var d = (cat.drafts || []).find(function(x){ return x && x.id === draftId; });
   if(!d) return;
   var raw = String(value || '');
-  var nextField = field === 'rationale' ? stripTopicRationaleStepPrefix_(raw) : raw;
-  if(String(d[field] || '') === nextField) return;
-  d[field] = nextField;
+  d[field] = field === 'rationale' ? stripTopicRationaleStepPrefix_(raw) : raw;
   stampDraftActivity_(d);
   if(topicFieldSaveTimer_) clearTimeout(topicFieldSaveTimer_);
   topicFieldSaveTimer_ = setTimeout(function(){
@@ -11722,41 +11581,12 @@ function plannerGasPackUnusable_(pack){
   if(!pack.ok) return true;
   return pack.data.result === 'error' && /unknown action/i.test(String(pack.data.message || ''));
 }
-function syncPathTail_(key, full){
-  full = String(full || '');
-  if(String(key).indexOf('published:') === 0 && full.indexOf('content.') === 0) return full.slice('content.'.length);
-  return full;
-}
-function removeListedPaths_(bag, key, fullPaths){
-  if(!bag || !bag[key] || !fullPaths) return;
-  var drop = {};
-  fullPaths.forEach(function(p){
-    drop[syncPathTail_(key, p)] = true;
-    drop[String(p || '')] = true;
-  });
-  bag[key] = bag[key].filter(function(p){ return !drop[p]; });
-  if(!bag[key].length) delete bag[key];
-}
-function clearSheetPathsAfterAccept_(item){
-  var key = item && item.key;
-  if(!key || (key.indexOf('published:') !== 0 && key.indexOf('generated:') !== 0)) return;
-  var remaining = item.remainingPaths || [];
-  if(remaining.length){
-    removeListedPaths_(state._sheetEditedPaths, key, item.appliedPaths || []);
-    removeListedPaths_(state._clearedPaths, key, item.appliedPaths || []);
-    return;
-  }
-  if(!Array.isArray(item.sentEditedPaths) && !Array.isArray(item.sentClearedPaths)) return;
-  removeListedPaths_(state._sheetEditedPaths, key, item.sentEditedPaths || []);
-  removeListedPaths_(state._clearedPaths, key, item.sentClearedPaths || []);
-}
 function noteSupabaseAcceptedRevisions_(accepted){
   if(!state.syncEntityRevisions) state.syncEntityRevisions = {};
   (accepted || []).forEach(function(item){
     if(!item || !item.key) return;
     var rev = parseInt(item.entityRevision, 10) || 0;
     if(rev) state.syncEntityRevisions[item.key] = rev;
-    clearSheetPathsAfterAccept_(item);
   });
 }
 function listLocalUserDraftIds_(){
@@ -11768,55 +11598,6 @@ function listLocalUserDraftIds_(){
     });
   });
   return ids;
-}
-var PLANNER_ACCEPTED_UPLOADS_KEY_ = 'ht_planner_accepted_uploads_v1';
-function readAcceptedUploadKeys_(){
-  var bag = {};
-  function merge(raw){
-    if(!raw) return;
-    try {
-      var parsed = JSON.parse(raw);
-      if(!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
-      Object.keys(parsed).forEach(function(key){ if(key) bag[key] = parsed[key]; });
-    } catch(e){}
-  }
-  try { merge(localStorage.getItem(PLANNER_ACCEPTED_UPLOADS_KEY_)); } catch(eLs){}
-  try { merge(sessionStorage.getItem(PLANNER_ACCEPTED_UPLOADS_KEY_)); } catch(eSs){}
-  return bag;
-}
-function writeAcceptedUploadKeys_(bag){
-  var text = '';
-  try { text = JSON.stringify(bag || {}); } catch(eJson){ return; }
-  try { localStorage.setItem(PLANNER_ACCEPTED_UPLOADS_KEY_, text); } catch(eLs){}
-  try { sessionStorage.setItem(PLANNER_ACCEPTED_UPLOADS_KEY_, text); } catch(eSs){}
-}
-function rememberAcceptedUploadKeys_(keys){
-  if(!keys || !keys.length) return;
-  var bag = readAcceptedUploadKeys_();
-  var now = Date.now();
-  keys.forEach(function(key){ if(key) bag[String(key)] = now; });
-  var names = Object.keys(bag);
-  if(names.length > 500){
-    names.sort(function(a, b){ return (parseInt(bag[a], 10) || 0) - (parseInt(bag[b], 10) || 0); });
-    names.slice(0, names.length - 500).forEach(function(key){ delete bag[key]; });
-  }
-  writeAcceptedUploadKeys_(bag);
-}
-function forgetAcceptedUploadKeysOnServer_(index){
-  var bag = readAcceptedUploadKeys_();
-  var names = Object.keys(bag);
-  if(!names.length) return;
-  var live = {};
-  (index || []).forEach(function(row){
-    if(row && row.key && !row.deleted) live[String(row.key)] = true;
-  });
-  var changed = false;
-  names.forEach(function(key){
-    if(!live[key]) return;
-    delete bag[key];
-    changed = true;
-  });
-  if(changed) writeAcceptedUploadKeys_(bag);
 }
 function classifyTopicGap_(spec){
   spec = spec || {};
@@ -11830,17 +11611,10 @@ function classifyTopicGap_(spec){
   var ask = [];
   var upload = [];
   var seen = {};
-  var ruleAsks = null;
-  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerTopicGapAsks){
-    ruleAsks = PlannerSyncRules.plannerTopicGapAsks(real, serverRev, spec.resolvedKeys || []);
-  }
   real.forEach(function(op){
-    var base = parseInt(op.baseEntityRevision != null ? op.baseEntityRevision : op.base, 10) || 0;
+    var base = parseInt(op.base, 10) || 0;
     var rev = parseInt(serverRev[op.key], 10) || 0;
-    var stillAsking = ruleAsks
-      ? ruleAsks.indexOf(op.key) >= 0
-      : (rev > base && op.conflictResolved !== 'local' && op.conflictResolved !== 'server');
-    if(stillAsking){
+    if(rev > base){
       if(ask.indexOf(op.key) < 0) ask.push(op.key);
       return;
     }
@@ -11890,16 +11664,9 @@ function applyTopicGapDecision_(detail, index){
     if(row && row.key) serverRev[String(row.key)] = parseInt(row.revision, 10) || 0;
   });
   detail.serverRev = serverRev;
-  healStaleConflictOutbox_(serverRev);
   var decision = classifyTopicGap_({
     outbox: (state.syncOutbox || []).map(function(op){
-      return {
-        key: op && op.key,
-        base: op && op.baseEntityRevision,
-        baseEntityRevision: op && op.baseEntityRevision,
-        conflictResolved: op && op.conflictResolved,
-        localOnly: !!(op && op.localOnly)
-      };
+      return { key: op && op.key, base: op && op.baseEntityRevision, localOnly: !!(op && op.localOnly) };
     }),
     selectedId: state.selectedId || '',
     focusIds: state._syncFocusDraftIds || null,
@@ -11928,14 +11695,6 @@ function applyTopicGapDecision_(detail, index){
     });
     decision.receive = false;
     decision.adoptSurface = false;
-  }
-  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerTopicGapUploadKeys){
-    decision.uploadKeys = PlannerSyncRules.plannerTopicGapUploadKeys({
-      uploadKeys: decision.uploadKeys,
-      outbox: state.syncOutbox || [],
-      serverRev: serverRev,
-      acceptedKeys: readAcceptedUploadKeys_()
-    });
   }
   detail.ambiguousKeys = decision.askKeys;
   state._topicListGap = decision.askKeys.length > 0 && !plannerSyncConflictPending_;
@@ -11998,7 +11757,6 @@ function applyTopicGapDecision_(detail, index){
   return state._topicListGap;
 }
 function finishTopicListCheck_(index){
-  forgetAcceptedUploadKeysOnServer_(index);
   var local = listLocalUserDraftIds_();
   var serverLive = {};
   var serverDeleted = {};
@@ -12318,93 +12076,31 @@ function dropTopicGapDraftLocally_(id){
 function queueTopicGapEntity_(key, deleted, baseRev, explicitValue){
   if(!key) return;
   if(!Array.isArray(state.syncOutbox)) state.syncOutbox = [];
+  var entities = {};
+  try { entities = collectSyncEntities_(getPersistPayload(), { skipEnsureIds: true }) || {}; } catch(eEnt){}
+  var hasValue = Object.prototype.hasOwnProperty.call(entities, key);
   var existing = null;
   state.syncOutbox.forEach(function(op){
     if(op && op.key === key) existing = op;
   });
-  var requestedBase = parseInt(baseRev, 10) || 0;
-  var alreadyQueued = !deleted && explicitValue === undefined && existing && (
-    (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerQueuedTopicStable)
-      ? PlannerSyncRules.plannerQueuedTopicStable(existing, requestedBase)
-      : (!!existing.mutationId && (parseInt(existing.baseEntityRevision, 10) || 0) >= requestedBase)
-  );
-  if(alreadyQueued) return;
-  var entities = {};
-  try { entities = collectSyncEntities_(getPersistPayload(), { skipEnsureIds: true }) || {}; } catch(eEnt){}
-  var hasValue = Object.prototype.hasOwnProperty.call(entities, key);
   var op = existing || {
     mutationId: makePlannerMutationId_(),
     version: 1,
     key: key
   };
-  var keepResolvedValue = !!(existing && existing.conflictResolved === 'local' && explicitValue === undefined && !deleted);
   if(explicitValue !== undefined){
     op.value = cloneSyncValue_(explicitValue);
     op.deleted = false;
-  } else if(!keepResolvedValue){
+  } else {
     op.value = deleted ? null : (hasValue ? cloneSyncValue_(entities[key]) : null);
     op.deleted = !!deleted || !hasValue;
   }
-  var nextBase = parseInt(baseRev, 10) || 0;
-  var prevBase = parseInt(op.baseEntityRevision, 10) || 0;
-  if(nextBase < prevBase) nextBase = prevBase;
-  op.baseEntityRevision = nextBase;
+  op.baseEntityRevision = parseInt(baseRev, 10) || 0;
   op.updatedAt = new Date().toISOString();
   if(existing) bumpOutboxOpVersion_(op);
   if(!existing) state.syncOutbox.push(op);
   if(!state.syncDirtyEntityKeys) state.syncDirtyEntityKeys = {};
   state.syncDirtyEntityKeys[key] = true;
-}
-function topicGapPendingChoiceKeys_(){
-  var keys = [];
-  var pending = plannerSyncConflictPending_;
-  if(!pending || !pending.conflicts) return keys;
-  pending.conflicts.forEach(function(conflict){
-    if(conflict && conflict.key) keys.push(String(conflict.key));
-  });
-  return keys;
-}
-function healStaleConflictOutbox_(serverRev){
-  if(typeof PlannerSyncRules === 'undefined' || !PlannerSyncRules.plannerHealStaleConflictRows) return [];
-  var healed = PlannerSyncRules.plannerHealStaleConflictRows(state.syncOutbox || [], serverRev || {}, topicGapPendingChoiceKeys_());
-  if(!healed) return [];
-  state.syncOutbox = healed.outbox || [];
-  if(!healed.healed || !healed.healed.length) return [];
-  var touched = {};
-  healed.healed.forEach(function(key){ touched[key] = true; });
-  (state.syncOutbox || []).forEach(function(op){
-    if(op && touched[op.key]) bumpOutboxOpVersion_(op);
-  });
-  state.syncDirty = true;
-  state._sessionUserEdit = true;
-  try { rebuildDirtyStateFromOutbox_(); } catch(eHeal){}
-  try {
-    save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
-  } catch(eHealSave){}
-  return healed.healed;
-}
-function applyConflictResolutionToOutbox_(choices){
-  var plan = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerApplyConflictResolution)
-    ? PlannerSyncRules.plannerApplyConflictResolution(state.syncOutbox || [], choices)
-    : null;
-  if(!plan) return null;
-  state.syncOutbox = plan.outbox || [];
-  (choices || []).forEach(function(choice){
-    if(!choice || !choice.useLocal || !choice.key) return;
-    (state.syncOutbox || []).forEach(function(op){
-      if(!op || op.key !== choice.key) return;
-      bumpOutboxOpVersion_(op);
-      op.conflictResolved = 'local';
-      op.localOnly = true;
-    });
-  });
-  try { rebuildDirtyStateFromOutbox_(); } catch(eRes){}
-  state._topicListGap = false;
-  state.syncDirty = hasPendingLocalSyncChanges_();
-  try {
-    save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
-  } catch(eResSave){}
-  return plan;
 }
 window.applyTopicGapChoice_ = async function(side){
   var detail = state._topicListGapDetail || {};
@@ -12417,41 +12113,49 @@ window.applyTopicGapChoice_ = async function(side){
       state._topicListGap = false;
       return;
     }
-    var choices = keys.map(function(key){
-      return { key: key, useLocal: useLocal, serverRevision: (detail.serverRev || {})[key] || 0 };
-    });
-    applyConflictResolutionToOutbox_(choices);
-    state._topicListGap = false;
     if(useLocal){
+      keys.forEach(function(key){
+        queueTopicGapEntity_(key, false, (detail.serverRev || {})[key] || 0);
+      });
+      (state.syncOutbox || []).forEach(function(op){
+        if(op && keys.indexOf(op.key) >= 0) op.localOnly = true;
+      });
       state.syncDirty = true;
       state._sessionUserEdit = true;
       state._gapUploadActive = true;
       plannerSyncBootstrapReady_ = true;
       state._bootstrapChoiceDone = true;
+      try { rebuildDirtyStateFromOutbox_(); } catch(eReb){}
       var last = await plannerGasPushNow_();
       state._gapUploadActive = false;
+      state._topicListGap = !(last && last.ok);
       if(!last || !last.ok){
-        if(typeof setAppToast === 'function') setAppToast('고른 항목을 이 기기 내용으로 남겼습니다. 올리다 멈추면 자동으로 다시 보냅니다.', { duration: 5200, variant: 'ok' });
+        if(typeof setAppToast === 'function') setAppToast('고른 항목을 올리다 멈췄습니다. 다시 고르세요.', { duration: 5200, variant: 'err' });
       } else if(typeof setAppToast === 'function'){
         setAppToast('고른 항목을 이 기기 내용으로 서버에 저장했습니다.', { duration: 4200, variant: 'ok' });
       }
     } else {
+      state.syncOutbox = (state.syncOutbox || []).filter(function(op){
+        return !(op && keys.indexOf(op.key) >= 0);
+      });
+      try { rebuildDirtyStateFromOutbox_(); } catch(eOut){}
       state._topicGapReceiveKeys = keys.slice();
       state._topicGapForceKeys = true;
       await plannerGasJsonRequest_({ action: 'plannerSyncPull' }, PLANNER_SYNC_PULL_TIMEOUT_MS);
+      state._topicListGap = false;
       if(typeof setAppToast === 'function') setAppToast('고른 항목을 서버 내용으로 맞췄습니다.', { duration: 4200, variant: 'ok' });
     }
   } catch(eGap){
     state._gapUploadActive = false;
     state._topicGapForceKeys = false;
-    state._topicListGap = false;
-    if(typeof setAppToast === 'function') setAppToast((eGap && eGap.message) || '맞추지 못했습니다. 고른 항목은 다시 묻지 않습니다.', { duration: 5200, variant: 'err' });
+    state._topicListGap = keys.length > 0;
+    if(typeof setAppToast === 'function') setAppToast((eGap && eGap.message) || '맞추지 못했습니다.', { duration: 5200, variant: 'err' });
   } finally {
     state._topicGapForceServer = false;
     state._topicGapForceKeys = false;
     state._topicGapResolving = false;
-    state._topicListGap = false;
     try { updateSyncStatusUI_(); } catch(eUi){}
+    if(state._topicListGap) setTimeout(function(){ try { openTopicGapChoice_(); } catch(eRe){} }, 400);
   }
 };
 var GENERAL_UPLOAD_DONE_KEY_ = 'ht_planner_general_upload_done';
@@ -12666,20 +12370,9 @@ function applySupabaseEntityRows_(rows){
       try { same = syncEntitiesEquivalent_(key, localVal, serverVal); } catch(eSame){}
       if(same){
         payload.syncEntityRevisions[key] = serverRev;
-        // 서버 값이 이 기기 값과 완전히 같으면 올릴 것이 없다. 대기열에 남기면 「남은 N건」이 줄지 않는다.
-        op._dropSameAsServer = true;
         return;
       }
       if(base !== serverRev){
-        var promptAction = promptConflictAction_(key, localVal, serverVal, op);
-        if(promptAction === 'align' || promptAction === 'adopt-server'){
-          setSyncEntity_(payload, key, row.deleted ? undefined : serverVal);
-          payload.syncEntityRevisions[key] = serverRev;
-          op._dropQuietPrompt = true;
-          changed = true;
-          return;
-        }
-        if(conflictKeyIsSnoozed_(key)) return;
         conflicts.push({
           key: key,
           mutationId: op.mutationId || '',
@@ -12734,16 +12427,6 @@ function applySupabaseEntityRows_(rows){
       changed = true;
     }
   });
-  var quietPrompt = false;
-  state.syncOutbox = (state.syncOutbox || []).filter(function(op){
-    if(!op || !(op._dropQuietPrompt || op._dropSameAsServer)) return true;
-    quietPrompt = true;
-    if(state.syncDirtyEntityKeys) delete state.syncDirtyEntityKeys[op.key];
-    return false;
-  });
-  if(quietPrompt){
-    try { rebuildDirtyStateFromOutbox_(); } catch(eQuiet){}
-  }
   if(sawIncomingGeneralPlan && !keepGeneral) markGeneralUploadDone_();
   if(changed){
     state.syncEntityRevisions = payload.syncEntityRevisions;
@@ -12774,7 +12457,6 @@ function applySupabaseEntityRows_(rows){
   return { conflicts: conflicts, changed: changed, appliedGeneration: 2 };
 }
 async function plannerGasJsonRequest_(requestPayload, timeoutMs){
-  if(plannerSafeModeBlocksSync_()) return { result: 'error', retry: false, safeMode: true, message: '안전 모드: 서버 동기화를 하지 않습니다.' };
   var syncAction = requestPayload && requestPayload.action;
   if(syncAction === 'plannerSyncPull' || syncAction === 'plannerSyncPatch' || syncAction === 'plannerSyncPush'){
     if(typeof PlannerSyncSupabase === 'undefined' || !PlannerSyncSupabase.handle){
@@ -13520,7 +13202,7 @@ function getExpertCourseTopicAudienceLine_(catId){
 /** 초안·주제 생성 등에 쓰는 탭별 독자 한 줄 (cat.audience보다 구체적) */
 function getProgramAudienceLine_(catId){
   var id = parseInt(catId, 10);
-  if(id === 3) return 'CMT 임상 도수치료 과정 수강·복습 중인 물리치료사·도수 치료사 (평가·촉진 중심)';
+  if(id === 3) return 'CMT 임상도수 과정 수강·복습 중인 물리치료사·도수 치료사 (평가·촉진 중심)';
   if(id === 4) return 'IFC 얼굴·구조 교육 수강·복습 중인 얼굴·구조 교육 전문가 (미용·도수·물리치료)';
   if(id === 5) return 'Re:Al 움직임 과정 — 강사·트레이너·물리치료사 등 움직임 지도자 (직군 제한 없음 · 강사/회원 호칭)';
   if(id === 0) return '통증·구조 치료에 관심 있는 일반인';
@@ -13706,10 +13388,6 @@ function closeTopmostPlannerOverlay_(){
     closeDrawerEditor_();
     return true;
   }
-  if(plannerOverlayIsOpen_('draft-import-overlay')){
-    closeDraftImport_();
-    return true;
-  }
   if(plannerOverlayIsOpen_('links-modal-overlay')){
     if(typeof closeLinksModal_ === 'function') closeLinksModal_();
     else {
@@ -13735,11 +13413,11 @@ const EXT_NAVER_BLOG_WRITE = 'https://blog.naver.com/PostWriteForm.naver?blogId=
 /** 기본(폴백) — 도수치료·CMT. 실제 이동은 getInstagramUrlForCat_ 사용 */
 const EXT_INSTAGRAM_WEB = 'https://www.instagram.com/dr.park_dc.pt/';
 const EXT_THREADS = 'https://www.threads.com/@dr.park_dc.pt';
-/** 인스타 게시 계정 — 모든 프로그램의 기본 게시 계정은 박준규 계정. 프로그램 계정은 아래 공동작업 계정으로 붙인다. */
+/** 프로그램별 인스타 계정 — 도수·CMT / 페이스·IFC / 무브먼트·움직임 */
 const INSTAGRAM_USER_BY_PROGRAM = {
   park: 'dr.park_dc.pt',
-  face: 'dr.park_dc.pt',
-  movement: 'dr.park_dc.pt'
+  face: 'dr.face_ifc',
+  movement: 're.al_movement_official'
 };
 /** 인스타 발행·복사 시 캡션에 넣는 연결 계정 (콜라보) */
 const INSTAGRAM_COLLAB_USER_BY_PROGRAM = {
@@ -13955,7 +13633,7 @@ function withRealMovementBlogFooter_(text, catId){
 }
 function getExpertCourseBlogFooterText_(catId){
   var id = parseInt(catId, 10);
-  if(id === 3) return 'CMT 임상 도수치료 과정\nhttps://breezefeel.github.io/academy#cmt';
+  if(id === 3) return 'CMT 도수치료 과정\nhttps://breezefeel.github.io/academy#cmt';
   if(id === 4) return 'IFC 얼굴교정 과정\nhttps://breezefeel.github.io/academy#ifc';
   if(id === 5) return 'Re:Al 움직임 과정\nhttps://breezefeel.github.io/academy#real';
   return '';
@@ -14155,15 +13833,12 @@ function withInstagramCollabMention_(text, catId){
   if(textHasInstagramCollabMention_(body, mention)) return body;
   return body ? body + '\n\n' + mention : mention;
 }
-/** 계정 칸 표기: 게시 계정과 공동작업 계정을 나눠 보여 준다. */
-function instagramAccountSplitText_(catId){
-  var mention = instagramCollabMentionForCat_(catId);
-  return '게시: @' + getInstagramUsernameForCat_(catId) + ' / 공동작업: ' + (mention || '없음');
-}
 function instagramCollabSheetHtml_(catId){
-  return '<div class="cb"><div class="cb-label">계정 (공동작업 계정은 발행·복사 시 캡션에 포함)</div>' +
-    '<div class="cb-box" data-insta-accounts="1" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">' +
-    escapeHtml(instagramAccountSplitText_(catId)) + '</div></div>';
+  var mention = instagramCollabMentionForCat_(catId);
+  if(!mention) return '';
+  return '<div class="cb"><div class="cb-label">연결 계정 (고정 · 발행·복사 시 캡션에 포함)</div>' +
+    '<div class="cb-box" style="white-space:pre-wrap;color:#6B7280;font-size:13px;line-height:1.65;">' +
+    escapeHtml(mention) + '</div></div>';
 }
 /** 예전 초안: carousel이 있으면 캡션에 합쳐 붙여넣기용으로 사용 */
 function formatCarouselKeyPointsForCaption_(carousel){
@@ -14197,7 +13872,7 @@ function getInstaFullPasteText_(ig, catId){
   const mid = hook ? hook + (body ? '\n\n' + body : '') : body;
   const cid = catId != null ? catId : getActiveInstagramCatId_();
   const withCollab = withInstagramCollabMention_(mid, cid);
-  const tags = (ig.hashtags || []).map(function (h){ return '#' + String(h).replace(/^#+/, ''); }).join(' ');
+  const tags = (ig.hashtags || []).map(function (h){ return '#' + h; }).join(' ');
   return (withCollab + (tags ? '\n\n' + tags : '')).trim();
 }
 
@@ -14558,7 +14233,12 @@ const MANGO_PALETTES_BY_CAT = {
   }
 };
 
-/** 썸네일 스크림 — 프로그램 메인색. 8(현황)은 스크림을 두지 않는다 */
+/** 썸네일 스크림 — 프로그램 색
+ * 리얼 무브먼트(1): 차콜만 — 크림슨 하단 워시 금지
+ * CMT(3): glow는 스틸 블루. 프로그램 색은 네이비
+ * Re:Al(5): 차콜 바탕, 와인 glow만 포인트. 프로그램 색 #8B1E3D 는 액센트
+ * 기타(7): 차분한 그레이그린
+ * 8(지점·브랜딩)은 프로그램이 아니라 스크림을 두지 않는다 */
 const THUMB_SCRIM_BY_CAT = {
   0: { tint: '#2A2E66', tint2: '#4A4E92', glow: '#4A4E92' },
   1: { tint: '#146E6B', tint2: '#1A9A96', glow: '#7ED8D0' },
@@ -15547,16 +15227,13 @@ problem:
 selfCare:
 👉 먼저 확인: 손을 엉덩이 아래에 넣어 보세요. 뼈 끝이 닿나요?
 
-1) 두 발을 바닥에 두고 골반을 세워, 좌골이 의자 가운데 오게 합니다.
-
-2) 숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완하는게 중요합니다.
-
-3) 정수리를 천장 쪽으로 보내 목이 어깨 위에 놓이게 합니다.
+👉 1. 두 발을 바닥에 두고 골반을 세워, 좌골이 의자 가운데 오게 합니다.
+👉 2. 숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완하는게 중요합니다.
+👉 3. 정수리를 천장 쪽으로 보내 목이 어깨 위에 놓이게 합니다.
 
 시원하다 싶으면 거기서 멈추세요.
-
-✕ 혼자 할 때 실수: 목만 당긴다. 숨을 참는다. 허리를 억지로 젖힌다.
-✕ 팔이 저리거나 힘이 빠지면 운동보다 병원 진료가 먼저입니다.
+혼자 할 때 실수: 목만 당긴다. 숨을 참는다. 허리를 억지로 젖힌다.
+팔이 저리거나 힘이 빠지면 운동보다 병원 진료가 먼저입니다.
 
 explanation:
 살만 느껴진다면 좌골이 앞으로 빠진 상태예요. 바른 자세의 출발점은 아래입니다. 그래서 목만 늘리면 유지가 잘 안 됩니다.
@@ -15569,7 +15246,7 @@ const DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW = `${VOICE_CORE_POINTER}
 [블로그 형식]
 존댓말. **, ---, > 금지. 문단 사이 빈 줄. 같은 결론을 칸마다 반복하지 않는다.
 1. problem: 일상 장면 2~4문장. 자가 점검·병원 안내 없음.
-2. selfCare: 👉 먼저 확인(자가 점검 한 문장) → 1) 2) 3) (4)) 3~4단계(자세→숨→목·머리→등). 번호는 「1)」 형식이고 앞에 👉를 붙이지 않는다. 각 단계는 동작과 이유를 한 절에, 초·회를 포함한다. 항목(먼저 확인·번호 단계) 사이마다 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 주의·실수·적신호 줄은 모두 「✕ 」로 시작한다(예: ✕ 목만 당긴다). 맨 끝 한 줄만 적신호면 병원. 「1단계 —」 표기 금지.
+2. selfCare: 👉 먼저 확인(자가 점검 한 문장) → 👉 1.~4. 3~4단계(자세→숨→목·머리→등). 각 단계는 동작과 이유를 한 절에, 초·회를 포함한다. 단계 사이에만 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 맨 끝 한 줄만 적신호면 병원. 「1단계 —」 표기 금지.
 3. explanation: 맨 앞 1~2문장이 핵심. 그 뒤는 새 이유. 병원·자가 점검 반복 없음.
 4. cta: 「프로필 링크에서 온라인 문진」 하나. 병원 문구 없음. 허브 URL은 주제와 맞을 때 하나 — 허리 ?hub=back · 목 ?hub=neck · 어깨 ?hub=shoulder · 무릎 ?hub=knee · 골반 ?hub=pelvis (기본 ${PROFILE_BRAND_URL})
 5. title: 궁금증 한 줄, 35자 내외. hashtags 6~8개.
@@ -15621,7 +15298,7 @@ function buildExpertCourseInstaPrompt_(opts){
 }
 
 const DEFAULT_CMT_EXPERT_BLOG_PROMPT = buildExpertCourseBlogPrompt_({
-  audienceIntro: '**CMT 임상 도수치료 과정** 수강·복습 중인 물리치료사·도수 치료사를 독자로 하는',
+  audienceIntro: '**CMT 임상도수 전문가 과정** 수강·복습 중인 물리치료사·도수 치료사를 독자로 하는',
   roleReaders: '평가(촉진·히스토리) 중심 사고를 키우는 현장 치료사·도수 전문가',
   programBlock: '[CMT 맥락]\n' +
     '- 치료 테크닉보다 **평가·판단 순서**가 먼저임을 유지. "왜 그렇게 판단했는가"가 드러나게\n' +
@@ -15708,8 +15385,8 @@ const DEFAULT_PROMPTS = {
 프로그램: Real Movement(P-스트레칭·기능운동·자세교정), 리얼 페이스(얼굴 교정·작은얼굴), CMT/IFC/Re:Al 전문가 교육
 프로필·약력: https://breezefeel.github.io/drpark · https://blog.naver.com/allenjoy/120205433765
 ${BLOG_CONTENT_VOICE_RULE}
-인스타 게시 계정: 모든 프로그램 @dr.park_dc.pt
-인스타 공동작업 계정(시스템이 캡션에 자동 삽입, 본문에 쓰지 말 것): CMT @cmt_academy · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트 @re.al_movement_official (도수치료·Re:Al 과정은 공동작업 계정 없음)
+인스타(프로그램별): 도수·CMT @dr.park_dc.pt · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트·움직임 @re.al_movement_official
+인스타 연결 계정(시스템이 캡션에 자동 삽입, 본문에 쓰지 말 것): CMT @cmt_academy · 리얼 페이스·IFC @dr.face_ifc · 리얼무브먼트 @re.al_movement_official (도수치료·Re:Al 과정은 연결 계정 없음)
 표기: 「리얼무브먼트」붙여 쓰기. 「리얼 페이스」. 「리:얼」 금지. 영문 Re:Al / Re:Al Face는 유지.` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
   categories: {
     0: { // 도수치료
@@ -16287,8 +15964,7 @@ var SCROLL_LOCKED_OVERLAY_IDS_ = {
   'bulk-reassign-overlay': 1,
   'drawer-edit-overlay': 1,
   'sync-conflict-overlay': 1,
-  'sync-bootstrap-choice-overlay': 1,
-  'draft-import-overlay': 1
+  'sync-bootstrap-choice-overlay': 1
 };
 function dismissPlannerOverlayOpenState_(id){
   var el = document.getElementById(id);
@@ -16587,50 +16263,9 @@ function stampDraftBrandOverride_(draftId, patch){
   state.draftBrandOverrides[draftId] = next;
 }
 
-// 컨테이너만 복제하고 문자열(특히 data:image)은 참조 공유. JSON stringify/parse 복제는
-// 2MB 사진 문자열을 매번 두세 벌 만들어 iOS Safari 메모리 한도를 넘겼다.
-var plannerPerf_ = { clones: 0, approxBytes: 0, stringify: 0 };
-try { if(typeof window !== 'undefined') window.__plannerPerf = plannerPerf_; } catch(ePerfExp){}
-function cloneSyncValueDeep_(v, depth){
-  if(v === null || typeof v !== 'object') return (typeof v === 'function') ? undefined : v;
-  if(depth > 60) throw new Error('clone depth');
-  if(Array.isArray(v)){
-    var arr = new Array(v.length);
-    for(var i = 0; i < v.length; i++){
-      var item = cloneSyncValueDeep_(v[i], depth + 1);
-      arr[i] = item === undefined ? null : item;
-    }
-    return arr;
-  }
-  if(typeof v.toJSON === 'function') return v.toJSON();
-  var out = {};
-  var keys = Object.keys(v);
-  for(var k = 0; k < keys.length; k++){
-    var c = cloneSyncValueDeep_(v[keys[k]], depth + 1);
-    if(c !== undefined) out[keys[k]] = c;
-  }
-  return out;
-}
 function cloneSyncValue_(value){
   if(value === undefined) return undefined;
-  plannerPerf_.clones++;
-  try { return cloneSyncValueDeep_(value, 0); } catch(e){ return value; }
-}
-/** JSON 길이에 가까운 크기 추정. stringify 없이 문자열 길이만 합산한다. */
-function syncValueApproxBytes_(v, depth){
-  if(v === null || v === undefined) return 4;
-  var t = typeof v;
-  if(t === 'string') return v.length + 2;
-  if(t !== 'object') return 8;
-  if(depth > 60) return 16;
-  var n = 2;
-  if(Array.isArray(v)){
-    for(var i = 0; i < v.length; i++) n += syncValueApproxBytes_(v[i], depth + 1) + 1;
-    return n;
-  }
-  var keys = Object.keys(v);
-  for(var k = 0; k < keys.length; k++) n += keys[k].length + 4 + syncValueApproxBytes_(v[keys[k]], depth + 1);
-  return n;
+  try { return JSON.parse(JSON.stringify(value)); } catch(e){ return value; }
 }
 function syncStringHash_(str){
   str = String(str || '');
@@ -16641,22 +16276,10 @@ function syncStringHash_(str){
   }
   return (h >>> 0).toString(36) + ':' + str.length;
 }
-// 서버(jsonb)는 객체 키를 정렬해 돌려준다. 키 삽입 순서에 따라 문자열이 달라지면
-// 같은 내용도 「다름」으로 판정돼 충돌 창과 안 줄어드는 남은 건수가 생긴다. 키를 정렬해 비교한다.
-function canonicalizeForFingerprint_(v, depth){
-  if(v === null || typeof v !== 'object' || depth > 60) return v;
-  if(Array.isArray(v)) return v.map(function(x){ return canonicalizeForFingerprint_(x, depth + 1); });
-  if(typeof v.toJSON === 'function') return v.toJSON();
-  var out = {};
-  Object.keys(v).sort().forEach(function(k){
-    if(v[k] !== undefined) out[k] = canonicalizeForFingerprint_(v[k], depth + 1);
-  });
-  return out;
-}
 function syncValueFingerprint_(value){
   if(value === undefined) return '__missing__';
   try {
-    var s = JSON.stringify(canonicalizeForFingerprint_(value, 0));
+    var s = JSON.stringify(value);
     // 대형 초안/발행본 전체 문자열 비교는 부트스트랩에서 메인 스레드를 멈춤
     if(s.length > 2500) return 'h:' + syncStringHash_(s);
     return s;
@@ -16690,7 +16313,6 @@ function syncUntrackedContentFingerprint_(payload){
   delete copy.published;
   delete copy.generatedOnly;
   delete copy.chatgptOpenUrl;
-  delete copy.blogDefaultCategories;
   delete copy.publishRecCurrentTabOnly;
   delete copy.syncRationalesOnBrandSave;
   delete copy.promptRefineMilestones;
@@ -16736,7 +16358,6 @@ function isEmptyDefaultSyncEntity_(key, val){
     v = v.value;
   }
   if(key === 'setting:chatgptOpenUrl') return !String(v == null ? '' : v).trim();
-  if(key === 'setting:blogDefaultCategories') return v == null || typeof v !== 'object';
   if(key === 'setting:publishRecCurrentTabOnly') return !v;
   if(key === 'setting:syncRationalesOnBrandSave') return v == null || v === '' || v === true;
   if(key.indexOf('plan:year:period:') === 0) return !periodHasYearGoalText_(v);
@@ -16800,12 +16421,6 @@ function collectSyncEntities_(payload, opts){
   Object.keys(branding.seriesGoals || {}).forEach(function(key){
     out['branding:seriesGoal:' + key] = branding.seriesGoals[key];
   });
-  if(Object.prototype.hasOwnProperty.call(payload, 'blogDefaultCategories')){
-    var blogCatKey = 'setting:blogDefaultCategories';
-    if(!isEmptyDefaultSyncEntity_(blogCatKey, payload.blogDefaultCategories)){
-      out[blogCatKey] = payload.blogDefaultCategories;
-    }
-  }
   ['chatgptOpenUrl','publishRecCurrentTabOnly','syncRationalesOnBrandSave'].forEach(function(field){
     if(!Object.prototype.hasOwnProperty.call(payload, field)) return;
     var settingKey = 'setting:' + field;
@@ -17114,31 +16729,9 @@ function setSyncEntity_(payload, key, wrapped){
       payload.extraDraftsByCat[cat].push(cloneSyncValue_(wrapped.value));
       if(payload.deletedDraftIds) delete payload.deletedDraftIds[draftId];
     }
-    if(!missing && wrapped && typeof rememberSyncFieldBase_ === 'function') rememberSyncFieldBase_('draft:' + draftId, wrapped);
     return;
   }
   var id = parts.slice(1).join(':');
-  if((parts[0] === 'published' || parts[0] === 'generated') && !missing){
-    var syncKey = parts[0] + ':' + id;
-    if(wrapped && typeof wrapped === 'object'){
-      stripThreadsPendingFields_(wrapped);
-      if(wrapped.content) stripThreadsPendingFields_(wrapped.content);
-    }
-    if(typeof rememberSyncFieldBase_ === 'function'){
-      var baseWrapped = (typeof PlannerFieldSync !== 'undefined' && PlannerFieldSync.omitDevicePending)
-        ? PlannerFieldSync.omitDevicePending(wrapped)
-        : wrapped;
-      rememberSyncFieldBase_(syncKey, baseWrapped);
-    }
-    var editing = state.selectedId === id && state._sheetDomDirty && typeof PlannerFieldSync !== 'undefined';
-    var editedPaths = state._sheetEditedPaths && state._sheetEditedPaths[syncKey];
-    var current = parts[0] === 'published'
-      ? (payload.published && payload.published[id])
-      : (payload.generatedOnly && payload.generatedOnly[id]);
-    if(editing && editedPaths && editedPaths.length && current){
-      wrapped = PlannerFieldSync.keepEditingFields(current, wrapped, syncKey, editedPaths);
-    }
-  }
   if(parts[0] === 'published'){
     if(!payload.published) payload.published = {};
     if(missing) delete payload.published[id];
@@ -17152,10 +16745,10 @@ function setSyncEntity_(payload, key, wrapped){
 function normalizeDraftRowForSync_(draft){
   if(!draft || typeof draft !== 'object') return draft;
   var row = {};
-  ['id','topic','angle','series','step','pillar','rationale','writingBrief','roadmapStepId','reviewHold','programCatId',
-    'shareMonth','createdAt','sourceNote','collab','youtubeAnalysis','updatedAt','activityAt','publishedChannels','dailyShareKind',
+  ['id','topic','angle','series','step','pillar','rationale','writingBrief','roadmapStepId',
+    'shareMonth','createdAt','sourceNote','youtubeAnalysis','updatedAt','activityAt','publishedChannels','dailyShareKind',
     'dailyThought','dailyWho','dailyWhat','dailyBody','articleKind','previousRoadmapStepId',
-    'previousSeries','miscLocked','importDrawerSettled','drawerUserPlaced','articleFlow'].forEach(function(k){
+    'previousSeries','miscLocked','articleFlow'].forEach(function(k){
     var v = draft[k];
     if(v == null || v === '') return;
     if(Array.isArray(v) && !v.length) return;
@@ -17166,19 +16759,15 @@ function normalizeDraftRowForSync_(draft){
   if(imageSig) row.imageSig = imageSig;
   return row;
 }
-// 비교에서만 무시하는 수정 시각 필드. 예약·발행 날짜(scheduledDate, publishedAt 등)는 내용이라 비교에 넣는다.
-  var SYNC_COMPARE_IGNORED_KEYS_ = { updatedAt: 1, savedAt: 1, order: 1, index: 1, modifiedAt: 1, editedAt: 1, lastEditedAt: 1, lastSavedAt: 1, localSavedAt: 1, syncedAt: 1, threadsPending: 1, threadsPendingStartedAt: 1, threadsPendingEndMs: 1, threadsPendingTopic: 1, threadsPendingCatId: 1, instaPending: 1, instaPendingStartedAt: 1, instaPendingEndMs: 1, instaPendingTopic: 1, instaPendingCatId: 1 };
 function omitEmptyForSyncCompare_(value){
   if(value == null) return undefined;
-  // 비교할 때만 앞뒤 줄바꿈·공백을 뺀다. 가운데 줄바꿈은 그대로 둔다.
-  if(typeof value === 'string') return value.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/^[ \t\n]+|[ \t\n]+$/g, '');
   if(typeof value !== 'object') return value;
   if(Array.isArray(value)){
     return value.map(omitEmptyForSyncCompare_).filter(function(v){ return v !== undefined; });
   }
   var out = {};
   Object.keys(value).forEach(function(k){
-    if(SYNC_COMPARE_IGNORED_KEYS_[k]) return;
+    if(k === 'updatedAt' || k === 'savedAt' || k === 'order' || k === 'index') return;
     var v = omitEmptyForSyncCompare_(value[k]);
     if(v === undefined || v === '' || v === false || v === null) return;
     if(Array.isArray(v) && !v.length) return;
@@ -17190,11 +16779,10 @@ function omitEmptyForSyncCompare_(value){
 function stripSyncVolatileForCompare_(value){
   if(!value || typeof value !== 'object') return value;
   var copy = Array.isArray(value) ? value.slice() : Object.assign({}, value);
-  Object.keys(SYNC_COMPARE_IGNORED_KEYS_).forEach(function(k){ delete copy[k]; });
-  if(copy.content && typeof copy.content === 'object' && !Array.isArray(copy.content)){
-    copy.content = Object.assign({}, copy.content);
-    Object.keys(SYNC_COMPARE_IGNORED_KEYS_).forEach(function(k){ delete copy.content[k]; });
-  }
+  delete copy.updatedAt;
+  delete copy.savedAt;
+  delete copy.order;
+  delete copy.index;
   if(copy.roadmapStepId) copy.roadmapStepId = canonicalizeStepIdForCompare_(copy.roadmapStepId);
   if(copy.previousRoadmapStepId) copy.previousRoadmapStepId = canonicalizeStepIdForCompare_(copy.previousRoadmapStepId);
   if(copy.strategyGuide){
@@ -17203,7 +16791,10 @@ function stripSyncVolatileForCompare_(value){
   }
   if(copy.value && typeof copy.value === 'object' && !Array.isArray(copy.value)){
     copy.value = Object.assign({}, copy.value);
-    Object.keys(SYNC_COMPARE_IGNORED_KEYS_).forEach(function(k){ delete copy.value[k]; });
+    delete copy.value.updatedAt;
+    delete copy.value.savedAt;
+    delete copy.value.order;
+    delete copy.value.index;
     if(copy.value.roadmapStepId) copy.value.roadmapStepId = canonicalizeStepIdForCompare_(copy.value.roadmapStepId);
     if(copy.value.previousRoadmapStepId) copy.value.previousRoadmapStepId = canonicalizeStepIdForCompare_(copy.value.previousRoadmapStepId);
     if(copy.value.strategyGuide){
@@ -17359,8 +16950,6 @@ function countRealUnpushedMutations_(){
   (state.syncOutbox || []).forEach(function(op){
     if(!op || !op.key || isDeviceLocalSyncEntityKey_(op.key)) return;
     seen[op.key] = true;
-    // 「나중에」로 보류한 충돌 키는 고르기 전에는 올라가지 않는다. 남은 건수에 넣으면 줄지 않는 숫자가 된다.
-    if(conflictKeyIsSnoozed_(op.key)) return;
     n++;
   });
   Object.keys(state.syncDirtyEntityKeys || {}).forEach(function(k){
@@ -17368,21 +16957,6 @@ function countRealUnpushedMutations_(){
     n++;
   });
   return n;
-}
-/** 사용자가 「나중에」로 보류해 대기열에 남아 있는 충돌 키 수 */
-function countSnoozedHeldOps_(){
-  var n = 0;
-  (state.syncOutbox || []).forEach(function(op){
-    if(!op || !op.key || isDeviceLocalSyncEntityKey_(op.key)) return;
-    if(conflictKeyIsSnoozed_(op.key)) n++;
-  });
-  return n;
-}
-/** 지금 실제로 올릴 수 있는 대기 항목이 있는지. 보류한 충돌 키만 남았으면 false */
-function hasSendableOutboxOps_(){
-  return (state.syncOutbox || []).some(function(op){
-    return op && op.key && !isDeviceLocalSyncEntityKey_(op.key) && !conflictKeyIsSnoozed_(op.key);
-  });
 }
 /** 이전 세션 잔재(794건 루프)는 올리지 않음. 이 세션에서 고친 것만 푸시. */
 function shouldBlockStaleFloodPush_(){
@@ -17575,76 +17149,6 @@ function requeueLocalRicherContent_(remotePayload){
 function requeueLocalYearPlanIfRicher_(remotePayload){
   return requeueLocalRicherContent_(remotePayload);
 }
-function pendingWorkIsNeverSyncedTopicsOnly_(){
-  if(state.syncNeedsSnapshot) return false;
-  var ops = [];
-  (state.syncOutbox || []).forEach(function(op){
-    if(!op || !op.key || op.deleted || isDeviceLocalSyncEntityKey_(op.key)) return;
-    ops.push(op);
-  });
-  if(!ops.length || ops.length > REAL_UNPUSHED_PUSH_MAX_) return false;
-  var i;
-  for(i = 0; i < ops.length; i++){
-    var key = String(ops[i].key);
-    var topic = /^(draft|generated|published|override):/.test(key) || key.indexOf('plan:subgoal:') === 0;
-    if(!topic) return false;
-    var base = parseInt(ops[i].baseEntityRevision, 10) || 0;
-    var known = parseInt((state.syncEntityRevisions || {})[key], 10) || 0;
-    if(base !== 0 || known !== 0) return false;
-  }
-  var dirty = Object.keys(state.syncDirtyEntityKeys || {});
-  for(i = 0; i < dirty.length; i++){
-    var dk = dirty[i];
-    if(isDeviceLocalSyncEntityKey_(dk)) continue;
-    var found = false;
-    var j;
-    for(j = 0; j < ops.length; j++){
-      if(String(ops[j].key) === dk){ found = true; break; }
-    }
-    if(!found) return false;
-  }
-  return true;
-}
-function markNeverSyncedTopicOpsLocal_(){
-  var n = 0;
-  (state.syncOutbox || []).forEach(function(op){
-    if(!op || op.deleted || !op.key) return;
-    if(!/^(draft|generated|published):/.test(String(op.key)) && String(op.key).indexOf('plan:subgoal:') !== 0) return;
-    var base = parseInt(op.baseEntityRevision, 10) || 0;
-    var known = parseInt((state.syncEntityRevisions || {})[op.key], 10) || 0;
-    if(base !== 0 || known !== 0) return;
-    op.localOnly = true;
-    n++;
-  });
-  return n;
-}
-function restoreOutboxTopicDraftsMissingLocally_(){
-  if(plannerSafeModeBlocksSync_()) return 0;
-  var local = {};
-  try { local = listLocalUserDraftIds_(); } catch(eIds){ local = {}; }
-  var missing = false;
-  var missingKeys = {};
-  (state.syncOutbox || []).forEach(function(op){
-    if(!op || op.deleted || !/^draft:/.test(String(op.key)) || !op.value) return;
-    var id = String(op.key).slice('draft:'.length);
-    if(id && !local[id]){ missing = true; missingKeys[op.key] = true; }
-  });
-  if(!missing) return 0;
-  var before = local;
-  // 없는 초안 op만 얹는다. 22건 전부를 복제하면 사진 문자열이 같이 복제된다.
-  var payload = overlayOutboxOnPayload_(getPersistPayload(), { onlyKeys: missingKeys });
-  applyPersistPayload(payload, { skipRestorePending: true, deferHeavyRepair: true });
-  var after = {};
-  try { after = listLocalUserDraftIds_(); } catch(eAfter){ after = {}; }
-  var restored = 0;
-  Object.keys(after).forEach(function(id){ if(!before[id]) restored++; });
-  if(restored){
-    state.syncDirty = true;
-    state._sessionUserEdit = true;
-    try { rebuildDirtyStateFromOutbox_(); } catch(eReb){}
-  }
-  return restored;
-}
 function discardStaleUnpushedBeforeConnect_(){
   if(state._emptyServerSeed) return;
   var n = countRealUnpushedMutations_();
@@ -17779,17 +17283,12 @@ function clearStuckSyncFlagsIfClean_(remotePayload){
 /** 로컬 미업로드 수정이 없을 때 — GAS를 기준본으로 채택 */
 function adoptServerPayloadAuthoritatively_(remotePayload, remoteRevision){
   try { invalidateStalePendingPlans_(); } catch(eInv){}
-  state._deferClinicRepair = true;
-  try {
-    applyPersistPayload(remotePayload || {}, {
-      skipRestorePending: true,
-      replaceDeletedDraftIds: true,
-      authoritativeAdopt: true,
-      deferHeavyRepair: !!state._bootstrapDeferHeavy
-    });
-  } finally {
-    state._deferClinicRepair = false;
-  }
+  applyPersistPayload(remotePayload || {}, {
+    skipRestorePending: true,
+    replaceDeletedDraftIds: true,
+    authoritativeAdopt: true,
+    deferHeavyRepair: !!state._bootstrapDeferHeavy
+  });
   state.syncRevision = parseInt(remoteRevision, 10) || getPayloadRevision_(remotePayload);
   state.syncEntityRevisions = ensureSyncEntityRevisions_(remotePayload || {});
   state.syncEntityTombstones = Object.assign({}, (remotePayload && remotePayload.syncEntityTombstones) || {});
@@ -17810,10 +17309,6 @@ function adoptServerPayloadAuthoritatively_(remotePayload, remoteRevision){
   if(state._postAdoptMigration){
     state._postAdoptMigration = false;
   }
-  // 서버 본문을 받은 뒤에 제목 접두어·기타 서랍만 고친다. 이 줄은 충돌이 아니라 정리 업로드다.
-  try {
-    if(applyClinicTitleAndImportDrawerRepair_()) state.syncDirty = true;
-  } catch(eClinicAdopt){}
 }
 /**
  * 서버 기준본. 이 세션 수정만 올리는 중이면 'push'.
@@ -18014,10 +17509,6 @@ function syncEntitiesEquivalent_(key, localVal, remoteVal){
     }
     return syncValueFingerprint_(subMetaCore_(l)) === syncValueFingerprint_(subMetaCore_(r));
   }
-  if(isPromptSyncKey_(key)){
-    var promptAction = promptConflictAction_(key, l, r, null);
-    if(promptAction === 'align') return true;
-  }
   if(key.indexOf('plan:subgoal:') === 0 && l && typeof l === 'object' && r && typeof r === 'object'){
     var localOrder = (typeof l.order === 'number') ? l.order : null;
     var remoteOrder = (typeof r.order === 'number') ? r.order : null;
@@ -18057,7 +17548,6 @@ function forceOutboxOverwriteBase_(conflicts){
     }
     if(op){
       op.baseEntityRevision = serverRev;
-      op.conflictResolved = 'local';
       op.updatedAt = now;
       bumpOutboxOpVersion_(op);
       return;
@@ -18070,7 +17560,6 @@ function forceOutboxOverwriteBase_(conflicts){
       value: localVal === undefined ? null : cloneSyncValue_(localVal),
       deleted: localVal === undefined,
       baseEntityRevision: serverRev,
-      conflictResolved: 'local',
       updatedAt: now
     });
   });
@@ -18107,66 +17596,6 @@ function dropSkippableOutboxConflicts_(serverConflicts){
     _syncTransferStartedAt_ = 0;
   }
   return n;
-}
-function isPromptSyncKey_(key){
-  key = String(key || '');
-  return key === 'prompt:base' || /^prompt:\d+:[^:]+$/.test(key);
-}
-function rememberPromptUserEdited_(key){
-  if(!isPromptSyncKey_(key)) return;
-  if(!state.promptUserEditedKeys || typeof state.promptUserEditedKeys !== 'object') state.promptUserEditedKeys = {};
-  state.promptUserEditedKeys[key] = true;
-}
-function promptWasUserEdited_(key, op){
-  if(op && op.userEdited) return true;
-  return !!(state.promptUserEditedKeys && state.promptUserEditedKeys[String(key || '')]);
-}
-function findOutboxOp_(key){
-  var ops = state.syncOutbox || [];
-  for(var i = 0; i < ops.length; i++){
-    if(ops[i] && ops[i].key === key) return ops[i];
-  }
-  return null;
-}
-function promptConflictAction_(key, localVal, remoteVal, op){
-  if(typeof PlannerSyncRules === 'undefined' || !PlannerSyncRules.plannerPromptConflictAction) return 'keep';
-  return PlannerSyncRules.plannerPromptConflictAction({
-    key: key,
-    localText: unwrapSyncEntityValue_(localVal),
-    remoteText: unwrapSyncEntityValue_(remoteVal),
-    userEdited: promptWasUserEdited_(key, op || findOutboxOp_(key))
-  });
-}
-function dropUntouchedPromptOutboxOps_(){
-  var before = (state.syncOutbox || []).length;
-  var droppedKeys = {};
-  state.syncOutbox = (state.syncOutbox || []).filter(function(op){
-    if(!op || !isPromptSyncKey_(op.key) || promptWasUserEdited_(op.key, op)) return true;
-    droppedKeys[op.key] = true;
-    return false;
-  });
-  if((state.syncOutbox || []).length === before) return 0;
-  Object.keys(droppedKeys).forEach(function(key){
-    if(state.syncDirtyEntityKeys) delete state.syncDirtyEntityKeys[key];
-    delete _conflictAutoKeepCount_[key];
-  });
-  try { rebuildDirtyStateFromOutbox_(); } catch(eReb){}
-  if(!hasPendingLocalSyncChanges_()){
-    state.syncNeedsSnapshot = false;
-    state.syncDirty = false;
-    _syncTransferStartedAt_ = 0;
-  }
-  return before - (state.syncOutbox || []).length;
-}
-function conflictKeyIsSnoozed_(key){
-  return !!(state._conflictSnoozeKeys && state._conflictSnoozeKeys[String(key || '')]);
-}
-function clearDividedSaveToast_(){
-  var el = document.getElementById('app-toast');
-  if(!el || !el.classList.contains('show')) return;
-  if(String(el.textContent || '').indexOf('나눠 저장 중') !== 0) return;
-  try { clearTimeout(appToastTimer); } catch(eClr){}
-  el.classList.remove('show');
 }
 /** 한쪽만 추가된 키·로컬 생성 초안(서버에 본문 없음)은 충돌 UI 없이 병합 */
 function shouldSkipPlannerConflict_(key, localVal, remoteVal){
@@ -18205,8 +17634,6 @@ function detectPlannerEntityConflicts_(local, remote){
     return rEntities;
   }
   function pushIfRealConflict_(conflicts, key){
-    if(conflictKeyIsSnoozed_(key)) return;
-    if(isPromptSyncKey_(key) && !promptWasUserEdited_(key, findOutboxOp_(key))) return;
     var lEnt = entitiesL_()[key];
     var rEnt = entitiesR_()[key];
     if(shouldSkipPlannerConflict_(key, lEnt, rEnt)) return;
@@ -18320,7 +17747,6 @@ function plannerConflictLabel_(key){
   if(p[0] === 'published') return '발행 글 · ' + p.slice(1).join(':');
   if(p[0] === 'generated') return '생성 초안 · ' + p.slice(1).join(':');
   if(p[0] === 'branding') return '브랜딩 설정 · ' + p.slice(2).join(':');
-  if(p[0] === 'setting' && p[1] === 'blogDefaultCategories') return '블로그 기본 카테고리';
   if(p[0] === 'setting') return '플래너 설정 · ' + p.slice(1).join(':');
   if(p[0] === 'deleted') return '삭제 기록 · ' + p.slice(1).join(':');
   if(p[0] === 'pinned') return '고정 주제 · ' + p.slice(1).join(':');
@@ -18395,7 +17821,6 @@ function getPersistPayload(){
     syncEntityRevisions: state.syncEntityRevisions || {},
     syncEntityTombstones: state.syncEntityTombstones || {},
     chatgptOpenUrl: state.chatgptOpenUrl,
-    blogDefaultCategories: (state.blogDefaultCategories && typeof state.blogDefaultCategories === 'object') ? state.blogDefaultCategories : undefined,
     prompts: state.prompts,
     promptsUpdatedAt: state.promptsUpdatedAt || '',
     promptRefineMilestones: state.promptRefineMilestones || {},
@@ -18415,9 +17840,6 @@ function getPersistPayload(){
     payload.pinnedDraftIds = state.pinnedDraftIds;
   }
   if(state.plannerSetupDismissed) payload.plannerSetupDismissed = true;
-  if(state.promptUserEditedKeys && Object.keys(state.promptUserEditedKeys).length){
-    payload.promptUserEditedKeys = state.promptUserEditedKeys;
-  }
   if(state.opsManual) payload.opsManual = state.opsManual;
   if(state.catGroupLast) payload.catGroupLast = state.catGroupLast;
   if(state._blockAutoSeedTopics && typeof state._blockAutoSeedTopics === 'object'){
@@ -18513,33 +17935,9 @@ function normalizeSyncOutbox_(raw, opts){
       baseEntityRevision: Math.max(0, parseInt(item.baseEntityRevision, 10) || 0),
       updatedAt: String(item.updatedAt || new Date().toISOString())
     };
-    if(item.conflictResolved === 'local' || item.conflictResolved === 'server'){
-      normalized.conflictResolved = item.conflictResolved;
-    }
-    if(item.localOnly) normalized.localOnly = true;
-    if(Array.isArray(item.devicePaths)) normalized.devicePaths = item.devicePaths.filter(Boolean).slice();
-    if(Array.isArray(item.clearedPaths)) normalized.clearedPaths = item.clearedPaths.filter(Boolean).slice();
     if(previous){
       normalized.baseEntityRevision = previous.baseEntityRevision;
-      if(previous.conflictResolved === 'local') normalized.conflictResolved = 'local';
-      else if(!normalized.conflictResolved && previous.conflictResolved) normalized.conflictResolved = previous.conflictResolved;
       if(!item.mutationId) normalized.mutationId = previous.mutationId;
-      if(previous.devicePaths || normalized.devicePaths){
-        var pathSeen = {};
-        normalized.devicePaths = (previous.devicePaths || []).concat(normalized.devicePaths || []).filter(function(p){
-          if(!p || pathSeen[p]) return false;
-          pathSeen[p] = true;
-          return true;
-        });
-      }
-      if(previous.clearedPaths || normalized.clearedPaths){
-        var clearSeen = {};
-        normalized.clearedPaths = (previous.clearedPaths || []).concat(normalized.clearedPaths || []).filter(function(p){
-          if(!p || clearSeen[p]) return false;
-          clearSeen[p] = true;
-          return true;
-        });
-      }
       var mergedVersion = Math.max(previous.version + 1, normalized.version);
       if(mergedVersion > normalized.version && normalized.mutationId === previous.mutationId){
         normalized.mutationId = makePlannerMutationId_();
@@ -18551,111 +17949,6 @@ function normalizeSyncOutbox_(raw, opts){
   if(droppedContentful) state.syncNeedsSnapshot = true;
   return Object.keys(byKey).map(function(key){ return byKey[key]; });
 }
-/**
- * 변경 키는 비교용으로 plan:subgoal:N:step:s1 → step:1 처럼 줄여 오는데, 엔티티 맵의 실제 키는 step:s1 이다.
- * 줄인 키로 바로 찾으면 값이 없는 것으로 읽혀 단계가 「삭제」로 올라간다. 실제 키를 찾아 돌려준다.
- */
-function resolveAliasedSyncEntityKey_(entities, key){
-  key = String(key || '');
-  if(!entities || Object.prototype.hasOwnProperty.call(entities, key)) return key;
-  var m = key.match(/^(plan:subgoal:\d+:step:)(\d+)$/);
-  if(m && Object.prototype.hasOwnProperty.call(entities, m[1] + 's' + m[2])) return m[1] + 's' + m[2];
-  var m2 = key.match(/^(plan:subgoal:\d+:step:)s(\d+)$/i);
-  if(m2 && Object.prototype.hasOwnProperty.call(entities, m2[1] + m2[2])) return m2[1] + m2[2];
-  return key;
-}
-function reviewHoldSkipsSyncKey_(key){
-  var m = String(key || '').match(/^(draft|published|generated):(.+)$/);
-  if(!m || typeof findDraftByIdAnywhere_ !== 'function') return false;
-  var draft = findDraftByIdAnywhere_(m[2]);
-  if(!draft || !draft.reviewHold) return false;
-  if(m[1] === 'draft' && state._reviewLockSync) return false;
-  return true;
-}
-function rememberSyncFieldBase_(key, value, patch){
-  if(!key) return;
-  if(!state.syncFieldBase) state.syncFieldBase = {};
-  if(!state.syncFieldBaseFromServer) state.syncFieldBaseFromServer = {};
-  if(patch && patch.paths && typeof PlannerFieldSync !== 'undefined'){
-    if(!state.syncFieldBase[key]) return;
-    state.syncFieldBase[key] = PlannerFieldSync.rememberPatchedBase(state.syncFieldBase[key], patch);
-    state.syncFieldBaseFromServer[key] = true;
-    return;
-  }
-  if(value){
-    state.syncFieldBase[key] = cloneSyncValue_(value);
-    state.syncFieldBaseFromServer[key] = true;
-  }
-}
-function syncFieldBaseFromServer_(key){
-  return !!(state.syncFieldBaseFromServer && state.syncFieldBaseFromServer[key] && state.syncFieldBase && state.syncFieldBase[key]);
-}
-function noteSheetEditedPaths_(draftId, tab){
-  if(!draftId || typeof PlannerFieldSync === 'undefined') return;
-  var paths = PlannerFieldSync.pathsForTab(tab);
-  if(tab === 'images') paths = paths.concat(['reelFile']);
-  if(!state._sheetEditedPaths) state._sheetEditedPaths = {};
-  ['published:' + draftId, 'generated:' + draftId].forEach(function(key){
-    var cur = state._sheetEditedPaths[key] || [];
-    paths.forEach(function(p){ if(cur.indexOf(p) < 0) cur.push(p); });
-    state._sheetEditedPaths[key] = cur;
-  });
-}
-function noteClearedPaths_(draftId, paths){
-  if(!draftId || !paths || !paths.length) return;
-  if(!state._clearedPaths) state._clearedPaths = {};
-  ['published:' + draftId, 'generated:' + draftId].forEach(function(key){
-    var cur = state._clearedPaths[key] || [];
-    paths.forEach(function(p){ if(p && cur.indexOf(p) < 0) cur.push(p); });
-    state._clearedPaths[key] = cur;
-  });
-}
-function rememberOutboxDevicePaths_(op, key, localValue){
-  if(!op || (String(key).indexOf('published:') !== 0 && String(key).indexOf('generated:') !== 0)) return;
-  var cleared = (state._clearedPaths && state._clearedPaths[key]) || [];
-  var seenClear = {};
-  op.clearedPaths = (op.clearedPaths || []).concat(cleared).filter(function(p){
-    if(!p || seenClear[p]) return false;
-    seenClear[p] = true;
-    return true;
-  });
-  var base = state.syncFieldBase && state.syncFieldBase[key];
-  if(!base || typeof PlannerFieldSync === 'undefined' || !PlannerFieldSync.diffTabPaths) return;
-  op.devicePaths = PlannerFieldSync.diffTabPaths(base, localValue, key);
-}
-function shapeSyncedContentValue_(key, localValue){
-  if(!localValue || typeof localValue !== 'object' || typeof PlannerFieldSync === 'undefined' || !PlannerFieldSync.planOutboxSend){
-    return { value: localValue, fieldPatch: null };
-  }
-  if(key.indexOf('published:') === 0 || key.indexOf('generated:') === 0){
-    localValue = PlannerFieldSync.omitDevicePending(localValue);
-  }
-  var keyList = PlannerFieldSync.sendKeyList(localValue);
-  var ownBase = syncFieldBaseFromServer_(key) ? state.syncFieldBase[key] : null;
-  var siblingBase = null;
-  var baseKey = String(key || '').match(/^(published|generated):(.+)$/);
-  if(baseKey){
-    var siblingKey = (baseKey[1] === 'published' ? 'generated:' : 'published:') + baseKey[2];
-    if(syncFieldBaseFromServer_(siblingKey)) siblingBase = state.syncFieldBase[siblingKey];
-  }
-  var queued = (state.syncOutbox || []).find(function(row){ return row && row.key === key; });
-  var base = PlannerFieldSync.baseForContentSend ? PlannerFieldSync.baseForContentSend(ownBase, siblingBase, key, {
-    baseEntityRevision: queued ? (parseInt(queued.baseEntityRevision, 10) || 0) : 0,
-    serverRevision: parseInt((state.syncEntityRevisions || {})[key], 10) || 0
-  }) : ownBase;
-  var cleared = state._clearedPaths && state._clearedPaths[key];
-  var plan = PlannerFieldSync.planOutboxSend(base, localValue, key, cleared);
-  if(plan.mode === 'patch'){
-    try { console.info('[칸 저장]', key, plan.fieldPatch.paths.join(',')); } catch(eLog2){}
-    return { value: localValue, fieldPatch: plan.fieldPatch };
-  }
-  if(plan.mode === 'unchanged'){
-    try { console.info('[칸 저장]', key, '변화 없음'); } catch(eLog3){}
-    return { value: localValue, fieldPatch: null, unchanged: true };
-  }
-  try { console.info('[칸 저장]', key, '카드 전체', keyList); } catch(eLog){}
-  return { value: localValue, fieldPatch: null };
-}
 function enqueueSyncOutboxChanges_(changedKeys, payload){
   if(!changedKeys || !changedKeys.length) return;
   var entities = collectSyncEntities_(payload || {}, { skipEnsureIds: true });
@@ -18663,87 +17956,32 @@ function enqueueSyncOutboxChanges_(changedKeys, payload){
   if(!Array.isArray(state.syncOutbox)) state.syncOutbox = [];
   changedKeys.forEach(function(key){
     if(isDeviceLocalSyncEntityKey_(key)) return;
-    key = resolveAliasedSyncEntityKey_(entities, key);
-    if(reviewHoldSkipsSyncKey_(key)) return;
     var hasValue = Object.prototype.hasOwnProperty.call(entities, key);
     if(isEmptyDefaultSyncEntity_(key, hasValue ? entities[key] : null)) return;
-    var shaped = hasValue ? shapeSyncedContentValue_(key, entities[key]) : { value: null, fieldPatch: null };
     var existing = state.syncOutbox.find(function(op){ return op && op.key === key; });
-    if(shaped.unchanged && syncFieldBaseFromServer_(key)){
-      if(existing){
-        state.syncOutbox = state.syncOutbox.filter(function(op){ return op !== existing; });
-      }
-      return;
-    }
     if(existing){
-      existing.value = hasValue ? cloneSyncValue_(shaped.value) : null;
-      existing.fieldPatch = shaped.fieldPatch || null;
+      existing.value = hasValue ? cloneSyncValue_(entities[key]) : null;
       existing.deleted = !hasValue;
       existing.updatedAt = times[key] || new Date().toISOString();
       bumpOutboxOpVersion_(existing);
-      if(hasValue) rememberOutboxDevicePaths_(existing, key, entities[key]);
     } else {
-      var created = {
+      state.syncOutbox.push({
         mutationId: makePlannerMutationId_(),
         version: 1,
         key: key,
-        value: hasValue ? cloneSyncValue_(shaped.value) : null,
-        fieldPatch: shaped.fieldPatch || null,
+        value: hasValue ? cloneSyncValue_(entities[key]) : null,
         deleted: !hasValue,
         baseEntityRevision: Object.prototype.hasOwnProperty.call(state.syncEntityRevisions || {}, key)
           ? (parseInt(state.syncEntityRevisions[key], 10) || 0)
           : 0,
         updatedAt: times[key] || new Date().toISOString()
-      };
-      if(state._enqueueNormalization) created.normalization = true;
-      if(hasValue) rememberOutboxDevicePaths_(created, key, entities[key]);
-      if(state._promptUserEditedPending && isPromptSyncKey_(key)){
-        created.userEdited = true;
-        rememberPromptUserEdited_(key);
-      }
-      state.syncOutbox.push(created);
-    }
-    if(existing && state._enqueueNormalization) existing.normalization = true;
-    if(existing && state._promptUserEditedPending && isPromptSyncKey_(key)){
-      existing.userEdited = true;
-      rememberPromptUserEdited_(key);
+      });
     }
   });
   rebuildDirtyStateFromOutbox_();
 }
-/**
- * 이전 버전이 단계 s1 을 step:1 「삭제」로 쌓아 둔 줄을 바로잡는다.
- * 이 기기에 그 단계가 아직 있으면 삭제는 틀린 줄이므로, 그 단계의 올리기로 바꾼다.
- * 이 기기에서 정말 지운 단계(로컬에 없음)는 건드리지 않는다.
- */
-function healAliasedStepDeleteOps_(payload){
-  var ops = state.syncOutbox || [];
-  if(!ops.length) return 0;
-  var suspects = ops.filter(function(op){
-    return op && op.deleted && /^plan:subgoal:\d+:step:s?\d+$/i.test(String(op.key));
-  });
-  if(!suspects.length) return 0;
-  var entities = {};
-  try { entities = collectSyncEntities_(payload || {}, { skipEnsureIds: true }) || {}; } catch(eEnt){ return 0; }
-  var dropOld = {};
-  var requeue = [];
-  suspects.forEach(function(op){
-    var actual = resolveAliasedSyncEntityKey_(entities, op.key);
-    if(!Object.prototype.hasOwnProperty.call(entities, actual)) return;
-    dropOld[String(op.key)] = true;
-    if(requeue.indexOf(actual) < 0) requeue.push(actual);
-  });
-  var healed = Object.keys(dropOld).length;
-  if(!healed) return 0;
-  state.syncOutbox = ops.filter(function(op){ return !(op && op.deleted && dropOld[String(op.key)]); });
-  enqueueSyncOutboxChanges_(requeue, payload);
-  return healed;
-}
 function ensureOutboxFromLegacyDirty_(payload){
-  try { healAliasedStepDeleteOps_(payload); } catch(eHealStep){}
-  var raw = state.syncOutbox || [];
-  var alreadyShaped = raw.length > 0 && raw.every(function(op){ return op && op.key && op.mutationId; });
-  state.syncOutbox = normalizeSyncOutbox_(raw, alreadyShaped ? { skipClone: true } : null);
+  state.syncOutbox = normalizeSyncOutbox_(state.syncOutbox);
   if(Array.isArray(state.syncOutbox) && state.syncOutbox.length) return;
   var keys = Object.keys(state.syncDirtyEntityKeys || {});
   if(keys.length) enqueueSyncOutboxChanges_(keys, payload || getPersistPayload());
@@ -18772,16 +18010,6 @@ function syncMutationLightness_(op){
   return 2;
 }
 var SYNC_INLINE_BINARY_MAX_ = 450000;
-var SYNC_IOS_PATCH_MAX_ITEMS_ = 2;
-var SYNC_IOS_PATCH_MAX_BYTES_ = 12000;
-var SYNC_IOS_INLINE_BINARY_MAX_ = 60000;
-var _syncSplitCache_ = {};
-function plannerIsMemoryTightDevice_(){
-  try {
-    if(/[?&]ios=1(&|$)/.test(location.search || '')) return true;
-    return typeof isIOSLikeDevice === 'function' && isIOSLikeDevice();
-  } catch(e){ return false; }
-}
 function splitSyncBinaries_(value){
   var blobs = [];
   var seen = {};
@@ -18846,15 +18074,6 @@ function replaceSyncDataUrl_(fromUrl, toUrl){
   } catch(eWalk){}
   return n;
 }
-function releaseCanvas_(canvas){
-  if(!canvas) return;
-  try { canvas.width = 0; canvas.height = 0; } catch(eCanvas){}
-}
-function releaseBitmap_(bmp){
-  if(!bmp) return;
-  if(typeof bmp.close === 'function'){ try { bmp.close(); } catch(eClose){} }
-  try { if(bmp.src) bmp.src = ''; } catch(eSrc){}
-}
 function compressDataUrlUnderLimit_(dataUrl, maxChars){
   maxChars = parseInt(maxChars, 10) || syncBlobMaxChars_();
   return new Promise(function(resolve, reject){
@@ -18863,26 +18082,14 @@ function compressDataUrlUnderLimit_(dataUrl, maxChars){
       return;
     }
     var img = new Image();
-    var settled = false;
-    function finish(err, url){
-      if(settled) return;
-      settled = true;
-      img.onload = null;
-      img.onerror = null;
-      releaseBitmap_(img);
-      if(err) reject(err);
-      else resolve(url || '');
-    }
     img.onload = function(){
       var w = img.naturalWidth || img.width || 1;
       var h = img.naturalHeight || img.height || 1;
       var scale = Math.min(1, 1600 / Math.max(w, h, 1));
       var quality = 0.82;
-      var best = '';
       function attempt(){
-        var canvas = null;
         try {
-          canvas = document.createElement('canvas');
+          var canvas = document.createElement('canvas');
           canvas.width = Math.max(1, Math.round(w * scale));
           canvas.height = Math.max(1, Math.round(h * scale));
           var ctx = canvas.getContext('2d');
@@ -18890,87 +18097,43 @@ function compressDataUrlUnderLimit_(dataUrl, maxChars){
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           var url = canvas.toDataURL('image/jpeg', quality);
-          releaseCanvas_(canvas);
-          canvas = null;
-          if(url && (!best || url.length < best.length)) best = url;
-          if(url && url.length <= maxChars){
-            best = '';
-            finish(null, url);
-            return;
-          }
-          url = '';
+          if(url && url.length <= maxChars){ resolve(url); return; }
           if(quality > 0.46){ quality -= 0.08; attempt(); return; }
           if(scale > 0.28){ scale *= 0.72; quality = 0.7; attempt(); return; }
-          var kept = best && best.length < dataUrl.length ? best : '';
-          best = '';
-          finish(null, kept);
+          resolve(url && url.length < dataUrl.length ? url : '');
         } catch(err){
-          releaseCanvas_(canvas);
-          best = '';
-          finish(err);
+          reject(err);
         }
       }
       attempt();
     };
-    img.onerror = function(){ finish(new Error('사진을 줄이지 못했어요')); };
+    img.onerror = function(){ reject(new Error('사진을 줄이지 못했어요')); };
     img.src = dataUrl;
   });
 }
-var _syncBlobCompressQueue_ = [];
-var _syncBlobCompressActive_ = null;
 function scheduleSyncBlobCompress_(blob){
-  if(plannerSafeModeBlocksSync_()) return;
   var hash = String((blob && blob.hash) || '');
-  if(!hash || !blob || !blob.data || _syncBlobCompressing_[hash]) return;
+  if(!hash || _syncBlobCompressing_[hash]) return;
   _syncBlobCompressing_[hash] = true;
-  _syncBlobCompressQueue_.push({ hash: hash, data: blob.data });
-  pumpSyncBlobCompress_();
-}
-function pumpSyncBlobCompress_(){
-  if(state && state._plannerSafeMode){
-    _syncBlobCompressQueue_ = [];
-    _syncBlobCompressActive_ = null;
-    return;
-  }
-  if(_syncBlobCompressActive_) return;
-  var next = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerNextBlobCompress)
-    ? PlannerSyncRules.plannerNextBlobCompress(_syncBlobCompressQueue_, false)
-    : (_syncBlobCompressQueue_[0] || null);
-  if(!next) return;
-  var idx = _syncBlobCompressQueue_.indexOf(next);
-  if(idx >= 0) _syncBlobCompressQueue_.splice(idx, 1);
-  else _syncBlobCompressQueue_.shift();
-  var hash = String(next.hash || '');
-  var original = next.data;
-  next.data = '';
-  _syncBlobCompressActive_ = hash || true;
-  compressDataUrlUnderLimit_(original, syncBlobMaxChars_()).then(function(compressed){
-    _syncBlobCompressActive_ = null;
-    if(!compressed || compressed.length > syncBlobMaxChars_()){
+  var original = String(blob.data || '');
+  compressDataUrlUnderLimit_(original, syncBlobMaxChars_()).then(function(next){
+    if(!next || next.length > syncBlobMaxChars_()){
       _syncBlobCompressing_[hash] = 'failed';
-      original = '';
-      noteRejectedSyncBlob_({ hash: hash }, '사진을 2.2MB 아래로 줄이지 못했어요. 더 작은 사진으로 다시 올려 주세요. 이 사진은 동기화에서 빠집니다.');
-      pumpSyncBlobCompress_();
+      noteRejectedSyncBlob_(blob, '사진을 2.2MB 아래로 줄이지 못했어요. 더 작은 사진으로 다시 올려 주세요. 이 사진은 동기화에서 빠집니다.');
       return;
     }
     _syncBlobCompressing_[hash] = false;
-    replaceSyncDataUrl_(original, compressed);
-    original = '';
-    compressed = '';
+    replaceSyncDataUrl_(original, next);
     try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true }); } catch(eSaveBlob){}
     if(typeof setAppToast === 'function'){
       setAppToast('큰 사진을 줄여 동기화 대기열에 넣었어요.', { duration: 4200, variant: 'ok' });
     }
-    if(plannerSyncBootstrapReady_ && !plannerSyncConflictPending_ && !(state && state._plannerSafeMode)){
+    if(plannerSyncBootstrapReady_ && !plannerSyncConflictPending_){
       try { schedulePlannerGasPush_(true); } catch(ePushBlob){}
     }
-    pumpSyncBlobCompress_();
   }).catch(function(){
-    _syncBlobCompressActive_ = null;
     _syncBlobCompressing_[hash] = 'failed';
-    original = '';
-    noteRejectedSyncBlob_({ hash: hash }, '사진을 줄이지 못했어요. 더 작은 사진으로 다시 올려 주세요. 이 사진은 동기화에서 빠집니다.');
-    pumpSyncBlobCompress_();
+    noteRejectedSyncBlob_(blob, '사진을 줄이지 못했어요. 더 작은 사진으로 다시 올려 주세요. 이 사진은 동기화에서 빠집니다.');
   });
 }
 function queueSyncBlobMutations_(blobs){
@@ -19006,24 +18169,18 @@ function queueSyncBlobMutations_(blobs){
   });
 }
 function toPlannerSyncMutation_(op){
-  var mut = {
+  return {
     mutationId: op.mutationId,
     version: parseInt(op.version, 10) || 1,
     key: op.key,
-    // 전송 묶음은 읽기만 한다(분리는 새 객체를 만든다). 복제하지 않고 참조를 공유한다.
-    value: op.deleted ? null : op.value,
+    value: op.deleted ? null : cloneSyncValue_(op.value),
     deleted: !!op.deleted,
     baseEntityRevision: parseInt(op.baseEntityRevision, 10) || 0,
     updatedAt: op.updatedAt || new Date().toISOString()
   };
-  Object.defineProperty(mut, 'fieldPatch', { value: op.fieldPatch || null, enumerable: false, writable: true });
-  return mut;
 }
 function syncMutationBytes_(mut){
-  try {
-    plannerPerf_.approxBytes++;
-    return syncValueApproxBytes_(mut, 0);
-  } catch(e){ return 4000; }
+  try { return JSON.stringify(mut).length; } catch(e){ return 4000; }
 }
 function plannerPushTimeoutMs_(bodyBytes, snapshot){
   var n = parseInt(bodyBytes, 10) || 0;
@@ -19033,11 +18190,10 @@ function plannerPushTimeoutMs_(bodyBytes, snapshot){
   // 삭제 조각(수 KB)은 25~35초, 40KB는 약 70초. 용량이 클수록만 더 기다림
   return Math.max(25000, Math.min(150000, 22000 + Math.ceil(n / 8000) * 10000));
 }
-function buildPendingSyncMutations_(payload, preferKeys){
+function buildPendingSyncMutations_(payload){
   ensureOutboxFromLegacyDirty_(payload);
   migrateIndexedPlanEntityKeysInPayload_(payload || {}, state.syncOutbox);
   var sorted = (state.syncOutbox || []).slice().filter(function(op){
-    if(op && conflictKeyIsSnoozed_(op.key)) return false;
     if(!state._generalUploadOnly || state._gapUploadActive) return true;
     return !!(op && isGeneralProgramSyncKey_(op.key) && !op.deleted);
   }).sort(function(a, b){
@@ -19048,27 +18204,13 @@ function buildPendingSyncMutations_(payload, preferKeys){
   var first = !!_syncFastAckPending_;
   var maxItems = first ? SYNC_OUTBOX_PATCH_FIRST_ITEMS_ : SYNC_OUTBOX_PATCH_MAX_ITEMS_;
   var maxBytes = first ? SYNC_OUTBOX_PATCH_FIRST_BYTES_ : SYNC_OUTBOX_PATCH_MAX_BYTES_;
-  var inlineMax = SYNC_INLINE_BINARY_MAX_;
-  if(plannerIsMemoryTightDevice_()){
-    // iOS: 1~2건씩, 사진이 든 항목은 작은 크기부터 blob으로 분리해 하나씩 올린다
-    maxItems = Math.min(maxItems, SYNC_IOS_PATCH_MAX_ITEMS_);
-    maxBytes = Math.min(maxBytes, SYNC_IOS_PATCH_MAX_BYTES_);
-    inlineMax = SYNC_IOS_INLINE_BINARY_MAX_;
-  }
   var out = [];
   for(var i = 0; i < sorted.length; i++){
     if(!sorted[i] || !sorted[i].key) continue;
     var mut = toPlannerSyncMutation_(sorted[i]);
-    if(!mut.deleted && String(mut.key).indexOf('blob:') !== 0 && syncMutationBytes_(mut) > inlineMax){
-      if(state && state._plannerSafeMode) continue;
+    if(!mut.deleted && String(mut.key).indexOf('blob:') !== 0 && syncMutationBytes_(mut) > SYNC_INLINE_BINARY_MAX_){
       try {
-        // 같은 op는 라운드마다 다시 쪼개지 않는다(2MB 문자열 해시·순회 반복 방지)
-        var splitKey = String(mut.mutationId) + ':' + String(mut.version);
-        var splitBin = _syncSplitCache_[splitKey];
-        if(!splitBin){
-          if(Object.keys(_syncSplitCache_).length > 120) _syncSplitCache_ = {};
-          splitBin = _syncSplitCache_[splitKey] = splitSyncBinaries_(mut.value);
-        }
+        var splitBin = splitSyncBinaries_(mut.value);
         mut.value = splitBin.value;
         queueSyncBlobMutations_(splitBin.blobs);
       } catch(eSplit){}
@@ -19076,25 +18218,6 @@ function buildPendingSyncMutations_(payload, preferKeys){
     out.push(mut);
   }
   if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerSelectSyncBatch){
-    var preferList = [];
-    var preferMap = {};
-    (preferKeys || []).forEach(function(key){
-      key = String(key || '');
-      if(!key || preferMap[key]) return;
-      preferMap[key] = true;
-    });
-    if(Object.keys(preferMap).length){
-      out.forEach(function(mut){
-        if(mut && preferMap[String(mut.key)]) preferList.push(mut);
-      });
-      if(preferList.length){
-        return PlannerSyncRules.plannerSelectSyncBatch(preferList, {
-          maxItems: maxItems,
-          maxBytes: maxBytes,
-          bytesOf: syncMutationBytes_
-        });
-      }
-    }
     return PlannerSyncRules.plannerSelectSyncBatch(out, {
       maxItems: maxItems,
       maxBytes: maxBytes,
@@ -19202,38 +18325,6 @@ function syncOutboxProgressStamp_(){
     return String(op.mutationId || '') + ':' + String(parseInt(op.version, 10) || 1) + ':' + String(op.baseEntityRevision || 0);
   }).join('|');
 }
-var PLANNER_SYNC_JOURNAL_KEY_ = 'ht_sync_journal_v1';
-function plannerIncrementalJournalEnabled_(){
-  try { return /(?:\?|&)inc=1(?:&|$)/.test(String(location.search || '')); } catch(e){ return false; }
-}
-function readPlannerSyncJournal_(){
-  try {
-    var raw = JSON.parse(localStorage.getItem(PLANNER_SYNC_JOURNAL_KEY_) || '{}');
-    return raw && typeof raw === 'object' ? raw : { items: [] };
-  } catch(e){ return { items: [] }; }
-}
-function recordConfirmedSyncJournal_(ackVer){
-  if(!plannerIncrementalJournalEnabled_()) return;
-  if(typeof PlannerSyncRules === 'undefined' || !PlannerSyncRules.plannerRecordSyncJournal) return;
-  var confirmed = [];
-  Object.keys(ackVer || {}).forEach(function(id){
-    confirmed.push({ mutationId: id, version: ackVer[id] });
-  });
-  if(!confirmed.length) return;
-  try {
-    var next = PlannerSyncRules.plannerRecordSyncJournal(readPlannerSyncJournal_(), confirmed);
-    localStorage.setItem(PLANNER_SYNC_JOURNAL_KEY_, JSON.stringify(next));
-  } catch(e){}
-}
-function applyConfirmedSyncJournal_(){
-  if(!plannerIncrementalJournalEnabled_()) return;
-  if(typeof PlannerSyncRules === 'undefined' || !PlannerSyncRules.plannerApplySyncJournal) return;
-  var before = state.syncOutbox || [];
-  var next = PlannerSyncRules.plannerApplySyncJournal(before, readPlannerSyncJournal_());
-  if(next.length === before.length) return;
-  state.syncOutbox = next;
-  try { rebuildDirtyStateFromOutbox_(); } catch(e){}
-}
 function acknowledgeSyncOutbox_(accepted, sentMutations, holdKeys){
   var ackVer = {};
   (accepted || []).forEach(function(item){
@@ -19260,8 +18351,6 @@ function acknowledgeSyncOutbox_(accepted, sentMutations, holdKeys){
   var filter = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerFilterAckedOutbox)
     ? PlannerSyncRules.plannerFilterAckedOutbox
     : null;
-  var beforeOps = (state.syncOutbox || []).slice();
-  if((acceptedForSent || []).length) plannerMarkBootHealthy_('first push accepted');
   if(filter){
     state.syncOutbox = filter(state.syncOutbox || [], {
       ack: ackVer,
@@ -19270,13 +18359,8 @@ function acknowledgeSyncOutbox_(accepted, sentMutations, holdKeys){
       isDeviceLocal: isDeviceLocalSyncEntityKey_
     });
   }
-  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerAcceptedUploadKeys){
-    try { rememberAcceptedUploadKeys_(PlannerSyncRules.plannerAcceptedUploadKeys(beforeOps, state.syncOutbox, ackVer)); } catch(eAcc){}
-  }
   rebuildDirtyStateFromOutbox_();
   _syncFastAckPending_ = false;
-  try { console.info('[대기열] 반영 후', describePendingSyncItems_().join(' | ') || '없음'); } catch(eLeft){}
-  try { recordConfirmedSyncJournal_(ackVer); } catch(eJournal){}
 }
 function rotateIdempotentOutbox_(accepted){
   var byId = {};
@@ -19300,27 +18384,16 @@ function acknowledgeSyncBatch_(accepted, sentMutations, conflicts){
   var holdKeys = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConflictHoldKeys)
     ? PlannerSyncRules.plannerConflictHoldKeys(conflicts)
     : {};
-  (accepted || []).forEach(function(item){
-    if(!item || !item.key || item.status === 'partial') return;
-    delete holdKeys[String(item.key)];
-    var rev = parseInt(item.entityRevision, 10) || 0;
-    if(!rev) return;
-    (state.syncOutbox || []).forEach(function(op){
-      if(op && op.key === item.key) op.baseEntityRevision = rev;
-    });
-  });
   if(!accepted){
     acknowledgeSyncOutbox_(null, sentMutations, holdKeys);
     return;
   }
-  var leaving = accepted.filter(function(item){ return item && item.status !== 'partial'; });
-  acknowledgeSyncOutbox_(leaving, sentMutations, holdKeys);
+  var ok = accepted.filter(function(item){ return !item || item.status !== 'idempotent'; });
+  rotateIdempotentOutbox_(accepted);
+  acknowledgeSyncOutbox_(ok, sentMutations, holdKeys);
 }
-function overlayOutboxOnPayload_(payload, opts){
-  var onlyKeys = opts && opts.onlyKeys;
-  var ops = (state.syncOutbox || []).filter(function(op){
-    return !onlyKeys || (op && onlyKeys[op.key]);
-  });
+function overlayOutboxOnPayload_(payload){
+  var ops = state.syncOutbox || [];
   // outbox 없으면 전체 payload deep clone 생략 (대용량 초안에서 부트스트랩 정지 원인)
   if(!ops.length) return payload || {};
   // 초안 본문 전체 JSON clone 금지 — 건드릴 컨테이너만 얕게 복사
@@ -19362,7 +18435,6 @@ function applyServerPayloadPreservingOutbox_(serverPayload, serverRevision){
   applyPersistPayload(merged, {
     skipRestorePending: true,
     authoritativeAdopt: true,
-    preserveOutbox: true,
     deferHeavyRepair: !!state._bootstrapDeferHeavy
   });
   try {
@@ -19444,7 +18516,6 @@ function outboxHasUserDraftUpload_(){
   return plannerOutboxHasTeamContent_();
 }
 function schedulePlannerGasPush_(immediate){
-  if(plannerSafeModeBlocksSync_()) return;
   if(!plannerSyncBootstrapReady_ || !state._bootstrapChoiceDone || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return;
   if(typeof shouldProtectComposeUi_ === 'function' && shouldProtectComposeUi_()){
     if(!plannerGasPushTimer){
@@ -19523,7 +18594,6 @@ function clearPlannerGasRetry_(){
   plannerLastSyncError_ = '';
 }
 function schedulePlannerGasRetry_(error){
-  if(plannerSafeModeBlocksSync_()) return;
   if(!hasPendingLocalSyncChanges_() || !plannerSyncBootstrapReady_ || plannerSyncConflictPending_) return;
   if(typeof navigator !== 'undefined' && navigator.onLine === false) return;
   if(plannerGasRetryTimer_) return;
@@ -19551,7 +18621,6 @@ function schedulePlannerGasRetry_(error){
   updateSyncStatusUI_();
 }
 async function plannerPullRemoteIntoStateCore_(){
-  if(plannerSafeModeBlocksSync_()) return false;
   var body = getPersistPayload();
   var fpBefore = plannerSyncFingerprint_(body);
   var remote = null;
@@ -19608,10 +18677,8 @@ function dropBulkOutboxUnlessChosen_(){
   return 0;
 }
 async function plannerGasPushNow_(){
-  if(plannerSafeModeBlocksSync_()) return { ok: false, skipped: true, safeMode: true };
   var url = getPlannerGasUrl_();
   if(!url || !plannerSyncBootstrapReady_ || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return { ok: false, skipped: true };
-  try { dropUntouchedPromptOutboxOps_(); } catch(ePromptDrop){}
   if(typeof PlannerSyncSupabase !== 'undefined' && PlannerSyncSupabase.configured()){
     state.syncProtocolVersion = 2;
   }
@@ -19631,8 +18698,9 @@ async function plannerGasPushNow_(){
     } catch(ePreStuck){}
     var skipPull = !!(state._generalUploadOnly || state._gapUploadActive);
     try {
-      // 보낼 것이 있는지만 본다. 묶음 전체를 미리 만들면(복제·해시) iOS에서 메모리가 두 배로 든다.
-      var prePatch = (hasSendableOutboxOps_() || Object.keys(state.syncDirtyEntityKeys || {}).length > 0) && (state.syncProtocolVersion || 1) >= 2;
+      var preBody = getPersistPayload();
+      var preMut = buildPendingSyncMutations_(preBody);
+      var prePatch = preMut.length > 0 && (state.syncProtocolVersion || 1) >= 2;
       if(prePatch) state.syncNeedsSnapshot = false;
       var locRev = parseInt(state.syncRevision, 10) || 0;
       var storedRev = readStoredSyncRev_(GAS_LAST_SYNC_REV_KEY);
@@ -19665,15 +18733,6 @@ async function plannerGasPushNow_(){
     ensurePlanRowStableIdsInPayload_(body);
     migrateIndexedPlanEntityKeysInPayload_(body, state.syncOutbox);
     var mutations = buildPendingSyncMutations_(body);
-    // 보류한 충돌 키만 남았으면 보낼 것이 없다. 빈 묶음이 전체 저장본 경로로 빠지면
-    // 서버가 거절하면서 「남은 N건」이 줄지 않고 오류 토스트만 반복된다.
-    if(!mutations.length && !state.syncNeedsSnapshot && (state.syncOutbox || []).length && !hasSendableOutboxOps_()){
-      clearPlannerGasRetry_();
-      _syncTransferStartedAt_ = 0;
-      try { clearDividedSaveToast_(); } catch(eHeldToast){}
-      try { updateSyncStatusUI_(); } catch(eHeldUi){}
-      return { ok: true, held: true };
-    }
     var requestDirtyGeneration = plannerDirtyGeneration_;
     var usePatch = mutations.length > 0 && state.syncProtocolVersion >= 2;
     if(usePatch) state.syncNeedsSnapshot = false;
@@ -19682,49 +18741,28 @@ async function plannerGasPushNow_(){
     var lastOkRevision = state.syncRevision;
     var outboxPrevRound = (state.syncOutbox || []).length;
     var outboxPrevStamp = syncOutboxProgressStamp_();
-    var prevLeftKeys = [];
-    var forceTailKeys = null;
     while(round < maxPatchRounds){
       round++;
-      if(round > 1 && (state.syncOutbox || []).length >= outboxPrevRound && syncOutboxProgressStamp_() === outboxPrevStamp && !forceTailKeys){
+      if(round > 1 && (state.syncOutbox || []).length >= outboxPrevRound && syncOutboxProgressStamp_() === outboxPrevStamp){
         break;
       }
       outboxPrevRound = (state.syncOutbox || []).length;
       outboxPrevStamp = syncOutboxProgressStamp_();
       if(round > 1){
         if(plannerSyncConflictPending_ || !state.syncDirty) break;
-        if(plannerSafeModeBlocksSync_()) break;
-        // 배치 사이에 메인 스레드를 비워 GC·렌더가 따라오게 한다
-        await plannerYieldToUi_(plannerIsMemoryTightDevice_() ? 40 : 0);
-        // 매 라운드 전체 payload를 다시 만들지 않는다. outbox가 남아 있으면 1라운드 body를 재사용한다.
-        if(!(state.syncOutbox || []).length){
-          body = getPersistPayload();
-          ensurePlanRowStableIdsInPayload_(body);
-          migrateIndexedPlanEntityKeysInPayload_(body, state.syncOutbox);
-        }
+        body = getPersistPayload();
         body.savedAt = new Date().toISOString();
-        try { dropUntouchedPromptOutboxOps_(); } catch(ePromptMid){}
-        mutations = buildPendingSyncMutations_(body, forceTailKeys);
-        forceTailKeys = null;
+        ensurePlanRowStableIdsInPayload_(body);
+        migrateIndexedPlanEntityKeysInPayload_(body, state.syncOutbox);
+        mutations = buildPendingSyncMutations_(body);
         if(!mutations.length || state.syncNeedsSnapshot || state.syncProtocolVersion < 2) break;
-        var eligibleOutbox = (state.syncOutbox || []).filter(function(op){
-          return op && !conflictKeyIsSnoozed_(op.key);
-        });
-        var leftKeys = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerKeysLeftBehind)
-          ? PlannerSyncRules.plannerKeysLeftBehind(eligibleOutbox, mutations)
-          : [];
-        if(leftKeys.length && PlannerSyncRules.plannerSameKeyList && PlannerSyncRules.plannerSameKeyList(prevLeftKeys, leftKeys)){
-          forceTailKeys = leftKeys.slice();
-        }
-        prevLeftKeys = leftKeys.slice();
-        var stillQueued = eligibleOutbox.length;
-        if(stillQueued > mutations.length && typeof setAppToast === 'function'){
+        if((state.syncOutbox || []).length > mutations.length && typeof setAppToast === 'function'){
           setAppToast(
-            '나눠 저장 중이에요. 남은 ' + stillQueued + '건…',
+            '나눠 저장 중이에요. 남은 ' +
+              Math.max(0, (state.syncOutbox || []).length - mutations.length) +
+              '건…',
             { duration: 2800, variant: 'ok' }
           );
-        } else {
-          clearDividedSaveToast_();
         }
       }
     noteSyncSending_(usePatch ? mutations.length : Math.max(1, countPendingSyncItems_()), !usePatch);
@@ -19984,7 +19022,7 @@ async function plannerGasPushNow_(){
     }
     break;
     }
-    if(hasSendableOutboxOps_() && !plannerSyncConflictPending_ && !state._generalUploadOnly && !state._gapUploadActive) schedulePlannerGasPush_(true);
+    if((state.syncOutbox || []).length && !plannerSyncConflictPending_ && !state._generalUploadOnly && !state._gapUploadActive) schedulePlannerGasPush_(true);
     return { ok: true, revision: lastOkRevision, batches: round };
   } catch(err) {
     console.warn('[GAS push]', err);
@@ -19998,8 +19036,6 @@ async function plannerGasPushNow_(){
     return { ok: false, error: err, slow: slow };
   } finally {
     clearSyncSending_();
-    // 나눠 저장 안내는 전송 중에만 맞는 말이다. 끝난 뒤에는 남기지 않는다.
-    try { if(!hasSendableOutboxOps_()) clearDividedSaveToast_(); } catch(eFinToast){}
     try { updateSyncStatusUI_(); } catch(eFinUi){}
   }
   });
@@ -20243,11 +19279,6 @@ function mergePlannerPayloads_(local, remote){
   else if(local.prompts != null) out.prompts = local.prompts;
   if(remote.chatgptOpenUrl && !local.chatgptOpenUrl) out.chatgptOpenUrl = remote.chatgptOpenUrl;
   else if(local.chatgptOpenUrl) out.chatgptOpenUrl = local.chatgptOpenUrl;
-  if(local.blogDefaultCategories || remote.blogDefaultCategories){
-    var localBlogCats = (local.blogDefaultCategories && typeof local.blogDefaultCategories === 'object') ? local.blogDefaultCategories : {};
-    var remoteBlogCats = (remote.blogDefaultCategories && typeof remote.blogDefaultCategories === 'object') ? remote.blogDefaultCategories : {};
-    out.blogDefaultCategories = Object.assign({}, preferRemote ? localBlogCats : remoteBlogCats, preferRemote ? remoteBlogCats : localBlogCats);
-  }
   if(remote.dailyAutoLast && (!local.dailyAutoLast || remote.dailyAutoLast > local.dailyAutoLast)) out.dailyAutoLast = remote.dailyAutoLast;
   else if(local.dailyAutoLast) out.dailyAutoLast = local.dailyAutoLast;
   if(local.branding || remote.branding){
@@ -20531,7 +19562,6 @@ function dropEmptyDefaultSyncMutations_(){
     var op = (state.syncOutbox || []).find(function(item){ return item && item.key === k; });
     var val = op ? op.value : (
       k === 'setting:chatgptOpenUrl' ? state.chatgptOpenUrl :
-      k === 'setting:blogDefaultCategories' ? state.blogDefaultCategories :
       k === 'setting:publishRecCurrentTabOnly' ? state.publishRecCurrentTabOnly :
       k === 'setting:syncRationalesOnBrandSave' ? state.syncRationalesOnBrandSave :
       undefined
@@ -20545,19 +19575,6 @@ function dropEmptyDefaultSyncMutations_(){
     try { rebuildDirtyStateFromOutbox_(); } catch(eDrop){}
   }
   return removed;
-}
-function seedSyncFieldBaseFromState_(){
-  // 기준값은 서버가 내려 준 값과 서버가 받아 준 저장만 채운다.
-  // 이 기기에만 있는 값은 기준값이 아니므로, 없으면 카드 전체를 보낸다.
-}
-function describePendingSyncItems_(){
-  return (state.syncOutbox || []).filter(function(op){
-    return op && op.key && !isDeviceLocalSyncEntityKey_(op.key) && !conflictKeyIsSnoozed_(op.key);
-  }).map(function(op){
-    var topic = '';
-    try { topic = pendingSyncValueTopic_(op.value) || ''; } catch(eTopic){}
-    return String(op.key) + (topic ? '(' + topic + ')' : '') + (op.deleted ? ' 삭제' : '');
-  });
 }
 function countPendingSyncItems_(){
   try { dropEmptyDefaultSyncMutations_(); } catch(eDropCnt){}
@@ -20628,8 +19645,6 @@ function formatSyncHeaderSub_(info){
   }
   if(info.phase === 'checking') return '서버 확인';
   if(info.phase === 'conflict') return '충돌 선택';
-  if(plannerSafeModeBlocksSync_()) return '안전 모드 · 대기 ' + (info.pendingCount || 0) + '건';
-  if(info.phase === 'held') return '선택 대기 ' + (info.heldCount || 0) + '건';
   if(info.phase === 'pull') return '받을 내용';
   if(info.phase === 'pending'){
     return left || '반영 대기';
@@ -20736,7 +19751,6 @@ function getSyncStatusInfo_(remoteMeta){
   var serverOn = isServerSyncConfigured_();
   var driveOn = hasDriveValidToken_();
   var pendingCount = countPendingSyncItems_();
-  var heldCount = countSnoozedHeldOps_();
   var localPending = hasPendingLocalSyncChanges_();
   var serverPending = serverOn && localPending;
   var drivePending = driveOn && localPending;
@@ -20772,10 +19786,6 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(remoteNewer && !serverPending && !drivePending){
     phase = 'pull';
     overall = 'pending';
-  } else if((serverPending || drivePending) && pendingCount === 0 && heldCount > 0){
-    // 남은 것이 전부 「나중에」로 보류한 충돌뿐이다. 올릴 대기가 아니라 사용자의 선택을 기다리는 상태.
-    phase = 'held';
-    overall = 'warn';
   } else if(serverPending || drivePending || (serverOn && !serverRev && localRev > 0 && pendingCount > 0)){
     phase = 'pending';
     overall = 'pending';
@@ -20852,9 +19862,6 @@ function getSyncStatusInfo_(remoteMeta){
     actionHint = state._surfaceUnmatched && !plannerOutboxHasTeamContent_()
       ? '빈 글이 더 긴 글을 지우지는 않습니다. 다음 저장 때 다시 맞춥니다.'
       : '자동으로 올라갑니다. 오래 멈추면 「동기화」→「지금 동기화」를 누르세요.';
-  } else if(phase === 'held'){
-    summary = '나중에 고르기로 한 충돌 ' + heldCount + '건이 있어요. 고르기 전에는 올라가지 않고, 이 기기 내용은 그대로 둡니다.';
-    actionHint = '화면을 새로고침하면 충돌 선택 창이 다시 열려요. 서버 내용과 이 기기 중 하나를 고르면 이어서 올라갑니다.';
   } else if(phase === 'warn'){
     if(loginRequired){
       summary = '팀 로그인이 필요합니다. 동기화 창에서 로그인한 뒤 Supabase 내용을 받습니다.';
@@ -20888,7 +19895,6 @@ function getSyncStatusInfo_(remoteMeta){
     queuedPush: queuedPush,
     phase: phase,
     pendingCount: pendingCount,
-    heldCount: heldCount,
     sendingNow: sendingNow,
     sendingSnapshot: sendingSnapshot,
     retryInSec: retryInSec,
@@ -21016,7 +20022,6 @@ function updateSyncStatusUI_(){
   btn.classList.add(info.overall);
   if(label) label.textContent = '동기화';
   if(sub) sub.textContent = formatSyncHeaderSub_(info);
-  if(info.overall === 'ok' || info.phase === 'held') clearDividedSaveToast_();
   btn.title = '동기화 및 설정\n' + info.summary +
     (info.actionHint ? '\n\n할 일: ' + info.actionHint : '');
   var generalUpBtn = document.getElementById('btn-sync-general-up');
@@ -21056,10 +20061,6 @@ window.plannerSupabaseSignInFromSync_ = async function(){
   }
   try {
     await PlannerSyncSupabase.signIn(email, password);
-    if(!isPlannerEmployeeEmailValid_(getPlannerEmployeeId_()) && isPlannerEmployeeEmailValid_(email)){
-      setPlannerEmployeeId_(email);
-    }
-    markNeverSyncedTopicOpsLocal_();
     if(passEl) passEl.value = '';
     if(typeof setAppToast === 'function') setAppToast('팀 로그인되었습니다. Supabase 내용을 확인합니다.', { duration: 2800, variant: 'ok' });
     state._teamLoginRequired = false;
@@ -21100,19 +20101,11 @@ function renderSyncStatusBodyHTML_(info){
       ? '개인 Claude API로 동작 중입니다. 서버 키를 쓰면 직원 브라우저에 키가 남지 않습니다.'
       : '서버 CLAUDE_API_KEY 또는 개인 API 키가 필요합니다.');
   var html = '<div class="sync-status-summary ' + (info.overall === 'ok' ? '' : info.overall) + '">' + escapeHtml(info.summary) + '</div>';
-  if(!state._fieldPatchProbed && typeof PlannerSyncSupabase !== 'undefined' && PlannerSyncSupabase.fieldPatchDisplay){
-    html += '<div class="sync-status-row-meta">칸 단위 저장은 이번 실행에서 서버를 확인한 뒤에 씁니다.' +
-      (PlannerSyncSupabase.fieldPatchDisplay() ? ' 지난번 표시는 지원이었습니다.' : '') + '</div>';
-  }
   if(info.actionHint){
     html += '<div class="sync-status-action-hint">' +
       '<strong>할 일</strong> ' + escapeHtml(info.actionHint) +
       '</div>';
   }
-
-  // 중복 카드 확인(지우지 않고 목록만)
-  html += '<div class="sync-status-action-hint"><button type="button" class="modal-btn sync-settings-mini-btn" onclick="openDuplicateCardsReview_()">중복 카드 확인</button> ' +
-    '<span style="font-size:12px;opacity:.75">날짜·채널·주제가 같은 카드 목록. 지우지 않아요.</span></div>';
 
   // 1. 사용자 이메일
   html += row(
@@ -21127,8 +20120,8 @@ function renderSyncStatusBodyHTML_(info){
   );
 
   // 2. 이 기기
-  var localBadge = info.transferring || info.phase === 'checking' ? 'syncing' : (info.phase === 'pending' || info.phase === 'queued' || info.phase === 'retry_wait' || info.phase === 'held' ? 'pending' : 'ok');
-  var localText = (info.phase === 'transferring' || info.phase === 'retry_wait' || info.phase === 'queued' || info.phase === 'pending' || info.phase === 'checking' || info.phase === 'held')
+  var localBadge = info.transferring || info.phase === 'checking' ? 'syncing' : (info.phase === 'pending' || info.phase === 'queued' || info.phase === 'retry_wait' ? 'pending' : 'ok');
+  var localText = (info.phase === 'transferring' || info.phase === 'retry_wait' || info.phase === 'queued' || info.phase === 'pending' || info.phase === 'checking')
     ? formatSyncHeaderSub_(info)
     : (info.pendingCount > 0 && (info.serverPending || info.drivePending)
       ? ('남은 ' + info.pendingCount + '건')
@@ -21499,7 +20492,6 @@ function reconcileBootstrapLight_(localPayload, remotePayload, remoteRevision){
   return reconcileLocalWithServerPayload_(localPayload, remotePayload, remoteRevision);
 }
 async function verifyPlannerServerReachable_(){
-  if(plannerSafeModeBlocksSync_()) throw new Error('안전 모드: 서버 동기화를 하지 않습니다.');
   if(!isPlannerEmployeeEmailValid_(getPlannerEmployeeId_())) throw new Error('직원 이메일을 입력해야 팀 데이터를 사용할 수 있어요.');
   var url = getPlannerGasUrl_();
   if(!url || location.protocol === 'file:') throw new Error('웹 배포 주소(https)에서 접속해야 서버 데이터를 확인할 수 있어요.');
@@ -21515,10 +20507,6 @@ function yieldPlannerBootstrapUi_(message){
   return new Promise(function(resolve){ setTimeout(resolve, 0); });
 }
 async function runPlannerBootstrapInBackground_(){
-  if(plannerSafeModeBlocksSync_()){
-    markCardLinkSyncSettled_();
-    return;
-  }
   try {
     if(!isPlannerEmployeeEmailValid_(getPlannerEmployeeId_())) return;
     if(state._bootstrapChoiceDone || plannerBootstrapChoicePending_) return;
@@ -21537,7 +20525,6 @@ async function runPlannerBootstrapInBackground_(){
       );
     }
     await yieldPlannerBootstrapUi_(null);
-    markNeverSyncedTopicOpsLocal_();
     discardStaleUnpushedBeforeConnect_();
     // 비교 전에 integrity를 돌리면 로컬만 바뀌어 F5마다 「선택」창이 뜸 → 비교 후에만 정리
     var bootstrapData = await verifyPlannerServerReachable_();
@@ -21557,20 +20544,12 @@ async function runPlannerBootstrapInBackground_(){
         save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
       } catch(eSupaSv){}
       try { renderTabs(); renderMain(); } catch(eSupaR){}
-      markNeverSyncedTopicOpsLocal_();
-      var allowEmptyTopicPush = !!(bootstrapData.emptyTable && pendingWorkIsNeverSyncedTopicsOnly_());
-      var wantBootPush = (!bootstrapData.emptyTable || allowEmptyTopicPush) && hasPendingLocalSyncChanges_();
-      // 첫 렌더 뒤에 복원 → 그다음에 올리기. 동시에 돌리면 iOS에서 메모리가 겹친다.
-      plannerRunAfterFirstPaint_(function(){
-        try { restoreOutboxTopicDraftsMissingLocally_(); } catch(eRest){}
-        if(!wantBootPush) return;
-        setTimeout(function(){
-          try { if(hasPendingLocalSyncChanges_()) schedulePlannerGasPush_(true); } catch(eSupaPush){}
-        }, plannerIsMemoryTightDevice_() ? 3000 : 800);
-      }, plannerIsMemoryTightDevice_() ? 2500 : 600);
+        if(!bootstrapData.emptyTable && hasPendingLocalSyncChanges_()){
+        try { schedulePlannerGasPush_(true); } catch(eSupaPush){}
+      }
       try { updateSyncStatusUI_(); } catch(eSupaU){}
       if(typeof setAppToast === 'function'){
-        setAppToast(bootstrapData.emptyTable && !allowEmptyTopicPush
+        setAppToast(bootstrapData.emptyTable
           ? 'Supabase에 아직 팀 내용이 없습니다. 이 브라우저의 내용은 올리지 않았습니다.'
           : (hasPendingLocalSyncChanges_()
             ? '이 기기에만 있는 주제를 서버로 올리는 중이에요. 올린 뒤 다른 기기가 받습니다.'
@@ -21616,9 +20595,7 @@ async function runPlannerBootstrapInBackground_(){
           save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
         } catch(eAdSv2){}
         try { renderTabs(); renderMain(); } catch(eAdR2){}
-        plannerRunAfterFirstPaint_(function(){
-          try { schedulePlannerGasPush_(true); } catch(eBootPush){}
-        }, plannerIsMemoryTightDevice_() ? 3000 : 400);
+        try { schedulePlannerGasPush_(true); } catch(eBootPush){}
         try { updateSyncStatusUI_(); } catch(eBootU){}
         if(typeof setAppToast === 'function'){
           setAppToast('Supabase 내용을 받은 뒤, 이 기기에서 고친 ' + sessionOps.length + '건을 올립니다…', { duration: 3600, variant: 'ok' });
@@ -21665,8 +20642,6 @@ async function runPlannerBootstrapInBackground_(){
         try { schedulePlannerGasPush_(true); } catch(ePushFail){}
       }
     }
-  } finally {
-    markCardLinkSyncSettled_();
   }
 }
 function summarizeBootstrapPayloadLite_(payload){
@@ -22211,7 +21186,7 @@ function openPlannerBootstrapSyncChoice_(local, remote, serverRevision){
       });
     });
   }
-  ['sync-bootstrap-overlay', 'api-modal', 'drive-oauth-busy', 'sync-status-overlay', 'sync-preview-overlay', 'draft-import-overlay'].forEach(function(id){
+  ['sync-bootstrap-overlay', 'api-modal', 'drive-oauth-busy', 'sync-status-overlay', 'sync-preview-overlay'].forEach(function(id){
     dismissPlannerOverlayOpenState_(id);
   });
   openScrollLockedOverlayEl_(document.getElementById('sync-bootstrap-choice-overlay'));
@@ -22413,10 +21388,6 @@ window.skipPlannerBootstrapChoiceKeepLocal_ = function(){
   updateSyncStatusUI_();
 };
 async function runPlannerBootstrapSync_(){
-  if(plannerSafeModeBlocksSync_()){
-    markCardLinkSyncSettled_();
-    return;
-  }
   if(plannerSyncBootstrapRunning_) return;
   plannerSyncBootstrapRunning_ = true;
   state._bootstrapDeferHeavy = true;
@@ -22456,11 +21427,7 @@ window.continuePlannerWithLocalData_ = function(){
   }
 };
 function openPlannerConflict_(local, remote, serverRevision){
-  try { dropUntouchedPromptOutboxOps_(); } catch(ePromptOpen){}
   var conflicts = detectPlannerEntityConflicts_(local, remote);
-  conflicts = (conflicts || []).filter(function(conflict){
-    return conflict && !conflictKeyIsSnoozed_(conflict.key);
-  });
   if(!conflicts.length) return false;
   // 1~5건은 대용량이어도 선택창. 예전엔 자동 유지→재전송이 같은 1건을 수십 분 반복함
   if(conflicts.length > 5){
@@ -22512,7 +21479,6 @@ function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts, opts
     if(!real.length){
       dropSkippableOutboxConflicts_(conflicts);
       plannerSyncConflictPending_ = null;
-      state._topicListGap = false;
       var ovEmpty = document.getElementById('sync-conflict-overlay');
       closeScrollLockedOverlayEl_(ovEmpty);
       if(!plannerSyncBootstrapReady_) plannerSyncBootstrapReady_ = true;
@@ -22573,11 +21539,9 @@ function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts, opts
       }
       return;
     }
-    if(opts.fromUser) narrowKeptConflictLocals_(real);
     forceOutboxOverwriteBase_(real);
     state.syncDirty = true;
     plannerSyncConflictPending_ = null;
-    state._topicListGap = false;
     var ov = document.getElementById('sync-conflict-overlay');
     closeScrollLockedOverlayEl_(ov);
     if(!plannerSyncBootstrapReady_) plannerSyncBootstrapReady_ = true;
@@ -22595,152 +21559,9 @@ function keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts, opts
 function autoResolveConflictsKeepLocal_(local, remote, serverRevision, conflicts){
   keepLocalConflictsWithoutMerge_(remote, serverRevision, conflicts);
 }
-/** 충돌한 두 값에서 어느 칸이 다른지. 비교에서 무시하는 시각 필드·빈 칸·줄 끝 공백은 뺀다. */
-var CONFLICT_FIELD_LABELS_ = {
-  title: '제목', importTitle: '제목', headline: '제목',
-  draft: '본문', body: '본문', explanation: '본문', problem: '본문', selfCare: '본문', caption: '본문', text: '본문',
-  hook: '본문', empathyLead: '본문', empathyBullets: '본문', comment: '댓글', cta: '본문', finalText: '본문',
-  status: '상태', state: '상태', publishState: '상태', published: '상태',
-  scheduledDate: '날짜', scheduledAt: '날짜', date: '날짜', publishedAt: '날짜', activityAt: '날짜', createdAt: '날짜', plannedDate: '날짜',
-  topic: '주제', angle: '각도', series: '시리즈', pillar: '필러', roadmapStepId: '단계', step: '단계',
-  collab: '공동작업', account: '계정', sourceNote: '메모', rationale: '이유', writingBrief: '작성 메모'
-};
-var CONFLICT_CHANNEL_LABELS_ = { blog: '블로그', insta: '인스타', instagram: '인스타', threads: '쓰레드', news: '소식', community: '커뮤니티' };
-function conflictDiffFields_(localVal, remoteVal){
-  function flatten(v){
-    var out = {};
-    (function walk(x, path){
-      if(x === undefined || x === null) return;
-      if(typeof x === 'object'){
-        Object.keys(x).forEach(function(k){ walk(x[k], path ? path + '.' + k : k); });
-        return;
-      }
-      out[path] = String(x);
-    })(stripSyncVolatileForCompare_(unwrapSyncEntityValue_(v)), '');
-    return out;
-  }
-  var l = flatten(localVal), r = flatten(remoteVal);
-  var paths = {};
-  Object.keys(l).concat(Object.keys(r)).forEach(function(k){ if(l[k] !== r[k]) paths[k] = true; });
-  var labels = [];
-  Object.keys(paths).forEach(function(path){
-    var parts = path.split('.');
-    var leaf = parts[parts.length - 1];
-    if(/^\d+$/.test(leaf) && parts.length > 1) leaf = parts[parts.length - 2];
-    var field = CONFLICT_FIELD_LABELS_[leaf] || leaf;
-    var channel = '';
-    for(var i = 0; i < parts.length - 1; i++){
-      if(CONFLICT_CHANNEL_LABELS_[parts[i]]){ channel = CONFLICT_CHANNEL_LABELS_[parts[i]]; break; }
-    }
-    var label = (channel && field !== '날짜' ? channel + ' ' : '') + field;
-    if(labels.indexOf(label) < 0) labels.push(label);
-  });
-  return labels;
-}
-function assignNarrowedCard_(id, key, narrowed){
-  var pub = state.published && state.published[id];
-  var gen = state.generatedOnly && state.generatedOnly[id];
-  var shared = !!(pub && gen && pub.content && pub.content === gen);
-  if(key.indexOf('published:') === 0){
-    if(!state.published) state.published = {};
-    state.published[id] = narrowed;
-    if(shared && narrowed && narrowed.content) state.generatedOnly[id] = narrowed.content;
-  } else {
-    if(!state.generatedOnly) state.generatedOnly = {};
-    state.generatedOnly[id] = narrowed;
-    if(shared && state.published && state.published[id]) state.published[id].content = narrowed;
-  }
-  return shared;
-}
-function conflictTouchLists_(key){
-  var id = String(key || '').slice(String(key || '').indexOf(':') + 1);
-  var paths = [];
-  var cleared = [];
-  ['published:' + id, 'generated:' + id].forEach(function(one){
-    var op = typeof findOutboxOp_ === 'function' ? findOutboxOp_(one) : null;
-    paths = paths.concat((op && op.devicePaths) || []);
-    paths = paths.concat((state._sheetEditedPaths && state._sheetEditedPaths[one]) || []);
-    cleared = cleared.concat((op && op.clearedPaths) || []);
-    cleared = cleared.concat((state._clearedPaths && state._clearedPaths[one]) || []);
-  });
-  return { paths: paths, cleared: cleared };
-}
-function narrowKeptConflictLocals_(conflicts){
-  if(typeof PlannerFieldSync === 'undefined') return;
-  var done = {};
-  (conflicts || []).forEach(function(conflict){
-    var key = String(conflict && conflict.key || '');
-    if(key.indexOf('published:') !== 0 && key.indexOf('generated:') !== 0) return;
-    if(!conflict.remote) return;
-    var id = key.slice(key.indexOf(':') + 1);
-    if(done[id]) return;
-    var touch = conflictTouchLists_(key);
-    var narrowed = PlannerFieldSync.overlayDeviceEdits
-      ? PlannerFieldSync.overlayDeviceEdits(conflict.remote, conflict.local, key, touch.paths, touch.cleared)
-      : PlannerFieldSync.mergeChangedOntoBase(conflict.remote, conflict.local, key, touch.paths, touch.cleared);
-    if(!narrowed) return;
-    var shared = assignNarrowedCard_(id, key, narrowed);
-    (conflicts || []).forEach(function(other){
-      if(!other) return;
-      if(other.key === 'published:' + id && state.published && state.published[id]) other.local = state.published[id];
-      if(other.key === 'generated:' + id && state.generatedOnly && state.generatedOnly[id]) other.local = state.generatedOnly[id];
-    });
-    (state.syncOutbox || []).forEach(function(op){
-      if(!op) return;
-      var opId = String(op.key || '').slice(String(op.key || '').indexOf(':') + 1);
-      if(opId !== id) return;
-      if(op.key.indexOf('published:') !== 0 && op.key.indexOf('generated:') !== 0) return;
-      var live = op.key.indexOf('published:') === 0 ? state.published[id] : state.generatedOnly[id];
-      if(!live) return;
-      var remote = null;
-      (conflicts || []).forEach(function(other){
-        if(other && other.key === op.key) remote = other.remote;
-      });
-      if(!remote && state.syncFieldBase) remote = state.syncFieldBase[op.key];
-      op.value = cloneSyncValue_(live);
-      op.fieldPatch = remote ? PlannerFieldSync.buildFieldPatch(remote, live, op.key, state._clearedPaths && state._clearedPaths[op.key]) : null;
-    });
-    if(shared) done[id] = true;
-  });
-}
-function conflictOnlyPaths_(conflict){
-  if(conflict && Array.isArray(conflict.devicePaths)) return conflict.devicePaths;
-  if(conflict && conflict.remainingPaths && conflict.remainingPaths.length) return conflict.remainingPaths;
-  return null;
-}
-function conflictFieldCompareHTML_(conflict){
-  if(typeof PlannerFieldSync === 'undefined') return '';
-  var key = String(conflict && conflict.key || '');
-  if(key.indexOf('published:') !== 0 && key.indexOf('generated:') !== 0) return '';
-  var only = conflictOnlyPaths_(conflict);
-  var rows = [];
-  try { rows = PlannerFieldSync.describeDiff(conflict.local, conflict.remote, key, only); } catch(eDiff){ rows = []; }
-  if(!rows.length) return '';
-  return '<div class="sync-conflict-fields" style="font-size:12px;line-height:1.45;margin:6px 0">' +
-    rows.slice(0, 8).map(function(row){
-      return '<div style="margin:4px 0"><b>' + escapeHtml(row.path) + '</b><br>이 기기: ' + escapeHtml(row.local || '(빈 칸)') +
-        '<br>서버: ' + escapeHtml(row.remote || '(빈 칸)') + '</div>';
-    }).join('') +
-    (rows.length > 8 ? '<div>외 ' + (rows.length - 8) + '칸</div>' : '') +
-    '<div style="color:#6B7280">이 기기를 고르면 위에 보인 칸만 이 기기 값으로 두고, 나머지 칸은 서버 값을 유지합니다.</div></div>';
-}
-function conflictDiffLineHTML_(conflict){
-  var labels = [];
-  var only = conflictOnlyPaths_(conflict);
-  if(only && typeof PlannerFieldSync !== 'undefined'){
-    try {
-      labels = PlannerFieldSync.describeDiff(conflict.local, conflict.remote, conflict.key, only).map(function(row){ return row.path; });
-    } catch(eLeft){ labels = []; }
-  } else if(!only) {
-    try { labels = conflictDiffFields_(conflict.local, conflict.remote); } catch(eDiff){ labels = []; }
-  }
-  if(!labels.length) return '';
-  var shown = labels.slice(0, 8).join(', ') + (labels.length > 8 ? ' 외 ' + (labels.length - 8) + '칸' : '');
-  return '<div class="sync-conflict-diff" style="font-size:12px;color:#92400E;margin:4px 0">다른 칸: <strong>' + escapeHtml(shown) + '</strong></div>';
-}
 function renderPlannerConflictUi_(pending){
   // 다른 오버레이가 클릭을 가로채지 못하게 전부 닫음 (스크롤 잠금도 함께 해제)
-  ['sync-bootstrap-overlay', 'api-modal', 'drive-oauth-busy', 'sync-status-overlay', 'sync-preview-overlay', 'sync-bootstrap-choice-overlay', 'draft-import-overlay'].forEach(function(id){
+  ['sync-bootstrap-overlay', 'api-modal', 'drive-oauth-busy', 'sync-status-overlay', 'sync-preview-overlay', 'sync-bootstrap-choice-overlay'].forEach(function(id){
     dismissPlannerOverlayOpenState_(id);
   });
   var list = document.getElementById('sync-conflict-list');
@@ -22750,20 +21571,7 @@ function renderPlannerConflictUi_(pending){
     var hidden = Math.max(0, (pending.conflicts || []).length - conflicts.length);
     var remoteBy = remote.lastModifiedBy ? ' · ' + remote.lastModifiedBy : '';
     var localBy = getPlannerEmployeeId_() ? ' · ' + getPlannerEmployeeId_() : '';
-    var groups = (typeof PlannerFieldSync !== 'undefined' && PlannerFieldSync.collapseSharedConflicts)
-      ? PlannerFieldSync.collapseSharedConflicts(conflicts.map(function(conflict){
-          var only = conflictOnlyPaths_(conflict);
-          var paths = [];
-          if(only && only.length) paths = only.slice();
-          else {
-            try { paths = conflictDiffFields_(conflict.local, conflict.remote); } catch(ePaths){ paths = []; }
-          }
-          return { key: conflict.key, paths: paths };
-        }))
-      : conflicts.map(function(conflict, i){ return { indexes: [i], key: conflict.key, label: plannerConflictLabel_(conflict.key) }; });
-    var html = groups.map(function(group){
-      var i = group.indexes[0];
-      var conflict = conflicts[i];
+    var html = conflicts.map(function(conflict, i){
       var key = String(conflict.key || '');
       var preferLocal = (key.indexOf('generated:') === 0 || key.indexOf('published:') === 0) &&
         hasUsableAiDraftContent_(unwrapSyncEntityValue_(conflict.local)) &&
@@ -22774,7 +21582,7 @@ function renderPlannerConflictUi_(pending){
         ? '<div class="sync-conflict-name-sub" style="font-size:11px;color:#B45309;margin-top:4px;">이 기기 초안 본문이 있어요. 「이 기기」 권장.</div>'
         : '';
       return '<div class="sync-conflict-item">' +
-        '<div class="sync-conflict-name">' + escapeHtml(group.label || plannerConflictLabel_(conflict.key)) + '</div>' + conflictDiffLineHTML_(conflict) + conflictFieldCompareHTML_(conflict) + hint +
+        '<div class="sync-conflict-name">' + escapeHtml(plannerConflictLabel_(conflict.key)) + '</div>' + hint +
         '<div class="sync-conflict-options">' +
           '<label class="sync-conflict-option"><input type="radio" name="sync-conflict-' + i + '" value="remote"' + remoteChecked + '>' +
             '<span><strong>서버 기준' + escapeHtml(remoteBy) + '</strong><span class="sync-conflict-preview">' + escapeHtml(plannerConflictPreview_(conflict.remote)) + '</span></span></label>' +
@@ -22817,31 +21625,7 @@ function bindPlannerConflictButtons_(){
       applyAllConflictsKeepLocal_();
     }, true);
   }
-  var laterBtn = document.getElementById('sync-conflict-later');
-  if(laterBtn && !laterBtn._boundConflictLater){
-    laterBtn._boundConflictLater = true;
-    laterBtn.addEventListener('click', function(ev){
-      ev.preventDefault();
-      ev.stopPropagation();
-      dismissPlannerConflictForLater_();
-    }, true);
-  }
 }
-window.dismissPlannerConflictForLater_ = function(){
-  var pending = plannerSyncConflictPending_;
-  var keys = pending && pending.conflicts ? pending.conflicts : [];
-  if(!state._conflictSnoozeKeys) state._conflictSnoozeKeys = {};
-  keys.forEach(function(conflict){
-    if(conflict && conflict.key) state._conflictSnoozeKeys[String(conflict.key)] = true;
-  });
-  plannerSyncConflictPending_ = null;
-  var overlay = document.getElementById('sync-conflict-overlay');
-  closeScrollLockedOverlayEl_(overlay);
-  if(typeof setAppToast === 'function'){
-    setAppToast('이 충돌은 나중에 다시 고를 수 있어요. 원고는 그대로 둡니다.', { duration: 3600, variant: 'ok' });
-  }
-  if(hasPendingLocalSyncChanges_() && !plannerSyncConflictPending_) schedulePlannerGasPush_(true);
-};
 window.applyAllConflictsKeepLocal_ = function(){
   var pending = plannerSyncConflictPending_;
   if(!pending){
@@ -22923,7 +21707,7 @@ function copyMissingContentChannels_(intoVal, fromVal){
 }
 function blogTitleOfContent_(content){
   if(!content || !content.blog) return '';
-  return stripClinicBlogTitlePrefix_(content.blog.title);
+  return String(content.blog.title || '').trim();
 }
 function alignDraftTopicToBlogTitle_(){
   // 블로그 제목으로 카드 주제를 바꾸면, 초안 생성 직후 다른 글이 생긴 것처럼 보인다.
@@ -22977,7 +21761,6 @@ function settleContentConflictsByLatest_(conflicts){
   return { upload: upload.length, kept: kept, rest: rest };
 }
 function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
-  try { dropUntouchedPromptOutboxOps_(); } catch(ePromptOpen){}
   var localPayload = getPersistPayload();
   var localEntities = collectSyncEntities_(localPayload, { skipEnsureIds: true });
   var outboxByKey = {};
@@ -22993,74 +21776,12 @@ function openPlannerOutboxConflict_(serverConflicts, remote, serverRevision){
       remoteAt: conflict.serverUpdatedAt || '',
       serverDeleted: !!conflict.serverDeleted,
       serverEntityRevision: parseInt(conflict.serverEntityRevision, 10) || 0,
-      remainingPaths: conflict.remainingPaths || [],
-      appliedPaths: conflict.appliedPaths || [],
-      opDevicePaths: (op && op.devicePaths) || [],
-      opClearedPaths: (op && op.clearedPaths) || [],
       mutationId: conflict.mutationId || (op && op.mutationId) || '',
       version: parseInt(conflict.version, 10) || (op && parseInt(op.version, 10)) || 1
     };
   }).filter(function(conflict){
-    if(!conflict || conflictKeyIsSnoozed_(conflict.key)) return false;
-    if(isPromptSyncKey_(conflict.key) && promptConflictAction_(conflict.key, conflict.local, conflict.remote, findOutboxOp_(conflict.key)) !== 'ask') return false;
     return !shouldSkipPlannerConflict_(conflict.key, conflict.local, conflict.remote);
   });
-  var kept = [];
-  var droppedUnedited = false;
-  var narrowedAny = false;
-  conflicts.forEach(function(conflict){
-    var key = String(conflict && conflict.key || '');
-    var contentKey = key.indexOf('published:') === 0 || key.indexOf('generated:') === 0;
-    if(!contentKey || !conflict.remote || typeof PlannerFieldSync === 'undefined' || !PlannerFieldSync.planConflictAction){
-      kept.push(conflict);
-      return;
-    }
-    var localSnap = cloneSyncValue_(conflict.local);
-    var remoteSnap = cloneSyncValue_(conflict.remote);
-    var touch = conflictTouchLists_(key);
-    var base = state.syncFieldBase && state.syncFieldBase[key];
-    var plan = PlannerFieldSync.planConflictAction({
-      base: base,
-      local: localSnap,
-      server: remoteSnap,
-      key: key,
-      devicePaths: touch.paths,
-      sheetPaths: [],
-      clearedPaths: touch.cleared
-    });
-    if(plan.action === 'ask' && !plan.showPaths){
-      kept.push(conflict);
-      return;
-    }
-    conflict.local = plan.value;
-    if(plan.showPaths) conflict.devicePaths = plan.showPaths;
-    var id = key.slice(key.indexOf(':') + 1);
-    assignNarrowedCard_(id, key, plan.value);
-    narrowedAny = true;
-    (state.syncOutbox || []).forEach(function(opRow){
-      if(opRow && opRow.key === key) opRow.value = cloneSyncValue_(plan.value);
-    });
-    if(plan.keepOutbox){
-      kept.push(conflict);
-      return;
-    }
-    if(typeof rememberSyncFieldBase_ === 'function') rememberSyncFieldBase_(key, remoteSnap);
-    var rev = parseInt(conflict.serverEntityRevision, 10) || 0;
-    if(rev){
-      if(!state.syncEntityRevisions) state.syncEntityRevisions = {};
-      state.syncEntityRevisions[key] = rev;
-    }
-    state.syncOutbox = (state.syncOutbox || []).filter(function(op){ return !(op && op.key === key); });
-    if(state.syncDirtyEntityKeys) delete state.syncDirtyEntityKeys[key];
-    droppedUnedited = true;
-  });
-  if(droppedUnedited){
-    try { rebuildDirtyStateFromOutbox_(); } catch(eDrop){}
-  }
-  conflicts = kept;
-  if(narrowedAny){
-    try { save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true }); } catch(eAdopt){}
-  }
   if(!conflicts.length) return false;
   plannerSyncConflictPending_ = {
     mode: 'outbox',
@@ -23118,9 +21839,8 @@ function applyMixedConflictChoices_(choices, snap){
   if(localChoices.length) forceOutboxOverwriteBase_(localChoices);
   try { rebuildDirtyStateFromOutbox_(); } catch(eMix){}
   if(!plannerSyncBootstrapReady_) plannerSyncBootstrapReady_ = true;
-  state._topicListGap = false;
   state.syncDirty = hasPendingLocalSyncChanges_();
-  save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
+  save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
 }
 /** @deprecated dropSkippableOutboxConflicts_ 사용 */
 function bumpOutboxBaseForSkippedConflicts_(serverConflicts){
@@ -23143,22 +21863,7 @@ window.applyPlannerConflictChoices_ = async function(){
 
   // 라디오 선택을 모달 DOM이 사라지기 전에 스냅샷
   var choices = (pending.conflicts || []).map(function(conflict, i){
-    var owner = i;
-    if(typeof PlannerFieldSync !== 'undefined' && PlannerFieldSync.collapseSharedConflicts){
-      var groups = PlannerFieldSync.collapseSharedConflicts((pending.conflicts || []).map(function(row){
-        var only = conflictOnlyPaths_(row);
-        var paths = [];
-        if(only && only.length) paths = only.slice();
-        else {
-          try { paths = conflictDiffFields_(row.local, row.remote); } catch(eChoicePaths){ paths = []; }
-        }
-        return { key: row.key, paths: paths };
-      }));
-      groups.forEach(function(group){
-        if(group.indexes.indexOf(i) >= 0) owner = group.indexes[0];
-      });
-    }
-    var picked = document.querySelector('input[name="sync-conflict-' + owner + '"]:checked');
+    var picked = document.querySelector('input[name="sync-conflict-' + i + '"]:checked');
     var useLocal = pending._forceAllLocal || !picked || picked.value === 'local';
     return { conflict: conflict, useLocal: useLocal };
   });
@@ -24023,9 +22728,6 @@ function collectExtraDrafts(){
         activityAt: d.activityAt || '',
         publishedChannels: d.publishedChannels || [],
         sourceNote: d.sourceNote,
-        collab: d.collab,
-        importDrawerSettled: d.importDrawerSettled,
-        drawerUserPlaced: d.drawerUserPlaced,
         youtubeAnalysis: d.youtubeAnalysis,
         youtubeUrls: d.youtubeUrls,
         articleFlow: d.articleFlow,
@@ -24038,9 +22740,7 @@ function collectExtraDrafts(){
         articleKind: d.articleKind,
         previousRoadmapStepId: d.previousRoadmapStepId,
         previousSeries: d.previousSeries,
-        miscLocked: d.miscLocked,
-        reviewHold: d.reviewHold ? true : undefined,
-        programCatId: d.programCatId != null ? d.programCatId : undefined
+        miscLocked: d.miscLocked
       });
     });
   });
@@ -24079,12 +22779,7 @@ function mergeExtraDrafts(byCat){
       if(d.dailyWho) merged.dailyWho = d.dailyWho;
       if(d.dailyWhat) merged.dailyWhat = d.dailyWhat;
       if(d.dailyBody) merged.dailyBody = d.dailyBody;
-      if(Array.isArray(d.collab) && d.collab.length) merged.collab = d.collab.slice();
       if(d.miscLocked) merged.miscLocked = true;
-      if(d.reviewHold) merged.reviewHold = true;
-      if(d.programCatId != null) merged.programCatId = d.programCatId;
-      if(d.importDrawerSettled) merged.importDrawerSettled = true;
-      if(d.drawerUserPlaced) merged.drawerUserPlaced = true;
       if(merged && !merged.previousRoadmapStepId) delete merged.previousRoadmapStepId;
       if(merged && !merged.previousSeries) delete merged.previousSeries;
       // 이미 단계가 있으면 재배정하지 않음 — 매 동기화 apply마다 updatedAt이 바뀌어 재전송 루프가 생김
@@ -24129,17 +22824,6 @@ function ensureSyncedContentDraftCards_(){
       var cat = CATEGORIES[catId];
       if(!cat) return;
       if(!cat.drafts) cat.drafts = [];
-      // 다른 기기가 같은 원고를 다른 id로 올렸으면, 서버 내용만으로 같은 카드를 또 만들지 않는다.
-      // 내용은 지우지 않고 그대로 두며, 중복 확인 화면에 「카드 없이 남은 원고」로 보인다.
-      var sameWork = findLiveCardWithSameWork_(catId, id, topic, content);
-      if(sameWork){
-        if(!state._dupPlaceholderSkipped) state._dupPlaceholderSkipped = {};
-        if(!state._dupPlaceholderSkipped[id]){
-          state._dupPlaceholderSkipped[id] = { id: id, topic: topic || '', existingId: sameWork.id, catId: catId };
-          try { console.info('[중복 카드 생성 막음]', JSON.stringify(state._dupPlaceholderSkipped[id])); } catch(eLogSkip){}
-        }
-        return;
-      }
       cat.drafts.push({
         id: id,
         topic: topic || '가져온 주제',
@@ -24271,15 +22955,8 @@ function applyPersistPayload(s, opts){
     }
   }
   state.chatgptOpenUrl = s.chatgptOpenUrl || '';
-  if(Object.prototype.hasOwnProperty.call(s, 'blogDefaultCategories') && s.blogDefaultCategories && typeof s.blogDefaultCategories === 'object'){
-    state.blogDefaultCategories = Object.assign({}, s.blogDefaultCategories);
-    try { localStorage.setItem('ht_blog_default_cat_v1', JSON.stringify(state.blogDefaultCategories)); } catch(eBlogCat){}
-  }
   state.prompts = s.prompts !== undefined ? s.prompts : null;
   state.promptsUpdatedAt = s.promptsUpdatedAt || '';
-  if(s.promptUserEditedKeys && typeof s.promptUserEditedKeys === 'object'){
-    state.promptUserEditedKeys = Object.assign({}, state.promptUserEditedKeys || {}, s.promptUserEditedKeys);
-  }
   state.promptRefineMilestones = s.promptRefineMilestones || {};
   state.branding = s.branding && typeof s.branding === 'object' ? s.branding : null;
   state.draftBrandOverrides = s.draftBrandOverrides && typeof s.draftBrandOverrides === 'object' ? s.draftBrandOverrides : {};
@@ -24321,8 +22998,6 @@ function applyPersistPayload(s, opts){
   if(fastBoot){
     state._pendingHeavyRepair = true;
     state._pendingBootMigrations = true;
-    try { if(applyClinicTitleAndImportDrawerRepair_()) state._clinicRepairNeedsSave = true; } catch(eClinicFast){}
-    try { seedSyncFieldBaseFromState_(); } catch(eSeedBase){}
     return;
   }
   var migOpts = opts && opts.authoritativeAdopt
@@ -24366,37 +23041,26 @@ function applyPersistPayload(s, opts){
     state._pendingHeavyRepair = true;
   }
   if(migrateLegacyPublishTabPublished_()) migrated = true;
-  var promptMigrated = false;
-  if(migrateLegacyBaseAffiliationPrompt_()) promptMigrated = true;
-  if(migrateLegacyExpertCoursePrompts_()) promptMigrated = true;
-  if(migrateRealMovementExpertBlogPrompt_()) promptMigrated = true;
-  if(migrateUniversalContentFlowPrompts_()) promptMigrated = true;
-  if(migrateSpeechStylePromptDefaults_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
-  if(migrateHospitalGuidanceOnceInSelfCare_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
-  if(migrateAntiAiPainSafetyPrompts_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
-  if(migratePlainDraftSentencePrompts_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
-  if(migrateBlogPlainReadabilityPrompts_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
-  if(migrateMangoImagePromptDefaults_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
-  if(migrateDraftShapePrompts_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
-  if(migrateVoiceCorePrompts_()){ promptMigrated = true; touchPromptsUpdatedAt_(); }
-  if(promptMigrated){
-    try { dropUntouchedPromptOutboxOps_(); } catch(ePromptMig){}
-    if(!migrated){
-      try {
-        save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
-      } catch(ePromptSave){}
-    }
-  }
+  if(migrateLegacyBaseAffiliationPrompt_()) migrated = true;
+  if(migrateLegacyExpertCoursePrompts_()) migrated = true;
+  if(migrateRealMovementExpertBlogPrompt_()) migrated = true;
+  if(migrateUniversalContentFlowPrompts_()) migrated = true;
+  if(migrateSpeechStylePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateHospitalGuidanceOnceInSelfCare_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateAntiAiPainSafetyPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migratePlainDraftSentencePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateBlogPlainReadabilityPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateDraftShapePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateVoiceCorePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
   if(migrated){
     var desktopReceiveOnly = isPlannerDesktopBrowser_() && !state._sessionUserEdit;
     if(opts && opts.authoritativeAdopt){
       state._postAdoptMigration = true;
       state.syncNeedsSnapshot = false;
-      if(!(opts && opts.preserveOutbox)){
-        state.syncDirty = false;
-        state.syncDirtyEntityKeys = {};
-        state.syncOutbox = [];
-      }
+      state.syncDirty = false;
+      state.syncDirtyEntityKeys = {};
+      state.syncOutbox = [];
     } else if(desktopReceiveOnly){
       state._postAdoptMigration = true;
       keepPlannerTeamOutbox_();
@@ -24406,11 +23070,6 @@ function applyPersistPayload(s, opts){
     }
     state._applyMigrated = true;
     save(migOpts);
-  }
-  if(!state._deferClinicRepair && applyClinicTitleAndImportDrawerRepair_()){
-    try {
-      save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
-    } catch(eClinicSave){}
   }
 }
 function runDeferredHeavyPlanRepairs_(){
@@ -25043,7 +23702,6 @@ function save(opts) {
     if(!desktopAuto && (changedEntities.length || contentChanged)) state.syncDirty = true;
     if(!desktopAuto) changedEntities.forEach(function(key){ state.syncDirtyEntityKeys[key] = true; });
     if(!desktopAuto) enqueueSyncOutboxChanges_(changedEntities, getPersistPayload());
-    state._promptUserEditedPending = false;
     if(untrackedChanged && !desktopAuto) state.syncNeedsSnapshot = true;
     if(!desktopAuto) rebuildDirtyStateFromOutbox_();
     if(untrackedChanged && !desktopAuto) state.syncDirty = true;
@@ -25100,7 +23758,6 @@ let driveUploadTimer = null;
 let promptCloudSaveTimer = null;
 
 function loadGsiScript(){
-  if(plannerSafeModeBlocksSync_()) return Promise.reject(new Error('안전 모드: 외부 로그인 스크립트를 불러오지 않습니다.'));
   if(window.google && google.accounts && google.accounts.oauth2) return Promise.resolve();
   if(window.__htGsiLoadPromise) return window.__htGsiLoadPromise;
   window.__htGsiLoadPromise = new Promise(function(resolve, reject){
@@ -25664,7 +24321,6 @@ async function driveUploadNow(){
   });
 }
 function scheduleDriveUpload(immediate){
-  if(plannerSafeModeBlocksSync_()) return;
   if(!plannerSyncBootstrapReady_ || plannerSyncConflictPending_) return;
   try {
     if(!hasDriveValidToken_()) return;
@@ -25901,8 +24557,6 @@ function stripGeneratedContentBodiesInPayload_(payload){
   return n;
 }
 function runDeferredBootMigrations_(){
-  // 안전 모드: 부팅 이관도 로컬 데이터를 바꾸므로 건너뛴다(대기열·초안 보존)
-  if(plannerSafeModeBlocksSync_()) return;
   if(!state._pendingBootMigrations) return;
   state._pendingBootMigrations = false;
   try {
@@ -25931,32 +24585,24 @@ function runDeferredBootMigrations_(){
       migrated = true;
     }
     if(migrateLegacyPublishTabPublished_()) migrated = true;
-    if(migrateLegacyBaseAffiliationPrompt_()) touchPromptsUpdatedAt_();
-    if(migrateLegacyExpertCoursePrompts_()) touchPromptsUpdatedAt_();
-    if(migrateRealMovementExpertBlogPrompt_()) touchPromptsUpdatedAt_();
-    if(migrateUniversalContentFlowPrompts_()) touchPromptsUpdatedAt_();
-    if(migrateSpeechStylePromptDefaults_()) touchPromptsUpdatedAt_();
-    if(migrateHospitalGuidanceOnceInSelfCare_()) touchPromptsUpdatedAt_();
-    if(migrateAntiAiPainSafetyPrompts_()) touchPromptsUpdatedAt_();
-    if(migratePlainDraftSentencePrompts_()) touchPromptsUpdatedAt_();
-    if(migrateBlogPlainReadabilityPrompts_()) touchPromptsUpdatedAt_();
-    if(migrateMangoImagePromptDefaults_()) touchPromptsUpdatedAt_();
-    if(migrateDraftShapePrompts_()) touchPromptsUpdatedAt_();
-    if(migrateVoiceCorePrompts_()) touchPromptsUpdatedAt_();
-    try { dropUntouchedPromptOutboxOps_(); } catch(ePromptBoot){}
-    var clinicMoved = false;
-    if(applyClinicTitleAndImportDrawerRepair_() || state._clinicRepairNeedsSave){
-      clinicMoved = true;
-      state._clinicRepairNeedsSave = false;
-    }
+    if(migrateLegacyBaseAffiliationPrompt_()) migrated = true;
+    if(migrateLegacyExpertCoursePrompts_()) migrated = true;
+  if(migrateRealMovementExpertBlogPrompt_()) migrated = true;
+    if(migrateUniversalContentFlowPrompts_()) migrated = true;
+    if(migrateSpeechStylePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
+    if(migrateHospitalGuidanceOnceInSelfCare_()){ migrated = true; touchPromptsUpdatedAt_(); }
+    if(migrateAntiAiPainSafetyPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migratePlainDraftSentencePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+  if(migrateBlogPlainReadabilityPrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+    if(migrateMangoImagePromptDefaults_()){ migrated = true; touchPromptsUpdatedAt_(); }
+    if(migrateDraftShapePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
+    if(migrateVoiceCorePrompts_()){ migrated = true; touchPromptsUpdatedAt_(); }
     if(migrated){
       state.syncDirty = true;
       state.syncNeedsSnapshot = true;
-    }
-    if(migrated || clinicMoved){
       save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true, forceWrite: true });
     }
-    if(expertMigrated || clinicMoved){
+    if(expertMigrated){
       try { renderTabs(); renderMain(); } catch(eExpertRender){}
     }
   } catch(eMig){
@@ -26019,8 +24665,6 @@ function applyBootPlannerRaw_(raw){
     try { applyBuiltinDraftBrandSeeds_(); } catch(e3){}
     return;
   }
-  try { applyConfirmedSyncJournal_(); } catch(eJournal){}
-  try { adoptLocalBlogCategoriesIfUnsynced_(); } catch(eBlogCat){}
   try {
     if(state.syncDirty || Object.keys(state.syncDirtyEntityKeys || {}).length){
       state.syncNeedsSnapshot = true;
@@ -26219,7 +24863,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=415').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=400').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -26246,179 +24890,8 @@ function setupPlannerServiceWorker_(){
   }
 }
 
-var PLANNER_BOOT_CRASH_KEY_ = 'ht_planner_boot_crash_v1';
-function plannerReadBootCrashCount_(){
-  var n = 0;
-  try { n = Math.max(n, parseInt(sessionStorage.getItem(PLANNER_BOOT_CRASH_KEY_), 10) || 0); } catch(eSs){}
-  try { n = Math.max(n, parseInt(localStorage.getItem(PLANNER_BOOT_CRASH_KEY_), 10) || 0); } catch(eLs){}
-  return n;
-}
-function plannerWriteBootCrashCount_(n){
-  var s = String(parseInt(n, 10) || 0);
-  try { sessionStorage.setItem(PLANNER_BOOT_CRASH_KEY_, s); } catch(eSs){}
-  try { localStorage.setItem(PLANNER_BOOT_CRASH_KEY_, s); } catch(eLs){}
-}
-function plannerReadSafeFlag_(){
-  try {
-    var q = new URLSearchParams(location.search || '');
-    var on = function(v){ return v != null && v !== '' && !/^(0|false|off|no)$/i.test(v); };
-    if(on(q.get('safe'))) return 'safe';
-    if(on(q.get('nosync'))) return 'nosync';
-  } catch(eQ){}
-  return '';
-}
-/** 안전 모드면 서버 push·pull·사진 압축·초안 복원·부팅 이관을 모두 멈춘다. 로컬 데이터와 대기열은 건드리지 않는다. */
-function plannerSafeModeBlocksSync_(){
-  return !!(state && state._plannerSafeMode);
-}
-function plannerYieldToUi_(ms){
-  return new Promise(function(resolve){ setTimeout(resolve, ms || 0); });
-}
-function plannerRunAfterFirstPaint_(fn, delayMs){
-  var tries = 0;
-  (function wait(){
-    if(!(state && state._bootFirstPaintDone) && tries++ < 40){ setTimeout(wait, 250); return; }
-    var go = function(){
-      setTimeout(function(){
-        if(plannerSafeModeBlocksSync_()) return;
-        try { fn(); } catch(eAfterPaint){ console.warn('[after first paint]', eAfterPaint); }
-      }, delayMs || 0);
-    };
-    if(typeof requestAnimationFrame === 'function') requestAnimationFrame(go); else go();
-  })();
-}
-/** 부팅이 무사히 끝났다고 볼 때만 연속 크래시 카운터를 0으로 되돌린다. 안전 모드는 사용자가 끌 때까지 유지. */
-function plannerMarkBootHealthy_(why){
-  if(state && state._plannerSafeMode) return;
-  if(plannerReadBootCrashCount_() === 0) return;
-  plannerWriteBootCrashCount_(0);
-  try { console.info('[crash guard] 카운터 초기화:', why); } catch(eC){}
-}
-function armPlannerCrashGuard_(){
-  var prev = plannerReadBootCrashCount_();
-  var next = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerBootCrashState)
-    ? PlannerSyncRules.plannerBootCrashState(prev, { limit: 3 })
-    : { count: prev + 1, safeMode: (prev + 1) >= 3 };
-  var flag = plannerReadSafeFlag_();
-  // 주소 옵션으로 연 안전 모드는 크래시 횟수를 세지 않는다(끄고 나왔을 때 자동 안전 모드로 되돌아가지 않게)
-  if(!flag) plannerWriteBootCrashCount_(next.count);
-  state._plannerSafeMode = !!next.safeMode || !!flag;
-  state._plannerSafeReason = flag || (next.safeMode ? 'crash' : '');
-  if(state._plannerSafeMode) return;
-  // 1) 사용자가 새로고침·이동해 정상적으로 떠나면 크래시가 아니다 (jetsam 종료는 pagehide가 오지 않는다)
-  window.addEventListener('pagehide', function(ev){
-    if(ev && ev.persisted) return;
-    plannerMarkBootHealthy_('pagehide');
-  });
-  // 2) 부팅 60초 뒤에도 살아 있고 보낼 것이 없으면 정상. 보낼 것이 남았으면 비워질 때까지 기다린다.
-  setTimeout(function check(){
-    if(state._plannerSafeMode) return;
-    var idle = true;
-    try { idle = !hasSendableOutboxOps_(); } catch(eIdle){}
-    if(idle) plannerMarkBootHealthy_('60s idle');
-    else setTimeout(check, 15000);
-  }, 60000);
-}
-function plannerLocalBackupParts_(){
-  var parts = [];
-  var payload = getPersistPayload();
-  parts.push('{"app":"thewellness-planner","kind":"local-backup","exportedAt":' + JSON.stringify(new Date().toISOString()) +
-    ',"safeMode":' + (state._plannerSafeMode ? 'true' : 'false') + ',"payload":');
-  parts.push(JSON.stringify(payload));
-  parts.push(',"syncDirtyEntityKeys":' + JSON.stringify(state.syncDirtyEntityKeys || {}));
-  parts.push(',"syncOutbox":[');
-  (state.syncOutbox || []).forEach(function(op, i){
-    if(i) parts.push(',');
-    parts.push(JSON.stringify(op));
-  });
-  parts.push(']}');
-  return parts;
-}
-function plannerExportLocalBackup_(){
-  var stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 13);
-  var name = 'planner-local-backup-' + stamp + '.json';
-  var blob;
-  try { blob = new Blob(plannerLocalBackupParts_(), { type: 'application/json' }); }
-  catch(eBlob){
-    if(typeof setAppToast === 'function') setAppToast('백업 파일을 만들지 못했어요: ' + (eBlob && eBlob.message || eBlob), { duration: 6000, variant: 'err' });
-    return false;
-  }
-  var done = function(){
-    if(typeof setAppToast === 'function') setAppToast('로컬 백업을 내보냈어요. 이 기기의 데이터와 대기열은 그대로입니다.', { duration: 5000, variant: 'ok' });
-  };
-  var download = function(){
-    var a = document.createElement('a');
-    var url = URL.createObjectURL(blob);
-    a.href = url; a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){ try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch(eRm){} }, 60000);
-    done();
-  };
-  try {
-    var file = new File([blob], name, { type: 'application/json' });
-    if(navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share){
-      navigator.share({ files: [file], title: name }).then(done).catch(function(eShare){
-        if(eShare && eShare.name === 'AbortError') return;
-        download();
-      });
-      return true;
-    }
-  } catch(eFile){}
-  download();
-  return true;
-}
-function plannerLeaveSafeMode_(){
-  plannerWriteBootCrashCount_(0);
-  var q;
-  try {
-    q = new URLSearchParams(location.search || '');
-    q.delete('safe'); q.delete('nosync');
-  } catch(eQ){ q = null; }
-  var qs = q && q.toString();
-  location.href = location.pathname + (qs ? '?' + qs : '') + (location.hash || '');
-}
-function plannerShowSafeModeBanner_(){
-  if(!(state && state._plannerSafeMode) || document.getElementById('planner-safe-banner')) return;
-  var reason = state._plannerSafeReason === 'crash'
-    ? '이 탭이 반복해서 종료돼 자동으로 켰어요.'
-    : '주소의 안전 모드 옵션으로 켜졌어요.';
-  var box = document.createElement('div');
-  box.id = 'planner-safe-banner';
-  box.setAttribute('role', 'status');
-  box.style.cssText = 'position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0px));z-index:2147483000;' +
-    'background:#fff7e0;color:#4a3300;border:1px solid #e0b84a;border-radius:12px;padding:10px 12px;font:13px/1.45 -apple-system,system-ui,sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.18)';
-  var t = document.createElement('div');
-  t.innerHTML = '<b>안전 모드</b> · ' + reason + ' 서버 올리기·받기를 멈췄고, 이 기기의 수정과 대기열 ' +
-    ((state.syncOutbox || []).length) + '건은 지우지 않아요.';
-  var row = document.createElement('div');
-  row.style.cssText = 'display:flex;gap:8px;margin-top:8px';
-  function btn(label, fn, primary){
-    var b = document.createElement('button');
-    b.type = 'button'; b.textContent = label;
-    b.style.cssText = 'flex:1;min-height:40px;border-radius:9px;border:1px solid #c9992b;font:600 13px system-ui;' +
-      (primary ? 'background:#c9992b;color:#fff' : 'background:#fff;color:#4a3300');
-    b.addEventListener('click', fn);
-    return b;
-  }
-  row.appendChild(btn('로컬 백업 내보내기', function(){ plannerExportLocalBackup_(); }, true));
-  row.appendChild(btn('안전 모드 끄기', function(){
-    if(confirm('안전 모드를 끄고 다시 불러옵니다. 계속할까요?')) plannerLeaveSafeMode_();
-  }, false));
-  box.appendChild(t); box.appendChild(row);
-  document.body.appendChild(box);
-}
-function plannerSkipDeepLink_(){
-  return !!(state && state._plannerSafeMode);
-}
-function clearOpenDeepLinkHash_(){
-  var h = (location.hash || '').replace(/^#/, '');
-  if(!/^open\//.test(h)) return;
-  try { history.replaceState(null, '', location.pathname + location.search); } catch(eHash){}
-}
 // ── Init ──
 window.onload = () => {
-  armPlannerCrashGuard_();
   consumePlannerTeamInvite_();
   if(readCachedDriveToken_()) hideDriveOAuthBusy_();
   var oauthHashEarly = readDriveOAuthHash_();
@@ -26451,13 +24924,8 @@ window.onload = () => {
         try { updateAddButtonVisibility_(); } catch(e5){}
         try { renderMain(); } catch(e6){}
         state._bootFirstPaintDone = true;
-        try { plannerShowSafeModeBanner_(); } catch(eBanner){}
-        if(state._plannerSafeMode && typeof setAppToast === 'function'){
-          setAppToast('이 탭이 반복해서 다시 시작돼 이미지 화면과 큰 사진 줄이기를 잠시 건너뜁니다. 이 기기의 수정은 그대로 둡니다.', { duration: 6400, variant: 'ok' });
-        }
         try { document.documentElement.classList.add('planner-ready'); } catch(e7){}
         setTimeout(function(){ try { runDeferredBootMigrations_(); } catch(e){} }, 600);
-        setTimeout(function(){ try { if(!plannerSafeModeBlocksSync_()) warnPassedBlogPlans_(); } catch(eWarnPlan){} }, 5000);
         setTimeout(function(){ try { runPlannerBootstrapSync_(); } catch(e2){} }, 1200);
         if(oauthReturned){
           handleDrivePendingActionAfterRedirect_();
@@ -26479,7 +24947,6 @@ window.onload = () => {
         try { renderMain(); } catch(eMain){}
         state._bootFirstPaintDone = true;
       }
-      try { plannerShowSafeModeBanner_(); } catch(eBanner2){}
       document.documentElement.classList.add('planner-ready');
     } catch(eSafe){}
   }, 4000);
@@ -26500,7 +24967,6 @@ window.onload = () => {
   driveGsiWarmup_();
   driveSilentWarmup_();
   startDriveTokenRefreshLoop_();
-  bindSheetEditScrollGuard_();
   if(!oauthReturned) consumeDeepLinkFromHash_();
   else setTimeout(function(){ consumeDeepLinkFromHash_(); }, 300);
   setTimeout(function(){
@@ -26558,7 +25024,6 @@ window.onload = () => {
   });
   startPlannerIdleSync_();
   window.addEventListener('hashchange', onPlannerHashChange_);
-  armCardLinkAfterSync_();
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape'){
       closeTopmostPlannerOverlay_();
@@ -26696,7 +25161,6 @@ function saveKey() {
   }
   var syncTokEl = document.getElementById('planner-sync-token');
   if(syncTokEl) setPlannerSyncToken_(syncTokEl.value);
-  try { saveBlogDefaultCategories_(); } catch(eBdcS){}
   save();
   closeApiModal();
   updateApiBadge();
@@ -26715,67 +25179,7 @@ function closeApiModalBackdrop(ev){
   closeApiModal();
 }
 window.closeApiModalBackdrop = closeApiModalBackdrop;
-// 네이버 블로그 기본 카테고리 — 프로그램별. 저장본에 넣어 기기 간에 맞춘다. 리얼페이스 기본값은 코드에 둔다.
-var BLOG_DEFAULT_CATEGORY_KEY_ = 'ht_blog_default_cat_v1';
-var BLOG_DEFAULT_CATEGORY_BUILTIN_ = { 2: '안면비대칭/축소' };
-function readBlogDefaultCategories_(){
-  if(state && state.blogDefaultCategories && typeof state.blogDefaultCategories === 'object'){
-    return state.blogDefaultCategories;
-  }
-  try {
-    var raw = JSON.parse(localStorage.getItem(BLOG_DEFAULT_CATEGORY_KEY_) || '{}');
-    return raw && typeof raw === 'object' ? raw : {};
-  } catch(e){ return {}; }
-}
-function adoptLocalBlogCategoriesIfUnsynced_(){
-  if(state.blogDefaultCategories && typeof state.blogDefaultCategories === 'object') return;
-  var local = readBlogDefaultCategories_();
-  if(!local || typeof local !== 'object' || !Object.keys(local).length) return;
-  state.blogDefaultCategories = Object.assign({}, local);
-}
-function getBlogDefaultCategoryForCat_(catId){
-  var saved = readBlogDefaultCategories_();
-  var id = String(catId);
-  if(Object.prototype.hasOwnProperty.call(saved, id)) return String(saved[id] || '').trim();
-  return BLOG_DEFAULT_CATEGORY_BUILTIN_[id] || '';
-}
-function renderBlogDefaultCategoryInputs_(){
-  var host = document.getElementById('blog-default-cat-list');
-  if(!host) return;
-  host.innerHTML = CATEGORIES.map(function(cat){
-    if(!cat || cat.id > 5) return '';
-    var val = getBlogDefaultCategoryForCat_(cat.id);
-    return '<label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px;color:#374151;">' +
-      '<span style="flex:0 0 112px;">' + escapeHtml(cat.name) + '</span>' +
-      '<input class="modal-input" type="text" data-blog-default-cat="' + cat.id + '" value="' + escapeHtml(val) + '" placeholder="카테고리 이름" autocomplete="off" style="margin:0;flex:1;">' +
-      '</label>';
-  }).join('');
-}
-function saveBlogDefaultCategories_(){
-  var host = document.getElementById('blog-default-cat-list');
-  if(!host) return;
-  var out = {};
-  host.querySelectorAll('input[data-blog-default-cat]').forEach(function(inp){
-    var id = inp.getAttribute('data-blog-default-cat');
-    var v = String(inp.value || '').trim();
-    var builtin = BLOG_DEFAULT_CATEGORY_BUILTIN_[id] || '';
-    // 기본값과 같으면 저장하지 않는다. 비운 칸은 「없음」으로 저장해 기본값을 끈다.
-    if(v === builtin) return;
-    out[id] = v;
-  });
-  state.blogDefaultCategories = out;
-  try { localStorage.setItem(BLOG_DEFAULT_CATEGORY_KEY_, JSON.stringify(out)); } catch(e){}
-}
-function noteBlogDefaultCategoryOnOpen_(catId){
-  var name = getBlogDefaultCategoryForCat_(catId);
-  if(!name || typeof setAppToast !== 'function') return;
-  // 열기 직후 뜨는 다른 안내 토스트가 지나간 뒤에 보이게 한다
-  setTimeout(function(){
-    setAppToast('네이버 에디터에서 카테고리는 「' + name + '」으로 골라 주세요.', { duration: 6000, variant: 'ok' });
-  }, 1800);
-}
 function openApiModal() {
-  try { renderBlogDefaultCategoryInputs_(); } catch(eBdc){}
   document.getElementById('api-input').value = state.apiKey === '__server__' ? '' : state.apiKey;
   document.getElementById('api-input').type = 'password';
   var toggleBtn = document.getElementById('api-key-toggle');
@@ -26863,6 +25267,7 @@ function renderTabs() {
   var promptBtn = document.getElementById('btn-prompt-settings');
   if(promptBtn) promptBtn.style.display = isOpsManualCategory(state.currentCat) ? 'none' : '';
 }
+
 function activateCatGroup_(groupKey, ev){
   if(ev){
     if(ev.target && ev.target.closest && ev.target.closest('select')) return;
@@ -27049,7 +25454,6 @@ function getTopicListMode_(){
 }
 function draftMatchesTopicListMode_(d, catId){
   if(!d || !d.id) return false;
-  if(cardLinkRevealId_ && d.id === cardLinkRevealId_) return true;
   if(getTopicListMode_() === 'plan') return false;
   var onPub = draftShowsOnPublishedList_(d.id, catId);
   if(getTopicListMode_() === 'published') return onPub;
@@ -27349,27 +25753,19 @@ function getDraftCreatedDateLabel_(d) {
   return formatDraftMonthDayLabel_(getDraftCreatedAtMs_(d));
 }
 function getDraftListActivityMs_(d){
-  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerDraftListDate){
-    return PlannerSyncRules.plannerDraftListDate(d || {}).ms || 0;
-  }
   if(!d) return 0;
   var created = getDraftCreatedAtMs_(d) || 0;
   var touch = 0;
   if(d.activityAt){
     var a = parsePlannerDateMs_(d.activityAt);
     if(!isNaN(a)) touch = a;
-  }
-  if(d.updatedAt){
+  } else if(typeof draftHasContent === 'function' && draftHasContent(d) && d.updatedAt){
     var u = parsePlannerDateMs_(d.updatedAt);
-    if(!isNaN(u) && u > touch) touch = u;
+    if(!isNaN(u)) touch = u;
   }
   return touch > created ? touch : created;
 }
 function getDraftListDateInfo_(d) {
-  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerDraftListDate){
-    var info = PlannerSyncRules.plannerDraftListDate(d || {});
-    return { label: info.label, edited: !!info.edited };
-  }
   var createdMs = getDraftCreatedAtMs_(d);
   var activityMs = getDraftListActivityMs_(d);
   var createdLabel = formatDraftMonthDayLabel_(createdMs);
@@ -28578,7 +26974,7 @@ function copyOpsMarketingReport_(itemId){
 }
 window.copyOpsMarketingReport_ = copyOpsMarketingReport_;
 function renderOpsMarketingPanelHTML_(itemId){
-  if(!isOpsMobileDevice_() && opsAdsApiOnline_ === true) setTimeout(checkOpsAdsApi_, 50);
+  if(!isOpsMobileDevice_()) setTimeout(checkOpsAdsApi_, 50);
   var r = buildOpsMarketingReport_(itemId);
   var seed = getOpsMarketingSeed_();
   var rep = r.report;
@@ -28828,6 +27224,7 @@ function buildOpsAdsApiGuideHTML_(kind, accountId){
       '일반 키워드, 동네(= 광고그룹 이름), 동네 조합 키워드를 확인하고 필요하면 고칩니다',
       '소재(제목·설명·연결 URL)와 확장소재(전화·플레이스·서브링크)를 확인하고 고칩니다',
       '각 칸의 <strong>「적용하기」</strong> → 바뀔 내용 미리보기 → <strong>「이대로 적용」</strong>. 없는 그룹은 만들고, 목록에서 뺀 키워드·그룹·예전 소재는 끕니다(삭제는 하지 않음)'];
+  setTimeout(checkOpsAdsApi_, 50);
   return '<div class="ops-review-group ops-kw-group" style="border:1px solid rgba(15,118,110,.18);background:rgba(15,118,110,.04);padding:12px 14px;border-radius:10px">' +
     '<div class="ops-review-group-title"><strong>API 연결</strong> <span class="ops-review-group-hint">' + (isG ? '구글 애즈 API' : '네이버 검색광고 API') + ' · 파일 다운로드·업로드 없이 바로 반영</span>' +
       '<span class="ops-review-group-progress" data-ops-ads-api-status>' + (opsAdsApiOnline_ === true ? '연결됨' : (opsAdsApiOnline_ === false ? '꺼짐' : '확인 중')) + '</span></div>' +
@@ -30038,60 +28435,7 @@ function blogScheduleButtonHTML_(){
   var plan = getChannelPlan_(state.selectedId, 'blog');
   var label = plan ? (opsPlanChipLabel_(plan.at) + ' 수정') : '예약하기';
   var title = plan ? '예약 날짜를 바꿉니다' : '날짜를 고르고 블로그 글쓰기를 엽니다';
-  var html = '<button type="button" class="btn-save-draft" data-blog-schedule onclick="onBlogSchedule_()" title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
-  if(plan){
-    // 네이버 에디터에서 예약한 글은 플래너가 발행 여부를 알 수 없다. 확인 버튼으로 발행 완료로 바꾼다.
-    var passed = blogPlanDatePassed_(plan);
-    html += '<button type="button" class="btn-save-draft" data-blog-confirm onclick="onBlogPublishConfirm_()" title="네이버에서 발행된 것을 확인했으면 눌러 발행 완료로 바꿉니다"' +
-      (passed ? ' style="border-color:#B45309;color:#B45309;font-weight:700;"' : '') + '>' + (passed ? '확인 필요' : '발행 확인') + '</button>';
-  }
-  return html;
-}
-function blogPlanDatePassed_(plan){
-  return !!(plan && plan.at && opsPlanYmd_(plan.at) && opsPlanYmd_(plan.at) < opsPlanYmd_(new Date()));
-}
-/** 블로그를 예약해 둔 글의 썸네일을 바꾸면, 네이버 예약에는 옛 이미지가 그대로 남는다. 경고만 한다. */
-function warnThumbChangedAfterReserve_(draftId){
-  var pub = state.published && state.published[draftId];
-  if(!pub || (pub.tabPublished && pub.tabPublished.blog)) return false;
-  if(!getChannelPlan_(draftId, 'blog')) return false;
-  if(typeof setAppToast === 'function'){
-    setAppToast('예약에는 옛 이미지가 남아 있어요.\n네이버에서 예약한 글의 썸네일을 직접 바꿔 주세요.', { duration: 7000, variant: 'err' });
-  }
-  return true;
-}
-function onBlogPublishConfirm_(){
-  var draftId = state.selectedId;
-  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
-  var plan = getChannelPlan_(draftId, 'blog');
-  if(!plan){ if(typeof setAppToast === 'function') setAppToast('예약된 블로그가 없어요.', { duration: 2500, variant: 'err' }); return; }
-  if(!confirm(opsPlanChipLabel_(plan.at) + ' 예약한 글이 네이버에서 발행됐나요?\n확인하면 발행 완료로 바꿉니다.')) return;
-  try {
-    commitSheetTabPublish_(draftId, catId, 'blog', { skipDom: true, at: plan.at });
-  } catch(eConfirm){
-    if(typeof setAppToast === 'function') setAppToast('발행 확인을 저장하지 못했어요: ' + (eConfirm && eConfirm.message || eConfirm), { duration: 5000, variant: 'err' });
-    return;
-  }
-  var btn = document.querySelector('[data-blog-schedule]');
-  if(btn) btn.textContent = '예약하기';
-  var cbtn = document.querySelector('[data-blog-confirm]');
-  if(cbtn) cbtn.remove();
-  try { paintOpsPlanStrip_(); } catch(ePaint){}
-  if(typeof setAppToast === 'function') setAppToast('발행 완료로 바꿨어요.', { duration: 3000, variant: 'ok' });
-}
-window.onBlogPublishConfirm_ = onBlogPublishConfirm_;
-/** 예약일이 지났는데 발행 확인이 안 된 블로그가 있으면 한 번 알린다. */
-function warnPassedBlogPlans_(){
-  var n = 0;
-  Object.keys(state.published || {}).forEach(function(id){
-    var pub = state.published[id];
-    if(!pub || (pub.tabPublished && pub.tabPublished.blog)) return;
-    if(blogPlanDatePassed_(pub.channelPlan && pub.channelPlan.blog)) n++;
-  });
-  if(n && typeof setAppToast === 'function'){
-    setAppToast('예약일이 지난 블로그 ' + n + '건이 아직 「예약」으로 남아 있어요.\n글을 열어 「발행 확인」을 눌러 주세요.', { duration: 7000, variant: 'ok' });
-  }
-  return n;
+  return '<button type="button" class="btn-save-draft" data-blog-schedule onclick="onBlogSchedule_()" title="' + escapeHtml(title) + '">' + escapeHtml(label) + '</button>';
 }
 function onBlogSchedule_(){
   var draftId = state.selectedId;
@@ -30112,7 +28456,7 @@ function onBlogSchedule_(){
       setChannelPlan_(draftId, catId, 'blog', when.toISOString(), '');
       var btn = document.querySelector('[data-blog-schedule]');
       if(btn) btn.textContent = opsPlanChipLabel_(when.toISOString()) + ' 수정';
-      if(!existing && content && content.blog) copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId), catId);
+      if(!existing && content && content.blog) copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId));
       if(typeof setAppToast === 'function') setAppToast('블로그 예약 ' + opsPlanChipLabel_(when.toISOString()), { duration: 2500, variant: 'ok' });
     }
   });
@@ -30590,9 +28934,7 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
   if(seriesLine) intentLines.push('<div class="card-intent-line muted">' + escapeHtml(oneLine_(seriesLine)) + '</div>');
   if(d.angle) intentLines.push('<div class="card-intent-line">' + escapeHtml(oneLine_(d.angle)) + '</div>');
   if(brandMeta.rationale) intentLines.push('<div class="card-intent-line">' + escapeHtml(oneLine_(stripTopicRationaleStepPrefix_(brandMeta.rationale))) + '</div>');
-  var lineTitle = oneLine_(stripClinicBlogTitlePrefix_(blogTitleOfContent_(getDraftContent_(d.id)) || d.topic)) || '(제목 없음)';
-  var branchLabel = clinicBranchLabel_(cat.id);
-  var branchHtml = branchLabel ? '<span class="card-branch-label">' + escapeHtml(branchLabel) + '</span>' : '';
+  var lineTitle = oneLine_(blogTitleOfContent_(getDraftContent_(d.id)) || d.topic) || '(제목 없음)';
   var orderBtns = '';
   try {
     var stepIdForOrder = getDraftRoadmapStepId_(d, cat.id, draftIndex);
@@ -30627,10 +28969,6 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
         '<div class="card-more-step-chips" title="카테고리(단계) 이동">' +
           renderMoveDraftStepChipsHTML_(cat.id, d.id) +
         '</div>' +
-        '<button type="button" class="draft-card-delete-mini draft-card-link-mini" title="이 카드 주소 복사" onclick="event.stopPropagation();copyCardLink_(\'' + jsAttrString_(d.id) + '\')">링크 복사</button>' +
-        '<button type="button" class="draft-card-delete-mini" title="검토 중에는 이 카드를 대기열에 올리지 않습니다" onclick="event.stopPropagation();toggleDraftReviewHold_(\'' + jsAttrString_(d.id) + '\')">' + (d.reviewHold ? '검토 해제' : '검토 중') + '</button>' +
-        '<button type="button" class="draft-card-delete-mini" title="카드 번호와 내용은 유지하고 프로그램만 옮깁니다" onclick="event.stopPropagation();openMoveDraftProgram_(\'' + jsAttrString_(d.id) + '\',' + cat.id + ')">프로그램 이동</button>' +
-        '<button type="button" class="draft-card-delete-mini" title="이 기기에만 남기는 최근 5개" onclick="event.stopPropagation();openCardRevisions_(\'' + jsAttrString_(d.id) + '\')">이전 버전</button>' +
         '<button type="button" class="draft-card-delete-mini" title="이 주제 카드 삭제" onclick="event.stopPropagation();deleteDraft(' + cat.id + ',\'' + d.id + '\')">삭제</button>' +
         orderBtns +
       '</div>' +
@@ -30650,12 +28988,10 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
     ${searchWhereHtml}
     <div class="topic-line-row">
       <span class="topic-drag-handle" title="끌어서 단계 이동" aria-hidden="true">⠿</span>
-      ${branchHtml}
       <div class="card-topic">${escapeHtml(lineTitle)}</div>
       <div class="topic-line-meta">${badges}</div>
       <button type="button" class="topic-line-more" onclick="toggleTopicLineMore_(this,event)">자세히</button>
     </div>
-    ${draftCollabLineHTML_(d)}
     <div class="card-more-body" onclick="event.stopPropagation()">${moreBody}</div>
   </div>`;
 }
@@ -33514,7 +31850,6 @@ window.dropDraftOnStep_ = function(catId, draftId, targetStepId, beforeDraftId){
   }
   var moved = relocateDraftToStepNoSave_(catId, draft, targetStepId, beforeDraftId);
   if(!moved) return;
-  draft.drawerUserPlaced = true;
   var sameStep = moved.sameStep;
   save({ driveImmediate: true, gasImmediate: true });
   renderMain();
@@ -34246,18 +32581,6 @@ function closeSheetUiOnly_(){
   }, 280);
 }
 function onPlannerHashChange_(){
-  if(cardLinkIdFromHash_()){
-    if(plannerSkipDeepLink_()) return;
-    if(cardLinkSyncSettled_ && cardLinkConsumedId_ !== cardLinkIdFromHash_()){
-      cardLinkConsumedId_ = '';
-      openCardLinkIfReady_();
-    }
-    return;
-  }
-  if(plannerSkipDeepLink_()){
-    clearOpenDeepLinkHash_();
-    return;
-  }
   if(detailHashSyncLock_) return;
   var h = (location.hash || '').replace(/^#/, '');
   var m = h.match(/^open\/([^/]+)\/(\d+)(?:\/([a-z]+))?$/);
@@ -34308,165 +32631,7 @@ function openNextPublishRecommendationFromEntry_(fallbackDraftId, fallbackCatId)
   renderMain();
   return false;
 }
-var cardLinkSyncSettled_ = false;
-var cardLinkConsumedId_ = '';
-var cardLinkRevealId_ = '';
-function jsAttrString_(value){
-  return String(value == null ? '' : value).replace(/\\/g, '\\\\').replace(/'/g, '\\\'');
-}
-function cardLinkIdFromHash_(){
-  var h = String(location.hash || '').replace(/^#/, '');
-  var m = h.match(/^card=(.*)$/);
-  if(!m) return '';
-  var raw = m[1] || '';
-  try { raw = decodeURIComponent(raw); } catch(eDec){}
-  return String(raw).trim();
-}
-function markCardLinkSyncSettled_(){
-  cardLinkSyncSettled_ = true;
-  openCardLinkIfReady_();
-}
-function openCardLinkIfReady_(){
-  var id = cardLinkIdFromHash_();
-  if(!id || cardLinkConsumedId_ === id) return;
-  if(!cardLinkSyncSettled_) return;
-  if(plannerSyncConflictPending_ || plannerBootstrapChoicePending_){
-    setTimeout(openCardLinkIfReady_, 500);
-    return;
-  }
-  cardLinkConsumedId_ = id;
-  openCardByLinkId_(id);
-}
-function armCardLinkAfterSync_(){
-  if(!cardLinkIdFromHash_()) return;
-  var started = Date.now();
-  var tick = function(){
-    if(!cardLinkIdFromHash_() || cardLinkSyncSettled_) return;
-    var waited = Date.now() - started;
-    var busy = plannerSyncBootstrapRunning_ || !!(state && state._bootstrapDeferHeavy);
-    if((waited > 90000 && !busy) || waited > 180000){
-      markCardLinkSyncSettled_();
-      return;
-    }
-    setTimeout(tick, 500);
-  };
-  setTimeout(tick, 500);
-}
-function findCardPlacement_(draftId){
-  var i, j, cat, draft;
-  for(i = 0; i < CATEGORIES.length; i++){
-    cat = CATEGORIES[i];
-    if(!cat || !cat.drafts) continue;
-    for(j = 0; j < cat.drafts.length; j++){
-      draft = cat.drafts[j];
-      if(draft && draft.id === draftId){
-        return { draft: draft, catId: cat.id != null ? cat.id : i };
-      }
-    }
-  }
-  return null;
-}
-function openCardByLinkId_(draftId){
-  var place = findCardPlacement_(draftId);
-  if(!place){
-    if(typeof setAppToast === 'function'){
-      setAppToast('카드를 찾을 수 없어요', { duration: 4200, variant: 'err' });
-    }
-    return;
-  }
-  state.searchQ = '';
-  state.legacyDraftsOpen = true;
-  cardLinkRevealId_ = draftId;
-  try { revealCardStepForLink_(place.catId, draftId); } catch(eStep){}
-  var search = document.querySelector('.search-input');
-  if(search) search.value = '';
-  if(state.currentCat !== place.catId){
-    state.currentCat = place.catId;
-    try { renderTabs(); } catch(eTab){}
-  }
-  try { renderMain(); } catch(eRender){}
-  requestAnimationFrame(function(){
-    var nodes = document.querySelectorAll('.draft-card');
-    var card = null;
-    var n;
-    for(n = 0; n < nodes.length; n++){
-      if(nodes[n].getAttribute('data-draft-id') === draftId){
-        card = nodes[n];
-        break;
-      }
-    }
-    if(card){
-      var block = card.closest('.collapsed');
-      if(block) block.classList.remove('collapsed');
-      if(card.scrollIntoView){
-        try { card.scrollIntoView({ block: 'center' }); } catch(eScroll){
-          try { card.scrollIntoView(true); } catch(eScroll2){}
-        }
-      }
-    }
-    openDetail(place.draft.id, place.catId);
-    cardLinkRevealId_ = '';
-  });
-}
-function revealCardStepForLink_(catId, draftId){
-  var plan = null;
-  try { plan = getEffectiveSubGoalPlan_(catId); } catch(ePlan){}
-  if(!plan) return;
-  var stepId = SUBGOAL_MISC_ID;
-  var assignments = plan.assignments || [];
-  var i;
-  for(i = 0; i < assignments.length; i++){
-    if(assignments[i] && assignments[i].draftId === draftId && assignments[i].stepId){
-      stepId = assignments[i].stepId;
-      break;
-    }
-  }
-  if(!state.collapsedSubGoalSteps) state.collapsedSubGoalSteps = {};
-  var key = subGoalStepKey_(catId, stepId);
-  if(state.collapsedSubGoalSteps[key]) state.collapsedSubGoalSteps[key] = false;
-}
-function cardLinkUrl_(draftId){
-  return location.origin + location.pathname + location.search + '#card=' + encodeURIComponent(draftId);
-}
-function copyTextFallback_(text){
-  var ta = document.createElement('textarea');
-  ta.value = text;
-  ta.setAttribute('readonly', '');
-  ta.style.position = 'fixed';
-  ta.style.top = '0';
-  ta.style.left = '-9999px';
-  document.body.appendChild(ta);
-  ta.select();
-  var ok = false;
-  try { ok = document.execCommand('copy'); } catch(eCopy){ ok = false; }
-  ta.remove();
-  return ok;
-}
-function copyCardLink_(draftId, ev){
-  if(ev){
-    ev.preventDefault();
-    ev.stopPropagation();
-  }
-  var url = cardLinkUrl_(draftId);
-  function done(ok){
-    if(typeof setAppToast === 'function'){
-      setAppToast(ok ? '카드 링크를 복사했어요.' : '링크를 복사하지 못했어요.', { duration: 2800, variant: ok ? 'ok' : 'err' });
-    }
-  }
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(url).then(function(){ done(true); }, function(){
-      done(copyTextFallback_(url));
-    });
-    return;
-  }
-  done(copyTextFallback_(url));
-}
-window.copyCardLink_ = copyCardLink_;
 function consumeDeepLinkFromHash_(){
-  if(plannerSkipDeepLink_()){
-    clearOpenDeepLinkHash_();
-    return;
-  }
   var h = (location.hash || '').replace(/^#/, '');
   var m = h.match(/^open\/([^/]+)\/(\d+)(?:\/([a-z]+))?$/);
   if(!m) return;
@@ -34515,35 +32680,10 @@ function composeSheetTabLayout_(tab, restHtml){
 function scrollSheetBodyToStart_(){
   var body = document.getElementById('sheet-body');
   if(!body) return;
-  if(isSheetEditFocused_()) return;
   requestAnimationFrame(function(){
-    if(isSheetEditFocused_()) return;
     body.scrollTop = 0;
     scheduleWorkshopTextareaGrow_(body);
   });
-}
-function scrollSheetFieldHeaderIntoView_(fieldId){
-  var body = document.getElementById('sheet-body');
-  var ta = fieldId ? document.getElementById(fieldId) : null;
-  if(!body || !ta) return;
-  var header = ta.closest && ta.closest('.cb') && ta.closest('.cb').querySelector('.cb-label');
-  var target = header || ta;
-  function place(){
-    if(!body.isConnected || !target.isConnected) return;
-    var sticky = body.querySelector('.sheet-tabs-scroll');
-    var stickyH = sticky ? sticky.getBoundingClientRect().height : 0;
-    var delta = target.getBoundingClientRect().top - body.getBoundingClientRect().top - stickyH;
-    var next = body.scrollTop + delta;
-    if(next < 0) next = 0;
-    body.scrollTop = next;
-    body._plannerHoldScroll = next;
-  }
-  requestAnimationFrame(function(){
-    place();
-    requestAnimationFrame(place);
-  });
-  setTimeout(place, 60);
-  setTimeout(place, 320);
 }
 
 function clampMangoTitle_(s){
@@ -34766,240 +32906,13 @@ function getGeneralBlogProblemText_(b){
   if(b.hook && String(b.hook).trim()) return String(b.hook).trim();
   return '';
 }
-var BLOG_SECTION_LABELS_ = {
-  '제목': 'title',
-  'title': 'title',
-  '문제제기': 'problem',
-  '공감': 'problem',
-  '셀프케어': 'selfCare',
-  '셀프케어(해결책)': 'selfCare',
-  '해결책': 'selfCare',
-  '해결책제시': 'selfCare',
-  '따라하기': 'selfCare',
-  '원리설명': 'explanation',
-  '원리': 'explanation',
-  '마무리': 'cta',
-  '마무리cta': 'cta',
-  'cta': 'cta',
-  '해시태그': 'hashtags',
-  'hashtags': 'hashtags',
-  'hashtag': 'hashtags'
-};
-function blogSectionHeadingKey_(line){
-  var raw = String(line || '').replace(/\u00a0/g, ' ').trim();
-  if(!raw || raw.length > 48) return null;
-  raw = raw.replace(/^#{1,6}\s+/, '');
-  raw = raw.replace(/^\d+\s*[\.)]\s+/, '');
-  raw = raw.replace(/^[*_「『【\[]+|[*_」』】\]]+$/g, '');
-  raw = raw.replace(/^[*_]+|[*_]+$/g, '');
-  var inline = '';
-  var sameLine = raw.match(/^(.{2,24}?)\s*[:：]\s*(\S.*)$/);
-  if(sameLine){
-    raw = sameLine[1].trim();
-    inline = sameLine[2].trim();
-  } else {
-    raw = raw.replace(/[:：]\s*$/, '').trim();
-  }
-  raw = raw.replace(/\s+/g, '');
-  var key = BLOG_SECTION_LABELS_[raw] || BLOG_SECTION_LABELS_[raw.toLowerCase()];
-  if(!key) return null;
-  return { key: key, inline: inline };
-}
-function blogSectionHeadingCount_(text){
-  var n = 0;
-  String(text || '').replace(/\r\n/g, '\n').split('\n').forEach(function(line){
-    if(blogSectionHeadingKey_(line)) n += 1;
-  });
-  return n;
-}
-function splitPlainIntoBlogSections_(text){
-  var lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
-  var hits = [];
-  lines.forEach(function(line, idx){
-    var hit = blogSectionHeadingKey_(line);
-    if(hit) hits.push({ key: hit.key, inline: hit.inline, idx: idx });
-  });
-  if(hits.length < 2) return null;
-  var out = { title: '', problem: '', selfCare: '', explanation: '', cta: '', hashtags: [] };
-  var preamble = lines.slice(0, hits[0].idx).join('\n').trim();
-  hits.forEach(function(hit, i){
-    var end = hits[i + 1] ? hits[i + 1].idx : lines.length;
-    var body = lines.slice(hit.idx + 1, end).join('\n').trim();
-    if(hit.inline) body = (hit.inline + (body ? '\n' + body : '')).trim();
-    if(hit.key === 'hashtags'){
-      out.hashtags = (typeof parseHashtagInput_ === 'function') ? parseHashtagInput_(body) : [];
-      return;
-    }
-    out[hit.key] = out[hit.key] ? (out[hit.key] + '\n\n' + body).trim() : body;
-  });
-  if(!out.title && preamble && preamble.indexOf('\n') < 0 && preamble.length <= 80) out.title = preamble;
-  var bodyCount = ['problem', 'selfCare', 'explanation', 'cta'].filter(function(key){
-    return String(out[key] || '').trim();
-  }).length;
-  if(bodyCount < 1) return null;
-  return out;
-}
-function rememberSectionBlob_(blog){
-  var best = '';
-  ['draft', 'explanation', 'problem', 'selfCare', 'hook'].forEach(function(key){
-    var text = String(blog && blog[key] || '');
-    if(blogSectionHeadingCount_(text) >= 2 && text.length > best.length) best = text;
-  });
-  return best;
-}
-function distributeBlogSections_(blog, opts){
-  opts = opts || {};
-  if(!blog || typeof blog !== 'object') return false;
-  var order = ['explanation', 'problem', 'selfCare', 'hook', 'draft'];
-  var sourceKey = '';
-  var i;
-  for(i = 0; i < order.length; i++){
-    if(blogSectionHeadingCount_(blog[order[i]]) >= 2){
-      sourceKey = order[i];
-      break;
-    }
-  }
-  if(!sourceKey) return false;
-  if(sourceKey === 'draft'){
-    var settled = ['problem', 'selfCare', 'explanation'].filter(function(key){
-      var text = String(blog[key] || '').trim();
-      return text && blogSectionHeadingCount_(text) < 2;
-    }).length;
-    if(settled >= 2) return false;
-  }
-  var parts = splitPlainIntoBlogSections_(blog[sourceKey]);
-  if(!parts) return false;
-  var original = String(blog[sourceKey]);
-  var changed = false;
-  ['title', 'problem', 'selfCare', 'explanation', 'cta'].forEach(function(key){
-    if(!parts[key]) return;
-    var current = String(blog[key] || '').trim();
-    var replace = key === sourceKey || !current || blogSectionHeadingCount_(blog[key]) >= 2;
-    if(!replace) return;
-    if(String(blog[key] || '') !== parts[key]) changed = true;
-    blog[key] = parts[key];
-  });
-  if(parts.hashtags && parts.hashtags.length && !(blog.hashtags && blog.hashtags.length)){
-    blog.hashtags = parts.hashtags.slice();
-    changed = true;
-  }
-  if(opts.keepDraft !== false && sourceKey !== 'draft' && !String(blog.draft || '').trim()){
-    blog.draft = original;
-    changed = true;
-  }
-  return changed;
-}
-function blogForSheet_(blog, catId){
-  var base = normalizeBlogBlock(blog, catId) || {};
-  var src = (blog && typeof blog === 'object') ? blog : {};
-  var copy = {
-    title: src.title != null ? String(src.title) : (base.title || ''),
-    problem: src.problem != null ? String(src.problem) : '',
-    selfCare: src.selfCare != null ? String(src.selfCare) : '',
-    explanation: src.explanation != null ? String(src.explanation) : (base.explanation || ''),
-    cta: src.cta != null ? String(src.cta) : (base.cta || ''),
-    hashtags: Array.isArray(src.hashtags) ? src.hashtags.slice() : (Array.isArray(base.hashtags) ? base.hashtags.slice() : []),
-    hook: src.hook != null ? String(src.hook) : (base.hook || ''),
-    outline: Array.isArray(src.outline) ? src.outline.slice() : (Array.isArray(base.outline) ? base.outline.slice() : []),
-    draft: src.draft != null ? String(src.draft) : (base.draft || '')
-  };
-  distributeBlogSections_(copy);
-  return copy;
-}
-function communityForSheet_(raw){
-  var base = normalizeCommunityBlock(raw) || {};
-  var src = (raw && typeof raw === 'object') ? raw : {};
-  var copy = {
-    title: src.title != null ? String(src.title) : (base.title || ''),
-    problem: src.problem != null ? String(src.problem) : (base.problem || ''),
-    selfCare: src.selfCare != null ? String(src.selfCare) : (base.selfCare || ''),
-    explanation: src.explanation != null ? String(src.explanation) : (base.explanation || ''),
-    empathyLead: base.empathyLead || '',
-    empathyBullets: Array.isArray(base.empathyBullets) ? base.empathyBullets.slice() : []
-  };
-  distributeBlogSections_(copy, { keepDraft: false });
-  return copy;
-}
-var sheetSectionLayoutChanged_ = false;
-var sheetSectionPainting_ = false;
-var sheetQuietSaving_ = false;
-function paintSheetAfterSectionSplit_(content){
-  if(!sheetSectionLayoutChanged_ || sheetSectionPainting_) return;
-  sheetSectionPainting_ = true;
-  sheetSectionLayoutChanged_ = false;
-  try {
-    var active = document.activeElement;
-    if(active && active.blur) active.blur();
-    renderSheetContent(content);
-  } finally {
-    sheetSectionPainting_ = false;
-  }
-}
-function stripClinicBlogTitlePrefix_(title){
-  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerStripClinicTitlePrefix){
-    return PlannerSyncRules.plannerStripClinicTitlePrefix(title);
-  }
+function withClinicBlogTitle_(title, catId){
+  var id = Number(catId);
+  if(id !== 0 && id !== 1 && id !== 2) return String(title || '').trim();
   var t = String(title || '').replace(/\s+/g, ' ').trim();
   if(!t) return '';
-  var prev = '';
-  while(t && t !== prev){
-    prev = t;
-    t = t.replace(/^\[약수\/인천\]\s*/, '').trim();
-  }
-  return t;
-}
-function clinicBranchLabel_(catId){
-  return '';
-}
-function clinicBranchLabelSheetHtml_(catId){
-  var label = clinicBranchLabel_(catId);
-  if(!label) return '';
-  return '<div class="sheet-branch-label">' + escapeHtml(label) + '</div>';
-}
-function withClinicBlogTitle_(title, catId){
-  return stripClinicBlogTitlePrefix_(title);
-}
-function stripStoredClinicBlogTitles_(){
-  var changed = false;
-  function stripField_(obj, key){
-    if(!obj || obj[key] == null) return;
-    var next = stripClinicBlogTitlePrefix_(obj[key]);
-    if(next === String(obj[key])) return;
-    obj[key] = next;
-    changed = true;
-  }
-  function walk_(content){
-    if(!content || typeof content !== 'object') return;
-    if(content.blog){
-      stripField_(content.blog, 'title');
-      stripField_(content.blog, 'importTitle');
-    }
-    if(content.community && /^\[약수\/인천\]/.test(String(content.community.title || '').replace(/\s+/g, ' ').trim())){
-      stripField_(content.community, 'title');
-    }
-  }
-  function walkDraft_(draft){
-    if(!draft || typeof draft !== 'object') return;
-    stripField_(draft, 'topic');
-  }
-  CATEGORIES.forEach(function(cat){
-    (cat.drafts || []).forEach(walkDraft_);
-  });
-  Object.keys(state.generatedOnly || {}).forEach(function(id){ walk_(state.generatedOnly[id]); });
-  Object.keys(state.published || {}).forEach(function(id){
-    var row = state.published[id];
-    if(!row || typeof row !== 'object') return;
-    stripField_(row, 'topic');
-    if(row.content) walk_(row.content);
-    if(row.finalTexts && typeof row.finalTexts.blog === 'string'){
-      var nextBlog = row.finalTexts.blog.replace(/^(?:\[약수\/인천\]\s*)+/, '');
-      if(nextBlog !== row.finalTexts.blog){
-        row.finalTexts.blog = nextBlog;
-        changed = true;
-      }
-    }
-  });
-  return changed;
+  if(/^\[약수\/인천\]/.test(t)) return t;
+  return '[약수/인천] ' + t;
 }
 function normalizeBlogBlock(raw, catId){
   if(!raw || typeof raw !== 'object') return null;
@@ -35411,7 +33324,7 @@ function buildMangoBriefFromBlog_(content, topic, catId){
   catId = catId != null ? catId : state.selectedCatId;
   var palette = getMangoPaletteForCat_(catId);
   var blog = content && content.blog ? content.blog : null;
-  var title = stripClinicBlogTitlePrefix_(blog && blog.title);
+  var title = blog && String(blog.title || '').trim();
   var productName = shortenMangoProductName_(title || topic || '');
   var problem = '';
   var selfCare = '';
@@ -36147,10 +34060,6 @@ function paintDraftSavedThumbFallback_(list){
 function renderThumbGalleryStrip_(){
   var root = document.getElementById('thumb-gallery-strip');
   if(!root) return;
-  if(state && state._plannerSafeMode){
-    root.textContent = '반복 재시작을 감지해 최근 사진은 열지 않습니다.';
-    return;
-  }
   loadThumbGallery_().then(function(list){
     var st = ensureThumbMakerState_();
     var photoOnly = isThumbPhotoOnlyMode_();
@@ -37853,7 +35762,7 @@ function renderThumbMakerCard_(content){
   html += '<textarea id="thumb-body" rows="3" oninput="onThumbMakerFieldChange_()" onfocus="onThumbMakerFieldFocus_(\'body\')" onblur="onThumbMakerFieldBlur_()">' + escapeHtml(copy.body) + '</textarea>';
   }
   var savedThumb = content && content.images && content.images.thumbMakerSaved;
-  if(savedThumb && savedThumb.dataUrl && !(state && state._plannerSafeMode)){
+  if(savedThumb && savedThumb.dataUrl){
     html += '<div class="thumb-maker-saved-box">';
     html += '<div class="thumb-maker-saved-hd">' + (photoOnly ? '초안에 저장된 4:5 JPEG' : '초안에 저장된 썸네일');
     if(savedThumb.savedAt){
@@ -37886,7 +35795,6 @@ function renderThumbMakerCard_(content){
 }
 
 function scheduleThumbMakerInit_(){
-  if(state && state._plannerSafeMode) return;
   if(!document.getElementById('thumb-preview-canvas')) return;
   syncStickyCatNavOffset_();
   setTimeout(function(){
@@ -38648,7 +36556,6 @@ window.refreshThumbMakerFromTopic_ = function(){
 };
 
 async function paintThumbMakerPreview_(){
-  if(state && state._plannerSafeMode) return;
   var canvas = document.getElementById('thumb-preview-canvas');
   if(!canvas) return;
   var st = ensureThumbMakerState_();
@@ -38794,14 +36701,9 @@ async function persistThumbMakerToDraft_(copy){
     state.published[draftId].content = content;
   }
   state.generatedOnly[draftId] = content;
-  var thumbDraft = getCurrentDraftForThumb_();
-  if(thumbDraft) stampDraftActivity_(thumbDraft);
-  try { paintDraftListDate_(draftId); } catch(eThumbDate){}
   try {
     save({ skipDriveUpload: true, gasImmediate: false });
   } catch(eSave){}
-  try { ensureDraftSyncKeysQueued_(draftId); } catch(eThumbSync){}
-  try { warnThumbChangedAfterReserve_(draftId); } catch(eThumbWarn){}
 
   schedulePersistThumbWorkspace_(true);
   try {
@@ -39244,7 +37146,6 @@ function renderTopicPhotoCard_(content){
   }
   var st = ensureThumbMakerState_();
   var preview = (st && st.bgDataUrl && st.draftId === state.selectedId && st.fileName === '주제 사진.jpg') ? st.bgDataUrl : '';
-  if(state && state._plannerSafeMode) preview = '';
   var html = '';
   html += '<div class="img-section-title">이미지 생성</div>';
   html += '<p class="empty-note" style="padding:0 0 8px;line-height:1.5;">1순위는 보관함 실사입니다. 해부 일러스트는 GPT, 인물은 나노바나나입니다. 인물은 앞의 둘이 안 맞을 때만.</p>';
@@ -39279,11 +37180,6 @@ function renderTopicPhotoCard_(content){
 function fillTopicPhotoPreview_(dataUrl){
   var box = document.getElementById('topic-photo-preview');
   var dl = document.getElementById('topic-photo-download');
-  if(state && state._plannerSafeMode){
-    if(dl) dl.disabled = true;
-    if(box) box.textContent = '반복 재시작을 감지해 사진은 열지 않습니다. 이 기기의 수정은 그대로 둡니다.';
-    return;
-  }
   if(dl) dl.disabled = !dataUrl;
   if(!box) return;
   if(!dataUrl){
@@ -39345,17 +37241,14 @@ async function topicPhotoBlobToJpegData_(blob, maxEdge, maxChars){
     if(ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(bmp, 0, 0, c.width, c.height);
     var dataUrl = c.toDataURL('image/jpeg', quality);
-    releaseCanvas_(c);
-    c = null;
     var m = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
-    dataUrl = '';
     data = m ? m[1] : '';
     if(!data || data.length <= limit) break;
     quality = Math.max(0.5, quality - 0.08);
     edge = Math.max(160, Math.round(edge * 0.82));
     guard++;
   }
-  releaseBitmap_(bmp);
+  if(bmp.close){ try { bmp.close(); } catch(eClose){} }
   return data;
 }
 async function loadTopicPhotoRefList_(paths, role, maxCount, limits){
@@ -39672,14 +37565,14 @@ function ensureTopicPhotoModelStatus_(){
   }).catch(function(){});
 }
 async function cropDataUrlToFourFive_(dataUrl){
-  if(!dataUrl || (state && state._plannerSafeMode)) return dataUrl;
+  if(!dataUrl) return dataUrl;
   var img = await loadBitmapForThumb_(dataUrl);
   var w = img.naturalWidth || img.width || 1;
   var h = img.naturalHeight || img.height || 1;
   var target = 4 / 5;
   var ratio = w / h;
   if(Math.abs(ratio - target) <= 0.02){
-    releaseBitmap_(img);
+    if(img.close){ try { img.close(); } catch(eClose){} }
     return dataUrl;
   }
   var sw = w, sh = h, sx = 0, sy = 0;
@@ -39703,10 +37596,8 @@ async function cropDataUrlToFourFive_(dataUrl){
   ctx.imageSmoothingEnabled = true;
   if(ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
-  releaseBitmap_(img);
-  var cropped = c.toDataURL('image/jpeg', 0.92);
-  releaseCanvas_(c);
-  return cropped;
+  if(img.close){ try { img.close(); } catch(eClose2){} }
+  return c.toDataURL('image/jpeg', 0.92);
 }
 window.generateTopicPhoto_ = async function(btn){
   if(btn && btn.disabled) return;
@@ -40295,7 +38186,7 @@ function openDetail(draftId, catId, tab, opts) {
   if(content && alignDraftTopicToBlogTitle_(draftId, content)){
     try { save({ gasImmediate: true }); } catch(eTopic){}
   }
-  document.getElementById('sheet-title').textContent = stripClinicBlogTitlePrefix_(draft.topic);
+  document.getElementById('sheet-title').textContent = draft.topic;
   if(content){
     var beforeLen = (content.images && content.images.gptVisuals) ? content.images.gptVisuals.length : 0;
     normalizeContentImages_(content, catId);
@@ -40390,11 +38281,8 @@ function renderSheetEmpty(draft, cat) {
 }
 
 
-function renderSheetContent(content, opts) {
-  opts = opts || {};
+function renderSheetContent(content) {
   const tab = state.activeTab;
-  var sheetBox = document.getElementById('sheet-body');
-  var keepScroll = sheetBox ? sheetBox.scrollTop : 0;
   var focusSnap = captureTextFieldFocus_();
   if(focusSnap && content){
     content = JSON.parse(JSON.stringify(content));
@@ -40425,17 +38313,16 @@ function renderSheetContent(content, opts) {
     }
   } else if(tab==='blog'){
     const blogCatId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
-    const b = blogForSheet_(content.blog, blogCatId);
+    const b = normalizeBlogBlock(content.blog, blogCatId) || content.blog || {};
     if(blogUsesStructuredGeneralFormat_(blogCatId, b)){
       bodyHTML = composeSheetTabLayout_(tab,
         addSourceHtml + sheetFullCopyBar_() +
-        clinicBranchLabelSheetHtml_(blogCatId) +
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, syncTopic: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('문제 제기', 'sheet-blog-problem', getGeneralBlogProblemText_(b), { rows: 5, help: '공감 질문 → 일상에서 바로 풀 수 있다는 한 줄까지', regen: 'blog.problem', copy: true, paragraphs: true }) +
         sheetEditField_('셀프 케어', 'sheet-blog-selfcare', b.selfCare || '', { rows: 8, help: '👉 먼저 확인 한 줄 · 👉 1.~4. 3~4단계(초·회) · 실수 2~3개 · 단계 사이 빈 줄', regen: 'blog.selfCare', copy: true, stepPreview: true }) +
         sheetEditField_('원리 설명', 'sheet-blog-explanation', b.explanation || '', { rows: 6, regen: 'blog.explanation', copy: true, paragraphs: true }) +
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
-        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
+        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         (isBranchBookingBlogCategory_(blogCatId) ? realMovementBlogFooterSheetHtml_(blogCatId) : expertCourseBlogFooterSheetHtml_(blogCatId)) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>지금 올리기·예약하기</strong>는 글을 복사하고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙고, 버튼으로 날짜를 바꿀 수 있어요. <strong>수정된 블로그 최종본</strong>으로 인스타 캡션이 백그라운드에서 만들어져요.' +
         ((isBranchBookingBlogCategory_(blogCatId) || isExpertCourseCategory(blogCatId)) ? ' 하단 <strong>말미 링크</strong>는 고정으로 붙어요.' : '') + '</p>'
@@ -40443,26 +38330,24 @@ function renderSheetContent(content, opts) {
     } else if(isExpertCourseCategory(blogCatId)){
       bodyHTML = composeSheetTabLayout_(tab,
         addSourceHtml + sheetFullCopyBar_() +
-        clinicBranchLabelSheetHtml_(blogCatId) +
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, syncTopic: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('영상·사진 맥락', 'sheet-blog-hook', b.hook, { rows: 4, help: '이번 영상·사진에서 다룬 장면·상황', regen: 'blog.hook', copy: true, paragraphs: true }) +
         sheetEditField_('시연·핵심 포인트', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '손 위치·동작·주의사항 — 한 줄에 하나씩', regen: 'blog.outline', copy: true }) +
         sheetEditField_('원리 설명', 'sheet-blog-draft', b.draft, { rows: 12, help: '본문의 중심. 왜 이렇게 하는지·짧은 메커니즘', regen: 'blog.draft', copy: true, paragraphs: true }) +
         sheetEditField_('마무리', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
-        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요 · 3~5개 권장', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
+        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분 · 3~5개 권장', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         expertCourseBlogFooterSheetHtml_(blogCatId) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>지금 올리기·예약하기</strong>는 저장·복사되고 글쓰기로 이동해요. 하단 <strong>말미 링크</strong>는 해당 과정 안내로 고정해서 붙어요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙습니다.</p>'
       );
     } else {
       bodyHTML = composeSheetTabLayout_(tab,
         addSourceHtml + sheetFullCopyBar_() +
-        clinicBranchLabelSheetHtml_(blogCatId) +
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, syncTopic: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('후킹 오프닝', 'sheet-blog-hook', b.hook, { rows: 4, regen: 'blog.hook', copy: true, paragraphs: true }) +
         sheetEditField_('목차 구성', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '한 줄에 소제목 하나씩', regen: 'blog.outline', copy: true }) +
         sheetEditField_('본문 초안', 'sheet-blog-draft', b.draft, { rows: 14, regen: 'blog.draft', copy: true, paragraphs: true }) +
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
-        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
+        sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).map(function(h){ return h.replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>지금 올리기·예약하기</strong>는 블로그가 저장·복사되고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙습니다.</p>'
       );
     }
@@ -40480,7 +38365,7 @@ function renderSheetContent(content, opts) {
         addSourceHtml + sheetFullCopyBar_() +
         sheetEditField_('첫 줄 후킹', 'sheet-insta-hook', ig.hook, { rows: 2, title: true, regen: 'insta.hook', copy: true }) +
         sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10, regen: 'insta.caption', copy: true, paragraphs: true }) +
-        sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
+        sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).map(function(h){ return String(h).replace(/^#/, ''); }).join(' '), { rows: 2, help: '# 없이 띄어쓰기로 구분', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
         instagramCollabSheetHtml_(state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId)) +
         '<div data-social-slot="insta"></div>' +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>지금 올리기</strong>는 @dr.park_dc.pt에 바로 게시하고(연결 계정은 공동작업자로 초대), <strong>예약하기</strong>는 고른 시간에 클라우드가 올립니다. 올리면 <strong>수정된 인스타 최종본</strong>으로 쓰레드 초안이 만들어져요. 앱에서 직접 올렸다면 <strong>직접 올림</strong>을 누르세요.</p>'
@@ -40490,10 +38375,6 @@ function renderSheetContent(content, opts) {
     var ths = content.threads;
     if(shouldShowThreadsPending_(content, state.selectedId)){
       bodyHTML = tabsHTML + buildThreadsPendingBox_(content, state.selectedId);
-    } else if(threadsInterruptedByDraft[state.selectedId] && (!ths || !getThreadsBodyText_(ths))){
-      bodyHTML = tabsHTML +
-        '<div class="sheet-insta-pending"><strong>생성이 중단됐습니다. 다시 만들려면 버튼을 누르세요.</strong></div>' +
-        '<button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin-top:12px;">쓰레드 글 만들기</button>';
     } else if(!ths || !getThreadsBodyText_(ths)){
       bodyHTML = tabsHTML +
         '<div class="sheet-insta-pending"><strong>쓰레드 글은 아직 없어요.</strong><br>인스타 탭에서 캡션을 다듬은 뒤 <strong>발행완료</strong>를 누르면, 그 최종본으로 쓰레드 초안이 만들어져요. 인스타 초안이 있으면 아래에서도 만들 수 있어요.</div>' +
@@ -40537,7 +38418,7 @@ function renderSheetContent(content, opts) {
       bodyHTML = tabsHTML + `<p class="empty-note" style="padding:12px 0;">커뮤니티 초안이 없어요. 초안을 다시 생성하면 함께 만들어져요.</p>
         <button type="button" class="btn-gen-big" onclick="genContent(event)" style="width:100%;margin-top:8px;">초안 다시 생성</button>`;
     } else {
-      const coNorm = communityForSheet_(co);
+      const coNorm = normalizeCommunityBlock(co);
       const problemText = getCommunityProblemText_(coNorm);
       bodyHTML = composeSheetTabLayout_(tab,
         addSourceHtml + sheetFullCopyBar_() +
@@ -40565,13 +38446,13 @@ function renderSheetContent(content, opts) {
   var socialTab = (tab === 'insta' || tab === 'threads') && isBlogInstaCategory(state.selectedCatId) && typeof PlannerSocial !== 'undefined';
   var blogPlanTab = tab === 'blog';
   setSheetActionsHtml_(socialTab
-    ? '<button type="button" class="btn-save-draft" onpointerdown="holdSheetSavePush_()" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' + PlannerSocial.actionsHTML(tab)
+    ? '<button type="button" class="btn-save-draft" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' + PlannerSocial.actionsHTML(tab)
     : blogPlanTab
-      ? '<button type="button" class="btn-save-draft" onpointerdown="holdSheetSavePush_()" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
+      ? '<button type="button" class="btn-save-draft" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
         '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
         blogScheduleButtonHTML_() +
         '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">지금 올리기</button>'
-      : '<button type="button" class="btn-save-draft" onpointerdown="holdSheetSavePush_()" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
+      : '<button type="button" class="btn-save-draft" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
         '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
         (isDailyImages ? '' : '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">발행완료</button>')
   );
@@ -40586,18 +38467,7 @@ function renderSheetContent(content, opts) {
     var topicPreviewSrc = topicPreview && (topicPreview.getAttribute('src') || '');
     if(topicPreviewSrc) fillTopicPhotoPreview_(topicPreviewSrc);
   }
-  if(opts.scrollFieldId){
-    scrollSheetFieldHeaderIntoView_(opts.scrollFieldId);
-  } else if(focusSnap && keepScroll > 8){
-    var kept = document.getElementById('sheet-body');
-    if(kept){
-      kept.scrollTop = keepScroll;
-      kept._plannerHoldScroll = keepScroll;
-      holdSheetScroll_(kept, keepScroll);
-    }
-  } else {
-    scrollSheetBodyToStart_();
-  }
+  scrollSheetBodyToStart_();
 }
 
 
@@ -40610,7 +38480,7 @@ function getTabCopyText(tab, content){
     if(!b) return '';
     if(blogUsesStructuredGeneralFormat_(catId, b)) return formatGeneralBlogPostText(b, catId);
     const outline = (b.outline || []).map(function(o, i){ return (i + 1) + '. ' + o; }).join('\n\n');
-    return withExpertCourseBlogFooter_(withRealMovementBlogFooter_('[블로그]\n제목: ' + withClinicBlogTitle_(b.title, catId) + '\n\n' + (b.hook || '') + '\n\n' + outline + '\n\n' + (b.draft || '') + '\n\n' + (b.cta || '') + '\n\n' + (b.hashtags || []).map(function(h){ return '#' + h; }).join(' '), catId), catId);
+    return withExpertCourseBlogFooter_(withRealMovementBlogFooter_('[블로그]\n제목: ' + b.title + '\n\n' + (b.hook || '') + '\n\n' + outline + '\n\n' + (b.draft || '') + '\n\n' + (b.cta || '') + '\n\n' + (b.hashtags || []).map(function(h){ return '#' + h; }).join(' '), catId), catId);
   }
   if(tab === 'insta'){
     const ig = content.insta;
@@ -40703,28 +38573,11 @@ function ensureNotifyForInstaBg_(){
   } catch(e){}
 }
 
-/** 첫 줄(제목)을 인용구(blockquote)로, 나머지는 문단으로 — 네이버 에디터에 붙이면 제목이 인용구가 된다. */
-function blogPasteHtmlWithQuotedTitle_(text){
-  var raw = String(text || '').replace(/\r\n/g, '\n').trim();
-  if(!raw) return '';
-  var nl = raw.indexOf('\n');
-  var title = (nl < 0 ? raw : raw.slice(0, nl)).trim();
-  if(!title || title.length > 120) return '';
-  var rest = nl < 0 ? '' : raw.slice(nl + 1).trim();
-  var paras = rest ? rest.split(/\n\s*\n/).map(function(block){
-    return '<p>' + escapeHtml(block.trim()).replace(/\n/g, '<br/>') + '</p>';
-  }).join('') : '';
-  return '<blockquote>' + escapeHtml(title.replace(/^제목\s*[:：]\s*/, '')) + '</blockquote>' + paras;
-}
-function copyAndOpenNaverBlog_(text, catId){
-  if(text){
-    var quotedHtml = '';
-    try { quotedHtml = blogPasteHtmlWithQuotedTitle_(text); } catch(eQuote){ quotedHtml = ''; }
-    if(quotedHtml) writeClipboardRich_(text, quotedHtml, function(){});
-    else if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(function(){});
+function copyAndOpenNaverBlog_(text){
+  if(text && navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(function(){});
   }
   openExternalNaverBlog();
-  try { noteBlogDefaultCategoryOnOpen_(catId != null ? catId : state.selectedCatId); } catch(eNote){}
 }
 function startInstaDraftAfterBlogPublish_(draftId, catId, topic, content){
   if(!isBlogInstaCategory(catId) || !content || !content.blog) return;
@@ -40911,11 +38764,11 @@ function shouldShowInstaPending_(content, draftId){
 }
 function getSheetThreadsBodyFromDom_(){
   var el = document.getElementById('sheet-threads-body');
-  return el ? sheetFieldText_(el) : '';
+  return el ? String(el.value || '').trim() : '';
 }
 function getSheetThreadsCommentFromDom_(){
   var el = document.getElementById('sheet-threads-comment');
-  return el ? sheetFieldText_(el) : '';
+  return el ? String(el.value || '').trim() : '';
 }
 function getSheetThreadsTextFromDom_(){
   return getSheetThreadsBodyFromDom_();
@@ -40936,7 +38789,7 @@ function syncThreadsDraftFromDom_(content, draftId){
   content.threads.body = bodyText;
   content.threads.comment = commentText;
   content.threads.text = bodyText;
-  clearThreadsPendingMeta_(content, draftId);
+  clearThreadsPendingMeta_(content);
   return content;
 }
 
@@ -40945,7 +38798,7 @@ function threadsContentReady_(content){
 }
 function shouldShowThreadsPending_(content, draftId){
   if(hasThreadsDraftText_(content, draftId)) return false;
-  return !!(threadsPendingMetaByDraft[draftId] || threadsBgByDraft[draftId]);
+  return !!(content && (content.threadsPending || threadsBgByDraft[draftId]));
 }
 function refreshSheetIfViewingDraft_(draftId, catId, tab){
   if(state.selectedId !== draftId) return;
@@ -41158,20 +39011,15 @@ function getThreadsBgJob_(draftId){
   if(job === true) return { startedMs: Date.now(), endMs: Date.now() + THREADS_BG_ESTIMATE_MS };
   return job;
 }
-var threadsPendingMetaByDraft = {};
-var threadsInterruptedByDraft = {};
-var THREADS_LOCAL_PENDING_KEY_ = 'ht_threads_pending_local_v1';
-function readThreadsLocalPending_(){
-  try {
-    var raw = localStorage.getItem(THREADS_LOCAL_PENDING_KEY_);
-    var parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-  } catch(ePending){ return {}; }
+function setThreadsPendingMeta_(content, draftId, catId, topic, startedMs, endMs){
+  if(!content) return;
+  content.threadsPending = true;
+  content.threadsPendingStartedAt = startedMs;
+  content.threadsPendingEndMs = endMs;
+  content.threadsPendingTopic = topic || '';
+  content.threadsPendingCatId = catId;
 }
-function writeThreadsLocalPending_(bag){
-  try { localStorage.setItem(THREADS_LOCAL_PENDING_KEY_, JSON.stringify(bag || {})); } catch(ePending){}
-}
-function stripThreadsPendingFields_(content){
+function clearThreadsPendingMeta_(content){
   if(!content) return;
   delete content.threadsPending;
   delete content.threadsPendingStartedAt;
@@ -41179,39 +39027,13 @@ function stripThreadsPendingFields_(content){
   delete content.threadsPendingTopic;
   delete content.threadsPendingCatId;
 }
-function setThreadsPendingMeta_(content, draftId, catId, topic, startedMs, endMs){
-  if(draftId){
-    threadsPendingMetaByDraft[draftId] = {
-      startedMs: startedMs,
-      endMs: endMs,
-      topic: topic || '',
-      catId: catId
-    };
-    delete threadsInterruptedByDraft[draftId];
-    var bag = readThreadsLocalPending_();
-    bag[draftId] = { startedMs: startedMs, endMs: endMs, topic: topic || '', catId: catId };
-    writeThreadsLocalPending_(bag);
-  }
-  stripThreadsPendingFields_(content);
-}
-function clearThreadsPendingMeta_(content, draftId){
-  if(draftId){
-    delete threadsPendingMetaByDraft[draftId];
-    delete threadsInterruptedByDraft[draftId];
-    var bag = readThreadsLocalPending_();
-    if(bag[draftId]){
-      delete bag[draftId];
-      writeThreadsLocalPending_(bag);
-    }
-  }
-  stripThreadsPendingFields_(content);
-}
 function getThreadsPendingEndMs_(content, draftId){
   var job = getThreadsBgJob_(draftId);
   if(job && job.endMs) return job.endMs;
-  var meta = threadsPendingMetaByDraft[draftId];
-  if(meta && meta.endMs) return meta.endMs;
-  return Date.now() + THREADS_BG_ESTIMATE_MS;
+  var endMs = parseInt(content && content.threadsPendingEndMs, 10);
+  if(endMs) return endMs;
+  var startedMs = parseInt(content && content.threadsPendingStartedAt, 10);
+  return startedMs ? startedMs + THREADS_BG_ESTIMATE_MS : Date.now() + THREADS_BG_ESTIMATE_MS;
 }
 function getThreadsPendingCountdownText_(content, draftId){
   var activeJob = !!getThreadsBgJob_(draftId);
@@ -41233,7 +39055,7 @@ function updateThreadsPendingCountdown_(){
   var el = document.getElementById('threads-pending-countdown');
   if(!el || !state.selectedId) return;
   var content = getDraftContent_(state.selectedId);
-  if(!threadsPendingMetaByDraft[state.selectedId] && !getThreadsBgJob_(state.selectedId)) return;
+  if(!content || !content.threadsPending) return;
   el.textContent = getThreadsPendingCountdownText_(content, state.selectedId);
 }
 function normalizeThreadsSnsBlock_(raw){
@@ -41242,13 +39064,6 @@ function normalizeThreadsSnsBlock_(raw){
   var comment = String(raw.comment != null ? raw.comment : '').trim();
   var legacyText = String(raw.text != null ? raw.text : raw.summary || '').trim();
   if(!body && legacyText) body = legacyText;
-  if(typeof PlannerFieldSync !== 'undefined'){
-    var splitThreads = PlannerFieldSync.splitThreadComment(body, comment);
-    if(splitThreads.merged){
-      body = splitThreads.body;
-      comment = splitThreads.comment;
-    }
-  }
   if(!body && !comment) return null;
   return { body: body, comment: comment, text: body };
 }
@@ -41390,7 +39205,7 @@ function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
       var content = getDraftContent_(draftId);
       if(content){
         content.threads = threads;
-        clearThreadsPendingMeta_(content, draftId);
+        clearThreadsPendingMeta_(content);
         persistDraftContent_(draftId, content);
       }
       delete threadsBgByDraft[draftId];
@@ -41415,7 +39230,7 @@ function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
           var retryStartMs = Date.now();
           setThreadsPendingMeta_(failContent, draftId, catId, topic, retryStartMs, retryStartMs + THREADS_BG_ESTIMATE_MS);
         } else {
-          clearThreadsPendingMeta_(failContent, draftId);
+          clearThreadsPendingMeta_(failContent);
         }
         persistDraftContent_(draftId, failContent);
         if(state.selectedId === draftId){
@@ -41446,30 +39261,49 @@ function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
   })();
 }
 function reconcileThreadsPendingJobs_(reason){
-  if(typeof PlannerFieldSync !== 'undefined' && PlannerFieldSync.shouldResumeThreadsJob(reason)) return false;
-  var bag = readThreadsLocalPending_();
-  var changed = false;
-  Object.keys(bag).forEach(function(id){
-    if(threadsBgByDraft[id]) return;
-    threadsInterruptedByDraft[id] = true;
-    delete bag[id];
-    changed = true;
-  });
-  if(changed) writeThreadsLocalPending_(bag);
+  if(!state.apiKey || genActiveJob || genPendingCount > 0) return false;
+  var now = Date.now();
+  var candidates = [];
   (CATEGORIES || []).forEach(function(cat){
+    if(!isBlogInstaCategory(cat.id)) return;
     (cat.drafts || []).forEach(function(d){
       var content = getDraftContent_(d.id);
-      if(!content) return;
-      var hadPending = !!(content.threadsPending || content.threadsPendingStartedAt || content.threadsPendingEndMs);
-      stripThreadsPendingFields_(content);
-      if(content.content){
-        hadPending = hadPending || !!(content.content.threadsPending || content.content.threadsPendingStartedAt || content.content.threadsPendingEndMs);
-        stripThreadsPendingFields_(content.content);
+      if(!content || !content.threadsPending || hasThreadsDraftText_(content, d.id) || !instaContentReady_(content) || threadsBgByDraft[d.id]) return;
+      var startedMs = parseInt(content.threadsPendingStartedAt, 10) || 0;
+      if(startedMs && now - startedMs > THREADS_PENDING_RESTART_WINDOW_MS){
+        clearThreadsPendingMeta_(content);
+        persistDraftContent_(d.id, content);
+        return;
       }
-      if(hadPending && !threadsBgByDraft[d.id]) threadsInterruptedByDraft[d.id] = true;
+      candidates.push({
+        draftId: d.id,
+        catId: cat.id,
+        topic: d.topic || content.threadsPendingTopic || '',
+        insta: content.insta,
+        startedMs: startedMs
+      });
     });
   });
-  return false;
+  if(!candidates.length) return false;
+  candidates.sort(function(a, b){
+    if(a.draftId === state.selectedId) return -1;
+    if(b.draftId === state.selectedId) return 1;
+    return (b.startedMs || 0) - (a.startedMs || 0);
+  });
+  var job = candidates[0];
+  enqueueThreadsFromInsta_(job.draftId, job.catId, job.topic, job.insta, { resume: true });
+  if(state.selectedId === job.draftId){
+    state.selectedCatId = job.catId;
+    state.activeTab = 'threads';
+    setOpenDetailHash_(job.draftId, job.catId, 'threads');
+    var content = getDraftContent_(job.draftId);
+    var ov = document.getElementById('detail-overlay');
+    if(content && ov && ov.classList.contains('open')) renderSheetContent(content);
+  }
+  if(reason && reason !== 'load' && typeof setAppToast === 'function'){
+    setAppToast('중단됐던 쓰레드 글 생성을 다시 이어서 시작했어요.', { duration: 4500, variant: 'ok' });
+  }
+  return true;
 }
 
 
@@ -41582,7 +39416,7 @@ function sheetEditField_(label, id, value, opts){
     (opts.regen ? ';onSheetFieldInput_(this)' : '') +
     (opts.stepPreview ? ';renderSelfCareStepsPreview_(this)' : '') +
     (opts.syncTopic ? ';onSheetTitleSyncTopic_(this)' : '');
-  var onblur = ' onblur="onSheetFieldBlur_(event)' + (opts.syncTopic ? ';flushSheetTitleBackgroundWork_()' : '') + '"';
+  var onblur = opts.syncTopic ? ' onblur="flushSheetTitleBackgroundWork_()"' : '';
   var previewAttr = opts.stepPreview ? ' data-selfcare-preview="1"' : '';
   var previewHost = opts.stepPreview ? '<div class="selfcare-steps" data-steps-for="' + id + '"></div>' : '';
   return '<div class="' + wrapCls + '"><div class="cb-label">' + escapeHtml(label) + tools + '</div>' + help +
@@ -41590,16 +39424,13 @@ function sheetEditField_(label, id, value, opts){
 }
 
 /**
- * 줄바꿈이 있으면 세 줄 이상만 두 줄로 줄이고 들여쓰기만 정리한다. 한 줄로 이어진 글만 문장 경계에 빈 줄을 넣는다.
+ * 빈 줄이 있으면 그 단락·댓글 경계와 줄바꿈을 유지한다.
  * 마침표로 나누는 것은 빈 줄이 전혀 없을 때만. 짧은 문장(36자 미만)은 다음 문장과 한 단락.
  * 이미 줄로 나뉜 목록은 불릿 사이에 빈 줄을 끼워 넣지 않는다. 👉 셀프케어는 그대로 둔다.
  */
 function ensureProseParagraphBreaks_(text){
-  var t = (typeof PlannerFieldSync !== 'undefined' && PlannerFieldSync.preserveProseBreaks)
-    ? PlannerFieldSync.preserveProseBreaks(text)
-    : String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  var t = String(text || '').replace(/\r\n/g, '\n').trim();
   if(!t) return '';
-  if(t.indexOf('\n') >= 0) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
   if(/\n[ \t]*\n/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
   if(/(^|\n)\s*👉/.test(t)) return stripProseParagraphIndents_(t.replace(/\n{3,}/g, '\n\n'));
   if(/(^|\n)\s*(?:[-•*]|\d+[.)])\s/.test(t)) return stripProseParagraphIndents_(t);
@@ -41686,17 +39517,14 @@ function sheetFullCopyBar_(){
     '<span class="sheet-fullcopy-hint">구분된 내용을 한 줄씩 띄워 복사해요</span></div>';
 }
 
-/** 해시태그 입력을 나눈다. 사용자가 넣은 #은 지우지 않고 그대로 둔다(#태그 → #태그, 태그 → 태그). */
-function parseHashtagInput_(text){
-  return (String(text || '').match(/#?[^\s,#]+/g) || []).map(function(t){ return t.trim(); }).filter(Boolean);
-}
 window.copySheetField_ = function(id, btn, isHashtags){
   var el = document.getElementById(id);
   if(!el) return;
   var text = String(el.value || '');
   var html = '';
   if(isHashtags){
-    text = parseHashtagInput_(text).map(function(t){ return '#' + t.replace(/^#+/, ''); }).join(' ');
+    text = text.split(/[\s,#]+/).map(function(t){ return t.replace(/^#/, '').trim(); })
+      .filter(Boolean).map(function(t){ return '#' + t; }).join(' ');
   } else if(el.getAttribute('data-selfcare-preview') === '1'){
     html = formatSelfCareStepsHtmlForCopy_(text);
     text = formatSelfCareStepsForCopy_(text);
@@ -41854,87 +39682,6 @@ function findSheetFieldTextarea_(btnOrKey){
 }
 window.onSheetFieldInput_ = function(ta){
   updateSheetFieldPolishBtn_(ta);
-  var box = sheetScrollBox_(ta);
-  if(box && box.scrollTop > 8) box._plannerHoldScroll = box.scrollTop;
-  armSheetScrollGuard_(box);
-  state._sheetDomDirty = true;
-  noteSheetDraftActivity_();
-  scheduleSheetQuietSave_();
-};
-var _sheetQuietSaveTimer_ = 0;
-function noteSheetDraftActivity_(){
-  if(state._revisionArmed || !state.selectedId) return;
-  state._revisionArmed = true;
-  pushCardRevision_(state.selectedId);
-}
-function scheduleSheetQuietSave_(){
-  if(_sheetQuietSaveTimer_) clearTimeout(_sheetQuietSaveTimer_);
-  _sheetQuietSaveTimer_ = setTimeout(flushSheetQuietSave_, 1000);
-}
-function flushSheetQuietSave_(){
-  _sheetQuietSaveTimer_ = 0;
-  if(sheetQuietSaving_) return;
-  if(!state._sheetDomDirty) return;
-  sheetQuietSaving_ = true;
-  try { flushSheetQuietSaveBody_(); }
-  finally { sheetQuietSaving_ = false; }
-}
-function flushSheetQuietSaveBody_(){
-  if(!state._sheetDomDirty) return;
-  var draftId = state.selectedId;
-  if(!draftId) return;
-  state._sheetDomDirty = false;
-  var content = getDraftContent_(draftId);
-  if(!content) return;
-  var beforeFp = typeof PlannerFieldSync !== 'undefined' ? PlannerFieldSync.historySnapshot(content).fp : '';
-  var beforeSheet = null;
-  try { beforeSheet = JSON.parse(JSON.stringify(content)); } catch(eBeforeSheet){ beforeSheet = null; }
-  applySheetEditsForTab_(content, state.activeTab);
-  if(beforeSheet && typeof PlannerFieldSync !== 'undefined'){
-    noteClearedPaths_(draftId, PlannerFieldSync.clearedPathsBetween(beforeSheet, content));
-  }
-  var afterFp = typeof PlannerFieldSync !== 'undefined' ? PlannerFieldSync.historySnapshot(content).fp : beforeFp;
-  var sectionChanged = sheetSectionLayoutChanged_;
-  var draft = findDraftByIdAnywhere_(draftId);
-  if(draft && (typeof PlannerFieldSync === 'undefined' || beforeFp !== afterFp)) stampDraftActivity_(draft);
-  state._revisionArmed = false;
-  if(!state.published[draftId]) state.published[draftId] = {};
-  state.published[draftId].content = content;
-  state.generatedOnly[draftId] = content;
-  paintDraftListDate_(draftId);
-  focusSyncOutboxOnDraft_(draftId);
-  try { save({ gasImmediate: false, driveImmediate: false, skipGasPush: true }); }
-  finally {
-    try { ensureDraftSyncKeysQueued_(draftId); } catch(eQuiet){}
-    state._syncFocusDraftIds = null;
-  }
-  if(sectionChanged) paintSheetAfterSectionSplit_(content);
-}
-var _holdSheetSaveTimer_ = 0;
-function holdSheetSavePush_(){
-  state._holdSheetSavePush = true;
-  if(_holdSheetSaveTimer_) clearTimeout(_holdSheetSaveTimer_);
-  _holdSheetSaveTimer_ = setTimeout(function(){
-    _holdSheetSaveTimer_ = 0;
-    state._holdSheetSavePush = false;
-  }, 2000);
-}
-function clearSheetSaveHold_(){
-  state._holdSheetSavePush = false;
-  if(_holdSheetSaveTimer_){
-    clearTimeout(_holdSheetSaveTimer_);
-    _holdSheetSaveTimer_ = 0;
-  }
-}
-window.onSheetFieldBlur_ = function(ev){
-  var next = ev && ev.relatedTarget;
-  if(next && next.closest && next.closest('.btn-save-draft')) holdSheetSavePush_();
-  if(sheetQuietSaving_ || sheetSectionPainting_) return;
-  if(_sheetQuietSaveTimer_){
-    clearTimeout(_sheetQuietSaveTimer_);
-    _sheetQuietSaveTimer_ = 0;
-  }
-  flushSheetQuietSave_();
 };
 function updateSheetFieldPolishBtn_(ta){
   if(!ta || !ta.id) return;
@@ -42152,7 +39899,7 @@ window.polishSheetField_ = async function(key, btn){
       syncDraftTopicFromTitle_(block[meta.__field], { draftId: draftId, save: false });
     }
     persistDraftContent_(draftId, content);
-    renderSheetContent(content, { scrollFieldId: ta && ta.id });
+    renderSheetContent(content);
     setAppToast('「' + meta.label + '」을 다듬었어요.', { duration: 2800, variant: 'ok' });
   } catch(e){
     setAppToast('글 다듬기에 실패했어요: ' + ((e && e.message) || String(e)), { duration: 6000, variant: 'err' });
@@ -42185,52 +39932,22 @@ function parseSelfCareSteps_(text){
 /** 👉 와 빈 줄로 이미 짜인 셀프 케어는 번호를 다시 매기지 않는다 */
 function selfCareKeepsAuthorBreaks_(text){
   var t = String(text || '');
-  if(/(^|\n)\s*\d+\)\s+\S/.test(t) && /\n\s*\n/.test(t)) return true;
   return /(^|\n)\s*👉/.test(t) && /\n\s*\n/.test(t);
-}
-/** 주의·실수 줄 머리표 → 「✕ 」 */
-var SELFCARE_CAUTION_RE_ = /^(?:[⚠❗❌✗✘×✖]\uFE0F?\s*|※\s*|주의\s*[:：]?\s*)/;
-/**
- * 운동 단계 템플릿: 번호는 1) 2) 3), 항목 사이 빈 줄, 주의 줄은 「✕ 」로 시작.
- * 예전 「👉 1.」 형식도 같은 모양으로 맞춘다. 내용 문장은 바꾸지 않는다.
- */
-function normalizeSelfCareTemplate_(text){
-  var lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
-  var out = [];
-  var prevKind = '';
-  function blank(){ if(out.length && out[out.length - 1] !== '') out.push(''); }
-  lines.forEach(function(raw){
-    var ln = raw.trim();
-    if(!ln){ blank(); prevKind = ''; return; }
-    var m = ln.match(/^(?:👉\s*)?(\d+)\s*[.)]\s*(.+)$/);
-    if(m){ blank(); out.push(m[1] + ') ' + m[2].trim()); prevKind = 'step'; return; }
-    if(/^✕\s/.test(ln)){ if(prevKind !== 'caution') blank(); out.push(ln); prevKind = 'caution'; return; }
-    if(/^혼자 할 때 실수\s*[:：]/.test(ln)){ if(prevKind !== 'caution') blank(); out.push('✕ ' + ln); prevKind = 'caution'; return; }
-    var cm = ln.match(SELFCARE_CAUTION_RE_);
-    if(cm && ln.length > cm[0].length){
-      if(prevKind !== 'caution') blank();
-      out.push('✕ ' + ln.slice(cm[0].length).trim());
-      prevKind = 'caution';
-      return;
-    }
-    out.push(ln); prevKind = 'text';
-  });
-  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 /** 미리보기처럼 번호 + 단계 사이 빈 줄 — 아파트너·블로그 붙여넣기용 */
 function formatSelfCareStepsForCopy_(text){
   var t = String(text || '').replace(/\r\n/g, '\n').trim();
   if(!t) return '';
-  if(selfCareKeepsAuthorBreaks_(t)) return normalizeSelfCareTemplate_(t);
+  if(selfCareKeepsAuthorBreaks_(t)) return t.replace(/\n{3,}/g, '\n\n');
   var steps = parseSelfCareSteps_(t);
   if(steps.length <= 1){
     var one = String(steps[0] || t).replace(SELFCARE_STEP_STRIP_RE_, '').trim();
-    return normalizeSelfCareTemplate_(one || t);
+    return one || t;
   }
-  return normalizeSelfCareTemplate_(steps.map(function(s, i){
-    return (i + 1) + ') ' + String(s || '').replace(SELFCARE_STEP_STRIP_RE_, '').trim();
-  }).join('\n\n'));
+  return steps.map(function(s, i){
+    return (i + 1) + '. ' + String(s || '').replace(SELFCARE_STEP_STRIP_RE_, '').trim();
+  }).join('\n\n');
 }
 
 /** 리치 에디터 붙여넣기용 — 따라하기 미리보기 카드와 비슷한 HTML */
@@ -42239,7 +39956,7 @@ function formatSelfCareStepsHtmlForCopy_(text){
   if(!t) return '';
   if(selfCareKeepsAuthorBreaks_(t)){
     return '<div style="white-space:pre-wrap;line-height:1.7;font-size:14px;color:#1F2937;word-break:keep-all;">' +
-      escapeHtml(normalizeSelfCareTemplate_(t)).replace(/\n/g, '<br/>') + '</div>';
+      escapeHtml(t.replace(/\n{3,}/g, '\n\n')).replace(/\n/g, '<br/>') + '</div>';
   }
   var steps = parseSelfCareSteps_(t);
   function bodyHtml(s){
@@ -42314,20 +40031,13 @@ function renderSelfCareStepsPreview_(ta){
   if(!host) return;
   var raw = String(ta.value || '').trim();
   var steps = parseSelfCareSteps_(raw);
-  var box = document.getElementById('sheet-body');
-  var top = box ? box.scrollTop : 0;
-  if(!raw || steps.length <= 1){
-    if(host.innerHTML) host.innerHTML = '';
-    if(box && top) box.scrollTop = top;
-    return;
-  }
+  if(!raw || steps.length <= 1){ host.innerHTML = ''; return; }
   host.innerHTML = '<div class="selfcare-steps-title">따라하기 미리보기</div>' +
     steps.map(function(s, i){
       var body = escapeHtml(s.replace(SELFCARE_STEP_STRIP_RE_, '')).replace(/\n/g, '<br/>');
       return '<div class="selfcare-step"><span class="selfcare-step-no">' + (i + 1) + '</span>' +
         '<div class="selfcare-step-body">' + body + '</div></div>';
     }).join('');
-  if(box && top) box.scrollTop = top;
 }
 
 function renderAllSelfCareStepPreviews_(){
@@ -42399,228 +40109,33 @@ function ensureDraftSyncKeysQueued_(draftId){
   enqueueSyncOutboxChanges_(keys, payload);
   state.syncDirty = true;
   state._sessionUserEdit = true;
-  if(state._holdSheetSavePush) return;
   if(plannerSyncBootstrapReady_ && !plannerSyncConflictPending_ && !plannerBootstrapChoicePending_){
     try { schedulePlannerGasPush_(true); } catch(ePush){}
   }
 }
 function saveFocusedDraftChange_(draftId){
   focusSyncOutboxOnDraft_(draftId);
-  try { save({ driveImmediate: true, gasImmediate: true, skipGasPush: true }); }
+  try { save({ driveImmediate: true, gasImmediate: true }); }
   finally {
     try { ensureDraftSyncKeysQueued_(draftId); } catch(eQueue){}
     state._syncFocusDraftIds = null;
   }
 }
 function stampDraftActivity_(draft){
-  if(!draft || draft.reviewHold) return;
+  if(!draft) return;
   var now = new Date().toISOString();
-  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerNoteDraftActivity){
-    var noted = PlannerSyncRules.plannerNoteDraftActivity(draft, now);
-    draft.activityAt = noted.activityAt;
-    draft.updatedAt = noted.updatedAt;
-    return;
-  }
   draft.activityAt = now;
   draft.updatedAt = now;
-}
-function paintDraftListDate_(draftId){
-  if(!draftId) return;
-  var draft = findDraftByIdAnywhere_(draftId);
-  if(!draft) return;
-  var info = getDraftListDateInfo_(draft);
-  var cards = document.querySelectorAll('.draft-card[data-draft-id="' + draftId + '"]');
-  for(var i = 0; i < cards.length; i++){
-    var badge = cards[i].querySelector('.topic-line-created');
-    if(badge){
-      badge.textContent = info.label;
-      badge.title = info.edited ? '수정일' : '생성일';
-    }
-    var spans = cards[i].querySelectorAll('.card-intent-dates span');
-    for(var s = 0; s < spans.length; s++){
-      var text = spans[s].textContent || '';
-      if(text.indexOf('수정 ') === 0 || text.indexOf('생성 ') === 0){
-        spans[s].textContent = (info.edited ? '수정 ' : '생성 ') + info.label;
-      }
-    }
-  }
-}
-var CARD_REVISIONS_LS_ = 'ht_card_revisions_v1';
-function readCardRevisionMap_(){
-  try {
-    var raw = localStorage.getItem(CARD_REVISIONS_LS_);
-    var parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === 'object' ? parsed : {};
-  } catch(eRev){ return {}; }
-}
-function writeCardRevisionMap_(map){
-  try { localStorage.setItem(CARD_REVISIONS_LS_, JSON.stringify(map || {})); } catch(eRev){}
-}
-function cardRevisionList_(draftId){
-  var map = readCardRevisionMap_();
-  var list = Array.isArray(map[draftId]) ? map[draftId] : [];
-  if(typeof findDraftByIdAnywhere_ === 'function'){
-    var draft = findDraftByIdAnywhere_(draftId);
-    if(draft && Array.isArray(draft.revisions) && draft.revisions.length && !list.length){
-      list = draft.revisions.slice(0, 5).map(function(rev){
-        var copy = JSON.parse(JSON.stringify(rev));
-        delete copy.reelFile;
-        return copy;
-      });
-      map[draftId] = list;
-      writeCardRevisionMap_(map);
-    }
-    if(draft && draft.revisions) delete draft.revisions;
-  }
-  return list;
-}
-function pushCardRevision_(draftId){
-  var draft = typeof findDraftByIdAnywhere_ === 'function' ? findDraftByIdAnywhere_(draftId) : null;
-  var content = typeof getDraftContent_ === 'function' ? getDraftContent_(draftId) : null;
-  if(!draft || !content || typeof PlannerFieldSync === 'undefined') return;
-  cardRevisionList_(draftId);
-  var snap = PlannerFieldSync.historySnapshot(content);
-  var map = readCardRevisionMap_();
-  var list = Array.isArray(map[draftId]) ? map[draftId] : [];
-  if(list[0] && list[0].fp === snap.fp) return;
-  list.unshift(snap);
-  if(list.length > 5) list.length = 5;
-  map[draftId] = list;
-  writeCardRevisionMap_(map);
-}
-function toggleDraftReviewHold_(draftId){
-  var draft = findDraftByIdAnywhere_(draftId);
-  if(!draft) return;
-  draft.reviewHold = !draft.reviewHold;
-  state._reviewLockSync = true;
-  try {
-    focusSyncOutboxOnDraft_(draftId);
-    save({ driveImmediate: true, gasImmediate: true });
-    ensureDraftSyncKeysQueued_(draftId);
-  } finally {
-    state._reviewLockSync = false;
-    state._syncFocusDraftIds = null;
-  }
-  try { renderMain(); } catch(eRender){}
-  if(typeof setAppToast === 'function'){
-    setAppToast(draft.reviewHold
-      ? '검토 중입니다. 이 카드는 대기열에 올리지 않고, 날짜도 바꾸지 않습니다. 해제는 직접 눌러야 합니다.'
-      : '검토를 해제했습니다.', { duration: 4200, variant: 'ok' });
-  }
-}
-function openMoveDraftProgram_(draftId, fromCat){
-  var old = document.getElementById('move-program-overlay');
-  if(old) old.remove();
-  var opts = '';
-  CATEGORIES.forEach(function(c, i){
-    if(!c || i === fromCat) return;
-    opts += '<option value="' + i + '">' + escapeHtml(c.name || ('프로그램 ' + i)) + '</option>';
-  });
-  var wrap = document.createElement('div');
-  wrap.id = 'move-program-overlay';
-  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:80;display:flex;align-items:flex-end;justify-content:center;padding:16px';
-  wrap.innerHTML = '<div style="background:#fff;border-radius:12px;padding:16px;width:min(420px,100%)">' +
-    '<div style="font-weight:700;margin-bottom:8px">프로그램 이동</div>' +
-    '<p style="font-size:13px;color:#4b5563;margin:0 0 8px">카드 번호와 내용은 그대로 두고, 보이는 프로그램만 바꿉니다.</p>' +
-    '<select id="move-program-select" style="width:100%;font:inherit;padding:8px;min-height:40px">' + opts + '</select>' +
-    '<div style="display:flex;gap:8px;margin-top:12px">' +
-    '<button type="button" id="move-program-go" style="flex:1;min-height:40px">이동</button>' +
-    '<button type="button" id="move-program-cancel" style="flex:1;min-height:40px">취소</button></div></div>';
-  document.body.appendChild(wrap);
-  wrap.querySelector('#move-program-cancel').onclick = function(){ wrap.remove(); };
-  wrap.querySelector('#move-program-go').onclick = function(){
-    var to = parseInt(wrap.querySelector('#move-program-select').value, 10);
-    wrap.remove();
-    moveDraftToProgram_(draftId, fromCat, to);
-  };
-}
-function moveDraftToProgram_(draftId, fromCat, toCat){
-  if(fromCat === toCat || !CATEGORIES[toCat]) return;
-  var from = CATEGORIES[fromCat];
-  var draft = (from && from.drafts || []).filter(function(d){ return d && d.id === draftId; })[0];
-  if(!draft) draft = findDraftByIdAnywhere_(draftId);
-  if(!draft) return;
-  CATEGORIES.forEach(function(cat){
-    if(!cat || !cat.drafts) return;
-    cat.drafts = cat.drafts.filter(function(d){ return !d || d.id !== draftId; });
-  });
-  draft.programCatId = toCat;
-  if(!CATEGORIES[toCat].drafts) CATEGORIES[toCat].drafts = [];
-  CATEGORIES[toCat].drafts.push(draft);
-  try {
-    focusSyncOutboxOnDraft_(draftId);
-    save({ driveImmediate: true, gasImmediate: true });
-    ensureDraftSyncKeysQueued_(draftId);
-  } finally {
-    state._syncFocusDraftIds = null;
-  }
-  try { renderTabs(); renderMain(); } catch(eRender){}
-  if(typeof setAppToast === 'function') setAppToast('프로그램을 옮겼습니다. 카드 번호는 그대로입니다.', { duration: 3600, variant: 'ok' });
-}
-function openCardRevisions_(draftId){
-  var list = cardRevisionList_(draftId);
-  if(!list.length){
-    if(typeof setAppToast === 'function') setAppToast('이전 버전이 없습니다.', { duration: 2800, variant: 'ok' });
-    return;
-  }
-  var old = document.getElementById('card-revision-overlay');
-  if(old) old.remove();
-  var rows = list.slice(0, 5).map(function(rev, i){
-    var when = rev.at ? new Date(rev.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ('버전 ' + (i + 1));
-    var title = rev.blog && rev.blog.title ? String(rev.blog.title).slice(0, 40) : '';
-    return '<button type="button" data-rev="' + i + '" style="display:block;width:100%;text-align:left;margin:0 0 6px;padding:8px;min-height:40px">' +
-      escapeHtml(when + (title ? ' · ' + title : '')) + '</button>';
-  }).join('');
-  var wrap = document.createElement('div');
-  wrap.id = 'card-revision-overlay';
-  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.35);z-index:80;display:flex;align-items:flex-end;justify-content:center;padding:16px';
-  wrap.innerHTML = '<div style="background:#fff;border-radius:12px;padding:16px;width:min(420px,100%);max-height:70vh;overflow:auto">' +
-    '<div style="font-weight:700;margin-bottom:8px">이전 버전</div>' + rows +
-    '<button type="button" id="card-revision-close" style="width:100%;min-height:40px;margin-top:8px">닫기</button></div>';
-  document.body.appendChild(wrap);
-  wrap.querySelector('#card-revision-close').onclick = function(){ wrap.remove(); };
-  wrap.querySelectorAll('[data-rev]').forEach(function(btn){
-    btn.onclick = function(){
-      var index = parseInt(btn.getAttribute('data-rev'), 10);
-      wrap.remove();
-      restoreCardRevision_(draftId, index);
-    };
-  });
-}
-function restoreCardRevision_(draftId, index){
-  var list = cardRevisionList_(draftId);
-  var rev = list[index];
-  if(!rev) return;
-  pushCardRevision_(draftId);
-  var content = getDraftContent_(draftId);
-  if(!content){
-    content = {};
-    if(!state.published[draftId]) state.published[draftId] = {};
-    state.published[draftId].content = content;
-    state.generatedOnly[draftId] = content;
-  }
-  ['blog', 'insta', 'threads', 'thread', 'community', 'news'].forEach(function(k){
-    if(rev[k] !== undefined) content[k] = JSON.parse(JSON.stringify(rev[k]));
-  });
-  ['blog', 'insta', 'threads', 'thread', 'community', 'news', 'images'].forEach(function(tab){
-    noteSheetEditedPaths_(draftId, tab);
-  });
-  saveFocusedDraftChange_(draftId);
-  if(typeof setAppToast === 'function') setAppToast('이전 버전으로 되돌렸습니다.', { duration: 3200, variant: 'ok' });
 }
 function persistDraftContent_(draftId, content){
   flushSheetTitleBackgroundWork_({ save: false });
   var editedDraft = findDraftByIdAnywhere_(draftId);
-  var nextFp = content && typeof PlannerFieldSync !== 'undefined' ? PlannerFieldSync.historySnapshot(content).fp : '';
-  var prevList = editedDraft ? cardRevisionList_(draftId) : [];
-  var prevFp = prevList[0] && prevList[0].fp;
-  if(editedDraft && (!nextFp || !prevFp || nextFp !== prevFp)) stampDraftActivity_(editedDraft);
+  if(editedDraft) stampDraftActivity_(editedDraft);
   alignDraftTopicToBlogTitle_(draftId, content);
   if(!state.published[draftId]) state.published[draftId] = {};
   state.published[draftId].content = content;
   state.generatedOnly[draftId] = content;
   saveFocusedDraftChange_(draftId);
-  try { paintDraftListDate_(draftId); } catch(eDate){}
 }
 
 var sheetTitleBgTimer_ = null;
@@ -42777,17 +40292,10 @@ window.onSheetTitleSyncTopic_ = function(el){
   scheduleSheetTitleBackgroundWork_(state.selectedId, title);
 };
 
-function sheetFieldText_(el){
-  if(!el) return '';
-  var raw = String(el.value || '');
-  if(typeof PlannerFieldSync !== 'undefined' && PlannerFieldSync.preserveProseBreaks) raw = PlannerFieldSync.preserveProseBreaks(raw);
-  else raw = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  return raw.replace(/^[ \t\u00A0]+|[ \t\u00A0]+$/g, '');
-}
 function readSheetBlogEdits_(){
-  function v(id){ return sheetFieldText_(document.getElementById(id)); }
+  function v(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
   if(!document.getElementById('sheet-blog-title')) return null;
-  var tags = parseHashtagInput_(v('sheet-blog-hashtags'));
+  var tags = v('sheet-blog-hashtags').split(/[\s,#]+/).map(function(t){ return t.replace(/^#/, '').trim(); }).filter(Boolean);
   if(document.getElementById('sheet-blog-problem')){
     return {
       title: v('sheet-blog-title'),
@@ -42814,10 +40322,7 @@ function applySheetBlogEdits_(content){
   var edits = readSheetBlogEdits_();
   if(!edits) return content;
   var prevTitle = String(content.blog.title || '').trim();
-  var backup = rememberSectionBlob_(content.blog);
   Object.assign(content.blog, edits);
-  if(backup && !String(content.blog.draft || '').trim()) content.blog.draft = backup;
-  if(distributeBlogSections_(content.blog)) sheetSectionLayoutChanged_ = true;
   var nextTitle = String(content.blog.title || '').trim();
   if(nextTitle && nextTitle !== prevTitle){
     var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
@@ -42829,8 +40334,8 @@ function applySheetBlogEdits_(content){
 
 function readSheetInstaEdits_(){
   if(!document.getElementById('sheet-insta-hook')) return null;
-  function v(id){ return sheetFieldText_(document.getElementById(id)); }
-  var tags = parseHashtagInput_(v('sheet-insta-hashtags'));
+  function v(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
+  var tags = v('sheet-insta-hashtags').split(/[\s,#]+/).map(function(t){ return t.replace(/^#/, '').trim(); }).filter(Boolean);
   return {
     hook: v('sheet-insta-hook'),
     caption: v('sheet-insta-caption'),
@@ -42855,8 +40360,8 @@ function applySheetThreadsEdits_(content){
   var commentEl = document.getElementById('sheet-threads-comment');
   if(!bodyEl && !commentEl) return content;
   if(!content.threads) content.threads = { body: '', comment: '', text: '' };
-  if(bodyEl) content.threads.body = sheetFieldText_(bodyEl);
-  if(commentEl) content.threads.comment = sheetFieldText_(commentEl);
+  if(bodyEl) content.threads.body = String(bodyEl.value || '').trim();
+  if(commentEl) content.threads.comment = String(commentEl.value || '').trim();
   content.threads.text = content.threads.body || '';
   return content;
 }
@@ -42879,11 +40384,11 @@ function applySheetImageEdits_(content){
       if(isNaN(idx) || !gpt[idx]) return;
       var overlayField = el.getAttribute('data-overlay-field');
       if(overlayField){
-        gpt[idx][overlayField] = sheetFieldText_(el);
+        gpt[idx][overlayField] = String(el.value || '').trim();
         return;
       }
       if(el.id && el.id.indexOf('sheet-image-prompt-') === 0){
-        gpt[idx].prompt = sheetFieldText_(el);
+        gpt[idx].prompt = String(el.value || '').trim();
       }
     });
   }
@@ -42992,14 +40497,14 @@ function applySheetThreadEdits_(content){
   if(!titleEl && !bodyEl) return content;
   var th = normalizeThreadBlock(content.thread) || { topicTitle: '', summary: '' };
   if(titleEl) th.topicTitle = String(titleEl.value || '').trim();
-  if(bodyEl) th.summary = sheetFieldText_(bodyEl);
+  if(bodyEl) th.summary = String(bodyEl.value || '').trim();
   content.thread = th;
   return content;
 }
 
 function readSheetCommunityEdits_(){
   if(!document.getElementById('sheet-community-title')) return null;
-  function v(id){ return sheetFieldText_(document.getElementById(id)); }
+  function v(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
   return {
     title: v('sheet-community-title'),
     problem: v('sheet-community-problem'),
@@ -43018,7 +40523,6 @@ function applySheetCommunityEdits_(content){
   content.community.problem = edits.problem;
   content.community.selfCare = edits.selfCare;
   content.community.explanation = edits.explanation;
-  if(distributeBlogSections_(content.community, { keepDraft: false })) sheetSectionLayoutChanged_ = true;
   var nextTitle = String(content.community.title || '').trim();
   if(nextTitle && nextTitle !== prevTitle){
     var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
@@ -43030,7 +40534,6 @@ function applySheetCommunityEdits_(content){
 
 function applySheetEditsForTab_(content, tab){
   if(!content) return content;
-  if(state.selectedId) noteSheetEditedPaths_(state.selectedId, tab);
   if(tab === 'blog') return applySheetBlogEdits_(content);
   if(tab === 'insta') return applySheetInstaEdits_(content);
   if(tab === 'threads') return applySheetThreadsEdits_(content);
@@ -43049,9 +40552,9 @@ function applySheetNewsEdits_(content){
   var t = document.getElementById('sheet-news-title');
   var b = document.getElementById('sheet-news-body');
   var c = document.getElementById('sheet-news-cta');
-  if(t) item.title = sheetFieldText_(t);
-  if(b) item.body = sheetFieldText_(b);
-  if(c) item.cta = sheetFieldText_(c);
+  if(t) item.title = t.value;
+  if(b) item.body = b.value;
+  if(c) item.cta = c.value;
   return content;
 }
 
@@ -43167,7 +40670,7 @@ function buildBlogSourceText_(b, catId){
   if(!b) return '';
   if(blogUsesStructuredGeneralFormat_(catId, b)){
     return (
-      '제목: ' + withClinicBlogTitle_(b.title, catId) + '\n\n' +
+      '제목: ' + (b.title || '') + '\n\n' +
       '문제 제기:\n' + getGeneralBlogProblemText_(b) + '\n\n' +
       '셀프 케어:\n' + (b.selfCare || '') + '\n\n' +
       '원리 설명:\n' + (b.explanation || '') + '\n\n' +
@@ -43178,7 +40681,7 @@ function buildBlogSourceText_(b, catId){
   var tags = (b.hashtags || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
   if(isExpertCourseCategory(catId)){
     return (
-      '제목: ' + withClinicBlogTitle_(b.title, catId) + '\n\n' +
+      '제목: ' + (b.title || '') + '\n\n' +
       '영상·사진 맥락:\n' + (b.hook || '') + '\n\n' +
       '시연·핵심 포인트:\n' + outline + '\n\n' +
       '원리 설명:\n' + (b.draft || '') + '\n\n' +
@@ -43187,7 +40690,7 @@ function buildBlogSourceText_(b, catId){
     ).trim();
   }
   return (
-    '제목: ' + withClinicBlogTitle_(b.title, catId) + '\n\n' +
+    '제목: ' + (b.title || '') + '\n\n' +
     '후킹 오프닝:\n' + (b.hook || '') + '\n\n' +
     '목차:\n' + outline + '\n\n' +
     '본문:\n' + (b.draft || '') + '\n\n' +
@@ -43354,30 +40857,21 @@ function enqueueMangoFromBlog_(draftId, catId, topic, blog, draft){
 }
 
 window.onSheetDraftSave_ = function(){
-  state._holdSheetSavePush = true;
-  var photoFromBlog = false;
-  var sectionChanged = false;
-  var content = null;
-  var tab = '';
-  try {
   var draftId = state.selectedId;
   if(!draftId){
     setAppToast('먼저 초안 카드를 선택해 주세요.', { duration: 3500, variant: 'err' });
     return;
   }
-  tab = state.activeTab;
-  content = tab === 'blog' ? ensureSheetBlogOnContent_(draftId) : getDraftContent_(draftId);
+  var tab = state.activeTab;
+  var content = tab === 'blog' ? ensureSheetBlogOnContent_(draftId) : getDraftContent_(draftId);
   if(!content){
     setAppToast('저장할 초안이 없어요. 먼저 초안을 생성해 주세요.', { duration: 4000, variant: 'err' });
     return;
   }
   applySheetEditsForTab_(content, tab);
-  sectionChanged = sheetSectionLayoutChanged_;
-  photoFromBlog = tab === 'blog' && refreshTopicPhotoPromptFromBlog_(content, draftId, state.selectedCatId);
+  var photoFromBlog = tab === 'blog' && refreshTopicPhotoPromptFromBlog_(content, draftId, state.selectedCatId);
   if(isDailyShareCategory(state.selectedCatId)) persistSheetDailyFactsToDraft_();
   persistDraftContent_(draftId, content);
-  try { schedulePlannerGasPush_(true); } catch(eOnePush){}
-  if(sectionChanged) paintSheetAfterSectionSplit_(content);
   if(isDailyShareCategory(state.selectedCatId) && tab === 'images'){
     var stSave = ensureThumbMakerState_();
     if(stSave.bgDataUrl && typeof persistThumbMakerToDraft_ === 'function'){
@@ -43397,18 +40891,12 @@ window.onSheetDraftSave_ = function(){
     }, 1400);
   }
   var pendingAfterSave = 0;
-  var pendingNames = [];
   try { pendingAfterSave = countPendingSyncItems_(); } catch(ePendToast){ pendingAfterSave = (state.syncOutbox || []).length; }
-  try { pendingNames = describePendingSyncItems_(); } catch(ePendNames){ pendingNames = []; }
-  try { console.info('[대기열]', pendingAfterSave, pendingNames.join(' | ') || '없음'); } catch(ePendLog){}
   setAppToast(photoFromBlog
     ? '저장했어요. 수정한 블로그에 맞춰 이미지 안내를 다시 썼어요.'
     : ('이 기기에 초안을 저장했어요.' + (pendingAfterSave
       ? (' 서버 반영은 아직 ' + pendingAfterSave + '건 남았습니다.')
       : ' 서버 반영을 확인 중입니다.') + ' (발행 아님)'), { duration: photoFromBlog ? 4200 : 5200, variant: 'ok' });
-  } finally {
-    clearSheetSaveHold_();
-  }
 };
 
 /** opts.viaApi: PlannerSocial이 API로 이미 올린 뒤 — 발행 기록·다음 채널 초안만 만들고 복사·앱 이동은 하지 않는다 */
@@ -43434,7 +40922,7 @@ window.onSheetPublishComplete = async function(opts){
       var quickText = buildFinalTextForKey_(quickContent, catId, quickResult.key);
       if(tab === 'blog') startInstaDraftAfterBlogPublish_(draftId, catId, (quickContent && quickContent.blog && quickContent.blog.title) || '', quickContent);
       if(!viaApi && tab === 'blog'){
-        copyAndOpenNaverBlog_(quickText, catId);
+        copyAndOpenNaverBlog_(quickText);
         setAppToast(isPhoneOrTablet()
           ? '수정본 저장 · 복사 · 글쓰기 앱으로 이동'
           : '수정본 저장 · 복사 · 글쓰기 페이지로 이동', { duration: 3600, variant: 'ok' });
@@ -43481,7 +40969,7 @@ window.onSheetPublishComplete = async function(opts){
       state.activeTab = 'insta';
       setOpenDetailHash_(draftId, catId, 'insta');
       startInstaDraftAfterBlogPublish_(draftId, catId, draft ? draft.topic : '', content);
-      copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId), catId);
+      copyAndOpenNaverBlog_(buildBlogPasteTextForPublish_(content.blog, catId));
       renderSheetContent(getDraftContent_(draftId) || content);
       renderTabs();
       renderMain();
@@ -43557,7 +41045,7 @@ window.onSheetPublishComplete = async function(opts){
     var thContent = getDraftContent_(draftId);
     if(thContent) syncThreadsDraftFromDom_(thContent, draftId);
     if(hasThreadsDraftText_(thContent, draftId)){
-      clearThreadsPendingMeta_(thContent, draftId);
+      clearThreadsPendingMeta_(thContent);
       delete threadsBgByDraft[draftId];
       persistDraftContent_(draftId, thContent);
     }
@@ -43760,18 +41248,6 @@ function closeSheet(){
 
 // planner-detail-publish.js — 브랜딩 플래너 detail
 function getCatIdFromDraftId_(draftId){
-  if(draftId && typeof CATEGORIES !== 'undefined'){
-    for(var ci = 0; ci < CATEGORIES.length; ci++){
-      var drafts = CATEGORIES[ci] && CATEGORIES[ci].drafts;
-      if(!drafts) continue;
-      for(var di = 0; di < drafts.length; di++){
-        var row = drafts[di];
-        if(!row || row.id !== draftId) continue;
-        if(row.programCatId != null && CATEGORIES[row.programCatId]) return row.programCatId;
-        return ci;
-      }
-    }
-  }
   var m = String(draftId || '').match(/^d(\d+)-/);
   return m ? parseInt(m[1], 10) : (state.selectedCatId != null ? state.selectedCatId : 0);
 }
@@ -44604,7 +42080,6 @@ function bindPromptTextareaAutosave_(){
     if(!el || el.__htPromptAutosave) return;
     el.__htPromptAutosave = true;
     el.addEventListener('input', function(){
-      state._promptUserEditedPending = true;
       if(hasAnyLivePromptModifications_(true)) touchPromptsUpdatedAt_();
       updatePromptResetButtons_();
       schedulePromptCloudSave_();
@@ -44664,10 +42139,7 @@ var afterFp = syncValueFingerprint_({
   image: state.prompts.categories[state.editingCatId].image,
   base: state.prompts.base
 });
-if(beforeFp !== afterFp){
-  state._promptUserEditedPending = true;
-  touchPromptsUpdatedAt_();
-}
+if(beforeFp !== afterFp) touchPromptsUpdatedAt_();
 }
 
 window.resetPrompt = function(type) {
@@ -45317,8 +42789,6 @@ if(!hasUsableAiDraftContent_(content) && !content.blog && !content.thread && !co
   throw new Error('초안 본문이 비어 있어요. 다시 시도해 주세요.');
 }
 content.thread = normalizeThreadBlock(content.thread);
-var beforeCleanup = null;
-try { beforeCleanup = JSON.parse(JSON.stringify(content)); } catch(eBeforeCleanup){ beforeCleanup = null; }
 if(isThreadCategory(catId)){
   content.community = null;
   delete content.blog;
@@ -45346,9 +42816,6 @@ if(isThreadCategory(catId)){
   ensureBlogInsertImagePrompts_(content, draft && draft.topic, catId);
   delete content.insta;
   delete content.threads;
-}
-if(beforeCleanup && typeof PlannerFieldSync !== 'undefined'){
-  noteClearedPaths_(jobDraftId, PlannerFieldSync.clearedPathsBetween(beforeCleanup, content));
 }
 
 scrubNonManualPainWordInValue_(content, catId);
@@ -45575,977 +43042,4 @@ window.genContent = async function(ev){
   } finally {
     if(clickBtn && !clickBtn.classList.contains('btn-regen')) stopButtonCountdown_(clickBtn);
   }
-};
-
-var _draftImportView_ = null;
-function importNormKey_(s){
-  return String(s || '').replace(/\s+/g, '').toLowerCase();
-}
-function importPlannedIso_(dateStr){
-  var m = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if(!m) return '';
-  var dt = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10), 12, 0, 0);
-  if(isNaN(dt.getTime())) return '';
-  return dt.toISOString();
-}
-function collectExistingImportSlots_(){
-  var rows = [];
-  CATEGORIES.forEach(function(cat){
-    (cat.drafts || []).forEach(function(d){
-      if(!d || !d.id || !d.topic) return;
-      if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
-      var content = null;
-      try { content = getDraftContent_(d.id); } catch(eSlot){ content = null; }
-      var slots = {};
-      var blog = content && content.blog;
-      if(blog && (blog.title || blog.draft || blog.explanation || blog.problem || blog.selfCare || blog.hook)){
-        var blogTitle = String(blog.importTitle || blog.title || '').replace(/^\[약수\/인천\]\s*/, '').trim();
-        slots.blog = blogTitle || true;
-      }
-      var ig = content && content.insta;
-      if(ig && (ig.caption || ig.hook || ig.text)) slots.instagram = ig.importTitle ? String(ig.importTitle).trim() : true;
-      var threads = content && content.threads;
-      if(threads && (threads.body || threads.text || threads.comment)) slots.threads = threads.importTitle ? String(threads.importTitle).trim() : true;
-      var news = content && content.news;
-      if(news){
-        ['naver', 'kakao', 'karrot'].forEach(function(slot){
-          var item = news[slot];
-          if(!item || !(item.title || item.body || item.cta)) return;
-          slots['sonsik:' + slot] = String(item.importTitle || item.title || '').trim() || true;
-        });
-      }
-      rows.push({ catId: cat.id, topic: d.topic, slots: slots });
-    });
-  });
-  return rows;
-}
-function findImportDraftByTopic_(catId, topic){
-  var cat = CATEGORIES[catId];
-  if(!cat) return null;
-  var want = importNormKey_(topic);
-  var found = null;
-  (cat.drafts || []).forEach(function(d){
-    if(!d || !d.id) return;
-    if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
-    if(importNormKey_(d.topic) === want) found = d;
-  });
-  return found;
-}
-function importCollabUnion_(pieces, previous){
-  var out = [];
-  var seen = {};
-  function add(list){
-    (list || []).forEach(function(handle){
-      var clean = String(handle || '').replace(/^@+/, '').trim();
-      var key = clean.toLowerCase();
-      if(!clean || seen[key]) return;
-      seen[key] = true;
-      out.push(clean);
-    });
-  }
-  add(previous);
-  (pieces || []).forEach(function(piece){ add(piece && piece.collab); });
-  return out;
-}
-function draftCollabHandles_(draft){
-  var raw = draft && Array.isArray(draft.collab) ? draft.collab : [];
-  if(!raw.length && draft){
-    try {
-      var content = getDraftContent_(draft.id);
-      if(content && Array.isArray(content.collab)) raw = content.collab;
-    } catch(eCollab){}
-  }
-  return importCollabUnion_([{ collab: raw }]);
-}
-function draftCollabLineHTML_(draft){
-  var handles = draftCollabHandles_(draft);
-  if(!handles.length) return '';
-  return '<div class="draft-collab-line">초대 ' + escapeHtml(handles.map(function(handle){ return '@' + handle; }).join(' ')) + '</div>';
-}
-function importTopicStepId_(topic){
-  var key = normalizeTopicMatchKey_(topic);
-  var hash = 0;
-  var i;
-  for(i = 0; i < key.length; i++) hash = ((hash << 5) - hash + key.charCodeAt(i)) | 0;
-  var id = 't' + Math.abs(hash).toString(36);
-  return id === 't0' ? '' : id;
-}
-function topicDrawerMatchKey_(title, catId){
-  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerTopicDrawerKey){
-    return PlannerSyncRules.plannerTopicDrawerKey(displaySubGoalStepTitle_(title, catId));
-  }
-  return curiosityStepTitleKey_(title, catId);
-}
-function ensureImportTopicDrawer_(catId, topic){
-  var title = String(topic || '').replace(/\s+/g, ' ').trim();
-  if(!title) return '';
-  if(!state.branding || typeof state.branding !== 'object') state.branding = {};
-  if(!state.branding.subGoalPlans) state.branding.subGoalPlans = {};
-  var key = String(catId);
-  var plan = state.branding.subGoalPlans[key];
-  var createdPlan = false;
-  if(!plan || typeof plan !== 'object'){
-    plan = { steps: [], miscLabel: SUBGOAL_MISC_LABEL };
-    state.branding.subGoalPlans[key] = plan;
-    createdPlan = true;
-  }
-  if(!Array.isArray(plan.steps)) plan.steps = [];
-  var wasEmpty = !plan.steps.length;
-  var want = topicDrawerMatchKey_(title, catId);
-  var i;
-  for(i = 0; i < plan.steps.length; i++){
-    var step = plan.steps[i];
-    if(!step) continue;
-    if(want && topicDrawerMatchKey_(step.title, catId) === want){
-      step.importTopic = true;
-      if(!step.rationale) step.rationale = '원고 가져오기';
-      return String(step.id);
-    }
-  }
-  var id = importTopicStepId_(title) || ('t' + String(Date.now()));
-  var used = {};
-  plan.steps.forEach(function(row){ if(row && row.id != null) used[String(row.id)] = true; });
-  while(used[id]) id += 'x';
-  plan.steps.push({
-    id: id,
-    title: title,
-    summary: '',
-    rationale: '원고 가져오기',
-    importTopic: true,
-    pinned: false
-  });
-  if(wasEmpty || createdPlan) plan.hubCustom = true;
-  plan.updatedAt = new Date().toISOString();
-  return id;
-}
-function placeImportedDraftOnTopic_(draft, catId){
-  if(!draft) return '';
-  var sid = ensureImportTopicDrawer_(catId, draft.topic);
-  if(!sid) return '';
-  var plan = peekSubGoalPlan_(catId);
-  if(!plan){
-    plan = state.branding && state.branding.subGoalPlans && state.branding.subGoalPlans[String(catId)];
-  }
-  var title = getSubGoalStepTitle_(plan || { steps: [], miscLabel: SUBGOAL_MISC_LABEL }, sid);
-  var peers = [];
-  try {
-    peers = getDraftsForSubGoalStep_(catId, sid, { live: true }).filter(function(row){
-      return row && row.id !== draft.id;
-    });
-  } catch(ePeers){ peers = []; }
-  var order = peers.length + 1;
-  withDraftStepReassignAllowed_(function(){
-    applyDraftRoadmapAssignment_(draft, catId, sid, title || draft.topic, order, Math.max(order, 1));
-  });
-  try { syncCuriosityHubPlanFromSeed_(catId); } catch(eHub){}
-  try {
-    var planLive = state.branding && state.branding.subGoalPlans && state.branding.subGoalPlans[String(catId)];
-    var renumbered = dedupeSubGoalPlanStepsInPlace_(planLive, { collectIdMap: true });
-    if(renumbered && renumbered.changed && renumbered.idMap && Object.keys(renumbered.idMap).length){
-      remapDraftStepIdsForCat_({ draftBrandOverrides: state.draftBrandOverrides }, catId, renumbered.idMap);
-    }
-  } catch(eDedupe){}
-  var finalId = String(draft.roadmapStepId || sid);
-  try {
-    if(!state.collapsedSubGoalSteps) state.collapsedSubGoalSteps = {};
-    state.collapsedSubGoalSteps[subGoalStepKey_(catId, finalId)] = false;
-  } catch(eOpen){}
-  return finalId;
-}
-function isImportedDraft_(draft){
-  if(!draft) return false;
-  if(String(draft.rationale || '').trim() === '원고 가져오기') return true;
-  return /(^|\n)원고 가져오기(\n|$)/.test(String(draft.sourceNote || ''));
-}
-function importedDraftStepId_(draft){
-  if(!draft) return '';
-  var ov = state.draftBrandOverrides && state.draftBrandOverrides[draft.id];
-  var sid = ov && ov.roadmapStepId ? String(ov.roadmapStepId).trim() : '';
-  if(!sid) sid = String(draft.roadmapStepId || '').trim();
-  return sid;
-}
-function importedDraftNeedsDrawerMove_(draft, catId){
-  if(!draft || !isImportedDraft_(draft) || draft.drawerUserPlaced) return false;
-  var sid = importedDraftStepId_(draft);
-  var plan = peekSubGoalPlan_(catId);
-  var resolves = !!(sid && sid !== SUBGOAL_MISC_ID && plan && normalizeStepIdAgainstPlan_(plan, sid));
-  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerImportNeedsMove){
-    return PlannerSyncRules.plannerImportNeedsMove({
-      imported: true,
-      userPlaced: false,
-      stepId: sid,
-      miscId: SUBGOAL_MISC_ID,
-      stepResolves: resolves
-    });
-  }
-  return !sid || sid === SUBGOAL_MISC_ID || !resolves;
-}
-function relocateImportedMiscDrafts_(){
-  var moved = false;
-  var seen = {};
-  CATEGORIES.forEach(function(cat, catId){
-    (cat.drafts || []).forEach(function(draft){
-      if(!draft || !draft.id || seen[draft.id] || !importedDraftNeedsDrawerMove_(draft, catId)) return;
-      seen[draft.id] = true;
-      if(!String(draft.topic || '').trim()) return;
-      var placed = '';
-      try { placed = placeImportedDraftOnTopic_(draft, catId); } catch(ePlace){ placed = ''; }
-      var plan = peekSubGoalPlan_(catId);
-      var resolved = placed && plan ? normalizeStepIdAgainstPlan_(plan, placed) : '';
-      if(!resolved || resolved === SUBGOAL_MISC_ID) return;
-      draft.importDrawerSettled = true;
-      draft.roadmapStepId = resolved;
-      moved = true;
-    });
-  });
-  return moved;
-}
-/** 사본 판정용 지문: id·날짜·단계 배치를 뺀 카드 내용 + 채널 본문 전체. 해시가 아니라 원문 그대로 비교한다. */
-function importedCopyFingerprint_(draft){
-  var row = {};
-  ['topic', 'angle', 'pillar', 'rationale', 'writingBrief', 'sourceNote', 'shareMonth', 'articleKind'].forEach(function(key){
-    row[key] = String(draft[key] == null ? '' : draft[key]).trim();
-  });
-  row.collab = (Array.isArray(draft.collab) ? draft.collab : []).map(String).sort();
-  row.channels = (Array.isArray(draft.publishedChannels) ? draft.publishedChannels : []).map(String).sort();
-  var pub = state.published && state.published[draft.id];
-  try {
-    return JSON.stringify([row, state.generatedOnly ? (state.generatedOnly[draft.id] || null) : null, pub ? (pub.content || null) : null]);
-  } catch(eFp){ return ''; }
-}
-/** 사본을 지워도 사용자 작업이 사라지지 않는지: 사진 배경·직접 고친 필드가 없어야 한다. */
-function importedCopyHasOwnWork_(draft){
-  if(draft.drawerUserPlaced) return true;
-  if(typeof draftIsPublished_ === 'function' && draftIsPublished_(draft.id)) return true;
-  if(typeof instaBgByDraft !== 'undefined' && instaBgByDraft[draft.id]) return true;
-  if(typeof threadsBgByDraft !== 'undefined' && threadsBgByDraft[draft.id]) return true;
-  var ov = state.draftBrandOverrides && state.draftBrandOverrides[draft.id];
-  if(ov){
-    var placementOnly = { series: 1, step: 1, roadmapStepId: 1, updatedAt: 1 };
-    if(Object.keys(ov).some(function(k){ return !placementOnly[k] && ov[k] != null && String(ov[k]).trim() !== ''; })) return true;
-  }
-  return false;
-}
-/** 채널별 본문이 들어 있는지만 본다. 내용이 아니라 어느 채널에 글이 있는지의 모양. */
-function contentChannelSig_(content){
-  if(!content || typeof content !== 'object') return '';
-  var parts = [];
-  var blog = content.blog;
-  if(blog && (blog.title || blog.draft || blog.explanation || blog.problem || blog.selfCare || blog.hook)) parts.push('blog');
-  var ig = content.insta;
-  if(ig && (ig.caption || ig.hook || ig.text)) parts.push('instagram');
-  var th = content.threads;
-  if(th && (th.body || th.text || th.comment)) parts.push('threads');
-  var news = content.news;
-  if(news) ['naver', 'kakao', 'karrot'].forEach(function(slot){
-    var item = news[slot];
-    if(item && (item.title || item.body || item.cta)) parts.push('sonsik:' + slot);
-  });
-  return parts.sort().join(',');
-}
-function dupTopicKey_(topic){
-  return typeof normalizeTopicKey_ === 'function' ? normalizeTopicKey_(topic) : String(topic || '').replace(/\s+/g, '').toLowerCase();
-}
-/** 채널별 제목까지 포함한 같은 원고 판별 키. 서버 내용으로 만든 카드는 주제가 블로그 제목이라 주제만으로는 못 맞춘다. */
-function contentWorkKey_(content){
-  var sig = contentChannelSig_(content);
-  if(!sig) return '';
-  var t = [];
-  function norm(v){ return String(v == null ? '' : v).replace(/\s+/g, '').toLowerCase(); }
-  var b = content.blog || {}; t.push(norm(b.importTitle || b.title));
-  var ig = content.insta || {}; t.push(norm(ig.importTitle || ig.hook));
-  var th = content.threads || {}; t.push(norm(th.importTitle));
-  var n = content.news || {};
-  ['naver', 'kakao', 'karrot'].forEach(function(slot){ var it = n[slot] || {}; t.push(norm(it.importTitle || it.title)); });
-  var joined = t.join('|');
-  return /[^|]/.test(joined) ? sig + '#' + joined : '';
-}
-function findLiveCardWithSameWork_(catId, selfId, topic, content){
-  var cat = CATEGORIES[catId];
-  var want = contentWorkKey_(content);
-  if(!cat || !want) return null;
-  var found = null;
-  (cat.drafts || []).forEach(function(d){
-    if(found || !d || !d.id || d.id === selfId || d._syncPlaceholder) return;
-    if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
-    var own = null;
-    try { own = getDraftContent_(d.id); } catch(eOwn){ own = null; }
-    if(contentWorkKey_(own) === want) found = d;
-  });
-  return found;
-}
-function dupCardDateLabel_(d){
-  try {
-    if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerDraftListDate) return PlannerSyncRules.plannerDraftListDate(d).label;
-  } catch(eLbl){}
-  return String((d && d.createdAt) || '').slice(5, 10);
-}
-/**
- * 중복으로 보이는 카드 묶음. 지우지 않고 목록만 만든다.
- * level 'same'  = 프로그램·주제·날짜·채널이 모두 같음(경고 대상)
- * level 'similar' = 프로그램·주제·채널은 같고 날짜만 다름(확인용)
- */
-function findPossibleDuplicateCards_(){
-  var strict = {};
-  var loose = {};
-  CATEGORIES.forEach(function(cat, catId){
-    (cat.drafts || []).forEach(function(d){
-      if(!d || !d.id || !d.topic) return;
-      if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
-      var content = null;
-      try { content = getDraftContent_(d.id); } catch(eC){ content = null; }
-      var sig = contentChannelSig_(content);
-      var tk = dupTopicKey_(d.topic);
-      if(!tk) return;
-      var date = dupCardDateLabel_(d);
-      var row = { d: d, catId: catId, sig: sig, date: date };
-      var sk = catId + '|' + tk + '|' + date + '|' + sig;
-      (strict[sk] = strict[sk] || []).push(row);
-      if(sig){
-        var lk = catId + '|' + tk + '|' + sig;
-        (loose[lk] = loose[lk] || []).push(row);
-      }
-    });
-  });
-  var groups = [];
-  var inSame = {};
-  function mk(level, list){
-    return {
-      level: level,
-      catId: list[0].catId,
-      program: (CATEGORIES[list[0].catId] && CATEGORIES[list[0].catId].name) || '',
-      topic: list[0].d.topic,
-      channels: list[0].sig,
-      cards: list.map(function(r){
-        var d = r.d;
-        var ent = state.syncEntityRevisions || {};
-        return {
-          id: d.id,
-          date: r.date,
-          createdAt: String(d.createdAt || ''),
-          step: String(d.roadmapStepId || ''),
-          placeholder: !!d._syncPlaceholder,
-          published: (typeof draftIsPublished_ === 'function') ? !!draftIsPublished_(d.id) : false,
-          onServer: !!ent['draft:' + d.id]
-        };
-      })
-    };
-  }
-  Object.keys(strict).forEach(function(k){
-    if(strict[k].length < 2) return;
-    strict[k].forEach(function(r){ inSame[r.d.id] = true; });
-    groups.push(mk('same', strict[k]));
-  });
-  Object.keys(loose).forEach(function(k){
-    var list = loose[k];
-    var dates = {};
-    list.forEach(function(r){ dates[r.date] = true; });
-    if(list.length < 2 || Object.keys(dates).length < 2) return;
-    groups.push(mk('similar', list));
-  });
-  return groups;
-}
-function plannerDuplicateCardReport_(){
-  var groups = findPossibleDuplicateCards_();
-  var orphans = Object.keys(state._dupPlaceholderSkipped || {}).map(function(id){ return state._dupPlaceholderSkipped[id]; });
-  return { groups: groups, orphanContent: orphans };
-}
-window.plannerListDuplicateCards_ = function(){
-  var r = plannerDuplicateCardReport_();
-  try { console.table(r.groups.map(function(g){ return { 구분: g.level, 프로그램: g.program, 주제: g.topic, 채널: g.channels, 카드: g.cards.map(function(c){ return c.id + '(' + c.date + ')'; }).join(' / ') }; })); } catch(eT){}
-  return r;
-};
-var _dupWarnSig_ = '';
-/** 날짜·채널·주제가 같은 카드가 두 장 이상이면 한 번 알린다(같은 상태에서는 반복하지 않음). */
-function warnIfDuplicateCards_(reason){
-  var same = findPossibleDuplicateCards_().filter(function(g){ return g.level === 'same'; });
-  var sig = same.map(function(g){ return g.cards.map(function(c){ return c.id; }).sort().join('+'); }).sort().join('|');
-  if(!sig){ _dupWarnSig_ = ''; return 0; }
-  if(sig === _dupWarnSig_) return same.length;
-  _dupWarnSig_ = sig;
-  try { console.warn('[같은 카드 두 장]', reason, JSON.stringify(same.map(function(g){ return { topic: g.topic, date: g.cards[0].date, ids: g.cards.map(function(c){ return c.id; }) }; }))); } catch(eW){}
-  if(typeof setAppToast === 'function'){
-    setAppToast('날짜·채널·주제가 같은 카드가 ' + same.length + '곳에서 두 장씩 있어요. 지우지 않았어요.\n동기화 상태 ▸ 중복 카드 확인에서 볼 수 있어요.', { duration: 8000, variant: 'err' });
-  }
-  return same.length;
-}
-window.openDuplicateCardsReview_ = function(){
-  var old = document.getElementById('dup-cards-overlay');
-  if(old) old.remove();
-  var r = plannerDuplicateCardReport_();
-  var box = document.createElement('div');
-  box.id = 'dup-cards-overlay';
-  box.style.cssText = 'position:fixed;inset:0;z-index:2147482000;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center';
-  var sheet = document.createElement('div');
-  sheet.style.cssText = 'background:#fff;color:#1c1c1e;width:100%;max-width:560px;max-height:88vh;overflow:auto;border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));font:14px/1.5 -apple-system,system-ui,sans-serif';
-  function esc(t){ return escapeHtml(String(t == null ? '' : t)); }
-  var html = '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">중복으로 보이는 카드</b><button type="button" id="dup-cards-close" style="border:0;background:#eee;border-radius:8px;min-height:36px;padding:0 12px">닫기</button></div>' +
-    '<p style="margin:6px 0 12px;color:#555">글이 완전히 같을 때만, 아래 버튼으로 한 장으로 합칠 수 있어요. 자동으로 지우거나 합치지 않습니다.</p>';
-  if(!r.groups.length && !r.orphanContent.length) html += '<p>중복으로 보이는 카드가 없어요.</p>';
-  r.groups.forEach(function(g){
-    var tag = g.level === 'same' ? '<span style="background:#fde2e2;color:#a31;padding:1px 6px;border-radius:6px">같은 날짜</span>' : '<span style="background:#fff3c4;color:#6a5000;padding:1px 6px;border-radius:6px">날짜만 다름</span>';
-    html += '<section style="border:1px solid #ddd;border-radius:10px;padding:10px;margin-bottom:10px"><div>' + tag + ' <b>' + esc(g.program) + '</b> · ' + esc(g.topic) + '</div>' +
-      '<div style="color:#666;font-size:12px;margin:2px 0 6px">채널: ' + esc(g.channels || '(본문 없음)') + '</div>';
-    g.cards.forEach(function(c){
-      html += '<div style="font-size:13px;padding:4px 0;border-top:1px dashed #e5e5e5">' + esc(c.date) + ' · ' + esc(c.id) +
-        ' · 단계 ' + esc(c.step || '-') + (c.published ? ' · 발행됨' : '') + (c.onServer ? ' · 서버에 있음' : ' · 이 기기에만') + (c.placeholder ? ' · 서버 내용만으로 생긴 카드' : '') + '</div>';
-    });
-    html += '</section>';
-  });
-  if(r.orphanContent.length){
-    html += '<section style="border:1px solid #ddd;border-radius:10px;padding:10px;margin-bottom:10px"><b>카드 없이 남은 원고</b><div style="color:#666;font-size:12px;margin:2px 0 6px">같은 카드가 이미 있어 새 카드를 만들지 않았어요. 원고는 지우지 않았습니다.</div>';
-    r.orphanContent.forEach(function(o){ html += '<div style="font-size:13px">' + esc(o.id) + ' · ' + esc(o.topic) + ' → 기존 ' + esc(o.existingId) + '</div>'; });
-    html += '</section>';
-  }
-  html += '<button type="button" id="dup-cards-merge" style="width:100%;min-height:44px;border-radius:10px;border:0;background:#1c1c1e;color:#fff;margin-bottom:8px">같은 글만 합치기</button>';
-  html += '<button type="button" id="dup-cards-copy" style="width:100%;min-height:44px;border-radius:10px;border:1px solid #888;background:#fff">목록 복사</button>';
-  sheet.innerHTML = html;
-  box.appendChild(sheet);
-  box.addEventListener('click', function(ev){ if(ev.target === box) box.remove(); });
-  document.body.appendChild(box);
-  document.getElementById('dup-cards-close').addEventListener('click', function(){ box.remove(); });
-  document.getElementById('dup-cards-merge').addEventListener('click', function(){
-    if(!window.confirm('글이 완전히 같은 카드만 한 장으로 합칩니다. 글이 다르거나 예약·링크를 옮길 수 없으면 그대로 둡니다.')) return;
-    var changed = false;
-    try { changed = mergeWarnedDuplicateCards_(); } catch(eMerge){ changed = false; }
-    if(changed) persistUserDuplicateMerge_();
-    box.remove();
-    if(typeof setAppToast === 'function'){
-      setAppToast(changed ? '같은 글을 한 장으로 합쳤어요.' : '합칠 수 있는 같은 글이 없어요.', { duration: 3600, variant: changed ? 'ok' : 'err' });
-    }
-  });
-  document.getElementById('dup-cards-copy').addEventListener('click', function(){
-    var text = JSON.stringify(r, null, 2);
-    try { navigator.clipboard.writeText(text).then(function(){ setAppToast('목록을 복사했어요.', { duration: 2400, variant: 'ok' }); }); } catch(eCp){ console.log(text); }
-  });
-};
-/**
- * 같은 원고 파일을 두 기기에서 각각 가져오면 같은 글이 다른 id 로 두 장이 된다(새로 가져올 때는 같은 id를 쓰도록 고쳤다).
- * 이미 생긴 사본은 지우지 않는다. 완전히 같은 사본만 state._importCopyMergeReport 와 콘솔에 남긴다.
- */
-function reportIdenticalImportedCopies_(){
-  var report = [];
-  CATEGORIES.forEach(function(cat, catId){
-    var groups = {};
-    (cat.drafts || []).forEach(function(d){
-      if(!d || !d.id || d._syncPlaceholder || !isUserAddedDraftId_(d.id) || !isImportedDraft_(d)) return;
-      if(state.deletedDraftIds && state.deletedDraftIds[d.id]) return;
-      var key = dupTopicKey_(d.topic);
-      if(!key) return;
-      (groups[key] = groups[key] || []).push(d);
-    });
-    Object.keys(groups).forEach(function(key){
-      var list = groups[key];
-      if(list.length < 2) return;
-      var fp0 = importedCopyFingerprint_(list[0]);
-      if(!fp0) return;
-      list.slice(1).forEach(function(dup){
-        if(importedCopyFingerprint_(dup) !== fp0) return;
-        report.push({ catId: catId, topic: String(dup.topic || ''), idA: list[0].id, idB: dup.id, dateA: String(list[0].createdAt || '').slice(0, 10), dateB: String(dup.createdAt || '').slice(0, 10) });
-      });
-    });
-  });
-  state._importCopyMergeReport = report;
-  if(report.length){
-    try { console.info('[내용이 같은 가져오기 사본(지우지 않음)]', JSON.stringify(report)); } catch(eLog){}
-  }
-  return false;
-}
-function duplicateAssignmentPlans_(){
-  var plans = [];
-  if(state.pendingSubGoalPlan && Array.isArray(state.pendingSubGoalPlan.assignments)){
-    plans.push(state.pendingSubGoalPlan);
-  }
-  var stored = state.branding && state.branding.subGoalPlans;
-  Object.keys(stored || {}).forEach(function(key){
-    if(stored[key] && Array.isArray(stored[key].assignments)) plans.push(stored[key]);
-  });
-  return plans;
-}
-function duplicateReservations_(){
-  var rows = [];
-  Object.keys(state.published || {}).forEach(function(id){
-    var plan = state.published[id] && state.published[id].channelPlan;
-    if(!plan) return;
-    Object.keys(plan).forEach(function(channel){
-      var item = plan[channel] || {};
-      rows.push({ draftId: id, channel: channel, at: item.at || '', postId: item.postId || '' });
-    });
-  });
-  return rows;
-}
-function duplicateLinks_(){
-  var links = [];
-  try {
-    var hashId = cardLinkIdFromHash_();
-    if(hashId) links.push({ draftId: hashId, kind: 'hash' });
-  } catch(eHash){}
-  if(typeof cardLinkRevealId_ !== 'undefined' && cardLinkRevealId_) links.push({ draftId: cardLinkRevealId_, kind: 'reveal' });
-  return links;
-}
-function applyDuplicateRefMove_(moved){
-  if(!moved || !moved.ok) return;
-  var plans = duplicateAssignmentPlans_();
-  (moved.plans || []).forEach(function(plan, index){
-    if(plans[index]) plans[index].assignments = plan.assignments;
-  });
-  (moved.reservations || []).forEach(function(row){
-    var pub = state.published && state.published[row.draftId];
-    if(!pub || !row.channel) return;
-    if(!pub.channelPlan) pub.channelPlan = {};
-    if(!pub.channelPlan[row.channel]) pub.channelPlan[row.channel] = { at: row.at || '', postId: row.postId || '' };
-  });
-  (moved.links || []).forEach(function(row){
-    if(!row) return;
-    if(row.kind === 'hash'){
-      try {
-        if(cardLinkIdFromHash_() && cardLinkIdFromHash_() !== row.draftId) location.hash = 'card=' + encodeURIComponent(row.draftId);
-      } catch(eHash){}
-    }
-    if(row.kind === 'reveal') cardLinkRevealId_ = row.draftId;
-  });
-  function applyIdMap_(stateKey, next){
-    if(!next) return;
-    if(!state[stateKey] || typeof state[stateKey] !== 'object') state[stateKey] = {};
-    (moved.retireIds || []).forEach(function(id){ delete state[stateKey][id]; });
-    if(Object.prototype.hasOwnProperty.call(next, moved.keepId)) state[stateKey][moved.keepId] = next[moved.keepId];
-  }
-  applyIdMap_('draftBrandOverrides', moved.brandOverrides);
-  applyIdMap_('pinnedDraftIds', moved.pinned);
-}
-function persistUserDuplicateMerge_(){
-  try {
-    var prev = {};
-    try { prev = readPreviousDiskPayloadSync_() || {}; } catch(ePrev){}
-    var now = getPersistPayload();
-    state._enqueueNormalization = true;
-    try { enqueueSyncOutboxChanges_(listChangedSyncEntityKeys_(prev, now), now); }
-    finally { state._enqueueNormalization = false; }
-  } catch(eEnq){}
-  try { save({ driveImmediate: true, gasImmediate: true }); } catch(eSave){}
-  try { renderTabs(); renderMain(); } catch(eRender){}
-}
-function mergeWarnedDuplicateCards_(){
-  if(typeof PlannerSyncRules === 'undefined' || !PlannerSyncRules.plannerMergeDuplicateGroup || !PlannerSyncRules.plannerRetargetDuplicateRefs) return false;
-  var groups = findPossibleDuplicateCards_().filter(function(g){ return g.level === 'same'; });
-  var changed = false;
-  groups.forEach(function(g){
-    var cat = CATEGORIES[g.catId];
-    var cards = (g.cards || []).map(function(c){
-      var content = null;
-      try { content = getDraftContent_(c.id); } catch(eContent){ content = null; }
-      return {
-        id: c.id,
-        placeholder: !!c.placeholder,
-        onServer: !!c.onServer,
-        createdAt: c.createdAt,
-        content: content
-      };
-    });
-    var plan = PlannerSyncRules.plannerMergeDuplicateGroup(cards);
-    if(!plan || !plan.changed || !plan.keepId || !(plan.retireIds || []).length) return;
-    var retireSet = {};
-    plan.retireIds.forEach(function(id){ retireSet[id] = true; });
-    var publishedSlice = {};
-    var generatedSlice = {};
-    if(state.published && Object.prototype.hasOwnProperty.call(state.published, plan.keepId)) publishedSlice[plan.keepId] = state.published[plan.keepId];
-    if(state.generatedOnly && Object.prototype.hasOwnProperty.call(state.generatedOnly, plan.keepId)) generatedSlice[plan.keepId] = state.generatedOnly[plan.keepId];
-    plan.retireIds.forEach(function(id){
-      if(state.published && Object.prototype.hasOwnProperty.call(state.published, id)) publishedSlice[id] = state.published[id];
-      if(state.generatedOnly && Object.prototype.hasOwnProperty.call(state.generatedOnly, id)) generatedSlice[id] = state.generatedOnly[id];
-    });
-    var brandSlice = {};
-    var pinSlice = {};
-    function takeId_(src, dest, id){
-      if(src && Object.prototype.hasOwnProperty.call(src, id)) dest[id] = src[id];
-    }
-    takeId_(state.draftBrandOverrides, brandSlice, plan.keepId);
-    takeId_(state.pinnedDraftIds, pinSlice, plan.keepId);
-    plan.retireIds.forEach(function(id){
-      takeId_(state.draftBrandOverrides, brandSlice, id);
-      takeId_(state.pinnedDraftIds, pinSlice, id);
-    });
-    var assignmentPlans = duplicateAssignmentPlans_();
-    var moved = PlannerSyncRules.plannerRetargetDuplicateRefs({
-      keepId: plan.keepId,
-      retireIds: plan.retireIds,
-      plans: assignmentPlans.map(function(p, index){ return { key: String(index), assignments: p.assignments }; }),
-      reservations: duplicateReservations_().filter(function(row){ return row.draftId === plan.keepId || retireSet[row.draftId]; }),
-      links: duplicateLinks_().filter(function(row){ return row.draftId === plan.keepId || retireSet[row.draftId]; }),
-      published: publishedSlice,
-      generated: generatedSlice,
-      brandOverrides: brandSlice,
-      pinned: pinSlice,
-      keepHasPublished: !!(state.published && state.published[plan.keepId])
-    });
-    if(!moved || !moved.ok) return;
-    applyDuplicateRefMove_(moved);
-    if(state.published && state.published[plan.keepId]){
-      state.published[plan.keepId].content = plan.content;
-      state.generatedOnly[plan.keepId] = state.published[plan.keepId].content;
-    } else if(state.generatedOnly){
-      state.generatedOnly[plan.keepId] = plan.content;
-    }
-    plan.retireIds.forEach(function(id){
-      if(state.generatedOnly) delete state.generatedOnly[id];
-      if(state.published && state.published[plan.keepId]) delete state.published[id];
-      if(cat) cat.drafts = (cat.drafts || []).filter(function(d){ return !d || d.id !== id; });
-      if(!state.deletedDraftIds) state.deletedDraftIds = {};
-      if(!state.deletedDraftIds[id]) state.deletedDraftIds[id] = new Date().toISOString();
-    });
-    changed = true;
-  });
-  return changed;
-}
-function applyClinicTitleAndImportDrawerRepair_(){
-  var changed = false;
-  try { if(stripStoredClinicBlogTitles_()) changed = true; } catch(eTitle){}
-  try { reportIdenticalImportedCopies_(); } catch(eCopies){}
-  try { if(relocateImportedMiscDrafts_()) changed = true; } catch(eMove){}
-  try { warnIfDuplicateCards_('repair'); } catch(eDupWarn){}
-  if(!changed) return false;
-  try {
-    var prev = {};
-    try { prev = readPreviousDiskPayloadSync_() || {}; } catch(ePrev){}
-    var now = getPersistPayload();
-    state._enqueueNormalization = true;
-    try {
-      enqueueSyncOutboxChanges_(listChangedSyncEntityKeys_(prev, now), now);
-    } finally {
-      state._enqueueNormalization = false;
-    }
-    state.syncDirty = hasPendingLocalSyncChanges_();
-  } catch(eEnq){}
-  return true;
-}
-function importSourceBlock_(pieces){
-  var labels = { blog: '블로그', instagram: '인스타', threads: '쓰레드', sonsik: '소식' };
-  var slots = { naver: '네이버', kakao: '카카오', karrot: '당근' };
-  var lines = ['원고 가져오기'];
-  (pieces || []).forEach(function(piece){
-    var label = labels[piece.channel] || piece.channel;
-    if(piece.channel === 'sonsik' && piece.newsSlot) label += ' ' + (slots[piece.newsSlot] || piece.newsSlot);
-    lines.push('[' + label + '] ' + (piece.title || ''));
-    if(piece.hookType) lines.push('훅: ' + piece.hookType);
-    if(piece.account) lines.push('계정: ' + piece.account);
-    if(piece.collab && piece.collab.length){
-      lines.push('초대: ' + piece.collab.map(function(handle){ return '@' + String(handle).replace(/^@+/, ''); }).join(' '));
-    }
-    if(piece.scheduledDate) lines.push('예정일: ' + piece.scheduledDate);
-    (piece.sourceLinks || []).forEach(function(url){ lines.push(url); });
-  });
-  return lines.join('\n');
-}
-function applyImportPiece_(content, piece, catId){
-  if(piece.channel === 'blog'){
-    content.blog = {
-      title: piece.title,
-      hook: '',
-      outline: [],
-      draft: piece.body,
-      problem: '',
-      selfCare: '',
-      explanation: piece.body,
-      cta: '',
-      hashtags: [],
-      importTitle: piece.title,
-      account: piece.account || ''
-    };
-    distributeBlogSections_(content.blog);
-    if(isHeiljagyaeCategory(catId)){
-      content.community = {
-        title: piece.title,
-        problem: '',
-        empathyLead: '',
-        empathyBullets: [],
-        explanation: piece.body,
-        selfCare: ''
-      };
-      distributeBlogSections_(content.community, { keepDraft: false });
-    }
-    return;
-  }
-  if(piece.channel === 'instagram'){
-    content.insta = {
-      hook: '',
-      caption: piece.body,
-      carousel: [],
-      hashtags: [],
-      importTitle: piece.title,
-      account: piece.account || ''
-    };
-    return;
-  }
-  if(piece.channel === 'threads'){
-    var threadParts = (typeof PlannerFieldSync !== 'undefined')
-      ? PlannerFieldSync.splitThreadComment(piece.body, '')
-      : { body: piece.body, comment: '' };
-    content.threads = {
-      body: threadParts.body,
-      comment: threadParts.comment,
-      text: threadParts.body,
-      importTitle: piece.title,
-      account: piece.account || ''
-    };
-    return;
-  }
-  if(piece.channel === 'sonsik'){
-    if(!content.news || typeof content.news !== 'object') content.news = {};
-    content.news[piece.newsSlot || 'naver'] = {
-      title: piece.title,
-      body: piece.body,
-      cta: '',
-      importTitle: piece.title,
-      account: piece.account || ''
-    };
-  }
-}
-/** 같은 프로그램·같은 주제를 두 기기에서 가져와도 같은 id가 되게 한다(다른 id면 서버에서 두 장이 된다). */
-function importDeterministicDraftId_(catId, topic){
-  var key = importNormKey_(topic);
-  if(!key) return '';
-  var h1 = 2166136261, h2 = 5381, i;
-  for(i = 0; i < key.length; i++){
-    var c = key.charCodeAt(i);
-    h1 = Math.imul(h1 ^ c, 16777619) >>> 0;
-    h2 = (Math.imul(h2, 33) + c) >>> 0;
-  }
-  var tail = String(h1 % 1000000).padStart(6, '0') + String(h2 % 100000).padStart(5, '0');
-  return 'd' + catId + '-c17' + tail;
-}
-function applyDraftImportBatch_(drafts){
-  var pieceCount = 0;
-  var firstCat = null;
-  (drafts || []).forEach(function(group){
-    var cat = CATEGORIES[group.catId];
-    if(!cat || !group.pieces || !group.pieces.length) return;
-    if(firstCat == null) firstCat = group.catId;
-    var created = false;
-    var draft = findImportDraftByTopic_(group.catId, group.topic);
-    if(!draft){
-      created = true;
-      var id = importDeterministicDraftId_(group.catId, group.topic);
-      // 이미 같은 id가 있거나(다른 주제와 충돌) 지운 기록이 있으면 예전 방식 id를 쓴다
-      var idTaken = !id || (state.deletedDraftIds && state.deletedDraftIds[id]) ||
-        CATEGORIES.some(function(c){ return (c.drafts || []).some(function(row){ return row && row.id === id; }); });
-      if(idTaken) id = 'd' + group.catId + '-c' + String(Date.now() + pieceCount);
-      while((cat.drafts || []).some(function(row){ return row && row.id === id; })) id += 'x';
-      var iso = importPlannedIso_(group.date) || new Date().toISOString();
-      draft = {
-        id: id,
-        topic: group.topic,
-        angle: (group.pieces[0] && group.pieces[0].hookType) || group.pieces[0].title,
-        series: getDefaultSeriesForCat_(group.catId),
-        pillar: getDefaultPillarForCat_(group.catId),
-        rationale: '원고 가져오기',
-        createdAt: iso,
-        activityAt: iso,
-        updatedAt: iso,
-        sourceNote: importSourceBlock_(group.pieces),
-        publishedChannels: []
-      };
-      cat.drafts.push(draft);
-    } else {
-      var block = importSourceBlock_(group.pieces);
-      draft.sourceNote = draft.sourceNote ? (String(draft.sourceNote).trim() + '\n\n' + block) : block;
-      if(group.date){
-        var nextIso = importPlannedIso_(group.date);
-        var currentMs = 0;
-        try { currentMs = getDraftListActivityMs_(draft) || 0; } catch(eMs){ currentMs = 0; }
-        var nextMs = nextIso ? Date.parse(nextIso) : 0;
-        if(nextMs && nextMs >= currentMs){
-          draft.activityAt = nextIso;
-          draft.updatedAt = nextIso;
-        }
-      }
-    }
-    var content = {};
-    try {
-      var prev = getDraftContent_(draft.id);
-      if(prev) content = JSON.parse(JSON.stringify(prev));
-    } catch(eCopy){ content = {}; }
-    var beforeImport = null;
-    try { beforeImport = JSON.parse(JSON.stringify(content)); } catch(eBeforeImport){ beforeImport = null; }
-    group.pieces.forEach(function(piece){
-      applyImportPiece_(content, piece, group.catId);
-      pieceCount += 1;
-    });
-    if(isHeiljagyaeCategory(group.catId) && !content.community){
-      var first = group.pieces[0];
-      content.community = {
-        title: first.title,
-        problem: '',
-        empathyLead: '',
-        empathyBullets: [],
-        explanation: first.body,
-        selfCare: ''
-      };
-      distributeBlogSections_(content.community, { keepDraft: false });
-    }
-    if(beforeImport && typeof PlannerFieldSync !== 'undefined'){
-      noteClearedPaths_(draft.id, PlannerFieldSync.clearedPathsBetween(beforeImport, content));
-    }
-    state.generatedOnly[draft.id] = content;
-    if(!state.published[draft.id] || typeof state.published[draft.id] !== 'object') state.published[draft.id] = {};
-    state.published[draft.id].content = content;
-    var handles = importCollabUnion_(group.pieces, [].concat(draft.collab || [], content.collab || []));
-    if(handles.length){
-      draft.collab = handles;
-      content.collab = handles.slice();
-    }
-    if(created || !String(draft.roadmapStepId || '').trim() || String(draft.roadmapStepId) === SUBGOAL_MISC_ID){
-      try { placeImportedDraftOnTopic_(draft, group.catId); } catch(ePlace){}
-    }
-  });
-  try { warnIfDuplicateCards_('import'); } catch(eDupW){}
-  return { count: pieceCount, catId: firstCat };
-}
-function renderDraftImportPreview_(view, parseError){
-  var host = document.getElementById('draft-import-preview');
-  var commit = document.getElementById('draft-import-commit');
-  if(!host) return;
-  if(parseError){
-    host.innerHTML = '<p class="draft-import-error">' + escapeHtml(parseError) + '</p>';
-    if(commit){
-      commit.disabled = true;
-      commit.textContent = '저장할 초안 없음';
-    }
-    return;
-  }
-  var items = view.items || [];
-  var byIndex = {};
-  items.forEach(function(item){ byIndex[item.index] = item; });
-  var ready = items.filter(function(item){ return item.ok; }).length;
-  var html = '<p class="draft-import-summary">' + items.length + '개 중 ' + ready + '개를 가져올 수 있습니다. 저장해도 예약·발행하지 않습니다.</p>';
-  if(ready){
-    html += '<label class="draft-import-all"><input type="checkbox" id="draft-import-all" checked onchange="toggleDraftImportAll_(this)"> 가져올 수 있는 글 모두 선택</label>';
-  }
-  (view.groups || []).forEach(function(group){
-    html += '<section class="draft-import-group"><h3>' + escapeHtml(group.programLabel) + ' · ' + escapeHtml(group.topic) + '</h3>';
-    group.items.forEach(function(index){
-      var item = byIndex[index];
-      if(!item) return;
-      html += '<label class="draft-import-row is-' + escapeHtml(item.status) + '">';
-      html += '<input type="checkbox" data-import-index="' + item.index + '"' + (item.ok ? ' checked' : ' disabled') + '>';
-      html += '<span><strong>' + escapeHtml(item.channelLabel || '채널') + '</strong> ' + escapeHtml(item.title || '(제목 없음)');
-      var meta = [];
-      if(item.channel === 'instagram'){
-        // 파일의 account가 박준규 계정이 아니면 프로그램 계정이라 공동작업으로 본다
-        var postUser = 'dr.park_dc.pt';
-        var acct = String(item.account || '').replace(/^@+/, '').trim();
-        var collabs = (item.collab && item.collab.length) ? item.collab.slice() : [];
-        if(acct && acct.toLowerCase() !== postUser && collabs.map(function(h){ return String(h).replace(/^@+/, '').toLowerCase(); }).indexOf(acct.toLowerCase()) < 0 && !collabs.length) collabs.push(acct);
-        if(!collabs.length){ var m = instagramCollabMentionForCat_(item.catId); if(m) collabs.push(m); }
-        meta.push('게시: @' + postUser + ' / 공동작업: ' + (collabs.length ? collabs.map(function(h){ return '@' + String(h).replace(/^@+/, ''); }).join(' ') : '없음'));
-      } else if(item.account) meta.push(item.account);
-      if(item.scheduledDate) meta.push(item.scheduledDate);
-      if(meta.length) html += '<em>' + escapeHtml(meta.join(' · ')) + '</em>';
-      if(item.collab && item.collab.length){
-        html += '<em class="is-collab">초대 ' + escapeHtml(item.collab.map(function(handle){ return '@' + handle; }).join(' ')) + '</em>';
-      }
-      (item.warnings || []).forEach(function(warning){ html += '<em class="is-warn">' + escapeHtml(warning) + '</em>'; });
-      (item.errors || []).forEach(function(error){ html += '<em class="is-err">' + escapeHtml(error) + '</em>'; });
-      html += '</span></label>';
-    });
-    html += '</section>';
-  });
-  host.innerHTML = html;
-  updateDraftImportCommitLabel_();
-}
-function updateDraftImportCommitLabel_(){
-  var commit = document.getElementById('draft-import-commit');
-  if(!commit) return;
-  var n = document.querySelectorAll('#draft-import-preview input[data-import-index]:checked').length;
-  commit.disabled = n === 0;
-  commit.textContent = n ? ('선택한 초안 저장 (' + n + ')') : '저장할 초안 없음';
-}
-function bindDraftImportPreview_(){
-  var host = document.getElementById('draft-import-preview');
-  if(!host || host.__importBound) return;
-  host.__importBound = true;
-  host.addEventListener('change', function(ev){
-    if(!ev.target || ev.target.id === 'draft-import-all') return;
-    updateDraftImportCommitLabel_();
-  });
-}
-window.toggleDraftImportAll_ = function(box){
-  document.querySelectorAll('#draft-import-preview input[data-import-index]').forEach(function(input){
-    if(input.disabled) return;
-    input.checked = !!(box && box.checked);
-  });
-  updateDraftImportCommitLabel_();
-};
-window.openDraftImport_ = function(){
-  if(typeof PlannerImport === 'undefined'){
-    setAppToast('가져오기 모듈을 불러오지 못했습니다. 새로고침해 주세요.', { duration: 4000, variant: 'err' });
-    return;
-  }
-  bindDraftImportPreview_();
-  openScrollLockedOverlayEl_(document.getElementById('draft-import-overlay'));
-};
-window.closeDraftImport_ = function(ev){
-  if(ev && ev.target && ev.target.id !== 'draft-import-overlay') return;
-  closeScrollLockedOverlayEl_(document.getElementById('draft-import-overlay'));
-};
-window.onDraftImportFile_ = function(input){
-  var file = input && input.files && input.files[0];
-  if(!file) return;
-  if(file.size > 1500000){
-    setAppToast('파일이 너무 커요. 1.5MB 이하로 올려 주세요.', { duration: 4000, variant: 'err' });
-    input.value = '';
-    return;
-  }
-  var reader = new FileReader();
-  reader.onload = function(){
-    var ta = document.getElementById('draft-import-text');
-    if(ta) ta.value = String(reader.result || '');
-    previewDraftImport_();
-  };
-  reader.onerror = function(){
-    setAppToast('파일을 읽지 못했어요.', { duration: 4000, variant: 'err' });
-  };
-  reader.readAsText(file);
-};
-window.previewDraftImport_ = function(){
-  if(typeof PlannerImport === 'undefined'){
-    setAppToast('가져오기 모듈을 불러오지 못했습니다. 새로고침해 주세요.', { duration: 4000, variant: 'err' });
-    return;
-  }
-  var ta = document.getElementById('draft-import-text');
-  var parsed = PlannerImport.parse(ta ? ta.value : '');
-  if(!parsed.ok){
-    _draftImportView_ = null;
-    renderDraftImportPreview_(null, parsed.error);
-    return;
-  }
-  _draftImportView_ = PlannerImport.inspect(parsed.posts, collectExistingImportSlots_());
-  renderDraftImportPreview_(_draftImportView_, '');
-};
-window.commitDraftImport_ = function(){
-  if(!_draftImportView_ || typeof PlannerImport === 'undefined') return;
-  var selected = [];
-  document.querySelectorAll('#draft-import-preview input[data-import-index]:checked').forEach(function(input){
-    selected.push(parseInt(input.getAttribute('data-import-index'), 10));
-  });
-  var result = PlannerImport.batch(_draftImportView_.items, selected);
-  if(!result.drafts.length){
-    var reason = (result.skipped[0] && result.skipped[0].reason) || '선택한 글이 없습니다.';
-    setAppToast(reason, { duration: 4200, variant: 'err' });
-    return;
-  }
-  var applied = applyDraftImportBatch_(result.drafts);
-  try { save({ gasImmediate: true, driveImmediate: false }); }
-  catch(eSave){
-    setAppToast('저장에 실패했어요. ' + ((eSave && eSave.message) || ''), { duration: 5000, variant: 'err' });
-    return;
-  }
-  closeDraftImport_();
-  if(applied.catId != null){
-    try { selectCat(applied.catId); } catch(eCat){ try { renderMain(); } catch(eRender){} }
-  }
-  var msg = '초안 ' + applied.count + '개를 가져왔어요. 예약하거나 발행하지 않았습니다.';
-  if(result.skipped.length){
-    msg += '\n건너뛴 ' + result.skipped.length + '개: ' + result.skipped.slice(0, 3).map(function(row){ return row.reason; }).join(' / ');
-  }
-  setAppToast(msg, { duration: 5200, variant: 'ok' });
 };

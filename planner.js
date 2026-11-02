@@ -28216,7 +28216,10 @@ function buildOpsContentStatus_(branchKey, rep, tip, scope){
         plannerEvents.push(e.at);
       });
     }
-    var manualEvents = opsMktManualPostDays_(rowKey).map(function(day){ return Date.parse(day + 'T12:00:00+09:00'); });
+    // 직접 적은 날짜는 이 기기의 로컬 날짜로 읽는다. 시간대를 못박으면(+09:00) 미국 기기에서 하루 밀린다.
+    var manualEvents = opsMktManualPostDays_(rowKey).map(function(day){
+      return PlannerSyncRules.plannerParsePublishStamp(day, NaN);
+    }).filter(function(ms){ return !isNaN(ms); });
     var primaryFromAccount = false;
     if(ch.source !== 'planner' && obs && Array.isArray(obs.posts) && obs.posts.length){
       primaryFromAccount = true;
@@ -44163,7 +44166,8 @@ function migrateLegacyPublishTabPublished_(){
         ? PlannerSyncRules.plannerParsePublishStamp(String(pub.date), NaN) : NaN;
       if(!isNaN(legacyMs)) stamp = new Date(legacyMs).toISOString();
     }
-    if(!stamp) stamp = new Date().toISOString();
+    // pub.date 도 못 읽고 savedAt 도 없으면 날짜를 지어내지 않는다(오늘로 저장하면 발행일이 거짓이 된다).
+    // 발행 사실만 true 로 남기고, 발행 기록에는 「날짜 없는 발행」으로 잡힌다. 이미 있는 값은 위 가드가 그대로 둔다.
     var finalTexts = Object.assign({}, pub.finalTexts || {});
 
     if((pub.finalText || '').trim()){
@@ -44188,7 +44192,7 @@ function migrateLegacyPublishTabPublished_(){
       if(pub.tabPublished[key]) return;
       var val = finalTexts[key] ? String(finalTexts[key]).trim() : '';
       if(val.length < 10) return;
-      pub.tabPublished[key] = stamp;
+      pub.tabPublished[key] = stamp || true;
       changed = true;
     });
 

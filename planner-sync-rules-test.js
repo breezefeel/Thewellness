@@ -454,6 +454,17 @@ assert(twoSameDay.events.length === 2, 'two posts on one day in the primary sour
 var skipBad = R.plannerMergePostEvents([NaN, d30], [[undefined, d31]]);
 assert(skipBad.events.length === 2, 'unreadable values are skipped');
 
+// 직접 적은 「YYYY-MM-DD」는 어느 시간대 기기에서도 같은 달력 날짜로 읽혀야 한다 (미국 기기에서 하루 밀리면 안 됨)
+['Asia/Seoul', 'America/New_York', 'America/Los_Angeles', 'UTC'].forEach(function(tz){
+  var out = require('child_process').execFileSync(process.execPath, ['-e',
+    "var fs=require('fs'),vm=require('vm');var c={};vm.createContext(c);" +
+    "vm.runInContext(fs.readFileSync(" + JSON.stringify(file) + ",'utf8'),c);var R=c.PlannerSyncRules;" +
+    "var ms=R.plannerParsePublishStamp('2026-10-31',NaN);var bad=R.plannerParsePublishStamp('2026-02-31',123);" +
+    "console.log(R.plannerDayKey(ms)+'|'+bad);"
+  ], { env: Object.assign({}, process.env, { TZ: tz }) }).toString().trim();
+  assert(out === '2026-10-31|123', 'YYYY-MM-DD stays the same calendar day in ' + tz + ' (got ' + out + ')');
+});
+
 if(failed){
   console.error(failed + ' assertion(s) failed');
   process.exit(1);

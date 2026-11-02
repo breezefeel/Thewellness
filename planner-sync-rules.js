@@ -361,6 +361,16 @@ var PlannerSyncRules = (function(){
     if(typeof value !== 'string') return fallback;
     var s = value.trim();
     if(!s) return fallback;
+    // 「2026-10-31」은 시간대 없는 달력 날짜다. 이 기기의 로컬 날짜로 읽는다(Date.parse 는 UTC 자정으로 읽어 미국에서 하루 밀린다).
+    var ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(ymd){
+      var yy = parseInt(ymd[1], 10);
+      var mm = parseInt(ymd[2], 10);
+      var dd = parseInt(ymd[3], 10);
+      var local = new Date(yy, mm - 1, dd);
+      if(local.getFullYear() !== yy || local.getMonth() !== mm - 1 || local.getDate() !== dd) return fallback;
+      return local.getTime();
+    }
     var md = s.match(/^(\d{1,2})\s*[.\/월]\s*(\d{1,2})\s*[.일]?$/);
     if(md){
       var month = parseInt(md[1], 10);

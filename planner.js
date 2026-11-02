@@ -13829,17 +13829,18 @@ const REAL_MOVEMENT_BOOKING_INCHEON_URL = 'https://booking.naver.com/booking/6/b
 const REAL_MOVEMENT_DIRECTIONS_YAKSU_URL = 'https://blog.naver.com/allenjoy/224307689748';
 const REAL_MOVEMENT_DIRECTIONS_INCHEON_URL = 'https://blog.naver.com/allenjoy/224122998739';
 /** 소식 탭 — 약수 작성창. 폰·태블릿은 앱, 데스크탑은 브라우저 */
-const YAKSU_NAVER_NEWS_WRITE_ = 'https://new.smartplace.naver.com/bizes/place/2018185163/feeds/new';
+const YAKSU_NAVER_NEWS_WRITE_ = 'https://new.smartplace.naver.com/bizes/place/11390820?bookingBusinessId=1704376';
 const YAKSU_KAKAO_NEWS_WRITE_ = 'https://business.kakao.com/space/998814/channel/_nVSxdn/posts';
 const YAKSU_KARROT_BA_ID_ = '4104757';
 const YAKSU_KARROT_NEWS_WRITE_ = 'https://bizprofile.karrotwebview.com/biz_accounts/' + YAKSU_KARROT_BA_ID_ + '/manager/posts/new';
 const SMARTPLACE_ANDROID_PKG_ = 'com.naver.smartplace';
 const KAKAO_PARTNER_ANDROID_PKG_ = 'com.kakao.yellowid';
 const KARROT_ANDROID_PKG_ = 'com.towneers.www';
+/** 소식 올리는 곳은 약수점 3곳만 둔다. 당근 비즈니스는 새 링크를 받으면 YAKSU_KARROT_NEWS_WRITE_ 한 곳만 바꾸면 된다. */
 const NEWS_POST_LINKS_ = {
-  naver: { label: '네이버 소식', href: YAKSU_NAVER_NEWS_WRITE_, title: '약수 스마트플레이스 새소식 작성' },
-  kakao: { label: '카카오 소식', href: YAKSU_KAKAO_NEWS_WRITE_, title: '약수 카카오 채널 소식 작성' },
-  karrot: { label: '당근 소식', href: YAKSU_KARROT_NEWS_WRITE_, title: '약수 당근 비즈프로필 소식 작성' }
+  naver: { label: '네이버 스마트플레이스 약수점', href: YAKSU_NAVER_NEWS_WRITE_, title: '네이버 스마트플레이스 약수점 소식 작성' },
+  kakao: { label: '카카오 채널 약수점', href: YAKSU_KAKAO_NEWS_WRITE_, title: '카카오 채널 약수점 소식 작성' },
+  karrot: { label: '당근 비즈니스 약수점', href: YAKSU_KARROT_NEWS_WRITE_, title: '당근 비즈니스 약수점 소식 작성' }
 };
 function openNewsExternalWindow_(url){
   if(!url) return null;
@@ -13939,18 +13940,10 @@ window.openNewsPostTarget_ = function(kind, branchKey, ev){
   openNewsExternalWindow_(target.web);
   return false;
 };
-function renderNewsChannelOpenButtons_(){
-  return '<div class="sheet-news-open-btns">' +
-    NEWS_CHANNEL_DEFS_.map(function(d){
-      return '<button type="button" class="sheet-news-open-btn" onclick="return openNewsPostTarget_(\'' + d.id + '\',\'yaksu\',event)">' +
-        escapeHtml(d.label) + '</button>';
-    }).join('') +
-  '</div>';
-}
+/** 소식 올리는 링크는 아래 한 줄(renderNewsPostLinksBarHTML_)에만 둔다. 복사 줄과 따로 한 번 더 그리면 6개로 보인다. */
 function sheetNewsCopyBar_(){
   return '<div class="sheet-fullcopy-bar sheet-news-copy-bar">' +
     '<button type="button" class="sheet-fullcopy-btn" onclick="copyWholeTab_(this)">전체 복사</button>' +
-    renderNewsChannelOpenButtons_() +
   '</div>';
 }
 function renderNewsPostLinksBarHTML_(){
@@ -28077,9 +28070,48 @@ function setOpsMarketingManual_(itemId, channel, field, value){
   refreshOpsMarketingPanel_(itemId);
 }
 window.setOpsMarketingManual_ = setOpsMarketingManual_;
-/** 플래너 발행 기록 → [{key, catId, at(ms), topic, draftId}] */
+/** 브랜딩 탭의 채널 행에 직접 적어 넣은 게시일을 두는 곳(브랜딩 항목). */
+var OPS_MKT_POST_ITEM_ = 'ops-m-26';
+/** 직접 입력한 게시일 → 그 행의 ms 목록. manual.posts[행키][YYYY-MM-DD] = true|false (false는 지운 표시) */
+function opsMktManualPostDays_(rowKey){
+  var st = getOpsMarketingState_(OPS_MKT_POST_ITEM_);
+  var map = st.manual && st.manual.posts && st.manual.posts[rowKey];
+  if(!map || typeof map !== 'object') return [];
+  return Object.keys(map).filter(function(day){ return map[day] === true && /^\d{4}-\d{2}-\d{2}$/.test(day); }).sort();
+}
+function setOpsMarketingManualPost_(rowKey, day, on){
+  day = String(day || '').trim();
+  rowKey = String(rowKey || '').trim();
+  if(!rowKey || !/^\d{4}-\d{2}-\d{2}$/.test(day)){
+    if(typeof setAppToast === 'function') setAppToast('채널과 날짜를 골라 주세요.', { duration: 2600, variant: 'err' });
+    return;
+  }
+  var ms = typeof PlannerSyncRules !== 'undefined' ? PlannerSyncRules.plannerParsePublishStamp(day, NaN) : Date.parse(day);
+  if(on && !isNaN(ms) && ms > Date.now() + 86400000){
+    if(typeof setAppToast === 'function') setAppToast('오늘보다 뒤 날짜는 적을 수 없어요.', { duration: 2600, variant: 'err' });
+    return;
+  }
+  var st = getOpsMarketingState_(OPS_MKT_POST_ITEM_);
+  if(!st.manual.posts || typeof st.manual.posts !== 'object') st.manual.posts = {};
+  if(!st.manual.posts[rowKey] || typeof st.manual.posts[rowKey] !== 'object') st.manual.posts[rowKey] = {};
+  // 지울 때도 칸 하나만 false 로 바꾼다 → 동기화는 바뀐 칸만 보낸다
+  st.manual.posts[rowKey][day] = !!on;
+  st.manualAt = new Date().toISOString();
+  getOpsManualState_().updatedAt = st.manualAt;
+  save({ skipDriveUpload: true, skipGasPush: true });
+  refreshOpsMarketingPanel_(OPS_MKT_POST_ITEM_);
+}
+function addOpsMarketingManualPostFromForm_(){
+  var rowEl = document.getElementById('ops-post-row');
+  var dayEl = document.getElementById('ops-post-day');
+  setOpsMarketingManualPost_(rowEl && rowEl.value, dayEl && dayEl.value, true);
+}
+window.setOpsMarketingManualPost_ = setOpsMarketingManualPost_;
+window.addOpsMarketingManualPostFromForm_ = addOpsMarketingManualPostFromForm_;
+/** 플래너 발행 기록 → [{key, catId, at(ms), topic, draftId, undated}]. 날짜를 못 읽어도 버리지 않고 undated 로 남긴다. */
 function opsMktPublishLog_(){
   var log = [];
+  var Rules = typeof PlannerSyncRules !== 'undefined' ? PlannerSyncRules : null;
   Object.keys(state.published || {}).forEach(function(id){
     var pub = state.published[id];
     if(!pub || !pub.tabPublished || typeof pub.tabPublished !== 'object') return;
@@ -28088,10 +28120,13 @@ function opsMktPublishLog_(){
     Object.keys(pub.tabPublished).forEach(function(k){
       var v = pub.tabPublished[k];
       if(!v) return;
-      var ms = typeof v === 'string' ? Date.parse(v) : NaN;
-      if(isNaN(ms)) ms = fallback;
-      if(isNaN(ms)) return;
-      log.push({ key: k, catId: catId, at: ms, topic: pub.topic || '', draftId: id });
+      var ms;
+      if(Rules && Rules.plannerParsePublishStamp) ms = Rules.plannerParsePublishStamp(v, fallback);
+      else {
+        ms = typeof v === 'string' ? Date.parse(v) : NaN;
+        if(isNaN(ms)) ms = fallback;
+      }
+      log.push({ key: k, catId: catId, at: ms, topic: pub.topic || '', draftId: id, undated: isNaN(ms) });
     });
   });
   return log;
@@ -28167,9 +28202,24 @@ function buildOpsContentStatus_(branchKey, rep, tip, scope){
     var events = [];
     var source = [];
     var chBranch = ch.branchKey || branchKey;
-    var obs = obsItems[ch.branch ? ch.id + '_' + chBranch : ch.id];
+    var rowKey = ch.branch ? ch.id + '_' + chBranch : ch.id;
+    var obs = obsItems[rowKey];
     var ownLast = 0;
+    // 플래너 발행 기록(이 채널 몫). 지점 소식은 약수 작성창에서만 올리므로 약수 행에만 붙인다.
+    var plannerEvents = [];
+    var undatedN = 0;
+    if(!ch.branch || chBranch === 'yaksu'){
+      log.forEach(function(e){
+        if(ch.keys.indexOf(e.key) < 0) return;
+        if(ch.cats && ch.cats.indexOf(e.catId) < 0) return;
+        if(e.undated){ undatedN++; return; }
+        plannerEvents.push(e.at);
+      });
+    }
+    var manualEvents = opsMktManualPostDays_(rowKey).map(function(day){ return Date.parse(day + 'T12:00:00+09:00'); });
+    var primaryFromAccount = false;
     if(ch.source !== 'planner' && obs && Array.isArray(obs.posts) && obs.posts.length){
+      primaryFromAccount = true;
       obs.posts.forEach(function(p){ var ms = Date.parse(p); if(!isNaN(ms)) events.push(ms); });
       ownLast = obs.ownLast ? Date.parse(obs.ownLast) : 0;
       var obsAt = obs.checkedAt ? String(obs.checkedAt).slice(5, 10).replace('-', '/') : obsDate;
@@ -28184,15 +28234,21 @@ function buildOpsContentStatus_(branchKey, rep, tip, scope){
         var ms = Date.parse(p.at);
         if(!isNaN(ms)) events.push(ms);
       });
+      primaryFromAccount = true;
       source.push(rssRe ? '블로그 RSS (제목·카테고리)' : '블로그 RSS');
-    } else if(!ch.branch || chBranch === 'yaksu'){
-      log.forEach(function(e){
-        if(ch.keys.indexOf(e.key) < 0) return;
-        if(ch.cats && ch.cats.indexOf(e.catId) < 0) return;
-        events.push(e.at);
-      });
+    } else if(plannerEvents.length){
+      events = plannerEvents.slice();
       source.push('플래너 발행완료');
     }
+    // 계정·RSS 확인은 분석을 누른 때까지만 본다. 그 뒤 플래너에서 발행완료한 글과 직접 적은 날짜는 같은 날이 아닐 때만 더한다.
+    if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerMergePostEvents){
+      var mergedPosts = PlannerSyncRules.plannerMergePostEvents(events, primaryFromAccount ? [plannerEvents, manualEvents] : [manualEvents]);
+      events = mergedPosts.events;
+      if(primaryFromAccount && mergedPosts.added[0]) source.push('플래너 발행완료 +' + mergedPosts.added[0]);
+      var manualAdded = mergedPosts.added[primaryFromAccount ? 1 : 0];
+      if(manualAdded) source.push('직접 입력 ' + manualAdded);
+    }
+    if(undatedN) source.push('날짜 없는 발행 ' + undatedN + '건');
     var last = events.length ? Math.max.apply(null, events) : 0;
     var n7 = events.filter(function(ms){ return now - ms < 7 * DAY; }).length;
     var n30 = events.filter(function(ms){ return now - ms < 30 * DAY; }).length;
@@ -28202,7 +28258,7 @@ function buildOpsContentStatus_(branchKey, rep, tip, scope){
     var level = 'good';
     if(!last || days >= interval * 1.5) level = 'high';
     else if(weekTarget ? n7 < weekTarget : days >= interval) level = 'mid';
-    rows.push({ id: ch.id, label: ch.label, last: last, days: days, n7: n7, n30: n30, perWeek: ch.perWeek, level: level, source: source.join(' + ') || '기록 없음' });
+    rows.push({ id: ch.id, rowKey: rowKey, label: ch.label, last: last, days: days, n7: n7, n30: n30, perWeek: ch.perWeek, level: level, source: source.join(' + ') || '기록 없음' });
     if(ownLast && n30 && ch.id !== 'ig_park' && now - ownLast > 30 * DAY){
       tip('mid', ch.label, '피드에는 박준규 계정 콜라보 글이 올라오지만, 이 계정에서 직접 올린 글은 ' + Math.floor((now - ownLast) / DAY) + '일 전이 마지막입니다. 과정 공지·후기·고정 게시물은 이 계정에서 직접 올리세요.');
     }
@@ -28751,6 +28807,28 @@ function renderOpsMarketingPanelHTML_(itemId){
       '<div class="ops-review-group-title"><strong>' + (r.adsOn ? '할 일' : '제안') + '</strong> <span class="ops-review-group-hint">오늘 · 이번 주 순 · ' + (r.adsOn ? '네이버·구글 키워드 광고' : '블로그·인스타·쓰레드·지점 소식') + '</span></div>' +
       '<ul style="list-style:none;margin:6px 0 0;padding:0;font-size:13px">' + (tipsHtml || '<li style="opacity:.7">지금은 따로 할 일이 없습니다.</li>') + '</ul>' +
     '</div>';
+  var manualPostHtml = '';
+  if(!r.adsOn){
+    var postRowOpts = (r.contentRows || []).map(function(c){
+      return '<option value="' + escapeHtml(c.rowKey) + '">' + escapeHtml(c.label) + '</option>';
+    }).join('');
+    var manualPostList = (r.contentRows || []).map(function(c){
+      return opsMktManualPostDays_(c.rowKey).map(function(day){
+        return '<span style="display:inline-flex;align-items:center;gap:4px;margin:4px 6px 0 0;padding:2px 8px;border:1px solid rgba(15,23,42,.15);border-radius:999px;font-size:12px">' +
+          escapeHtml(c.label) + ' · ' + escapeHtml(day.slice(5).replace('-', '/')) +
+          '<button type="button" aria-label="지우기" style="border:0;background:none;cursor:pointer;font-size:14px;line-height:1" onclick="setOpsMarketingManualPost_(\'' + escapeHtml(c.rowKey) + '\',\'' + escapeHtml(day) + '\',false)">×</button></span>';
+      }).join('');
+    }).join('');
+    manualPostHtml = '<div style="margin-top:10px;padding:10px 12px;border:1px dashed rgba(15,23,42,.25);border-radius:10px">' +
+      '<div style="font-size:12.5px;font-weight:700">빠진 게시일 직접 적기</div>' +
+      '<p class="ops-kw-chip-hint" style="margin:4px 0 8px">표에 날짜가 없거나 옛 날짜인 채널을 고르고, 실제로 올린 날을 적으세요. 같은 날 기록이 이미 있으면 한 번만 셉니다. ×로 지울 수 있습니다.</p>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">' +
+        '<select id="ops-post-row" style="font:inherit;font-size:13px;padding:4px 6px">' + postRowOpts + '</select>' +
+        '<input id="ops-post-day" type="date" max="' + new Date().toISOString().slice(0, 10) + '" style="font:inherit;font-size:13px;padding:4px 6px">' +
+        '<button type="button" class="ops-kw-btn" onclick="addOpsMarketingManualPostFromForm_()">기록하기</button>' +
+      '</div>' + (manualPostList ? '<div style="margin-top:4px">' + manualPostList + '</div>' : '') +
+    '</div>';
+  }
   if(!r.adsOn){
     return '<div class="ops-kw-panel ops-mkt-panel" data-ops-mkt="' + escapeHtml(itemId) + '">' +
       '<div class="ops-review-group ops-kw-group">' +
@@ -28759,6 +28837,7 @@ function renderOpsMarketingPanelHTML_(itemId){
         '<p class="ops-kw-chip-hint">' + (rep && rep.channels
           ? '블로그는 RSS, 지점 소식은 각 페이지에서 직접 확인한 결과입니다 (' + escapeHtml(String(rep.channels.checkedAt || '').slice(0, 16).replace('T', ' ')) + '). 인스타·쓰레드는 플래너 「발행완료」 기준입니다 — 플래너 밖에서 올린 글은 세지 않습니다.'
           : '아직 분석 결과가 없어 플래너 「발행완료」 기록으로만 셉니다. 「분석하기」를 누르면 블로그와 지점 소식을 직접 확인합니다.') + '</p>' +
+        manualPostHtml +
         reportButtons +
       '</div>' +
       tipsBlock +
@@ -33997,11 +34076,80 @@ function renderDrawerEditorBody_(){
     html += '<button type="button" class="drawer-edit-add" onclick="drawerEditAdd_()">+ 서랍 추가</button>';
   }
   html += '<p class="drawer-edit-note">서랍을 지우면 안에 있던 주제는 <strong>기타 주제</strong>로 옮겨져요.</p>';
+  html += '<button type="button" class="drawer-edit-add" onclick="showDrawerOverview_()">전체 서랍 현황 보기 (읽기 전용)</button>';
   if(ed.custom){
     html += '<button type="button" class="drawer-edit-reset" onclick="drawerEditResetToSeed_()">기본 서랍으로 되돌리기</button>';
   }
   body.innerHTML = html;
 }
+
+/**
+ * 전체 서랍 현황(읽기 전용). 아무것도 옮기거나 지우지 않는다.
+ * 표시: 가져오기 = 원고 가져오기가 주제 이름으로 만든 서랍 · 지역명 = 서랍 이름에 동네·역 이름이 있음 · 비어 있음 = 카드 0개.
+ */
+var DRAWER_OVERVIEW_REGION_RE_ = /약수|작전|인천|신당|계양|부평|서울|역(?!할|학|량|동)/;
+function collectDrawerOverview_(){
+  var out = [];
+  CATEGORIES.forEach(function(cat, catId){
+    var plan = peekSubGoalPlan_(catId);
+    if(!cat || !plan || !Array.isArray(plan.steps)) return;
+    var drawers = [];
+    var counted = 0;
+    plan.steps.forEach(function(s){
+      if(!s || s.id == null) return;
+      var title = displaySubGoalStepTitle_(s.title || '', catId);
+      var count = getDraftsForSubGoalStep_(catId, String(s.id), { live: true }).length;
+      counted += count;
+      var flags = [];
+      if(s.importTopic || String(s.rationale || '') === '원고 가져오기') flags.push('가져오기');
+      if(DRAWER_OVERVIEW_REGION_RE_.test(title)) flags.push('지역명');
+      if(!count) flags.push('비어 있음');
+      drawers.push({ id: String(s.id), title: title, count: count, flags: flags });
+    });
+    var total = (cat.drafts || []).filter(function(d){ return d && d.id && !(state.deletedDraftIds && state.deletedDraftIds[d.id]); }).length;
+    out.push({ catId: catId, name: cat.name, drawers: drawers, total: total, outside: Math.max(0, total - counted) });
+  });
+  return out;
+}
+function drawerOverviewMarkdown_(rows){
+  var lines = [];
+  rows.forEach(function(g){
+    lines.push('### ' + g.name + ' (카드 ' + g.total + '개 · 서랍 밖/기타 ' + g.outside + '개)', '', '| 서랍 | 카드 수 | 표시 |', '|---|---:|---|');
+    g.drawers.forEach(function(d){ lines.push('| ' + d.title.replace(/\|/g, '/') + ' | ' + d.count + ' | ' + d.flags.join(', ') + ' |'); });
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+window.showDrawerOverview_ = function(){
+  var body = document.getElementById('drawer-edit-body');
+  var titleEl = document.getElementById('drawer-edit-title');
+  if(!body) return;
+  var backCat = _drawerEdit ? _drawerEdit.catId : state.currentCat;
+  var rows = collectDrawerOverview_();
+  if(titleEl) titleEl.textContent = '전체 서랍 현황';
+  var html = '<p class="drawer-edit-note" style="margin-top:0">보기만 합니다. 옮기거나 지우지 않아요. 표시: <strong>가져오기</strong> = 원고 가져오기가 주제 이름으로 만든 서랍, <strong>지역명</strong> = 이름에 동네·역이 있음.</p>';
+  rows.forEach(function(g){
+    html += '<div style="margin:12px 0 4px;font-weight:800;font-size:13px">' + escapeHtml(g.name) +
+      ' <span style="font-weight:500;opacity:.7">카드 ' + g.total + '개' + (g.outside ? ' · 서랍 밖 ' + g.outside + '개' : '') + '</span></div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:12.5px">';
+    g.drawers.forEach(function(d){
+      html += '<tr><td style="padding:4px 6px;border-bottom:1px solid rgba(15,23,42,.08)">' + escapeHtml(d.title) + '</td>' +
+        '<td style="padding:4px 6px;border-bottom:1px solid rgba(15,23,42,.08);text-align:right;white-space:nowrap">' + d.count + '개</td>' +
+        '<td style="padding:4px 6px;border-bottom:1px solid rgba(15,23,42,.08);color:#B45309;white-space:nowrap">' + escapeHtml(d.flags.join(' · ')) + '</td></tr>';
+    });
+    html += '</table>';
+  });
+  html += '<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">' +
+    '<button type="button" class="drawer-edit-add" onclick="copyDrawerOverview_()">표 복사</button>' +
+    '<button type="button" class="drawer-edit-add" onclick="openDrawerEditor_(' + backCat + ')">돌아가기</button></div>';
+  body.innerHTML = html;
+};
+window.copyDrawerOverview_ = function(){
+  var text = drawerOverviewMarkdown_(collectDrawerOverview_());
+  var done = function(ok){ if(typeof setAppToast === 'function') setAppToast(ok ? '서랍 현황을 복사했어요.' : '복사하지 못했어요.', { duration: 2400, variant: ok ? 'ok' : 'err' }); };
+  if(typeof copyTextOnly_ === 'function') copyTextOnly_(text, done);
+  else if(navigator.clipboard) navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(false); });
+};
 
 window.drawerEditSetField_ = function(i, field, value){
   if(!_drawerEdit || !_drawerEdit.rows[i]) return;
@@ -40597,7 +40745,6 @@ function renderSheetContent(content, opts) {
         sheetEditField_('제목 · 첫 줄', 'sheet-news-title', newsItem.title || '', { rows: 2, title: true, regen: 'news.title', copy: true }) +
         sheetEditField_('본문', 'sheet-news-body', newsItem.body || '', { rows: 10, regen: 'news.body', copy: true, paragraphs: true, help: chLabel + ' 톤에 맞게 다듬으세요' }) +
         sheetEditField_('CTA', 'sheet-news-cta', newsItem.cta || '', { rows: 3, regen: 'news.cta', copy: true, paragraphs: true }) +
-        '<div class="sheet-news-open-row">' + renderNewsChannelOpenButtons_() + '</div>' +
         renderNewsPostLinksBarHTML_()
       );
     }
@@ -44009,7 +44156,14 @@ function migrateLegacyPublishTabPublished_(){
     if(draftIsFullyPublished_(draftId, catId)) return;
     if(!pub.date && !(pub.finalText || '').trim() && (!pub.finalTexts || !Object.keys(pub.finalTexts).length)) return;
 
-    var stamp = pub.savedAt || (pub.date ? String(pub.date) : '') || new Date().toISOString();
+    // pub.date 는 「10. 31.」 같은 표시용 글자라 날짜로 못 읽는다. 읽어서 ISO 로 저장해야 발행 기록에 남는다(savedAt 은 동기화에서 빠진다).
+    var stamp = pub.savedAt || '';
+    if(!stamp && pub.date){
+      var legacyMs = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerParsePublishStamp)
+        ? PlannerSyncRules.plannerParsePublishStamp(String(pub.date), NaN) : NaN;
+      if(!isNaN(legacyMs)) stamp = new Date(legacyMs).toISOString();
+    }
+    if(!stamp) stamp = new Date().toISOString();
     var finalTexts = Object.assign({}, pub.finalTexts || {});
 
     if((pub.finalText || '').trim()){

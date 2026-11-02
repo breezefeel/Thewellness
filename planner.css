@@ -2479,14 +2479,6 @@ background: #111827; color: #fff; border-color: #111827;
 border-color: #93C5FD; background: #EFF6FF; color: #1D4ED8;
 }
 .sheet-news-copy-bar { justify-content: space-between; }
-.sheet-news-open-row { display: flex; justify-content: flex-end; margin: 2px 0 10px; }
-.sheet-news-open-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; justify-content: flex-end; }
-.sheet-news-open-btn {
-  -webkit-appearance: none; appearance: none; margin: 0; cursor: pointer; font-family: inherit;
-  border: 1px solid #E5E7EB; background: #F8F7F4; color: #374151;
-  border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 700;
-}
-.sheet-news-open-btn:hover { background: #111827; color: #fff; border-color: #111827; }
 .sheet-news-post-links {
   margin: 0 0 4px; padding: 12px 14px; border-radius: 12px;
   border: 1px solid #E5E7EB; background: #F8FAFC;

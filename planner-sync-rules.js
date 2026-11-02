@@ -353,6 +353,75 @@ var PlannerSyncRules = (function(){
     return isNaN(t) ? NaN : t;
   }
 
+  // 발행 기록 값을 시각(ms)으로 읽는다. ISO·밀리초·「2026-10-31」, 그리고 옛 발행 모달이 남긴 「10. 31.」·「10월 31일」·「10/31」.
+  // 연도가 없으면 fallbackMs(저장 시각)의 해를 쓰고, 그래도 미래(2일 넘게)면 작년으로 본다. 못 읽으면 fallbackMs, 그것도 없으면 NaN.
+  function plannerParsePublishStamp(value, fallbackMs, nowMs){
+    var fallback = (typeof fallbackMs === 'number' && isFinite(fallbackMs) && fallbackMs > 0) ? fallbackMs : NaN;
+    if(typeof value === 'number') return (isFinite(value) && value > 100000000000) ? value : fallback;
+    if(typeof value !== 'string') return fallback;
+    var s = value.trim();
+    if(!s) return fallback;
+    // 「2026-10-31」은 시간대 없는 달력 날짜다. 이 기기의 로컬 날짜로 읽는다(Date.parse 는 UTC 자정으로 읽어 미국에서 하루 밀린다).
+    var ymd = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(ymd){
+      var yy = parseInt(ymd[1], 10);
+      var mm = parseInt(ymd[2], 10);
+      var dd = parseInt(ymd[3], 10);
+      var local = new Date(yy, mm - 1, dd);
+      if(local.getFullYear() !== yy || local.getMonth() !== mm - 1 || local.getDate() !== dd) return fallback;
+      return local.getTime();
+    }
+    var md = s.match(/^(\d{1,2})\s*[.\/월]\s*(\d{1,2})\s*[.일]?$/);
+    if(md){
+      var month = parseInt(md[1], 10);
+      var day = parseInt(md[2], 10);
+      if(month < 1 || month > 12 || day < 1 || day > 31) return fallback;
+      var now = (typeof nowMs === 'number' && isFinite(nowMs)) ? nowMs : Date.now();
+      var year = new Date(isNaN(fallback) ? now : fallback).getFullYear();
+      var at = new Date(year, month - 1, day).getTime();
+      if(at > now + 2 * 86400000) at = new Date(year - 1, month - 1, day).getTime();
+      return at;
+    }
+    var t = plannerParseDateMs(s);
+    return isNaN(t) ? fallback : t;
+  }
+
+  // 로컬 날짜 키 「2026-10-31」. 같은 날짜인지 비교할 때만 쓴다.
+  function plannerDayKey(ms){
+    if(typeof ms !== 'number' || !isFinite(ms)) return '';
+    var d = new Date(ms);
+    var m = d.getMonth() + 1;
+    var day = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+  }
+
+  // 게시 기록을 합친다. primary 는 그대로 두고(같은 날 두 번 올린 글도 둘 다 센다),
+  // secondaries 는 앞선 기록에 없는 날짜만 더한다. 같은 글이 두 출처에 있어도 한 번만 세려는 것이다.
+  // 돌려주는 added[i] 는 i번째 보조 기록에서 실제로 더해진 건수.
+  function plannerMergePostEvents(primary, secondaries){
+    var events = [];
+    var days = {};
+    (primary || []).forEach(function(ms){
+      if(typeof ms !== 'number' || !isFinite(ms)) return;
+      events.push(ms);
+      days[plannerDayKey(ms)] = true;
+    });
+    var added = [];
+    (secondaries || []).forEach(function(list){
+      var n = 0;
+      (list || []).slice().sort(function(a, b){ return a - b; }).forEach(function(ms){
+        if(typeof ms !== 'number' || !isFinite(ms)) return;
+        var key = plannerDayKey(ms);
+        if(days[key]) return;
+        days[key] = true;
+        events.push(ms);
+        n++;
+      });
+      added.push(n);
+    });
+    return { events: events, added: added };
+  }
+
   function plannerMonthDayLabel(ms){
     if(!ms) return '-';
     var d = new Date(ms);
@@ -887,6 +956,9 @@ var PlannerSyncRules = (function(){
     plannerBootCrashState: plannerBootCrashState,
     plannerNextBlobCompress: plannerNextBlobCompress,
     plannerDraftListDate: plannerDraftListDate,
+    plannerParsePublishStamp: plannerParsePublishStamp,
+    plannerDayKey: plannerDayKey,
+    plannerMergePostEvents: plannerMergePostEvents,
     plannerNoteDraftActivity: plannerNoteDraftActivity,
     plannerDraftActivityDay: plannerDraftActivityDay,
     plannerAcceptedSentByKey: plannerAcceptedSentByKey,

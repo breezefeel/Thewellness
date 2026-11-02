@@ -240,13 +240,39 @@ var PlannerSocial = (function(){
     var el = document.getElementById('social-reel-file');
     if(el) saveReelFile(el.value);
   }
+  /**
+   * 브라우저는 로컬 폴더를 직접 열 수 없다. 데스크탑에서 tools\open_publish_folder_setup.bat 을 한 번 실행하면
+   * thewellness-folder:// 주소가 등록되고, 이 주소를 누르면 아래 폴더가 탐색기로 열린다.
+   * 주소는 폴더 경로를 받지 않는다(등록된 명령이 이 폴더 하나로 고정). 광고연결켜기.bat 은 필요 없다.
+   */
+  var REEL_FOLDER_PATH = 'N:\\개인\\00.사진+영상\\11. 발행 확인';
+  var REEL_FOLDER_URL = 'thewellness-folder://open';
   var reelFolderAt = 0;
+  var reelFolderHinted = false;
+  function launchReelFolder(){
+    try {
+      var a = document.createElement('a');
+      a.href = REEL_FOLDER_URL;
+      a.style.display = 'none';
+      (document.body || document.documentElement).appendChild(a);
+      a.click();
+      setTimeout(function(){ try { a.remove(); } catch(e1){} }, 0);
+    } catch(e){
+      try { window.location.href = REEL_FOLDER_URL; } catch(e2){}
+    }
+  }
+  function copyReelFolderPath(){
+    var done = function(ok){
+      toast(ok ? '폴더 경로를 복사했어요. 탐색기 주소창에 붙여 넣으세요.' : '복사하지 못했어요. 경로: ' + REEL_FOLDER_PATH, ok ? 'ok' : 'err', 4200);
+    };
+    if(typeof copyTextOnly_ === 'function') copyTextOnly_(REEL_FOLDER_PATH, done);
+    else if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(REEL_FOLDER_PATH).then(function(){ done(true); }, function(){ done(false); });
+    else done(false);
+  }
   function openReelFolder(){
     var now = Date.now();
     if(now - reelFolderAt < 1200) return;
     reelFolderAt = now;
-    var el = document.getElementById('social-reel-file');
-    var name = el ? String(el.value || '') : readReelFile(curDraft());
     if(typeof isOpsMobileDevice_ === 'function' && isOpsMobileDevice_()){
       toast('폴더는 네이버 박스가 연결된 데스크탑에서 열립니다.', 'ok', 4200);
       return;
@@ -255,22 +281,11 @@ var PlannerSocial = (function(){
       var box = document.getElementById('social-reel-file');
       if(box) box.focus();
     }, 300);
-    fetch('http://127.0.0.1:28765/open-reel', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name })
-    }).then(function(r){
-      return r.json().catch(function(){ return {}; }).then(function(j){
-        if(!r.ok || j.ok === false) throw new Error((j && j.error) || '폴더를 열지 못했어요');
-        if(String(name || '').trim() && j.found === false) toast('발행 확인 폴더를 열었어요. 그 이름의 파일은 없어요.', 'ok', 4200);
-      });
-    }).catch(function(err){
-      var msg = err && err.message;
-      if(!msg || msg === 'Failed to fetch' || /NetworkError|Load failed|fetch/i.test(msg)){
-        msg = '폴더를 열려면 이 데스크탑에서 광고연결켜기.bat 을 실행해 주세요.';
-      }
-      toast(msg, 'err', 5200);
-    });
+    launchReelFolder();
+    if(!reelFolderHinted){
+      reelFolderHinted = true;
+      toast('발행 확인 폴더를 열어요. 안 열리면 「경로 복사」를 누르거나, open_publish_folder_setup.bat 을 한 번 실행해 주세요.', 'ok', 6200);
+    }
   }
   function reelFieldHTML(){
     return '<label for="social-reel-file" style="display:block;font-size:12px;font-weight:700;margin:10px 0 4px">릴스 파일</label>' +
@@ -278,7 +293,11 @@ var PlannerSocial = (function(){
       'style="width:100%;box-sizing:border-box;font:inherit;font-size:13px;line-height:1.45;padding:8px;border-radius:8px;border:1px solid #cbd5e1" ' +
       'onclick="PlannerSocial.openReelFolder()" onchange="PlannerSocial.saveReelFile(this.value)" onblur="PlannerSocial.saveReelFile(this.value)">' +
       esc(readReelFile(curDraft())) + '</textarea>' +
-      '<p style="font-size:11.5px;color:#6B7280;margin:4px 0 8px;line-height:1.5">칸을 누르면 그 파일이 있는 폴더가 열립니다. 원본은 MYBOX 「11. 발행 확인」에 있고, 발행 후에는 「발행 완료」로 옮깁니다.</p>';
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 0">' +
+        '<button type="button" class="ops-kw-btn" onclick="PlannerSocial.openReelFolder()">폴더 열기</button>' +
+        '<button type="button" class="ops-kw-btn" onclick="PlannerSocial.copyReelFolderPath()">경로 복사</button>' +
+      '</div>' +
+      '<p style="font-size:11.5px;color:#6B7280;margin:4px 0 8px;line-height:1.5">칸이나 「폴더 열기」를 누르면 MYBOX 「11. 발행 확인」 폴더가 열립니다. 발행 후에는 「발행 완료」로 옮깁니다. 열리지 않으면 이 컴퓨터에서 tools 폴더의 open_publish_folder_setup.bat 을 한 번만 실행하세요.</p>';
   }
   function hydrate(){
     flushReelFile();
@@ -719,7 +738,7 @@ var PlannerSocial = (function(){
   }
   setTimeout(syncPublished, 6000);
 
-  return { hydrate: hydrate, onPick: onPick, download: download, remove: remove, move: move, setCover: setCover, saveReelFile: saveReelFile, openReelFolder: openReelFolder,
+  return { hydrate: hydrate, onPick: onPick, download: download, remove: remove, move: move, setCover: setCover, saveReelFile: saveReelFile, openReelFolder: openReelFolder, copyReelFolderPath: copyReelFolderPath,
     publishNow: publishNow, schedule: schedule, cancel: cancel, actionsHTML: actionsHTML, upload: upload,
     saveThumb: saveThumb, syncPublished: syncPublished };
 })();

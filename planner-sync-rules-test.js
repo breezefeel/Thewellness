@@ -427,6 +427,44 @@ var identical = R.plannerMergeDuplicateGroup([
 ]);
 assert(identical.changed && identical.content.blog.problem === '같음', 'identical copies merge and keep the text');
 
+// 발행 기록 날짜 읽기: 옛 발행 모달이 남긴 「10. 31.」 같은 값도 버리지 않는다
+var NOW = new Date(2026, 10, 2, 12).getTime();
+var SAVED = new Date(2026, 9, 31, 9).getTime();
+function ymd(ms){ return R.plannerDayKey(ms); }
+assert(ymd(R.plannerParsePublishStamp('2026-10-31T01:00:00.000Z', NaN, NOW)) === '2026-10-31', 'ISO stamp is read');
+assert(ymd(R.plannerParsePublishStamp('10. 31.', SAVED, NOW)) === '2026-10-31', 'legacy "10. 31." is read with the saved year');
+assert(ymd(R.plannerParsePublishStamp('10월 31일', NaN, NOW)) === '2026-10-31', 'legacy "10월 31일" is read');
+assert(ymd(R.plannerParsePublishStamp('10/30', NaN, NOW)) === '2026-10-30', '"10/30" is read');
+assert(ymd(R.plannerParsePublishStamp('12. 25.', NaN, NOW)) === '2025-12-25', 'a month-day later than today falls back to last year');
+assert(R.plannerParsePublishStamp(true, SAVED, NOW) === SAVED, 'a bare true falls back to the saved time');
+assert(isNaN(R.plannerParsePublishStamp(true, NaN, NOW)), 'a bare true with no fallback stays unreadable');
+assert(R.plannerParsePublishStamp('13. 40.', SAVED, NOW) === SAVED, 'an impossible month-day falls back');
+assert(R.plannerParsePublishStamp(SAVED, NaN, NOW) === SAVED, 'a millisecond number is kept');
+
+// 게시 기록 합치기: 주 기록은 그대로, 보조 기록은 없는 날짜만
+var d30 = new Date(2026, 9, 30, 10).getTime();
+var d31 = new Date(2026, 9, 31, 10).getTime();
+var d31b = new Date(2026, 9, 31, 20).getTime();
+var merged = R.plannerMergePostEvents([d30], [[d31, d31b], [d30]]);
+assert(merged.events.length === 2, 'same day from a later source is counted once');
+assert(merged.added[0] === 1 && merged.added[1] === 0, 'only the missing day is added');
+assert(merged.events.indexOf(d31) >= 0, 'the newer planner record extends the last post date');
+var twoSameDay = R.plannerMergePostEvents([d31, d31b], []);
+assert(twoSameDay.events.length === 2, 'two posts on one day in the primary source are both kept');
+var skipBad = R.plannerMergePostEvents([NaN, d30], [[undefined, d31]]);
+assert(skipBad.events.length === 2, 'unreadable values are skipped');
+
+// 직접 적은 「YYYY-MM-DD」는 어느 시간대 기기에서도 같은 달력 날짜로 읽혀야 한다 (미국 기기에서 하루 밀리면 안 됨)
+['Asia/Seoul', 'America/New_York', 'America/Los_Angeles', 'UTC'].forEach(function(tz){
+  var out = require('child_process').execFileSync(process.execPath, ['-e',
+    "var fs=require('fs'),vm=require('vm');var c={};vm.createContext(c);" +
+    "vm.runInContext(fs.readFileSync(" + JSON.stringify(file) + ",'utf8'),c);var R=c.PlannerSyncRules;" +
+    "var ms=R.plannerParsePublishStamp('2026-10-31',NaN);var bad=R.plannerParsePublishStamp('2026-02-31',123);" +
+    "console.log(R.plannerDayKey(ms)+'|'+bad);"
+  ], { env: Object.assign({}, process.env, { TZ: tz }) }).toString().trim();
+  assert(out === '2026-10-31|123', 'YYYY-MM-DD stays the same calendar day in ' + tz + ' (got ' + out + ')');
+});
+
 if(failed){
   console.error(failed + ' assertion(s) failed');
   process.exit(1);

@@ -13515,6 +13515,34 @@ function maybeAutoloadDailyRefPhoto_(index){
 function isOpsManualCategory(catId){ return catId === 8; }
 function isThreadCategory(catId){ return isDailyShareCategory(catId); }
 function isHeiljagyaeCategory(catId){ return catId === 7; }
+/** 블로그 생성 때 항상 덧붙이는 구조 규칙 — 저장된 옛 프롬프트가 있어도 이 순서가 우선한다 */
+var BLOG_SELFCARE_ORDER_TEXT_ = '자극(도수·셀프 자극) → 스트레칭 → 자세·생활습관 → 기능운동';
+function getBlogCallToActionRuleText_(catId){
+  var id = parseInt(catId, 10);
+  if(id === 3 || id === 4 || id === 5){
+    var course = id === 3 ? 'CMT 임상 도수치료 과정' : (id === 4 ? 'IFC 얼굴교정 과정' : 'Re:Al 움직임 과정');
+    return '- 끝 링크는 「' + course + '」 신청 링크 하나만. 앱이 글 끝에 붙이니 본문에는 URL을 쓰지 말고, 과정 신청으로 이어지는 한두 문장만 쓰세요. 예약·온라인 문진·프로필 링크 문구는 쓰지 마세요.';
+  }
+  if(id === 1) return '- 끝 링크는 지점 예약 링크(리얼무브먼트 약수점·인천점)만. 앱이 글 끝에 붙이니 본문에는 URL을 쓰지 말고, 예약으로 이어지는 한두 문장만 쓰세요. 프로필 링크 문진·증상 허브 URL은 쓰지 마세요.';
+  if(id === 2) return '- 끝 링크는 리얼무브먼트 인천점 예약 링크 하나만. 앱이 글 끝에 붙이니 본문에는 URL을 쓰지 말고, 예약으로 이어지는 한두 문장만 쓰세요. 프로필 링크 문진·증상 허브 URL은 쓰지 마세요.';
+  return '- CTA 본문에는 URL을 쓰지 마세요.';
+}
+function getBlogStructureRulesText_(catId){
+  var id = parseInt(catId, 10);
+  var lines = [
+    '[블로그 구조 규칙 — 위 지침과 겹치면 이 블록이 우선]',
+    '- 셀프 케어(따라하기) 순서는 항상 ' + BLOG_SELFCARE_ORDER_TEXT_ + '. 3~4단계면 앞에서부터 이 순서대로 고르고, 순서를 바꾸거나 다른 종류를 앞에 두지 마세요. 「자세→숨→목·머리→등」 순서는 쓰지 않습니다.',
+    '- 셀프 케어 다음에는 충분히 긴 원리 설명을 둡니다(짧게 끝내지 말고 여러 문단). 원리 설명에는 네 가지가 모두 들어가야 합니다: ① 왜 아픈지(불편한지) ② 서로 연결된 구조 ③ 왜 이 순서(' + BLOG_SELFCARE_ORDER_TEXT_ + ')로 하는지 ④ 생활 속 원인. 원리 설명이 끝난 뒤에 CTA를 둡니다. CTA 뒤에 새 설명을 붙이지 마세요.',
+    '- 「교정」이라는 말은 쓰지 마세요. 과정명·학회명(예: 국제얼굴교정학회, IFC 얼굴교정 과정)만 그대로 씁니다. 본문에서는 「바로잡기·정렬·균형」 같은 말로 바꿉니다.',
+    getBlogCallToActionRuleText_(id)
+  ];
+  if(id === 0 || id === 3){
+    lines.splice(4, 0, '- 읽는 사람은 의료인·의료기사(물리치료사·도수치료사)입니다. 도움받는 사람은 「환자」라고 쓰고, 「회원」이라고 쓰지 마세요.');
+  } else if(id === 4){
+    lines.splice(4, 0, '- IFC 글은 「회원」이라는 말을 그대로 씁니다. 「환자」로 바꾸지 마세요.');
+  }
+  return lines.join('\n');
+}
 function isGeneralAudienceCategory(catId){ return catId === 0 || catId === 1 || catId === 2; }
 /** 도수치료(0)·CMT(3) 외 — 독자 문장의 메디컬·재활·치료·통증 금지 */
 function isNonManualBannedWordChannel_(catId){
@@ -14408,8 +14436,8 @@ const THREADS_BODY_COMMENT_RULES = `목소리는 기본 지침의 [목소리와 
 
 [쓰레드 형식]
 반말. 인스타 문장을 베끼지 않는다.
-body: 1~3문장. 통념 하나를 뒤집고, 일반인 글은 자가 점검 질문으로 끝낸다. 해설은 넣지 않는다. 전문가 과정은 전제를 뒤집는 한 줄.
-comment: 빈 줄로 나눈 4개. 각 1~2문장, 아이디어 하나. 1 해부 방향 2 그 다음 한 가지 3 주어가 분명한 원리와 절제된 결과 4 자가 점검·행동으로 끝. 적신호·병원·「10초면 돼」 같은 시간 약속 댓글은 넣지 않는다. 그 안내는 블로그에만 있다.
+body: 첫 훅 **한 줄(한 문장)** 만. 통념 하나를 뒤집고, 일반인 글은 자가 점검 질문으로 끝낸다. 해설·두 번째 문장은 넣지 않는다. 전문가 과정은 전제를 뒤집는 한 줄.
+comment: 나머지 내용은 **비슷한 문장끼리 묶어 댓글 3개**로 나눈다(빈 줄로만 구분). 댓글 하나는 **두 문장까지**, 아이디어 하나. 1 해부 방향·원인 2 주어가 분명한 원리와 절제된 결과 3 자가 점검·행동으로 끝. 적신호·병원·「10초면 돼」 같은 시간 약속 댓글은 넣지 않는다. 그 안내는 블로그에만 있다.
 해시태그·불릿 없음.
 
 ${CHANNEL_THREADS_FEWSHOT}`;
@@ -14498,7 +14526,7 @@ function buildExpertCourseThreadsPrompt_(opts){
     '[전문가 과정 맥락]\n' +
     '- 독자: ' + roleReaders + '\n' +
     '- 본문: 현장에서 흔히 틀리는 전제 하나를 한 줄로 뒤집기. 자가 점검 질문을 억지로 넣지 않는다\n' +
-    '- 댓글 4개도 인스타·영상 범위 안. 수강 유도 금지. 없는 내용 추가 금지. 일반인 앉기 본보기의 문장은 옮기지 않는다' +
+    '- 댓글 3개도 인스타·영상 범위 안. 수강 유도 금지. 없는 내용 추가 금지. 일반인 앉기 본보기의 문장은 옮기지 않는다' +
     (programBlock ? '\n' + programBlock : '');
 }
 
@@ -15632,9 +15660,9 @@ const DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW = `${VOICE_CORE_POINTER}
 [블로그 형식]
 존댓말. **, ---, > 금지. 문단 사이 빈 줄. 같은 결론을 칸마다 반복하지 않는다.
 1. problem: 일상 장면 2~4문장. 자가 점검·병원 안내 없음.
-2. selfCare: 👉 먼저 확인(자가 점검 한 문장) → 1) 2) 3) (4)) 3~4단계(자세→숨→목·머리→등). 번호는 「1)」 형식이고 앞에 👉를 붙이지 않는다. 각 단계는 동작과 이유를 한 절에, 초·회를 포함한다. 항목(먼저 확인·번호 단계) 사이마다 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 주의·실수·적신호 줄은 모두 「✕ 」로 시작한다(예: ✕ 목만 당긴다). 맨 끝 한 줄만 적신호면 병원. 「1단계 —」 표기 금지.
-3. explanation: 맨 앞 1~2문장이 핵심. 그 뒤는 새 이유. 병원·자가 점검 반복 없음.
-4. cta: 「프로필 링크에서 온라인 문진」 하나. 병원 문구 없음. 허브 URL은 주제와 맞을 때 하나 — 허리 ?hub=back · 목 ?hub=neck · 어깨 ?hub=shoulder · 무릎 ?hub=knee · 골반 ?hub=pelvis (기본 ${PROFILE_BRAND_URL})
+2. selfCare: 👉 먼저 확인(자가 점검 한 문장) → 1) 2) 3) (4)) 3~4단계(자극→스트레칭→자세·생활습관→기능운동 순서). 번호는 「1)」 형식이고 앞에 👉를 붙이지 않는다. 각 단계는 동작과 이유를 한 절에, 초·회를 포함한다. 항목(먼저 확인·번호 단계) 사이마다 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 주의·실수·적신호 줄은 모두 「✕ 」로 시작한다(예: ✕ 목만 당긴다). 맨 끝 한 줄만 적신호면 병원. 「1단계 —」 표기 금지.
+3. explanation: 충분히 길게(여러 문단). 왜 아픈지 · 연결된 구조 · 이 순서로 하는 이유 · 생활 속 원인을 모두 담는다. 맨 앞 1~2문장이 핵심. 병원·자가 점검 반복 없음.
+4. cta: 원리 설명 뒤에 둔다. 한두 문장, URL 없음(끝 링크는 앱이 지점 예약 링크로 붙인다). 병원 문구 없음.
 5. title: 궁금증 한 줄, 35자 내외. hashtags 6~8개.
 
 ${CHANNEL_BLOG_FEWSHOT}`;
@@ -16173,7 +16201,7 @@ function migrateDraftShapePrompts_(){
     if(!cat || typeof cat !== 'object') return;
     if((id === 0 || id === 1 || id === 2) && cat.blog && !promptHasVoiceCore_(cat.blog) && String(cat.blog).indexOf(shape) < 0){
       var blogAdd = shape + '\n' +
-        '- selfCare는 동작 1개로 끝내지 마세요. 👉 먼저 확인(자가 점검 한 문장) → 👉 1.~4. 3~4단계(자세→숨→목·머리→등, 각 단계에 초·회) → 「아, 시원하다」에서 멈추기 → 혼자 할 때 자주 하는 실수 2~3개 → 적신호면 병원 한 문장.\n' +
+        '- selfCare는 동작 1개로 끝내지 마세요. 👉 먼저 확인(자가 점검 한 문장) → 👉 1.~4. 3~4단계(자극(도수·셀프 자극)→스트레칭→자세·생활습관→기능운동 순서, 각 단계에 초·회) → 「아, 시원하다」에서 멈추기 → 혼자 할 때 자주 하는 실수 2~3개 → 적신호면 병원 한 문장.\n' +
         '- 비유는 글 전체 1개. 메커니즘을 직접 말하는 문장 우선.\n' +
         '- 메모에 없는 일화·회원 사례·숫자를 만들지 마세요.\n' +
         '- 👉 단계 안의 문장은 마침표마다 나누지 마세요. 빈 줄은 단계 사이에만.\n' +
@@ -16200,7 +16228,7 @@ function migrateDraftShapePrompts_(){
     if(cat.threads && !promptHasVoiceCore_(cat.threads) && String(cat.threads).indexOf(shape) < 0 && id >= 0 && id <= 5){
       var thAdd = shape + '\n' +
         '- 일반인 글의 본문은 자가 점검 질문으로 끝냅니다. 전문가 과정은 전제를 뒤집는 한 줄.\n' +
-        '- 댓글은 빈 줄로 구분된 3~4개, 각 1~2문장. 마침표마다 쪼개지 마세요.\n' +
+        '- 댓글은 빈 줄로 구분된 3개, 각 두 문장까지. 마침표마다 쪼개지 마세요.\n' +
         '- 일반인 글의 마지막 댓글만 적신호(팔 저림 등)면 병원 먼저. 교육 글에는 넣지 마세요.\n' +
         '- 메모에 없는 일화·회원 사례·숫자를 만들지 마세요.\n' +
         '- 비유는 1개 이내. 메커니즘 문장 우선.\n' +
@@ -40752,8 +40780,8 @@ function renderSheetContent(content, opts) {
     } else {
       bodyHTML = tabsHTML + addSourceHtml +
         sheetFullCopyBar_() +
-        sheetEditField_('본문 (게시글)', 'sheet-threads-body', getThreadsBodyText_(ths), { rows: 5, regen: 'threads.body', copy: true, help: '통념 뒤집기 훅. 일반인 글은 자가 점검 질문으로 끝내세요. 해설은 넣지 마세요.', paragraphs: true }) +
-        sheetEditField_('댓글 (재게시)', 'sheet-threads-comment', getThreadsCommentText_(ths), { rows: 12, regen: 'threads.comment', copy: true, help: '빈 줄로 나뉜 단락이 댓글 하나입니다. 빈 줄이 있으면 그 경계를 유지하고, 빈 줄이 없을 때만 마침표로 나눕니다.', paragraphs: true }) +
+        sheetEditField_('본문 (첫 훅 한 줄)', 'sheet-threads-body', getThreadsBodyText_(ths), { rows: 5, regen: 'threads.body', copy: true, help: '첫 훅 한 줄만. 일반인 글은 자가 점검 질문으로 끝내세요. 해설은 댓글로.', paragraphs: true }) +
+        sheetEditField_('댓글 (3개 · 빈 줄로 구분)', 'sheet-threads-comment', getThreadsCommentText_(ths), { rows: 12, regen: 'threads.comment', copy: true, help: '빈 줄로 나뉜 단락이 댓글 하나입니다(3개 정도, 하나에 두 문장까지). 빈 줄이 있으면 그 경계를 유지하고, 빈 줄이 없을 때만 마침표로 나눕니다.', paragraphs: true }) +
         '<div data-social-slot="threads"></div>' +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;"><strong>지금 올리기·예약하기</strong>는 본문을 올리고, 댓글 박스의 <strong>빈 줄마다</strong> 바로 아래 내 댓글로 이어 올립니다. 앱에서 직접 올렸다면 <strong>직접 올림</strong>을 누르세요.</p>';
     }
@@ -41517,8 +41545,12 @@ function getThreadsFullPasteText_(ths){
   var comment = getThreadsCommentText_(ths);
   if(!body && !comment) return '';
   var parts = [];
-  if(body) parts.push('[본문 · 게시]\n' + body);
-  if(comment) parts.push('[댓글 · 재게시]\n' + comment);
+  if(body) parts.push('[본문]\n' + body);
+  if(comment){
+    var cs = comment.split(/\n\s*\n/).map(function(c){ return c.trim(); }).filter(Boolean);
+    if(cs.length > 1) cs.forEach(function(c, i){ parts.push('[댓글 ' + (i + 1) + ']\n' + c); });
+    else parts.push('[댓글]\n' + comment);
+  }
   return parts.join('\n\n');
 }
 function buildInstaSourceText_(ig){
@@ -41584,14 +41616,14 @@ async function generateThreadsFromInsta_(catId, insta, topic){
     ? '\n- 전문가 과정: 인스타 캡션 범위 **밖** 내용 추가 금지. 본문 훅·댓글 해설 모두 인스타 근거 안에서.\n'
     : '';
   var generalHint = isGeneralAudienceCategory(catId)
-    ? '\n- 일반인 글: 반말. 본문은 자가 점검 질문으로 끝. 댓글은 빈 줄로 나눈 4개, 각 한 가지. 마지막은 행동. 적신호·병원·시간 약속 댓글 없음.\n'
+    ? '\n- 일반인 글: 반말. 본문은 첫 훅 한 줄만, 자가 점검 질문으로 끝. 댓글은 비슷한 문장끼리 묶은 3개(빈 줄로 구분), 하나에 두 문장까지. 마지막은 행동. 적신호·병원·시간 약속 댓글 없음.\n'
     : '';
   var prompt = baseInfo + '\n\n' +
     '카테고리: ' + (CATEGORIES[catId] ? CATEGORIES[catId].name : '') + '\n' +
     '주제: "' + (topic || '') + '"\n\n' +
     '[쓰레드 작성 지침]\n' + threadsGuide + expertScope + generalHint + '\n' +
     '아래는 **확정·수정된 인스타 최종본**입니다. 인스타 문장을 그대로 옮기지 말고, **본문(훅)+댓글(해설)** 2단으로 **새로** 작성하세요.\n\n' +
-    'JSON만:\n{"threads":{"body":"본문 1~3문장. 일반인 글은 자가 점검 질문으로 끝","comment":"댓글1\\n\\n댓글2\\n\\n댓글3\\n\\n댓글4는 행동으로 끝. 적신호 없음. 빈 줄로만 구분"}}\n\n' +
+    'JSON만:\n{"threads":{"body":"첫 훅 한 줄만(한 문장). 일반인 글은 자가 점검 질문으로 끝","comment":"댓글1(최대 두 문장)\\n\\n댓글2(최대 두 문장)\\n\\n댓글3은 행동으로 끝(최대 두 문장). 적신호 없음. 비슷한 문장끼리 묶고 빈 줄로만 구분"}}\n\n' +
     '[인스타 최종본]\n' + buildInstaSourceText_(insta);
 
   var text = await callClaudePlanner_(prompt, { maxTokens: 2800, timeoutMs: THREADS_BG_TIMEOUT_MS });
@@ -42010,9 +42042,9 @@ window.copyWholeTab_ = function(btn){
 var SHEET_FIELD_META_ = {
   'blog.title':       { block: 'blog', label: '제목', instr: '증상명과 지역/브랜드 키워드가 자연스럽게 들어간, 검색·AI 인용에 강한 제목 한 줄. 존댓말·질문형 권장.' },
   'blog.problem':     { block: 'blog', label: '문제 제기', instr: '맨 앞 두 문장은 짧게, 문장 사이 빈 줄. 이어서 구체 장면 하나만. 번호·불릿 금지. 원리 설명과 같은 결론을 반복하지 말 것. **존댓말(해요체)**. **, ---, > 금지.' },
-  'blog.selfCare':    { block: 'blog', label: '셀프 케어', step: true, instr: '👉 먼저 확인 한 문장. 👉 1.~4. 3~4단계. 각 단계는 동작과 이유를 한 절에, 초·회 포함. 단계 사이만 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 맨 끝 한 줄만 적신호면 병원. 방향 추측 금지. 존댓말.' },
-  'blog.explanation': { block: 'blog', label: '원리 설명', instr: '문제 제기의 장면을 다시 쓰지 말 것. 맨 앞 1~2문장만 핵심, 그 뒤는 새 이유. 마침표마다 빈 줄. 아주 짧은 문장은 다음 문장과 한 단락 가능. **존댓말(해요체)**. **, ---, > 금지.' },
-  'blog.cta':         { block: 'blog', label: '마무리 CTA', instr: '끝 행동은 하나. 저장·공유 금지. 「프로필 링크에서 온라인 문진」. 브랜드가 실제로 하는 코칭만. 없는 약속·병원 문구 금지. 존댓말 2~3문장.' },
+  'blog.selfCare':    { block: 'blog', label: '셀프 케어', step: true, instr: '👉 먼저 확인 한 문장. 👉 1.~4. 3~4단계. 순서는 자극(도수·셀프 자극)→스트레칭→자세·생활습관→기능운동. 각 단계는 동작과 이유를 한 절에, 초·회 포함. 단계 사이만 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 맨 끝 한 줄만 적신호면 병원. 방향 추측 금지. 존댓말.' },
+  'blog.explanation': { block: 'blog', label: '원리 설명', instr: '충분히 길게 쓰고 왜 아픈지·연결된 구조·이 순서로 하는 이유·생활 속 원인을 모두 담기. 문제 제기의 장면을 다시 쓰지 말 것. 맨 앞 1~2문장만 핵심, 그 뒤는 새 이유. 마침표마다 빈 줄. 아주 짧은 문장은 다음 문장과 한 단락 가능. **존댓말(해요체)**. **, ---, > 금지.' },
+  'blog.cta':         { block: 'blog', label: '마무리 CTA', instr: '원리 설명 뒤 한두 문장. 끝 행동은 하나. 저장·공유 금지. URL·프로필 링크 문구 쓰지 말 것(끝 링크는 앱이 붙임). 브랜드가 실제로 하는 코칭만. 없는 약속·병원 문구 금지. 존댓말 2~3문장.' },
   'blog.hashtags':    { block: 'blog', label: '해시태그', array: true, instr: '증상·지역·브랜드와 관련된 해시태그 5~8개.' },
   'blog.hook':        { block: 'blog', label: '영상·사진 맥락', instr: '인용으로 쓸 두 문장. 문장 사이 빈 줄. 본문에서 같은 말을 길게 다시 풀지 말 것. 전문어는 처음 한 번 괄호로 풀기. **존댓말**. **, ---, > 금지.' },
   'blog.outline':     { block: 'blog', label: '시연·핵심 포인트', arrayLines: true, instr: '본문 장면 다음에 둘 짧은 줄. 한 줄에 완전한 문장 하나. 본문과 같은 설명을 반복하지 말 것. **존댓말**.' },
@@ -42024,8 +42056,8 @@ var SHEET_FIELD_META_ = {
   'insta.hook':     { block: 'insta', label: '첫 줄 후킹', instr: '스크롤을 멈추게 하는 인스타 첫 줄 후킹 한 문장. **존댓말(해요체)**.' },
   'insta.caption':  { block: 'insta', label: '캡션', instr: '자가 점검으로 시작. • 3개(동작+이유, 불릿 사이 빈 줄 없음). 빈 줄로 나눈 네 블록: 느껴지는 변화 / 브랜드 코칭 / 프로필 링크에서 온라인 문진 / 지점 줄. 리얼페이스 지점 줄은 작전역 2분만. 그 외는 약수역 3분 · 작전역 2분 · 1:1 예약제. 방향 추측·없는 약속·저장·공유·적신호 금지. 존댓말.' },
   'insta.hashtags': { block: 'insta', label: '해시태그', array: true, instr: '해시태그 6~8개. 리얼무브먼트·도수는 약수역운동·작전역운동 포함. 리얼페이스는 작전역운동 등 인천. 약수 태그는 넣지 말 것.' },
-  'threads.body':    { block: 'threads', label: '본문 (게시글)', instr: '통념 뒤집기 1~3문장. 일반인 글은 자가 점검 질문으로 끝내 댓글을 유도. 해설·근거는 쓰지 마세요. **반말(구어체)**.' },
-  'threads.comment': { block: 'threads', label: '댓글 (재게시)', instr: '빈 줄로 나눈 4개. 각 한 가지, 1~2문장. 주어를 분명히. 방향 추측 금지. 절제된 결과. 마지막은 자가 점검·행동. 적신호·병원·시간 약속 댓글 금지. 반말.' },
+  'threads.body':    { block: 'threads', label: '본문 (첫 훅 한 줄)', instr: '첫 훅 한 줄(한 문장)만. 일반인 글은 자가 점검 질문으로 끝내 댓글을 유도. 해설·근거는 쓰지 마세요. **반말(구어체)**.' },
+  'threads.comment': { block: 'threads', label: '댓글 (3개)', instr: '비슷한 문장끼리 묶어 빈 줄로 나눈 3개. 하나에 두 문장까지. 주어를 분명히. 방향 추측 금지. 절제된 결과. 마지막은 자가 점검·행동. 적신호·병원·시간 약속 댓글 금지. 반말.' },
   'thread.topicTitle': { block: 'thread', label: '오늘의 한 줄', threadNorm: true, instr: '담백한 관찰·장면 한 줄. 짧은 감탄 가능. 따뜻한 위로·과한 감성 금지.' },
   'thread.summary':    { block: 'thread', label: '본문 (일상 나눔)', threadNorm: true, instr: '관찰 → 핵심 한 가지 → (선택) 짧은 감탄·철학 1문장. 담백·구어체. 과한 감성·설교 금지.' },
   'news.title': { block: 'news', label: '제목 · 첫 줄', instr: '소식용 제목 한 줄. 존댓말·질문형 권장. 과장 금지. 원데이면 일정 힌트, 정규면 적합성·변화 힌트.' },
@@ -42251,7 +42283,7 @@ window.regenSheetField_ = async function(key, btn){
       ? 'JSON만 출력하세요: {"value": ["줄1", "줄2", ...]}'
       : 'JSON만 출력하세요: {"value": "다시 쓴 내용"}';
   var rewriteHint = (meta.block === 'threads' && meta.__field === 'comment')
-    ? '위 **수정된 본문**의 물음·반전에 맞춰 「댓글 (재게시)」만 다시 써 주세요. 본문에 없는 새 주제로 바꾸지 말고, 해설·근거·과정·철학을 본문과 자연스럽게 이어 주세요. 다른 부분은 절대 출력하지 마세요.'
+    ? '위 **수정된 본문**의 물음·반전에 맞춰 「댓글」만 다시 써 주세요. 본문에 없는 새 주제로 바꾸지 말고, 해설·근거·과정·철학을 본문과 자연스럽게 이어 주세요. 다른 부분은 절대 출력하지 마세요.'
     : '위 참고 내용·주제·글 작성 핵심과 자연스럽게 이어지도록 「' + meta.label + '」만 다시 써 주세요. 사용자가 이미 적어 둔 방향·정보·표현은 최대한 살려 다듬는 방향으로 개선하세요. 다른 부분은 절대 출력하지 마세요.';
   var prompt = [
     brand, '',
@@ -45479,6 +45511,8 @@ ${briefPromptLines}
 ${blogGuide}
 ${imagePromptGuide}
 
+${getBlogStructureRulesText_(catId)}
+
 이 카테고리는 **blog(3단 구조)**와 **본문 사이에 넣을 실사 사진 3장(images.gptVisuals)** 을 만듭니다. 7장 슬라이드 소개(mangoBrief)는 필요할 때만 두고, 토큰이 모자라면 null. insta, notebookLM, community, thread 키는 JSON에 넣지 마세요. blog.title은 카드 주제와 같은 주장이어야 합니다.
 
 2026년 봄/초여름 — 주제·각도에 맞을 때만 계절감을 자연스럽게. JSON만 응답:
@@ -45486,17 +45520,15 @@ ${imagePromptGuide}
 "blog": {
 "title": "${flowJsonTitleHint_(draft, '호기심·질문형 한 줄. 증상형이면 증상+지역·프로그램 키워드를 자연스럽게 (35자 내외, 과장 금지)')}",
 "problem": "문제 제기 2~4문장. 불릿·번호 없이. 문장(문단) 사이 빈 줄. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스. 자가 점검 문장은 넣지 말 것",
-"selfCare": "👉 먼저 확인: 자가 점검 한 문장. 빈 줄. 👉 1.~👉 4. 3~4단계(자세→숨→목·머리→등). 각 단계는 동작과 이유를 한 절에, 초·회 포함. 단계 사이만 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 맨 끝 한 줄만 적신호면 병원",
-"explanation": "맨 앞 1~2문장이 핵심. 그 뒤는 새 이유. 방향 단어를 추측하지 말 것. 문단 사이 빈 줄. 병원·자가 점검 반복 금지",
-"cta": "끝 행동 하나. 저장·공유 금지. 「프로필 링크에서 온라인 문진」. 없는 약속·병원 문구 금지",
+"selfCare": "👉 먼저 확인: 자가 점검 한 문장. 빈 줄. 👉 1.~👉 4. 3~4단계(자극(도수·셀프 자극)→스트레칭→자세·생활습관→기능운동 순서). 각 단계는 동작과 이유를 한 절에, 초·회 포함. 단계 사이만 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 맨 끝 한 줄만 적신호면 병원",
+"explanation": "충분히 긴 원리 설명(여러 문단). 왜 아픈지 · 연결된 구조 · 이 순서로 하는 이유 · 생활 속 원인을 모두 담기. 맨 앞 1~2문장이 핵심. 방향 단어를 추측하지 말 것. 문단 사이 빈 줄. 병원·자가 점검 반복 금지",
+"cta": "원리 설명 뒤 한두 문장. 끝 행동 하나. 저장·공유 금지. URL·프로필 링크 문구 쓰지 말 것(끝 링크는 앱이 붙임). 없는 약속·병원 문구 금지",
 "hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6"]
 },
 ${generalImgJsonTail}
 }
 
-글 흐름은 **문제 제기 → selfCare → explanation** 순. selfCare는 👉 먼저 확인으로 시작하고, 👉 1.~4. 3~4단계(각 단계 초·회)와 실수 2~3개를 넣으세요. 동작 1개로 끝내지 마세요. "N단계 —" 표기 금지.
-
-[증상 허브 CTA 참고] ${hubCtaHint}
+글 흐름은 **문제 제기 → selfCare → 원리 설명(explanation, 충분히 길게) → cta** 순. selfCare는 👉 먼저 확인으로 시작하고, 👉 1.~4. 3~4단계(각 단계 초·회)와 실수 2~3개를 넣으세요. 동작 1개로 끝내지 마세요. "N단계 —" 표기 금지.
 
 images.gptVisuals는 **한글 실사 프롬프트 3장**. 영문만인 문장 금지. mangoBrief는 선택이며, 비우면 null. 채울 때만 소개란용 한글(장별 헤드+짧은 불릿, 블로그 원문 붙여넣기 금지).`;
 } else if(isExpertCourseCategory(catId)){
@@ -45521,6 +45553,8 @@ ${refHint}
 ${blogGuide}
 
 ${imagePromptGuide}
+
+${getBlogStructureRulesText_(catId)}
 
 이 카테고리는 **blog**와 **본문 사이에 넣을 실사 사진 3장(images.gptVisuals)** 을 만듭니다. 7장 슬라이드 소개(mangoBrief)는 선택입니다. 토큰이 모자라면 null. insta, notebookLM, community, thread 키는 JSON에 넣지 마세요. blog.title은 카드 주제와 같은 주장이어야 합니다.
 

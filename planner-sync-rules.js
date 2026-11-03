@@ -933,6 +933,47 @@ var PlannerSyncRules = (function(){
     };
   }
 
+  /** 블로그 복사 본문에서 메타 줄([블로그], 제목:, ##해시태그 줄)을 뺀다. 제목 글자는 첫 줄에 남긴다. */
+  function plannerCleanBlogCopyText(text){
+    var lines = String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n');
+    var out = [];
+    var titleDone = false;
+    for(var i = 0; i < lines.length; i++){
+      var line = lines[i];
+      var t = line.trim();
+      if(/^\[\s*블로그\s*\]$/.test(t)) continue;
+      if(/^(?:#+\s*[^\s#]+\s*)+$/.test(t) && /^\s*#/.test(t) && !/^#{1,6}\s+\S+\s+\S/.test(t)) continue;
+      if(!titleDone && t){
+        titleDone = true;
+        line = line.replace(/^\s*제목\s*[:：]\s*/, '');
+      }
+      out.push(line);
+    }
+    return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  /** 「시연·핵심 포인트」 칸 글자 → 배열(번호·빈 줄을 뺀 예전 모양, 다른 곳 호환용) */
+  function plannerOutlineFromText(text){
+    return String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n')
+      .map(function(s){ return s.replace(/^\s*\d+\s*[.)]\s*/, '').trim(); })
+      .filter(Boolean);
+  }
+
+  /** 칸에 보이는 글자: 사용자가 저장한 원문이 있으면 그대로, 없으면 예전 배열을 1. 2. 로 이어 붙인다 */
+  function plannerOutlineDisplayText(outlineText, outlineArr){
+    if(typeof outlineText === 'string' && outlineText.trim()) return outlineText.replace(/\r\n?/g, '\n');
+    var arr = Array.isArray(outlineArr) ? outlineArr : [];
+    return arr.map(function(o, i){ return (i + 1) + '. ' + o; }).join('\n\n');
+  }
+
+  /** 네이버 붙여넣기용: 번호를 빼고 문단만 남긴다 */
+  function plannerOutlineCopyText(outlineText, outlineArr){
+    var lines = (typeof outlineText === 'string' && outlineText.trim())
+      ? plannerOutlineFromText(outlineText)
+      : (Array.isArray(outlineArr) ? outlineArr.map(function(o){ return String(o || '').trim(); }).filter(Boolean) : []);
+    return lines.join('\n\n');
+  }
+
   return {
     plannerIsAuthFailure: plannerIsAuthFailure,
     plannerNextMutation: plannerNextMutation,
@@ -976,6 +1017,10 @@ var PlannerSyncRules = (function(){
     plannerKeysLeftBehind: plannerKeysLeftBehind,
     plannerSameKeyList: plannerSameKeyList,
     plannerStripClinicTitlePrefix: plannerStripClinicTitlePrefix,
+    plannerCleanBlogCopyText: plannerCleanBlogCopyText,
+    plannerOutlineFromText: plannerOutlineFromText,
+    plannerOutlineDisplayText: plannerOutlineDisplayText,
+    plannerOutlineCopyText: plannerOutlineCopyText,
     plannerMergeDuplicateGroup: plannerMergeDuplicateGroup,
     plannerRetargetDuplicateRefs: plannerRetargetDuplicateRefs,
     PLANNER_SYNC_BLOB_MAX_CHARS: PLANNER_SYNC_BLOB_MAX_CHARS,

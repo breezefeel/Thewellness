@@ -1775,6 +1775,7 @@ font-size: 10px; padding: 2px 7px; border-radius: 4px; font-weight: 700;
 .badge-ch-thread { background: #ECFDF5; color: #0F766E; }
 .badge-ch-image { background: #DBEAFE; color: #1D4ED8; }
 .badge-gen { background: #DBEAFE; color: #2563EB; }
+.badge-plan { background: #FEF3C7; color: #B45309; }
 .badge-thought { background: #F5F3FF; color: #6D28D9; }
 
 .daily-kind-toggle {

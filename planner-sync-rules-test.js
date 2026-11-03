@@ -465,6 +465,19 @@ assert(skipBad.events.length === 2, 'unreadable values are skipped');
   assert(out === '2026-10-31|123', 'YYYY-MM-DD stays the same calendar day in ' + tz + ' (got ' + out + ')');
 });
 
+// 블로그 복사 본문: 메타 줄만 빼고 본문·제목 글자는 남긴다
+var cleaned = R.plannerCleanBlogCopyText('[블로그]\n제목: 허리가 접히나요?\n\n첫 문단입니다.\n\n1) 스트레칭\n\n#허리 #고관절\n');
+assert(cleaned === '허리가 접히나요?\n\n첫 문단입니다.\n\n1) 스트레칭', 'blog copy drops [블로그], 제목:, hashtag lines (got ' + JSON.stringify(cleaned) + ')');
+assert(R.plannerCleanBlogCopyText('제목: A\n본문 #태그 포함 문장') === 'A\n본문 #태그 포함 문장', 'inline # inside a sentence is kept');
+assert(R.plannerCleanBlogCopyText('A\n\n\n\nB') === 'A\n\nB', 'extra blank lines collapse');
+
+// 시연·핵심 포인트: 번호와 빈 줄을 저장 그대로 보여 주고, 복사에서만 번호를 뺀다
+var rawOutline = '1. 첫째 동작\n\n2. 둘째 동작\n3. 셋째\n\n4. 넷째';
+assert(R.plannerOutlineDisplayText(rawOutline, ['x']) === rawOutline, 'saved outline text is shown exactly as typed');
+assert(R.plannerOutlineDisplayText('', ['가', '나']) === '1. 가\n\n2. 나', 'old array-only cards still show numbered');
+assert(R.plannerOutlineFromText(rawOutline).join('|') === '첫째 동작|둘째 동작|셋째|넷째', 'legacy array keeps stripped lines');
+assert(R.plannerOutlineCopyText(rawOutline, []) === '첫째 동작\n\n둘째 동작\n\n셋째\n\n넷째', 'copy drops section numbers');
+
 if(failed){
   console.error(failed + ' assertion(s) failed');
   process.exit(1);

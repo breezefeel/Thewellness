@@ -18224,7 +18224,9 @@ function dropUntouchedPromptOutboxOps_(){
 function conflictKeyIsSnoozed_(key){
   return !!(state._conflictSnoozeKeys && state._conflictSnoozeKeys[String(key || '')]);
 }
+var dividedToastLast_ = null;
 function clearDividedSaveToast_(){
+  dividedToastLast_ = null;
   var el = document.getElementById('app-toast');
   if(!el || !el.classList.contains('show')) return;
   if(String(el.textContent || '').indexOf('나눠 저장 중') !== 0) return;
@@ -19770,8 +19772,9 @@ async function plannerGasPushNow_(){
         mutations = buildPendingSyncMutations_(body, forceTailKeys);
         forceTailKeys = null;
         if(!mutations.length || state.syncNeedsSnapshot || state.syncProtocolVersion < 2) break;
+        // 이 기기에만 남는 값(isDeviceLocal)은 서버로 안 가므로 「남은 건수」에 넣지 않는다
         var eligibleOutbox = (state.syncOutbox || []).filter(function(op){
-          return op && !conflictKeyIsSnoozed_(op.key);
+          return op && !conflictKeyIsSnoozed_(op.key) && !isDeviceLocalSyncEntityKey_(op.key);
         });
         var leftKeys = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerKeysLeftBehind)
           ? PlannerSyncRules.plannerKeysLeftBehind(eligibleOutbox, mutations)
@@ -19781,7 +19784,10 @@ async function plannerGasPushNow_(){
         }
         prevLeftKeys = leftKeys.slice();
         var stillQueued = eligibleOutbox.length;
-        if(stillQueued > mutations.length && typeof setAppToast === 'function'){
+        // 남은 건수가 지난 안내보다 줄지 않았으면 안내를 거둔다(같은 숫자가 계속 보이지 않게)
+        var queueShrank = (typeof dividedToastLast_ !== 'number') || stillQueued < dividedToastLast_;
+        if(stillQueued > mutations.length && queueShrank && typeof setAppToast === 'function'){
+          dividedToastLast_ = stillQueued;
           setAppToast(
             '나눠 저장 중이에요. 남은 ' + stillQueued + '건…',
             { duration: 2800, variant: 'ok' }
@@ -20062,7 +20068,7 @@ async function plannerGasPushNow_(){
   } finally {
     clearSyncSending_();
     // 나눠 저장 안내는 전송 중에만 맞는 말이다. 끝난 뒤에는 남기지 않는다.
-    try { if(!hasSendableOutboxOps_()) clearDividedSaveToast_(); } catch(eFinToast){}
+    try { clearDividedSaveToast_(); } catch(eFinToast){}
     try { updateSyncStatusUI_(); } catch(eFinUi){}
   }
   });
@@ -30218,8 +30224,9 @@ function onBlogPublishConfirm_(){
   var plan = getChannelPlan_(draftId, 'blog');
   if(!plan){ if(typeof setAppToast === 'function') setAppToast('예약된 블로그가 없어요.', { duration: 2500, variant: 'err' }); return; }
   if(!confirm(opsPlanChipLabel_(plan.at) + ' 예약한 글이 네이버에서 발행됐나요?\n확인하면 발행 완료로 바꿉니다.')) return;
+  var confirmResult = null;
   try {
-    commitSheetTabPublish_(draftId, catId, 'blog', { skipDom: true, at: plan.at });
+    confirmResult = commitSheetTabPublish_(draftId, catId, 'blog', { skipDom: true, at: plan.at });
   } catch(eConfirm){
     if(typeof setAppToast === 'function') setAppToast('발행 확인을 저장하지 못했어요: ' + (eConfirm && eConfirm.message || eConfirm), { duration: 5000, variant: 'err' });
     return;
@@ -30229,6 +30236,8 @@ function onBlogPublishConfirm_(){
   var cbtn = document.querySelector('[data-blog-confirm]');
   if(cbtn) cbtn.remove();
   try { paintOpsPlanStrip_(); } catch(ePaint){}
+  try { renderMain(); } catch(eMain){}
+  if(confirmResult) afterTabPublishSaved_(confirmResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
   if(typeof setAppToast === 'function') setAppToast('발행 완료로 바꿨어요.', { duration: 3000, variant: 'ok' });
 }
 window.onBlogPublishConfirm_ = onBlogPublishConfirm_;
@@ -30706,6 +30715,22 @@ function renderMain(opts) {
   }
 }
 
+/** 예약해 둔 채널(아직 발행 확인 전)이 있으면 목록에 「초안」 대신 예약 날짜를 보여 준다 */
+function getDraftPlanBadgeHTML_(draftId){
+  var pub = state.published && state.published[draftId];
+  if(!pub || !pub.channelPlan) return '';
+  var labels = [];
+  Object.keys(pub.channelPlan).forEach(function(key){
+    var plan = pub.channelPlan[key];
+    if(!plan || !plan.at) return;
+    if(pub.tabPublished && pub.tabPublished[key]) return;
+    var name = ({ blog: '블로그', insta: '인스타', threads: '쓰레드' })[key] || '';
+    var passed = (key === 'blog') && blogPlanDatePassed_(plan);
+    labels.push((name ? name + ' ' : '') + '예약 ' + opsPlanChipLabel_(plan.at) + (passed ? ' · 확인 필요' : ''));
+  });
+  if(!labels.length) return '';
+  return '<span class="badge badge-plan" title="네이버 등에 예약한 글이에요. 올라간 것을 확인하면 「발행 확인」을 눌러 주세요.">' + escapeHtml(labels.join(' / ')) + '</span>';
+}
 function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
   const pub = state.published[d.id];
   const hasDraft = draftIsPendingPublish_(d);
@@ -30726,11 +30751,13 @@ function draftCardHTML(d, cat, isRec, draftIndex, compactInSeries, cardOpts) {
   const createdBadge = (createdDateLabel && createdDateLabel !== '-')
     ? '<span class="topic-line-created" title="' + (listDate.edited ? '수정일' : '생성일') + '">' + escapeHtml(createdDateLabel) + '</span>'
     : '';
+  const planBadge = onPublishedList ? '' : getDraftPlanBadgeHTML_(d.id);
   const badges = [
     createdBadge,
     isDailyThoughtDraft_(d) ? '<span class="badge badge-thought">생각</span>' : '',
     isRec && d.recType==='related' ? '<span class="badge badge-rec">관련</span>' : '',
-    (hasDraft && !onPublishedList && !publishBadges && !draftShowsOnPublishedList_(d.id, cat.id)) ? '<span class="badge badge-gen">초안</span>' : '',
+    (hasDraft && !onPublishedList && !publishBadges && !planBadge && !draftShowsOnPublishedList_(d.id, cat.id)) ? '<span class="badge badge-gen">초안</span>' : '',
+    planBadge,
     publishBadges,
     publishDots,
   ].filter(Boolean).join('');
@@ -35122,6 +35149,7 @@ function blogForSheet_(blog, catId){
     hashtags: Array.isArray(src.hashtags) ? src.hashtags.slice() : (Array.isArray(base.hashtags) ? base.hashtags.slice() : []),
     hook: src.hook != null ? String(src.hook) : (base.hook || ''),
     outline: Array.isArray(src.outline) ? src.outline.slice() : (Array.isArray(base.outline) ? base.outline.slice() : []),
+    outlineText: typeof src.outlineText === 'string' ? src.outlineText : (typeof base.outlineText === 'string' ? base.outlineText : undefined),
     draft: src.draft != null ? String(src.draft) : (base.draft || '')
   };
   distributeBlogSections_(copy);
@@ -35236,6 +35264,7 @@ function normalizeBlogBlock(raw, catId){
       hashtags: Array.isArray(raw.hashtags) ? raw.hashtags.filter(Boolean) : [],
       hook: raw.hook != null ? String(raw.hook) : '',
       outline: Array.isArray(raw.outline) ? raw.outline : [],
+      outlineText: typeof raw.outlineText === 'string' ? raw.outlineText : undefined,
       draft: raw.draft != null ? String(raw.draft) : ''
     };
   }
@@ -35243,6 +35272,7 @@ function normalizeBlogBlock(raw, catId){
     title: withClinicBlogTitle_(raw.title, catId),
     hook: raw.hook != null ? String(raw.hook) : '',
     outline: Array.isArray(raw.outline) ? raw.outline : [],
+    outlineText: typeof raw.outlineText === 'string' ? raw.outlineText : undefined,
     draft: raw.draft != null ? String(raw.draft) : '',
     cta: raw.cta != null ? String(raw.cta) : '',
     hashtags: Array.isArray(raw.hashtags) ? raw.hashtags.filter(Boolean) : []
@@ -40667,7 +40697,7 @@ function renderSheetContent(content, opts) {
         clinicBranchLabelSheetHtml_(blogCatId) +
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, syncTopic: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('영상·사진 맥락', 'sheet-blog-hook', b.hook, { rows: 4, help: '이번 영상·사진에서 다룬 장면·상황', regen: 'blog.hook', copy: true, paragraphs: true }) +
-        sheetEditField_('시연·핵심 포인트', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '손 위치·동작·주의사항 — 한 줄에 하나씩', regen: 'blog.outline', copy: true }) +
+        sheetEditField_('시연·핵심 포인트', 'sheet-blog-outline', PlannerSyncRules.plannerOutlineDisplayText(b.outlineText, b.outline), { rows: 5, help: '손 위치·동작·주의사항 — 한 줄에 하나씩', regen: 'blog.outline', copy: true }) +
         sheetEditField_('원리 설명', 'sheet-blog-draft', b.draft, { rows: 12, help: '본문의 중심. 왜 이렇게 하는지·짧은 메커니즘', regen: 'blog.draft', copy: true, paragraphs: true }) +
         sheetEditField_('마무리', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요 · 3~5개 권장', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
@@ -40680,7 +40710,7 @@ function renderSheetContent(content, opts) {
         clinicBranchLabelSheetHtml_(blogCatId) +
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, syncTopic: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('후킹 오프닝', 'sheet-blog-hook', b.hook, { rows: 4, regen: 'blog.hook', copy: true, paragraphs: true }) +
-        sheetEditField_('목차 구성', 'sheet-blog-outline', (b.outline || []).join('\n'), { rows: 5, help: '한 줄에 소제목 하나씩', regen: 'blog.outline', copy: true }) +
+        sheetEditField_('목차 구성', 'sheet-blog-outline', PlannerSyncRules.plannerOutlineDisplayText(b.outlineText, b.outline), { rows: 5, help: '한 줄에 소제목 하나씩', regen: 'blog.outline', copy: true }) +
         sheetEditField_('본문 초안', 'sheet-blog-draft', b.draft, { rows: 14, regen: 'blog.draft', copy: true, paragraphs: true }) +
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
@@ -40829,7 +40859,7 @@ function getTabCopyText(tab, content){
     const b = content.blog;
     if(!b) return '';
     if(blogUsesStructuredGeneralFormat_(catId, b)) return formatGeneralBlogPostText(b, catId);
-    const outline = (b.outline || []).map(function(o, i){ return (i + 1) + '. ' + o; }).join('\n\n');
+    const outline = PlannerSyncRules.plannerOutlineDisplayText(b.outlineText, b.outline);
     return withExpertCourseBlogFooter_(withRealMovementBlogFooter_('[블로그]\n제목: ' + withClinicBlogTitle_(b.title, catId) + '\n\n' + (b.hook || '') + '\n\n' + outline + '\n\n' + (b.draft || '') + '\n\n' + (b.cta || '') + '\n\n' + (b.hashtags || []).map(function(h){ return '#' + h; }).join(' '), catId), catId);
   }
   if(tab === 'insta'){
@@ -40896,15 +40926,12 @@ function buildBlogPasteTextForPublish_(b, catId){
   if(!b) return '';
   b = Object.assign({}, b, { title: withClinicBlogTitle_(b.title, catId) });
   if(blogUsesStructuredGeneralFormat_(catId, b)) return formatGeneralBlogPostText(b, catId);
-  var outline = (b.outline || []).map(function(o, i){ return (i + 1) + '. ' + o; }).join('\n\n');
-  var tags = (b.hashtags || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
+  var outline = PlannerSyncRules.plannerOutlineCopyText(b.outlineText, b.outline);
   if(isExpertCourseCategory(catId)){
     var expertParts = [b.title, b.hook, outline, b.draft, b.cta];
-    if(tags) expertParts.push(tags);
     return withExpertCourseBlogFooter_(expertParts.filter(function(p){ return String(p || '').trim(); }).join('\n\n'), catId);
   }
   var parts = [b.title, b.hook, outline, b.draft, b.cta];
-  if(tags) parts.push(tags);
   return withRealMovementBlogFooter_(parts.filter(function(p){ return String(p || '').trim(); }).join('\n\n'), catId);
 }
 
@@ -40937,6 +40964,8 @@ function blogPasteHtmlWithQuotedTitle_(text){
   return '<blockquote>' + escapeHtml(title.replace(/^제목\s*[:：]\s*/, '')) + '</blockquote>' + paras;
 }
 function copyAndOpenNaverBlog_(text, catId){
+  // 네이버에는 실제 본문만 붙인다: [블로그]·제목:·해시태그 줄은 뺀다
+  try { text = PlannerSyncRules.plannerCleanBlogCopyText(text); } catch(eClean){}
   if(text){
     var quotedHtml = '';
     try { quotedHtml = blogPasteHtmlWithQuotedTitle_(text); } catch(eQuote){ quotedHtml = ''; }
@@ -41957,6 +41986,7 @@ window.copyWholeTab_ = function(btn){
   else if(tab === 'threads') text = getThreadsFullPasteText_(clone.threads);
   else if(tab === 'thread') text = getThreadPlainText(normalizeThreadBlock(clone.thread));
   else text = getTabCopyText(tab, clone);
+  if(tab === 'blog'){ try { text = PlannerSyncRules.plannerCleanBlogCopyText(text); } catch(eCleanWhole){} }
   text = String(text || '').trim();
   if(!text){ setAppToast('복사할 내용이 없어요.', { duration: 3000, variant: 'err' }); return; }
   if(tab === 'community' && clone.community){
@@ -42254,6 +42284,7 @@ window.regenSheetField_ = async function(key, btn){
     } else if(meta.arrayLines){
       var arr2 = Array.isArray(val) ? val : String(val || '').split('\n');
       block[meta.__field] = arr2.map(function(s){ return String(s).replace(/^\d+[.)]\s*/, '').trim(); }).filter(Boolean);
+      if(meta.__field === 'outline' && block.outlineText != null) delete block.outlineText;
     } else {
       block[meta.__field] = String(val || '').trim();
     }
@@ -42353,6 +42384,7 @@ window.polishSheetField_ = async function(key, btn){
     } else if(meta.arrayLines){
       var arr2 = Array.isArray(val) ? val : String(val || '').split('\n');
       block[meta.__field] = arr2.map(function(s){ return String(s).replace(/^\d+[.)]\s*/, '').trim(); }).filter(Boolean);
+      if(meta.__field === 'outline' && block.outlineText != null) delete block.outlineText;
     } else {
       block[meta.__field] = String(val || '').trim();
     }
@@ -42518,10 +42550,7 @@ function formatGeneralBlogPostHtmlForCopy_(b, catId){
   parts.push(formatSelfCareStepsHtmlForCopy_(b.selfCare || ''));
   parts.push(proseHtmlBlock_(b.explanation || ''));
   parts.push(proseHtmlBlock_(b.cta || ''));
-  var tags = (b.hashtags || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
-  if(tags){
-    parts.push('<p style="margin:12px 0 0;line-height:1.6;font-size:13px;color:#4B5563;">' + escapeHtml(tags) + '</p>');
-  }
+  // 복사 본문에는 해시태그 줄을 넣지 않는다(해시태그는 해시태그 칸에서 따로 복사)
   if(isBranchBookingBlogCategory_(catId) || getExpertCourseBlogFooterText_(catId)){
     parts.push(realMovementBlogFooterHtml_(catId));
   }
@@ -42582,7 +42611,7 @@ function getDraftContent_(draftId){
 function sheetBlogEditsHaveText_(edits){
   if(!edits) return false;
   if(edits.title || edits.problem || edits.selfCare || edits.explanation || edits.hook || edits.draft || edits.cta) return true;
-  return !!(edits.outline && edits.outline.length);
+  return !!((edits.outline && edits.outline.length) || (edits.outlineText && String(edits.outlineText).trim()));
 }
 function ensureSheetBlogOnContent_(draftId){
   var content = getDraftContent_(draftId);
@@ -43018,11 +43047,14 @@ function readSheetBlogEdits_(){
       hashtags: tags
     };
   }
-  var outline = v('sheet-blog-outline').split('\n').map(function(s){ return s.replace(/^\d+\.\s*/, '').trim(); }).filter(Boolean);
+  // 번호와 빈 줄은 지우지 않고 쓴 그대로 outlineText에 저장한다. outline 배열은 예전 코드 호환용.
+  var outlineRaw = String((document.getElementById('sheet-blog-outline') || {}).value || '').replace(/\r\n?/g, '\n').replace(/\s+$/, '');
+  var outline = PlannerSyncRules.plannerOutlineFromText(outlineRaw);
   return {
     title: v('sheet-blog-title'),
     hook: v('sheet-blog-hook'),
     outline: outline,
+    outlineText: outlineRaw,
     draft: v('sheet-blog-draft'),
     cta: v('sheet-blog-cta'),
     hashtags: tags
@@ -43394,7 +43426,7 @@ function buildBlogSourceText_(b, catId){
       '마무리 CTA:\n' + (b.cta || '')
     ).trim();
   }
-  var outline = (b.outline || []).map(function(o, i){ return (i + 1) + '. ' + o; }).join('\n');
+  var outline = PlannerSyncRules.plannerOutlineDisplayText(b.outlineText, b.outline);
   var tags = (b.hashtags || []).map(function(h){ return '#' + String(h).replace(/^#/, ''); }).join(' ');
   if(isExpertCourseCategory(catId)){
     return (
@@ -43693,10 +43725,16 @@ window.onSheetPublishComplete = async function(opts){
     }
     if(pubBtn){ pubBtn.disabled = true; pubBtn.textContent = '저장 중…'; }
     try {
-      var saveResult = commitSheetTabPublish_(draftId, catId, 'blog');
+      // 네이버에 실제로 올라갔는지는 플래너가 알 수 없다. 여기서는 수정본만 저장하고
+      // 「오늘 올리는 중(예약)」으로 표시한다. 완료는 「발행 확인」을 눌렀을 때만 찍힌다.
       var cat = CATEGORIES[catId];
       var draft = cat && cat.drafts.find(function(d){ return d.id === draftId; });
       content = getDraftContent_(draftId);
+      applySheetEditsForTab_(content, 'blog');
+      persistDraftContent_(draftId, content);
+      var prevBlogPlan = getChannelPlan_(draftId, 'blog');
+      setChannelPlan_(draftId, catId, 'blog', (prevBlogPlan && prevBlogPlan.at) || new Date().toISOString(), '');
+      content = getDraftContent_(draftId) || content;
       ensureNotifyForInstaBg_();
       state.activeTab = 'insta';
       setOpenDetailHash_(draftId, catId, 'insta');
@@ -43705,11 +43743,11 @@ window.onSheetPublishComplete = async function(opts){
       renderSheetContent(getDraftContent_(draftId) || content);
       renderTabs();
       renderMain();
-      afterTabPublishSaved_(saveResult, draftId).catch(function(e){ console.warn('[발행 후속]', e); });
       setAppToast((isPhoneOrTablet()
         ? '블로그 저장 · 복사 · 글쓰기 앱으로 이동'
         : '블로그 저장 · 복사 · 글쓰기 페이지로 이동') +
-        '\n수정본으로 인스타 캡션을 만들고 있어요.', { duration: 5500, variant: 'ok' });
+        '\n네이버에 올린 뒤 「발행 확인」을 눌러야 완료로 바뀌어요.' +
+        '\n수정본으로 인스타 캡션을 만들고 있어요.', { duration: 6500, variant: 'ok' });
     } catch(err){
       console.warn('[블로그 발행]', err);
       setAppToast(((err && err.message) || String(err)), { duration: 9000, variant: 'err' });

@@ -478,6 +478,31 @@ assert(R.plannerOutlineDisplayText('', ['가', '나']) === '1. 가\n\n2. 나', '
 assert(R.plannerOutlineFromText(rawOutline).join('|') === '첫째 동작|둘째 동작|셋째|넷째', 'legacy array keeps stripped lines');
 assert(R.plannerOutlineCopyText(rawOutline, []) === '첫째 동작\n\n둘째 동작\n\n셋째\n\n넷째', 'copy drops section numbers');
 
+// 회원 → 환자 (조사 보정)
+var mp = R.plannerMemberToPatient;
+assert(mp('회원이 아프다고 말해요') === '환자가 아프다고 말해요', 'member + 이 → 환자가');
+assert(mp('회원은 숨을 참아요. 회원을 먼저 살펴요.') === '환자는 숨을 참아요. 환자를 먼저 살펴요.', 'member 은/을 → 는/를');
+assert(mp('회원과 함께, 회원으로 온') === '환자와 함께, 환자로 온', 'member 과/으로 → 와/로');
+assert(mp('회원이에요') === '환자예요', 'member 이에요 → 환자예요');
+assert(mp('회원들이 많고 회원님께') === '환자들이 많고 환자분께', 'plural keeps 이, 님 → 분');
+assert(mp('회원가입 정회원 회원권') === '회원가입 정회원 회원권', 'other nouns containing 회원 are untouched');
+// 본문 URL 제거
+assert(R.plannerStripBodyUrls('앞 문장\nhttps://a.com/x\n뒤 문장 https://b.com 끝') === '앞 문장\n뒤 문장 끝', 'urls are removed, url-only lines dropped');
+// 네이버 태그
+assert(R.plannerNaverTag('#Re:AlFace') === 'ReAlFace', 'tag special characters removed');
+assert(R.plannerNaverTag('##약수역_운동!') === '약수역운동', 'tag keeps Korean, drops _ and !');
+// 글자 수
+assert(R.plannerBlogBodyLength(['가나다', '라마\nhttps://x.com']) === 7, 'length counts spaces/newlines but not urls (got ' + R.plannerBlogBodyLength(['가나다', '라마\nhttps://x.com']) + ')');
+assert(R.plannerBlogLengthState(1500, false).state === 'short', 'under 1700 is short');
+assert(R.plannerBlogLengthState(1900, false).state === 'ok', '1900 is ok');
+assert(R.plannerBlogLengthState(5000, true).state === 'free', 'expert posts have no limit');
+assert(R.plannerStrongClaimWords('대부분 항상 그래요').join('|') === '대부분|항상', 'strong claim words found');
+
+// 카드에서 직접 정한 날짜
+var ovInfo = R.plannerDraftListDate({ id: 'd5-c1793629850222', createdAt: '2026-11-02T01:00:00.000Z', activityAt: '2026-11-02T05:00:00.000Z', dateOverride: '2026-11-07' });
+assert(ovInfo.label === '11.7.', 'dateOverride wins over created/activity dates (got ' + ovInfo.label + ')');
+assert(R.plannerDraftListDate({ createdAt: '2026-11-02T01:00:00.000Z', dateOverride: 'abc' }).label !== '-', 'bad override is ignored');
+
 if(failed){
   console.error(failed + ' assertion(s) failed');
   process.exit(1);

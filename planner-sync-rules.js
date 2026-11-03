@@ -446,6 +446,12 @@ var PlannerSyncRules = (function(){
   // 목록에 보이는 날짜. 생성일보다 늦은 수정·활동이 있으면 그 날짜.
   function plannerDraftListDate(draft){
     draft = draft || {};
+    // 사용자가 카드에서 직접 정한 날짜(YYYY-MM-DD)가 있으면 그 날짜를 보여 준다.
+    var ov = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(draft.dateOverride || ''));
+    if(ov){
+      var oms = new Date(parseInt(ov[1], 10), parseInt(ov[2], 10) - 1, parseInt(ov[3], 10), 12).getTime();
+      if(!isNaN(oms)) return { label: plannerMonthDayLabel(oms), edited: false, ms: oms };
+    }
     var created = plannerDraftCreatedMs(draft);
     var touch = 0;
     var activity = plannerParseDateMs(draft.activityAt);
@@ -974,6 +980,60 @@ var PlannerSyncRules = (function(){
     return lines.join('\n\n');
   }
 
+  /** 「회원」→「환자」. 조사도 같이 맞춘다(회원이→환자가, 회원은→환자는, 회원과→환자와, 회원이에요→환자예요). */
+  function plannerMemberToPatient(text){
+    var src = String(text == null ? '' : text);
+    var map = { '이에요': '예요', '이라': '라', '이다': '다', '이었': '였', '이': '가', '으로': '로', '은': '는', '을': '를', '과': '와' };
+    var out = src.replace(/(^|[^가-힣])회원(들)?(이에요|이라|이다|이었|이|으로|은|을|과|의|에게|께서|께|도|만|에서|에)/g, function(m, pre, pl, p){
+      if(pl) return pre + '환자들' + (p === '으로' ? '로' : p);
+      return pre + '환자' + (map[p] != null ? map[p] : p);
+    });
+    out = out.replace(/(^|[^가-힣])회원님/g, '$1환자분');
+    out = out.replace(/(^|[^가-힣])회원(들)?(?![가-힣])/g, function(m, pre, pl){ return pre + '환자' + (pl || ''); });
+    return out;
+  }
+
+  /** 본문 속 http(s) 주소를 지운다(끝 링크는 앱이 고정으로 붙인다). 주소만 있던 줄은 줄째 지운다. */
+  function plannerStripBodyUrls(text){
+    var lines = String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n');
+    var out = [];
+    lines.forEach(function(line){
+      if(!/https?:\/\//i.test(line)){ out.push(line); return; }
+      var cleaned = line.replace(/\s*https?:\/\/[^\s)）]+/gi, '').replace(/[ \t]+$/g, '');
+      if(cleaned.trim()) out.push(cleaned);
+    });
+    return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  /** 네이버 태그: 글자·숫자만 남긴다(Re:AlFace → ReAlFace). 앞의 # 는 하나만. */
+  function plannerNaverTag(tag){
+    var t = String(tag == null ? '' : tag).replace(/^[#\s]+/, '').replace(/[^0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ]/g, '');
+    return t;
+  }
+
+  /** 블로그 본문 글자 수(공백 포함). 제목·해시태그·끝 링크는 세지 않는다. */
+  function plannerBlogBodyLength(parts){
+    var arr = Array.isArray(parts) ? parts : [parts];
+    var joined = arr.map(function(x){ return plannerStripBodyUrls(String(x == null ? '' : x)); }).filter(Boolean).join('\n\n');
+    return joined.replace(/\r\n?/g, '\n').length;
+  }
+
+  /** 일반 대상 글은 1,900자 안팎. 전문가 글은 제한 없음. */
+  function plannerBlogLengthState(len, expert){
+    if(expert) return { state: 'free', min: 0, max: 0 };
+    if(!len) return { state: 'empty', min: 1700, max: 2100 };
+    if(len < 1700) return { state: 'short', min: 1700, max: 2100 };
+    if(len > 2100) return { state: 'long', min: 1700, max: 2100 };
+    return { state: 'ok', min: 1700, max: 2100 };
+  }
+
+  /** 근거를 단정하는 말(대부분·반드시·항상 …)을 찾아 돌려준다 */
+  function plannerStrongClaimWords(text){
+    var words = ['대부분', '반드시', '항상', '무조건', '모든 사람', '누구나', '절대', '100%', '확실히', '틀림없이', '예외 없이', '언제나'];
+    var src = String(text == null ? '' : text);
+    return words.filter(function(w){ return src.indexOf(w) >= 0; });
+  }
+
   return {
     plannerIsAuthFailure: plannerIsAuthFailure,
     plannerNextMutation: plannerNextMutation,
@@ -1018,6 +1078,12 @@ var PlannerSyncRules = (function(){
     plannerSameKeyList: plannerSameKeyList,
     plannerStripClinicTitlePrefix: plannerStripClinicTitlePrefix,
     plannerCleanBlogCopyText: plannerCleanBlogCopyText,
+    plannerMemberToPatient: plannerMemberToPatient,
+    plannerStripBodyUrls: plannerStripBodyUrls,
+    plannerNaverTag: plannerNaverTag,
+    plannerBlogBodyLength: plannerBlogBodyLength,
+    plannerBlogLengthState: plannerBlogLengthState,
+    plannerStrongClaimWords: plannerStrongClaimWords,
     plannerOutlineFromText: plannerOutlineFromText,
     plannerOutlineDisplayText: plannerOutlineDisplayText,
     plannerOutlineCopyText: plannerOutlineCopyText,

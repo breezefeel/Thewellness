@@ -1020,11 +1020,11 @@ var PlannerSyncRules = (function(){
 
   /** 일반 대상 글은 1,900자 안팎. 전문가 글은 제한 없음. */
   function plannerBlogLengthState(len, expert){
-    if(expert) return { state: 'free', min: 0, max: 0 };
-    if(!len) return { state: 'empty', min: 1700, max: 2100 };
-    if(len < 1700) return { state: 'short', min: 1700, max: 2100 };
-    if(len > 2100) return { state: 'long', min: 1700, max: 2100 };
-    return { state: 'ok', min: 1700, max: 2100 };
+    var base = { min: 1700, max: 2100, expert: !!expert };
+    if(!len) return Object.assign({ state: 'empty' }, base);
+    if(len < 1700) return Object.assign({ state: 'short' }, base);
+    if(len > 2100) return Object.assign({ state: 'long' }, base);
+    return Object.assign({ state: 'ok' }, base);
   }
 
   /** 근거를 단정하는 말(대부분·반드시·항상 …)을 찾아 돌려준다 */
@@ -1032,6 +1032,75 @@ var PlannerSyncRules = (function(){
     var words = ['대부분', '반드시', '항상', '무조건', '모든 사람', '누구나', '절대', '100%', '확실히', '틀림없이', '예외 없이', '언제나'];
     var src = String(text == null ? '' : text);
     return words.filter(function(w){ return src.indexOf(w) >= 0; });
+  }
+
+  /** 생성 뒤 자동 검사. 고칠 곳 목록을 돌려준다(빈 배열 = 문제 없음). */
+  function plannerLintContent(input){
+    input = input || {};
+    var catId = parseInt(input.catId, 10);
+    var issues = [];
+    function add(channel, field, code, msg){ issues.push({ channel: channel, field: field, code: code, msg: msg }); }
+    var FORBID = ['한 번에', '끝내기', '페이스리프트', '펴는', '완치', '진료', '더웰니스', '경락'];
+    function eachLine(text, fn){
+      String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n').forEach(fn);
+    }
+    function checkText(channel, field, text, o){
+      o = o || {};
+      var t = String(text == null ? '' : text);
+      if(!t.trim()) return;
+      eachLine(t, function(line){
+        if(/교정/.test(line) && !/(과정|학회)/.test(line)) add(channel, field, 'forbidden', '「교정」은 과정명·학회명에서만 써요');
+      });
+      FORBID.forEach(function(w){ if(t.indexOf(w) >= 0) add(channel, field, 'forbidden', '금지어 「' + w + '」'); });
+      eachLine(t, function(line){
+        if(/대부분|반드시/.test(line) || (/항상/.test(line) && !/시작은 항상 나로부터/.test(line))){
+          add(channel, field, 'strong', '근거를 단정하는 말(대부분·반드시·항상)');
+        }
+      });
+      if(!o.allowUrl && /https?:\/\//i.test(t)) add(channel, field, 'url', '본문에 URL이 있어요(링크는 말미 링크 칸에만)');
+      if(!o.allowEmoji){
+        var em = t.match(/\p{Extended_Pictographic}/gu);
+        if(em && em.length) add(channel, field, 'emoji', '이모지가 있어요(인스타 훅 끝 1개만 허용)');
+      }
+      if(catId === 0 || catId === 3){
+        if(/회원/.test(t)) add(channel, field, 'honorific', '이 카테고리는 「환자」를 써요(「회원」이 남아 있어요)');
+      } else if(catId === 1 || catId === 2 || catId === 4 || catId === 5){
+        if(/환자/.test(t)) add(channel, field, 'honorific', '이 카테고리는 「회원」을 써요(「환자」가 남아 있어요)');
+      }
+    }
+    var b = input.blog;
+    if(b){
+      ['title', 'problem', 'selfCare', 'explanation', 'hook', 'draft', 'cta', 'closing', 'references'].forEach(function(k){
+        if(typeof b[k] === 'string') checkText('blog', k, b[k]);
+      });
+      if(typeof b.outlineText === 'string') checkText('blog', 'outline', b.outlineText);
+      else if(Array.isArray(b.outline)) checkText('blog', 'outline', b.outline.join('\n'));
+    }
+    var ig = input.insta;
+    if(ig){
+      var hook = String(ig.hook || '').trim();
+      var hookEm = hook.match(/\p{Extended_Pictographic}/gu) || [];
+      if(hookEm.length > 1) add('insta', 'hook', 'emoji', '훅의 이모지는 끝에 1개만 넣어요');
+      else if(hookEm.length === 1 && !/\p{Extended_Pictographic}️?\s*$/u.test(hook)) add('insta', 'hook', 'emoji', '훅의 이모지는 맨 끝에 와야 해요');
+      checkText('insta', 'hook', hook.replace(/\p{Extended_Pictographic}️?\s*$/u, ''), {});
+      checkText('insta', 'caption', ig.caption, {});
+      var tags = Array.isArray(ig.hashtags) ? ig.hashtags.filter(Boolean) : [];
+      var inline = (String(ig.caption || '').match(/#[^\s#]+/g) || []);
+      if(!tags.length && !inline.length) add('insta', 'hashtags', 'hashtag', '해시태그(#)가 없어요');
+      else if(Math.max(tags.length, inline.length) < 7) add('insta', 'hashtags', 'hashtag', '해시태그가 9개 안팎이어야 해요(지금 ' + Math.max(tags.length, inline.length) + '개)');
+    }
+    var th = input.threads;
+    if(th){
+      checkText('threads', 'body', th.body, {});
+      checkText('threads', 'comment', th.comment, {});
+      var expected = parseInt(input.expectedComments, 10) || 4;
+      var n = String(th.comment || '').split(/\n\s*\n/).filter(function(x){ return x.trim(); }).length;
+      if(String(th.comment || '').trim() && n !== expected) add('threads', 'comment', 'count', '댓글이 ' + expected + '개여야 하는데 ' + n + '개예요');
+      if(String(th.body || '').trim() && String(th.body).trim().split('\n').filter(function(x){ return x.trim(); }).length > 1){
+        add('threads', 'body', 'body-lines', '본문은 한 줄이어야 해요');
+      }
+    }
+    return issues;
   }
 
   return {
@@ -1084,6 +1153,7 @@ var PlannerSyncRules = (function(){
     plannerBlogBodyLength: plannerBlogBodyLength,
     plannerBlogLengthState: plannerBlogLengthState,
     plannerStrongClaimWords: plannerStrongClaimWords,
+    plannerLintContent: plannerLintContent,
     plannerOutlineFromText: plannerOutlineFromText,
     plannerOutlineDisplayText: plannerOutlineDisplayText,
     plannerOutlineCopyText: plannerOutlineCopyText,

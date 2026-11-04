@@ -495,13 +495,33 @@ assert(R.plannerNaverTag('##약수역_운동!') === '약수역운동', 'tag keep
 assert(R.plannerBlogBodyLength(['가나다', '라마\nhttps://x.com']) === 7, 'length counts spaces/newlines but not urls (got ' + R.plannerBlogBodyLength(['가나다', '라마\nhttps://x.com']) + ')');
 assert(R.plannerBlogLengthState(1500, false).state === 'short', 'under 1700 is short');
 assert(R.plannerBlogLengthState(1900, false).state === 'ok', '1900 is ok');
-assert(R.plannerBlogLengthState(5000, true).state === 'free', 'expert posts have no limit');
+assert(R.plannerBlogLengthState(5000, true).state === 'long' && R.plannerBlogLengthState(1900, true).state === 'ok', 'expert posts use the same 1,900 guide');
 assert(R.plannerStrongClaimWords('대부분 항상 그래요').join('|') === '대부분|항상', 'strong claim words found');
 
 // 카드에서 직접 정한 날짜
 var ovInfo = R.plannerDraftListDate({ id: 'd5-c1793629850222', createdAt: '2026-11-02T01:00:00.000Z', activityAt: '2026-11-02T05:00:00.000Z', dateOverride: '2026-11-07' });
 assert(ovInfo.label === '11.7.', 'dateOverride wins over created/activity dates (got ' + ovInfo.label + ')');
 assert(R.plannerDraftListDate({ createdAt: '2026-11-02T01:00:00.000Z', dateOverride: 'abc' }).label !== '-', 'bad override is ignored');
+
+// 생성 뒤 자동 검사
+var lint = R.plannerLintContent({
+  catId: 5,
+  blog: { title: '강사가 먼저', draft: '대부분 환자가 교정을 원해요 https://a.com', closing: '강사가 먼저 이완되어야 회원도 이완합니다. 시작은 항상 나로부터!' },
+  insta: { hook: '스트레칭 시 회원이 버티는 건 테크닉 문제가 아닐 수 있습니다 🤲', caption: '손을 대는 순간 회원이 긴장한다면 😀', hashtags: ['a', 'b'] },
+  threads: { body: '스트레칭 시 회원이 긴장하며 버티는 이유, 테크닉의 문제일까?', comment: '하나\n\n둘\n\n셋' }
+});
+var codes = lint.map(function(i){ return i.channel + ':' + i.code; }).join(',');
+assert(/blog:strong/.test(codes), 'lint finds 대부분');
+assert(/blog:forbidden/.test(codes), 'lint finds 교정 outside a course name');
+assert(/blog:url/.test(codes), 'lint finds a url');
+assert(/blog:honorific/.test(codes), 'lint finds 환자 in a 회원 category');
+assert(/insta:emoji/.test(codes), 'lint finds the extra emoji in the caption');
+assert(/insta:hashtag/.test(codes), 'lint finds too few hashtags');
+assert(/threads:count/.test(codes), 'lint finds 3 comments instead of 4');
+assert(!/blog:strong.*title/.test(JSON.stringify(lint.filter(function(i){ return i.field === 'closing'; }))), 'fixed slogan 시작은 항상 나로부터 is not flagged');
+var clean = R.plannerLintContent({ catId: 5, insta: { hook: '스트레칭 시 회원이 긴장해요 🤲', caption: '본문입니다.', hashtags: ['1','2','3','4','5','6','7','8','9'] }, threads: { body: '한 줄?', comment: 'a\n\nb\n\nc\n\nd' } });
+assert(clean.length === 0, 'clean content has no issues (got ' + JSON.stringify(clean) + ')');
+assert(R.plannerLintContent({ catId: 0, blog: { draft: '회원이 아파요' } }).some(function(i){ return i.code === 'honorific'; }), 'CMT/도수 flags 회원');
 
 if(failed){
   console.error(failed + ' assertion(s) failed');

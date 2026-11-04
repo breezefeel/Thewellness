@@ -13527,6 +13527,29 @@ function getBlogCallToActionRuleText_(catId){
   if(id === 2) return '- 끝 링크는 리얼무브먼트 인천점 예약 링크 하나만. 앱이 글 끝에 붙이니 본문에는 URL을 쓰지 말고, 예약으로 이어지는 한두 문장만 쓰세요. 프로필 링크 문진·증상 허브 URL은 쓰지 마세요.';
   return '- CTA 본문에는 URL을 쓰지 마세요.';
 }
+/** 모든 글 프롬프트 앞에 붙이는 공통 규칙(CONTENT_RULES_V2). 저장된 프롬프트·학습 결과가 덮어쓰지 못하게 생성할 때마다 덧붙인다. */
+function getContentRulesV2Text_(catId){
+  var id = parseInt(catId, 10);
+  var clinical = (id === 0 || id === 3);
+  var instructorPost = (id === 3 || id === 4 || id === 5);
+  var lines = [
+    '[공통 규칙 — 모든 채널]',
+    '1. 주체: 글의 주어는 행동하는 사람 전체(강사의 상태·긴장·호흡·자세)입니다. 「강사 손」「어깨」처럼 신체 부위를 주어로 세우지 마세요. 부위는 확인 항목으로만 씁니다.',
+    '2. 용어: 비유 대신 현장 용어를 씁니다(움직임을 얹다→스트레칭을 진행하다, 힘이 나오다→전달되다, 굳다→긴장하다). 단계명은 영어 원어 그대로: Passive, Assisted Active, Resistive.',
+    '3. 근거 강도 = 어미 강도: 연구가 관찰·리뷰 수준이면 「~할 수 있습니다」「~로 보입니다」「~경우가 있습니다」. 「대부분」「반드시」「항상」과 단정 인과는 쓰지 마세요(고정 슬로건 「시작은 항상 나로부터!」만 예외). 근거보다 강한 표현이 남으면 blog.evidenceFlags에 그 문장을 적으세요.',
+    '4. 금지어: 교정(과정명·학회명 고유명사 제외), 한 번에, 끝내기, 페이스리프트, 펴는, 완치, 진료, 더웰니스, 경락(→ 인디바). 광고성 문장에는 「치료」를 쓰지 않습니다.',
+    '5. 호칭: ' + (clinical ? '이 카테고리는 임상(CMT·도수치료)이므로 「환자」를 씁니다. 「회원」은 쓰지 마세요.' : '이 카테고리는 「회원」을 씁니다. 「환자」는 쓰지 마세요.') + ' 호칭을 바꿀 때는 조사까지 맞춥니다(회원이/환자가, 회원을/환자를, 회원과/환자와).',
+    instructorPost
+      ? '6. 강사 대상 글에는 안전 문구(「불편하면 멈추세요」 등)와 부가 효익(허리 부담 감소 등)을 넣지 않습니다.'
+      : '6. 안전 문구는 셀프 케어에 한 줄만 둡니다.',
+    '7. 본문·캡션에 URL을 넣지 않습니다. 링크는 말미 링크 칸에만 있습니다.',
+    '8. **, ---, > 금지. 이모지는 인스타 훅 끝 1개만 허용하고 그 밖에는 쓰지 않습니다.',
+    '9. 덜어내기: 「현장에서 자주 봅니다」류 반복, 과정 홍보 문장 반복(본문 1회까지)을 쓰지 않습니다.',
+    '10. 용어 통일: 한 글 안에서 같은 개념은 한 단어로 씁니다(기술/테크닉 혼용 금지 → 「테크닉」). 훅·쓰레드 본문은 상황(「스트레칭 시」)을 맨 앞에 둡니다.',
+    '11. 인과 고리: 원인은 「강사의 긴장(상태)」, 전달 대상은 「회원에게/회원 근육」입니다. 「자극」「몸이」처럼 흐린 주어 대신 사람과 긴장을 밝힙니다.'
+  ];
+  return lines.join('\n');
+}
 function getBlogStructureRulesText_(catId){
   var id = parseInt(catId, 10);
   var expert = (id === 3 || id === 4 || id === 5);
@@ -13537,7 +13560,7 @@ function getBlogStructureRulesText_(catId){
     lines.push('- 분량: 본문(문제 제기·셀프 케어·원리 설명·CTA) 합쳐 공백 포함 **1,900자 안팎**(1,700~2,100자). 제목·태그·참고 문헌·끝 링크는 세지 않습니다.');
     lines.push('- 안전 문구(예: 「하다가 불편하면 바로 멈추세요.」)는 셀프 케어에 한 줄 넣습니다.');
   } else {
-    lines.push('- 분량 제한은 없습니다. 근거가 있는 만큼 충분히 쓰되, 근거 없는 내용으로 채우지 마세요.');
+    lines.push('- 분량: 본문 전체 약 1,900자(공백 포함, ±10%). 근거가 없는 내용으로 채우지 마세요.');
     lines.push('- 안전 문구(「하다가 불편하면 바로 멈추세요.」 같은 문장)는 넣지 않습니다.');
     lines.push('- 근거 없이 「현장에서 흔히 보인다」「많은 분들이」 같은 일반화 주장은 쓰지 마세요.');
   }
@@ -13559,7 +13582,7 @@ function getBlogStructureRulesText_(catId){
     lines.push('- IFC 글은 「회원」이라는 말을 그대로 씁니다. 「환자」로 바꾸지 마세요.');
   }
   lines.push(getBlogCallToActionRuleText_(id));
-  return lines.join('\n');
+  return lines.join('\n') + '\n\n' + getContentRulesV2Text_(id);
 }
 /** 생성·다시쓰기 직후 블로그 글자 규칙: 본문 URL 제거, (도수치료·CMT) 회원→환자, 네이버 태그 정리 */
 function applyBlogWordRulesToBlock_(blog, catId){
@@ -14481,8 +14504,8 @@ const THREADS_BODY_COMMENT_RULES = `목소리는 기본 지침의 [목소리와 
 
 [쓰레드 형식]
 반말. 인스타 문장을 베끼지 않는다.
-body: 첫 훅 **한 줄(한 문장)** 만. 통념 하나를 뒤집고, 일반인 글은 자가 점검 질문으로 끝낸다. 해설·두 번째 문장은 넣지 않는다. 전문가 과정은 전제를 뒤집는 한 줄.
-comment: 나머지 내용은 **비슷한 문장끼리 묶어 댓글 3개**로 나눈다(빈 줄로만 구분). 댓글 하나는 **두 문장까지**, 아이디어 하나. 1 해부 방향·원인 2 주어가 분명한 원리와 절제된 결과 3 자가 점검·행동으로 끝. 적신호·병원·「10초면 돼」 같은 시간 약속 댓글은 넣지 않는다. 그 안내는 블로그에만 있다.
+body: 한 줄만. 「[상황] 시 회원이 [현상]하는 이유, 테크닉의 문제일까?」처럼 상황을 맨 앞에 두고 인스타 훅과 같은 상황·같은 용어를 쓴다. 해설은 넣지 않는다. 일반인 글은 자가 점검 질문으로 끝낸다.
+comment: **정확히 4개**, 빈 줄로만 구분. 각 1~2문장, 주어(강사/회원) 명시. 1 원리(원인→회원 반응) 2 방법 1: 동작 → 회원이 얻는 결과까지 3 방법 2: 방법 이름 먼저(「강사가 체중을 이용하는 방법,」) → 권유 → 동작 4 자가 확인 3가지. 적신호·병원·「10초면 돼」 같은 시간 약속 댓글, 슬로건·CTA·링크는 넣지 않는다.
 해시태그·불릿 없음.
 
 ${CHANNEL_THREADS_FEWSHOT}`;
@@ -14571,7 +14594,7 @@ function buildExpertCourseThreadsPrompt_(opts){
     '[전문가 과정 맥락]\n' +
     '- 독자: ' + roleReaders + '\n' +
     '- 본문: 현장에서 흔히 틀리는 전제 하나를 한 줄로 뒤집기. 자가 점검 질문을 억지로 넣지 않는다\n' +
-    '- 댓글 3개도 인스타·영상 범위 안. 수강 유도 금지. 없는 내용 추가 금지. 일반인 앉기 본보기의 문장은 옮기지 않는다' +
+    '- 댓글 4개도 인스타·영상 범위 안. 수강 유도 금지. 없는 내용 추가 금지. 일반인 앉기 본보기의 문장은 옮기지 않는다' +
     (programBlock ? '\n' + programBlock : '');
 }
 
@@ -15730,12 +15753,14 @@ function buildExpertCourseBlogPrompt_(opts){
     '- 두 유형을 섞어 나열하지 말고, 입력의 중심에 더 가까운 하나를 선택하세요.\n\n' +
     '[형식 — JSON 필드]\n' +
     '- 존댓말. **, ---, > 금지. 문단 사이 빈 줄.\n' +
-    '- title: 무엇이 끝이 아닌지 한 줄 (35자 내외)\n' +
-    '- hook: 누가 어디서 멈추는지 2~3문장. 자막 조각·제작 과정 금지\n' +
-    '- outline: 한 줄에 완전한 문장 하나. 방향과 모양을 문장 안에\n' +
-    '- draft: 650~1,000자. 참고·영상·사진 범위 안만. outline을 다시 풀지 말 것\n' +
-    '- cta: 수강·등록·시청·댓글 유도 없이 원리로 닫기\n' +
-    '- hashtags: 3~5개. 영문 브랜드는 정확히 (예: Re:Al)' +
+    '- 분량: 본문 전체 약 1,900자(공백 포함, ±10%)\n' +
+    '- title: 「누가 무엇을」이 드러나는 한 줄. 행동 주체(강사)를 넣습니다. 35자 내외\n' +
+    '- hook: 강사가 겪는 장면 2~3문장, 문장 사이 빈 줄. 「기술을 바꾸기 전에 먼저 확인할 것이 있습니다」처럼 멈춥니다. 자막 조각·제작 과정 금지\n' +
+    '- outline: 3줄. ① 원인(강사 상태→회원 반응) ② 방법 두 가지를 한 문장에 ③ (선택) 과정 연결. 각 줄 완전한 문장\n' +
+    '- draft: 순서 고정 — 현장 장면 → 원리(문헌 근거, 완화 어미) → 방법 1·방법 2(각각 구체 장면: 자세·발 위치·호흡 박자) → 손대기 전 자가 확인 3가지 → 과정 단계(Passive→Assisted Active→Resistive) 연결 1단락. outline을 다시 풀지 말 것\n' +
+    '- cta(마무리): 대구형 결론 1문장 + 고정 슬로건. 수강·등록·시청·댓글 유도 금지. 예) 강사가 먼저 이완되어야 회원도 이완합니다. 시작은 항상 나로부터!\n' +
+    '- references: 마무리 다음. 「저자 (연도). 제목. 저널.」 형식, 링크·DOI 금지. 본문에 실제 쓴 근거만 2~4개\n' +
+    '- hashtags: 5개 내외. 네이버용이므로 특수문자 제거(Re:Al→ReAl). 브랜드·주제·대상 위주' +
     (programBlock ? '\n\n' + programBlock : '');
 }
 
@@ -15750,9 +15775,10 @@ function buildExpertCourseInstaPrompt_(opts){
     '- ' + roleReaders + '에게 말하듯. 존댓말\n' +
     '- 공유한 **영상·사진에서 다룬 테크닉**과 **원리 한 줄**이 드러나게. 범위 밖 추가 금지\n\n' +
     '[형식]\n' +
-    '- hook: 흔한 방법 vs 같은 자리 비교 한 줄. 「좋아요」 금지\n' +
-    '- caption: 비교 조건 → 손 느낌 하나 → 원리 한 줄. hook 제외 200~400자. 수강 유도 금지\n' +
-    '- hashtags: 4~6개' +
+    '- hook: 「[상황] 시 회원이 [현상]하는 건 테크닉 문제가 아닐 수 있습니다 🤲」 틀. 상황(예: 스트레칭 시)을 맨 앞에, 끝에 이모지 1개. 「기술」 대신 「테크닉」\n' +
+    '- caption: hook 제외 500~750자, 빈 줄로 나눈 블록. 1) 질문형 상황 1문장 2) 원리 3문장(강사가 긴장한 채로 회원에게 접촉하면 그 긴장이 회원 근육에 전달) 3) 방법 두 가지: • 불릿 2개, 각 불릿 = 방법 이름 → 구체 동작 2문장 → 회원이 얻는 결과 1문장. 불릿 사이 빈 줄 4) 손을 대기 전 확인할 것 셋 5) 원리로 닫는 1문장. 슬로건·CTA·프로필 링크 문구 없음\n' +
+    '- hashtags: # 붙여 9개 내외. 브랜드 → 주제 → 대상·분야 → 원리 → 과정 순. 강사 교육 글은 지역 태그와 온라인 문진·지점 문구를 쓰지 않습니다\n' +
+    '- postTime: 추천 게시 시각 1개(KST)' +
     (programBlock ? '\n\n' + programBlock : '');
 }
 
@@ -16273,7 +16299,7 @@ function migrateDraftShapePrompts_(){
     if(cat.threads && !promptHasVoiceCore_(cat.threads) && String(cat.threads).indexOf(shape) < 0 && id >= 0 && id <= 5){
       var thAdd = shape + '\n' +
         '- 일반인 글의 본문은 자가 점검 질문으로 끝냅니다. 전문가 과정은 전제를 뒤집는 한 줄.\n' +
-        '- 댓글은 빈 줄로 구분된 3개, 각 두 문장까지. 마침표마다 쪼개지 마세요.\n' +
+        '- 댓글은 빈 줄로 구분된 정확히 4개, 각 1~2문장. 마침표마다 쪼개지 마세요.\n' +
         '- 일반인 글의 마지막 댓글만 적신호(팔 저림 등)면 병원 먼저. 교육 글에는 넣지 마세요.\n' +
         '- 메모에 없는 일화·회원 사례·숫자를 만들지 마세요.\n' +
         '- 비유는 1개 이내. 메커니즘 문장 우선.\n' +
@@ -35236,6 +35262,7 @@ function blogForSheet_(blog, catId){
     outline: Array.isArray(src.outline) ? src.outline.slice() : (Array.isArray(base.outline) ? base.outline.slice() : []),
     outlineText: typeof src.outlineText === 'string' ? src.outlineText : (typeof base.outlineText === 'string' ? base.outlineText : undefined),
     references: src.references != null ? String(src.references) : (typeof base.references === 'string' ? base.references : undefined),
+    evidenceFlags: Array.isArray(src.evidenceFlags) ? src.evidenceFlags.slice() : (Array.isArray(base.evidenceFlags) ? base.evidenceFlags.slice() : undefined),
     draft: src.draft != null ? String(src.draft) : (base.draft || '')
   };
   distributeBlogSections_(copy);
@@ -35352,6 +35379,7 @@ function normalizeBlogBlock(raw, catId){
       outline: Array.isArray(raw.outline) ? raw.outline : [],
       outlineText: typeof raw.outlineText === 'string' ? raw.outlineText : undefined,
       references: raw.references != null ? String(raw.references).trim() : undefined,
+      evidenceFlags: Array.isArray(raw.evidenceFlags) ? raw.evidenceFlags.filter(Boolean) : undefined,
       draft: raw.draft != null ? String(raw.draft) : ''
     };
   }
@@ -35361,6 +35389,7 @@ function normalizeBlogBlock(raw, catId){
     outline: Array.isArray(raw.outline) ? raw.outline : [],
     outlineText: typeof raw.outlineText === 'string' ? raw.outlineText : undefined,
     references: raw.references != null ? String(raw.references).trim() : undefined,
+    evidenceFlags: Array.isArray(raw.evidenceFlags) ? raw.evidenceFlags.filter(Boolean) : undefined,
     draft: raw.draft != null ? String(raw.draft) : '',
     cta: raw.cta != null ? String(raw.cta) : '',
     hashtags: Array.isArray(raw.hashtags) ? raw.hashtags.filter(Boolean) : []
@@ -39484,6 +39513,138 @@ function topicPhotoLibraryHint_(action, scene){
 function topicPhotoFigureStyleLine_(catId){
   return '의학 도감. 뼈와 실루엣만. 아이보리 바탕. 근육·피·장기 없음. 세이지 안내선, 앰버 #b06d1a 포인트 하나.';
 }
+/* ── 이미지 프롬프트: 확정된 블로그 → 공통 베이스 + 타입(썸네일·근거·릴스 커버) + 도구(GPT·나노바나나·NotebookLM) ── */
+var IMAGE_TYPE_LABELS_ = { thumb: '썸네일', evidence: '근거 이미지', cover: '릴스 커버' };
+var IMAGE_TOOL_LABELS_ = { gpt: 'GPT 이미지', nano: '나노바나나', notebooklm: 'NotebookLM' };
+var IMAGE_TYPE_EXTRA_ = {
+  thumb: 'Format: vertical 4:5, realistic photo. Keep the top 30% as an empty plain/soft-blurred area for the title (the title is added by hand later).',
+  evidence: 'Format: journal-style graphical abstract, flat vector, white background, 2-3 muted colors, textbook-level anatomical accuracy with visible muscle fiber texture. Left-to-right 2-3 panel flow showing cause then effect. Leave an empty strip at the bottom for a citation. Labels, numbers and the source are added by hand later.',
+  cover: 'Format: vertical 9:16. Keep people inside the central 1:1 safe area (grid crop). Both full heads inside the frame. Leave empty space in the top and center for a two-line title (added by hand later).'
+};
+var IMAGE_TOOL_ADDONS_ = {
+  gpt: {
+    thumb: 'Write as one English descriptive paragraph (about 120 words), size 1024x1280. Match the attached reference style only, not its content. Do not render any text, letters, numbers or logos. Negative: cropped heads, extra fingers, watermark.',
+    evidence: 'Write as one English descriptive paragraph (about 120 words), size 1024x1280, flat vector. Match the attached style reference only, not its content. Do not render any text, letters, numbers or logos. Negative: photo realism, 3D render.',
+    cover: 'Write as one English descriptive paragraph (about 120 words), size 1024x1792. Do not render any text, letters, numbers or logos. Negative: cropped heads, watermark.'
+  },
+  nano: {
+    thumb: 'Use short English sentences (8 sentences or fewer), aspect ratio 4:5. Keep the same person and the same room as the reference images. No text, no captions, no labels anywhere. Keep the top 30% empty.',
+    evidence: 'Use short English sentences (8 sentences or fewer), aspect ratio 4:5, flat vector look. No text, no captions, no labels anywhere. Keep the bottom strip empty.',
+    cover: 'Use short English sentences (8 sentences or fewer), aspect ratio 9:16. Keep the same person and the same room as the reference images. No text, no captions, no labels anywhere. Both full heads in frame.'
+  },
+  notebooklm: {
+    thumb: '이 글을 소스로 올린 뒤 인포그래픽 한 장으로 만들어 주세요. 지시문은 500자 이내. 이미지 안에 글자는 만들지 말고 빈 여백을 두세요(제목은 나중에 직접 넣습니다).',
+    evidence: '업로드한 블로그와 참고 문헌만 근거로 「원인 → 신호 → 반응」과 「방법 → 신호 감소 → 이완」을 2칸 흐름 인포그래픽으로 만들어 주세요. 글자는 최소로, 라벨은 나중에 직접 넣을 예정이니 가능하면 텍스트 없는 버전으로 주세요. 문헌에 없는 주장은 넣지 마세요.',
+    cover: '이 글을 소스로 올린 뒤 세로 9:16 커버 이미지 초안을 만들어 주세요. 글자는 만들지 말고 제목 자리를 비워 두세요. 지시문은 500자 이내.'
+  }
+};
+function imageBlogOf_(content){ return content && content.blog ? content.blog : null; }
+function imageKeyMessage_(blog){
+  if(!blog) return '';
+  var first = '';
+  if(typeof blog.outlineText === 'string' && blog.outlineText.trim()){
+    first = PlannerSyncRules.plannerOutlineFromText(blog.outlineText)[0] || '';
+  } else if(Array.isArray(blog.outline) && blog.outline.length){
+    first = String(blog.outline[0] || '');
+  }
+  if(!first) first = String(blog.hook || '').split(/\n\s*\n/)[0] || '';
+  if(!first && typeof getGeneralBlogProblemText_ === 'function') first = String(getGeneralBlogProblemText_(blog) || '').split(/\n\s*\n/)[0] || '';
+  return String(first || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+}
+function imageOverlayTexts_(type, blog){
+  var title = blog ? String(blog.title || '').trim() : '';
+  if(type === 'thumb') return title ? [title] : [];
+  if(type === 'cover'){
+    if(!title) return [];
+    var half = Math.ceil(title.length / 2);
+    var cut = title.lastIndexOf(' ', half + 4);
+    if(cut < 4 || cut > half + 6) cut = half;
+    return [title.slice(0, cut).trim(), title.slice(cut).trim()].filter(Boolean);
+  }
+  if(type === 'evidence'){
+    var ref = blog && blog.references ? String(blog.references).split('\n').map(function(x){ return x.trim(); }).filter(Boolean)[0] : '';
+    return ['라벨(한국어)·숫자: 사람이 직접 입력', ref ? ('하단 인용: ' + ref) : '하단 인용: 참고 문헌에서 저자, 연도, 저널'];
+  }
+  return [];
+}
+/** 확정된 블로그에서 한 번 뽑는 공통 베이스. 도구 블록은 이 부분을 바꾸지 못한다. */
+function buildImageBase_(type, content, catId){
+  var blog = imageBlogOf_(content);
+  var id = parseInt(catId, 10);
+  var expert = isExpertCourseCategory(id);
+  var action = '';
+  try { action = topicPhotoActionLine_(content, catId); } catch(eAct){ action = ''; }
+  var lines = [
+    '[블로그에서 추출 — 수정 금지]',
+    '- Topic: ' + String((blog && blog.title) || '').trim(),
+    '- Key message (1 sentence): ' + imageKeyMessage_(blog),
+    '- Scene/movement: ' + (action || '(블로그에 나온 동작 하나)') + '. Show only this one movement taken from the blog. Do not draw any other movement. Do not default to head-and-neck scenes unless the blog itself is about the head or neck.',
+    '- People: ' + (expert
+      ? 'instructor + ' + (id === 3 ? 'patient' : 'member') + ', BOTH full heads inside the frame (no cropped heads or faces). Instructor relaxed shoulders and calm expression.'
+      : 'follow the blog scene; every person has the full head inside the frame (no cropped heads or faces).'),
+    '- Style rules: natural light, clean studio, no exaggerated retouching or over-defined muscles, calm neutral brand tone.',
+    '- Text: NO text, letters, numbers, logos or watermarks generated in the image. Titles, labels, numbers and sources are added by hand later (listed separately).'
+  ];
+  return lines.join('\n');
+}
+function buildImageToolPrompt_(type, tool, content, catId){
+  type = IMAGE_TYPE_EXTRA_[type] ? type : 'thumb';
+  tool = IMAGE_TOOL_ADDONS_[tool] ? tool : 'gpt';
+  var blog = imageBlogOf_(content);
+  var overlay = imageOverlayTexts_(type, blog);
+  return buildImageBase_(type, content, catId) + '\n\n' +
+    IMAGE_TYPE_EXTRA_[type] + '\n\n' +
+    IMAGE_TOOL_ADDONS_[tool][type] +
+    (overlay.length ? '\n\n[얹을 텍스트 — 사람이 직접 넣기]\n' + overlay.map(function(t){ return '- ' + t; }).join('\n') : '');
+}
+function imageFilename_(type, content, catId){
+  var blog = imageBlogOf_(content);
+  var d = new Date();
+  var yy = String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+  var cat = (CATEGORIES[parseInt(catId, 10)] || {}).name || '카드';
+  var key = String((blog && blog.title) || '').replace(/[^0-9A-Za-z가-힣]+/g, '').slice(0, 10) || '글';
+  return yy + '_' + String(cat).replace(/[^0-9A-Za-z가-힣]+/g, '') + '_' + key + '_' + type + '.png';
+}
+window.imageToolPromptFromControls_ = function(forceTool){
+  var content = getDraftContent_(state.selectedId);
+  if(!content || !content.blog){ setAppToast('먼저 블로그 초안을 만들고 확정해 주세요.', { duration: 3000, variant: 'err' }); return null; }
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
+  var typeEl = document.getElementById('img-tool-type');
+  var toolEl = document.getElementById('img-tool-tool');
+  var type = typeEl ? typeEl.value : 'thumb';
+  var tool = forceTool || (toolEl ? toolEl.value : 'gpt');
+  return { type: type, tool: tool, text: buildImageToolPrompt_(type, tool, content, catId), filename: imageFilename_(type, content, catId) };
+};
+window.copyImageToolPrompt_ = function(btn, forceTool){
+  var pack = window.imageToolPromptFromControls_(forceTool);
+  if(!pack) return;
+  var label = btn ? btn.textContent : '';
+  writeClipboardRich_(pack.text, '', function(){
+    if(btn){ btn.textContent = '복사됨'; setTimeout(function(){ btn.textContent = label || '프롬프트 복사'; }, 1500); }
+    setAppToast((IMAGE_TYPE_LABELS_[pack.type] || '') + ' · ' + (IMAGE_TOOL_LABELS_[pack.tool] || '') + ' 프롬프트를 복사했어요.\n파일명 제안: ' + pack.filename, { duration: 3600, variant: 'ok' });
+  });
+};
+window.fillImagePromptFromControls_ = function(){
+  var pack = window.imageToolPromptFromControls_();
+  if(!pack) return;
+  var ta = document.getElementById('sheet-image-prompt-0');
+  if(!ta){ setAppToast('프롬프트 입력란이 없어요.', { duration: 2500, variant: 'err' }); return; }
+  ta.value = pack.text;
+  if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(ta);
+  window.topicPhotoPromptEdited_(ta);
+  setAppToast('입력란에 넣었어요. GPT·나노바나나 버튼은 이 글을 그대로 보내요.', { duration: 3000, variant: 'ok' });
+};
+function imageToolControlsHTML_(){
+  return '<div class="image-tool-controls" style="margin:8px 0 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;">' +
+    '<label for="img-tool-type" style="font-weight:600;">종류</label>' +
+    '<select id="img-tool-type"><option value="thumb">썸네일(4:5)</option><option value="evidence">근거 이미지</option><option value="cover">릴스 커버(9:16)</option></select>' +
+    '<label for="img-tool-tool" style="font-weight:600;">도구</label>' +
+    '<select id="img-tool-tool"><option value="gpt">GPT 이미지</option><option value="nano">나노바나나</option><option value="notebooklm">NotebookLM</option></select>' +
+    '<button type="button" class="img-tool-copy-btn" onclick="copyImageToolPrompt_(this)">프롬프트 복사</button>' +
+    '<button type="button" class="img-tool-copy-btn" onclick="copyImageToolPrompt_(this, \'notebooklm\')">NotebookLM 프롬프트 복사</button>' +
+    '<button type="button" class="img-tool-copy-btn" onclick="fillImagePromptFromControls_()">입력란에 넣기</button>' +
+    '</div>';
+}
 function topicPhotoPromptSection_(prompt, startMark, endMark){
   var text = String(prompt || '');
   var start = text.indexOf(startMark);
@@ -39542,6 +39703,7 @@ function buildTopicPhotoPrompt_(content, catId, topic){
   var scene = topicPhotoSceneLine_(content);
   var hint = topicPhotoLibraryHint_(action, scene);
   return [
+    (content && content.blog ? buildImageBase_('thumb', content, catId) : ''),
     '전문적이고 신뢰가 가는 한 장. AI가 만든 사람은 인공적으로 보인다.',
     '1순위 실사. MYBOX 00.사진+영상, 특히 10. AI 썸네일에서 주제와 맞는 사진을 고른다.',
     '찾을 장면: ' + hint + '.',
@@ -39549,7 +39711,7 @@ function buildTopicPhotoPrompt_(content, catId, topic){
     buildTopicFigurePrompt_(content, catId, topic),
     '3순위 인물. 앞의 둘이 안 맞을 때만. 나노바나나.',
     buildTopicPersonPrompt_(content, catId, topic)
-  ].join('\n');
+  ].filter(function(l){ return l !== ''; }).join('\n');
 }
 function ensureTopicPhotoPrompt_(content, topic, catId, force){
   if(!content) return content;
@@ -39628,6 +39790,7 @@ function renderTopicPhotoCard_(content){
   html += '</div></div>';
   html += '<textarea class="sheet-edit" id="sheet-image-prompt-0" data-image-index="0" rows="8" oninput="autoGrowTextarea_(this);topicPhotoPromptEdited_(this)">' + escapeHtml(prompt) + '</textarea>';
   html += topicPhotoUserRefsHTML_();
+  html += imageToolControlsHTML_();
   html += '<div id="topic-photo-preview" class="topic-photo-preview">' +
     (preview ? '<img alt="만든 주제 사진" src="' + preview + '">' : '') + '</div>';
   html += '</div>';
@@ -40158,6 +40321,11 @@ window.generateTopicPhoto_ = async function(btn){
   var userEditedPrompt = !!(editedItem && editedItem.userEdited);
   // 직접 고친 프롬프트는 구역을 잘라 쓰지 않고 입력란 글 전체를 그대로 보낸다
   var apiBase = (structured && !userEditedPrompt) ? (figure ? atlasPrompt : personPrompt) : prompt;
+  if(structured && !userEditedPrompt){
+    // 블로그에서 뽑은 공통 베이스(주제·핵심 메시지·동작·머리 전체·글자 금지)를 도구 구역 앞에 붙여 보낸다
+    var baseBlock = topicPhotoPromptSection_(prompt, '[블로그에서 추출', '전문적이고');
+    if(baseBlock) apiBase = baseBlock + '\n' + apiBase;
+  }
   if(useNano) photoEstimateSec = 70;
   if(btn) startButtonCountdown_(btn, { estimateSec: photoEstimateSec, busyLabel: '만드는 중' });
   setAppToast(useNano
@@ -40897,6 +41065,8 @@ function renderSheetContent(content, opts) {
         sheetEditField_('첫 줄 후킹', 'sheet-insta-hook', ig.hook, { rows: 2, title: true, regen: 'insta.hook', copy: true }) +
         sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10, regen: 'insta.caption', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
+        instaExtraFieldsHTML_(ig) +
+        '<div id="content-lint-box" class="content-lint-box">' + contentLintHTML_(content) + '</div>' +
         instagramCollabSheetHtml_(state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId)) +
         '<div data-social-slot="insta"></div>' +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>지금 올리기</strong>는 @dr.park_dc.pt에 바로 게시하고(연결 계정은 공동작업자로 초대), <strong>예약하기</strong>는 고른 시간에 클라우드가 올립니다. 올리면 <strong>수정된 인스타 최종본</strong>으로 쓰레드 초안이 만들어져요. 앱에서 직접 올렸다면 <strong>직접 올림</strong>을 누르세요.</p>'
@@ -40917,8 +41087,8 @@ function renderSheetContent(content, opts) {
     } else {
       bodyHTML = tabsHTML + addSourceHtml +
         sheetFullCopyBar_() +
-        sheetEditField_('본문 (첫 훅 한 줄)', 'sheet-threads-body', getThreadsBodyText_(ths), { rows: 5, regen: 'threads.body', copy: true, help: '첫 훅 한 줄만. 일반인 글은 자가 점검 질문으로 끝내세요. 해설은 댓글로.', paragraphs: true }) +
-        sheetEditField_('댓글 (3개 · 빈 줄로 구분)', 'sheet-threads-comment', getThreadsCommentText_(ths), { rows: 12, regen: 'threads.comment', copy: true, help: '빈 줄로 나뉜 단락이 댓글 하나입니다(3개 정도, 하나에 두 문장까지). 빈 줄이 있으면 그 경계를 유지하고, 빈 줄이 없을 때만 마침표로 나눕니다.', paragraphs: true }) +
+        sheetEditField_('본문 (한 줄)', 'sheet-threads-body', getThreadsBodyText_(ths), { rows: 5, regen: 'threads.body', copy: true, help: '첫 훅 한 줄만. 일반인 글은 자가 점검 질문으로 끝내세요. 해설은 댓글로.', paragraphs: true }) +
+        sheetEditField_('댓글 (4개 · 빈 줄로 구분)', 'sheet-threads-comment', getThreadsCommentText_(ths), { rows: 12, regen: 'threads.comment', copy: true, help: '빈 줄로 나뉜 단락이 댓글 하나입니다(정확히 4개, 하나에 1~2문장). 빈 줄이 있으면 그 경계를 유지하고, 빈 줄이 없을 때만 마침표로 나눕니다.', paragraphs: true }) +
         '<div data-social-slot="threads"></div>' +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;"><strong>지금 올리기·예약하기</strong>는 본문을 올리고, 댓글 박스의 <strong>빈 줄마다</strong> 바로 아래 내 댓글로 이어 올립니다. 앱에서 직접 올렸다면 <strong>직접 올림</strong>을 누르세요.</p>';
     }
@@ -41754,14 +41924,15 @@ async function generateThreadsFromInsta_(catId, insta, topic){
     ? '\n- 전문가 과정: 인스타 캡션 범위 **밖** 내용 추가 금지. 본문 훅·댓글 해설 모두 인스타 근거 안에서.\n'
     : '';
   var generalHint = isGeneralAudienceCategory(catId)
-    ? '\n- 일반인 글: 반말. 본문은 첫 훅 한 줄만, 자가 점검 질문으로 끝. 댓글은 비슷한 문장끼리 묶은 3개(빈 줄로 구분), 하나에 두 문장까지. 마지막은 행동. 적신호·병원·시간 약속 댓글 없음.\n'
+    ? '\n- 일반인 글: 반말. 본문은 한 줄만, 자가 점검 질문으로 끝. 댓글은 정확히 4개(빈 줄로 구분), 하나에 1~2문장. 마지막은 행동. 적신호·병원·시간 약속 댓글 없음.\n'
     : '';
   var prompt = baseInfo + '\n\n' +
     '카테고리: ' + (CATEGORIES[catId] ? CATEGORIES[catId].name : '') + '\n' +
     '주제: "' + (topic || '') + '"\n\n' +
     '[쓰레드 작성 지침]\n' + threadsGuide + expertScope + generalHint + '\n' +
+    getContentRulesV2Text_(catId) + '\n' + getSnsV2SpecificRules_(catId, 'threads') + '\n\n' +
     '아래는 **확정·수정된 인스타 최종본**입니다. 인스타 문장을 그대로 옮기지 말고, **본문(훅)+댓글(해설)** 2단으로 **새로** 작성하세요.\n\n' +
-    'JSON만:\n{"threads":{"body":"첫 훅 한 줄만(한 문장). 일반인 글은 자가 점검 질문으로 끝","comment":"댓글1(최대 두 문장)\\n\\n댓글2(최대 두 문장)\\n\\n댓글3은 행동으로 끝(최대 두 문장). 적신호 없음. 비슷한 문장끼리 묶고 빈 줄로만 구분"}}\n\n' +
+    'JSON만:\n{"threads":{"body":"한 줄만. 상황을 맨 앞에. 일반인 글은 자가 점검 질문으로 끝","comment":"댓글1\\n\\n댓글2\\n\\n댓글3\\n\\n댓글4(정확히 4개, 각 1~2문장). 적신호·슬로건·CTA 없음. 빈 줄로만 구분"}}\n\n' +
     '[인스타 최종본]\n' + buildInstaSourceText_(insta);
 
   var text = await callClaudePlanner_(prompt, { maxTokens: 2800, timeoutMs: THREADS_BG_TIMEOUT_MS });
@@ -42197,8 +42368,8 @@ var SHEET_FIELD_META_ = {
   'insta.hook':     { block: 'insta', label: '첫 줄 후킹', instr: '스크롤을 멈추게 하는 인스타 첫 줄 후킹 한 문장. **존댓말(해요체)**.' },
   'insta.caption':  { block: 'insta', label: '캡션', instr: '자가 점검으로 시작. • 3개(동작+이유, 불릿 사이 빈 줄 없음). 빈 줄로 나눈 네 블록: 느껴지는 변화 / 브랜드 코칭 / 프로필 링크에서 온라인 문진 / 지점 줄. 리얼페이스 지점 줄은 작전역 2분만. 그 외는 약수역 3분 · 작전역 2분 · 1:1 예약제. 방향 추측·없는 약속·저장·공유·적신호 금지. 존댓말.' },
   'insta.hashtags': { block: 'insta', label: '해시태그', array: true, instr: '해시태그 6~8개. 리얼무브먼트·도수는 약수역운동·작전역운동 포함. 리얼페이스는 작전역운동 등 인천. 약수 태그는 넣지 말 것.' },
-  'threads.body':    { block: 'threads', label: '본문 (첫 훅 한 줄)', instr: '첫 훅 한 줄(한 문장)만. 일반인 글은 자가 점검 질문으로 끝내 댓글을 유도. 해설·근거는 쓰지 마세요. **반말(구어체)**.' },
-  'threads.comment': { block: 'threads', label: '댓글 (3개)', instr: '비슷한 문장끼리 묶어 빈 줄로 나눈 3개. 하나에 두 문장까지. 주어를 분명히. 방향 추측 금지. 절제된 결과. 마지막은 자가 점검·행동. 적신호·병원·시간 약속 댓글 금지. 반말.' },
+  'threads.body':    { block: 'threads', label: '본문 (한 줄)', instr: '한 줄만. 「[상황] 시 회원이 [현상]하는 이유, 테크닉의 문제일까?」처럼 상황을 맨 앞에. 일반인 글은 자가 점검 질문으로 끝내 댓글을 유도. 해설·근거는 쓰지 마세요. **반말(구어체)**.' },
+  'threads.comment': { block: 'threads', label: '댓글 (4개)', instr: '정확히 4개, 빈 줄로 나눈다. 각 1~2문장, 주어(강사/회원)를 밝힌다. 1 원리 2 방법1(동작→회원이 얻는 결과) 3 방법2(방법 이름 먼저→권유→동작) 4 자가 확인 3가지. 슬로건·CTA·링크 금지. 적신호·병원·시간 약속 댓글 금지. 반말.' },
   'thread.topicTitle': { block: 'thread', label: '오늘의 한 줄', threadNorm: true, instr: '담백한 관찰·장면 한 줄. 짧은 감탄 가능. 따뜻한 위로·과한 감성 금지.' },
   'thread.summary':    { block: 'thread', label: '본문 (일상 나눔)', threadNorm: true, instr: '관찰 → 핵심 한 가지 → (선택) 짧은 감탄·철학 1문장. 담백·구어체. 과한 감성·설교 금지.' },
   'news.title': { block: 'news', label: '제목 · 첫 줄', instr: '소식용 제목 한 줄. 존댓말·질문형 권장. 과장 금지. 원데이면 일정 힌트, 정규면 적합성·변화 힌트.' },
@@ -42434,7 +42605,8 @@ window.regenSheetField_ = async function(key, btn){
     '[현재 글의 다른 부분 — 참고용, 여기는 수정하지 마세요]',
     reference, '',
     '[다시 쓸 부분: 「' + meta.label + '」]',
-    '작성 지침: ' + meta.instr,
+    '작성 지침: ' + fieldInstrForCat_(meta, catId),
+    getContentRulesV2Text_(catId),
     '사용자가 방금 수정한 현재 「' + meta.label + '」 내용:',
     (currentValue || '(비어 있음)'), '',
     rewriteHint,
@@ -42772,10 +42944,9 @@ function blogQualityNoteHTML_(info){
   var st = info.state;
   var msg = '본문 ' + info.len.toLocaleString() + '자 (공백 포함)';
   var color = '#6B7280';
-  if(st.state === 'short'){ msg += ' · 짧아요. ' + st.min.toLocaleString() + '~' + st.max.toLocaleString() + '자가 좋아요'; color = '#B45309'; }
-  else if(st.state === 'long'){ msg += ' · 길어요. ' + st.min.toLocaleString() + '~' + st.max.toLocaleString() + '자가 좋아요'; color = '#B45309'; }
+  if(st.state === 'short'){ msg += ' · 짧아요. ' + (st.expert ? '권장 ' : '') + st.min.toLocaleString() + '~' + st.max.toLocaleString() + '자'; color = '#B45309'; }
+  else if(st.state === 'long'){ msg += ' · 길어요. ' + (st.expert ? '권장 ' : '') + st.min.toLocaleString() + '~' + st.max.toLocaleString() + '자'; color = '#B45309'; }
   else if(st.state === 'ok'){ msg += ' · 알맞아요'; color = '#047857'; }
-  else if(st.state === 'free'){ msg += ' · 전문가 글은 분량 제한 없음'; }
   var html = '<span style="color:' + color + ';font-weight:600;">' + escapeHtml(msg) + '</span>';
   if(info.claims && info.claims.length){
     html += '<br><span style="color:#B45309;">근거를 단정하는 말: ' + info.claims.map(function(w){ return '「' + escapeHtml(w) + '」'; }).join(' ') +
@@ -43362,16 +43533,98 @@ function applySheetBlogEdits_(content){
   return content;
 }
 
+function instaExtraFieldsHTML_(ig){
+  ig = ig || {};
+  function inp(id, val, ph){
+    return '<input type="text" class="sheet-edit" id="' + id + '" value="' + escapeHtml(val || '') + '" placeholder="' + escapeHtml(ph || '') + '" oninput="refreshContentLint_()" style="width:100%;box-sizing:border-box;">';
+  }
+  var fmt = ig.format === 'carousel' ? 'carousel' : 'single';
+  return '<div class="insta-extra-fields" style="margin-top:10px;">' +
+    '<div class="publish-field-help" style="margin:4px 0;font-weight:600;">게시 정보 (비워 둬도 돼요)</div>' +
+    '<label for="sheet-insta-posttime" style="font-size:12px;">게시 시간</label>' + inp('sheet-insta-posttime', ig.postTime, '예: 평일 19:30') +
+    '<label for="sheet-insta-format" style="font-size:12px;">형식</label>' +
+    '<select id="sheet-insta-format" class="sheet-edit"><option value="single"' + (fmt === 'single' ? ' selected' : '') + '>한 장</option><option value="carousel"' + (fmt === 'carousel' ? ' selected' : '') + '>캐러셀(여러 장)</option></select>' +
+    '<label for="sheet-insta-order" style="font-size:12px;">캐러셀 이미지 순서</label>' + inp('sheet-insta-order', ig.carouselOrder, '예: 1 썸네일 → 2 근거 이미지 → 3 동작 사진') +
+    '<label for="sheet-insta-cover" style="font-size:12px;">커버 파일명</label>' + inp('sheet-insta-cover', ig.coverFilename, '예: 261107_리얼무브먼트_스트레칭_thumb.png') +
+    '<div class="publish-field-help" style="margin:10px 0 4px;font-weight:600;">릴스</div>' +
+    '<label for="sheet-reel-caption" style="font-size:12px;">릴스 캡션</label>' +
+    '<textarea class="sheet-edit" id="sheet-reel-caption" rows="5" oninput="autoGrowTextarea_(this);refreshContentLint_()">' + escapeHtml(ig.reelCaption || '') + '</textarea>' +
+    '<div style="margin:4px 0;display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="img-tool-copy-btn" onclick="generateReelCaptionFromBlog_(this)">블로그로 릴스 캡션 만들기</button></div>' +
+    '<label for="sheet-reel-cover" style="font-size:12px;">릴스 커버 파일명</label>' + inp('sheet-reel-cover', ig.reelCoverFilename, '예: 261107_리얼무브먼트_스트레칭_cover.png') +
+    '</div>';
+}
+function contentLintHTML_(content){
+  if(!content) return '';
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
+  var ig = content.insta ? Object.assign({}, content.insta) : null;
+  var live = document.getElementById('sheet-insta-hook') ? readSheetInstaEdits_() : null;
+  if(ig && live) Object.assign(ig, live);
+  var issues = PlannerSyncRules.plannerLintContent({ catId: catId, blog: content.blog || null, insta: ig, threads: content.threads || null, expectedComments: 4 });
+  if(ig && ig.reelCaption){
+    PlannerSyncRules.plannerLintContent({ catId: catId, blog: { hook: ig.reelCaption } }).forEach(function(x){ x.channel = 'reel'; x.field = 'caption'; issues.push(x); });
+  }
+  if(!issues.length) return '<div style="font-size:12px;color:#047857;padding:6px 0;">자동 점검: 걸리는 곳이 없어요.</div>';
+  var chLabel = { blog: '블로그', insta: '인스타', threads: '쓰레드', reel: '릴스' };
+  return '<div style="font-size:12px;color:#B45309;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 10px;margin:8px 0;line-height:1.55;">' +
+    '<strong>자동 점검 ' + issues.length + '건</strong> (저장은 막지 않아요)<ul style="margin:4px 0 0 16px;padding:0;">' +
+    issues.slice(0, 12).map(function(x){ return '<li>' + escapeHtml((chLabel[x.channel] || x.channel) + ' · ' + x.field + ': ' + x.msg) + '</li>'; }).join('') +
+    '</ul></div>';
+}
+window.refreshContentLint_ = function(){
+  var box = document.getElementById('content-lint-box');
+  if(!box) return;
+  var content = getDraftContent_(state.selectedId);
+  if(content) box.innerHTML = contentLintHTML_(content);
+};
+window.generateReelCaptionFromBlog_ = async function(btn){
+  var content = getDraftContent_(state.selectedId);
+  if(!content || !content.blog){ setAppToast('확정된 블로그가 있어야 만들 수 있어요.', { duration: 3000, variant: 'err' }); return; }
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
+  var label = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '만드는 중…'; }
+  try {
+    var prompt =
+      getBasePrompt() + '\n\n' +
+      '아래 확정된 블로그를 바탕으로 릴스 캡션과 커버 파일명만 만드세요.\n' +
+      '- reelCaption: 2~4줄. 첫 줄은 상황으로 시작. 블로그에 없는 내용 추가 금지. URL·슬로건·CTA·이모지 금지. 해시태그 5개 이내(# 포함, 마지막 줄).\n' +
+      '- coverFilename: yymmdd_프로그램_핵심어_cover.png 형식, 공백 없이.\n\n' +
+      getContentRulesV2Text_(catId) + '\n\n' +
+      'JSON만: {"reelCaption":"...","coverFilename":"..."}\n\n' +
+      '[블로그 원문]\n' + buildBlogSourceText_(content.blog, catId);
+    var text = await callClaudePlanner_(prompt, { maxTokens: 900, timeoutMs: INSTA_BG_TIMEOUT_MS });
+    var parsed = parsePlannerAiJsonObject_(text) || {};
+    var cap = String(parsed.reelCaption || '').trim();
+    if(!cap) throw new Error('캡션이 비어 있어요');
+    var capEl = document.getElementById('sheet-reel-caption');
+    if(capEl){ capEl.value = cap; if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(capEl); }
+    var cvEl = document.getElementById('sheet-reel-cover');
+    if(cvEl && !cvEl.value.trim() && parsed.coverFilename) cvEl.value = String(parsed.coverFilename).trim();
+    window.refreshContentLint_();
+    setAppToast('릴스 캡션을 넣었어요. 확인 후 저장하세요.', { duration: 3000, variant: 'ok' });
+  } catch(e){
+    setAppToast('릴스 캡션을 만들지 못했어요: ' + (e && e.message || e), { duration: 3500, variant: 'err' });
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = label || '블로그로 릴스 캡션 만들기'; }
+  }
+};
+
 function readSheetInstaEdits_(){
   if(!document.getElementById('sheet-insta-hook')) return null;
   function v(id){ return sheetFieldText_(document.getElementById(id)); }
   var tags = parseHashtagInput_(v('sheet-insta-hashtags'));
-  return {
+  var out = {
     hook: v('sheet-insta-hook'),
     caption: v('sheet-insta-caption'),
     carousel: [],
     hashtags: tags
   };
+  // 새 칸(비어 있어도 됨). 화면에 있을 때만 읽어서 기존 카드 데이터를 건드리지 않는다.
+  [['sheet-insta-posttime','postTime'],['sheet-insta-format','format'],['sheet-insta-order','carouselOrder'],
+   ['sheet-insta-cover','coverFilename'],['sheet-reel-caption','reelCaption'],['sheet-reel-cover','reelCoverFilename']].forEach(function(pair){
+    var el = document.getElementById(pair[0]);
+    if(el) out[pair[1]] = sheetFieldText_(el);
+  });
+  return out;
 }
 
 function applySheetInstaEdits_(content){
@@ -43738,9 +43991,54 @@ function normalizeInstaBlock_(ig){
   if(!Array.isArray(ig.hashtags)) ig.hashtags = [];
   ig.hook = String(ig.hook || '').trim();
   ig.caption = String(ig.caption || '').trim();
+  ['postTime','format','carouselOrder','coverFilename','reelCaption','reelCoverFilename'].forEach(function(k){
+    if(ig[k] != null) ig[k] = String(ig[k]).trim();
+  });
   return ig;
 }
 
+/** 필드별 재생성 지시. 강사 교육 글(3~5번)은 클리닉 문진·지점·지역 태그 지시를 빼고 인스타·소식 규칙을 맞춘다. */
+function fieldInstrForCat_(meta, catId){
+  var base = String((meta && meta.instr) || '');
+  var id = parseInt(catId, 10);
+  if(!(id === 3 || id === 4 || id === 5) || !meta) return base;
+  var key = meta.block + '.' + (meta.__field || '');
+  if(key === 'insta.caption'){
+    return '강사 교육 글. hook 제외 500~750자, 빈 줄로 나눈 블록: 질문형 상황 1문장 → 원리 3문장 → 방법 두 가지(• 불릿, 방법 이름→동작→회원이 얻는 결과) → 손대기 전 확인 3가지 → 원리로 닫는 1문장. 슬로건·CTA·온라인 문진·지점 줄 금지. 존댓말.';
+  }
+  if(key === 'insta.hashtags'){
+    return '해시태그 9개 내외. 브랜드(리얼무브먼트, ReAl) → 주제 → 대상·분야 → 원리 → 과정 순. 지역 태그 금지.';
+  }
+  if(key === 'insta.hook'){
+    return '「[상황] 시 회원이 [현상]하는 건 테크닉 문제가 아닐 수 있습니다 🤲」 틀. 상황을 맨 앞에, 끝에 이모지 1개. 「기술」 대신 「테크닉」. 존댓말.';
+  }
+  if(key === 'news.cta'){
+    return '끝 행동 하나. 「프로필 링크/예약」 한 줄. URL·온라인 문진·지점 줄 금지.';
+  }
+  return base;
+}
+/** 인스타·쓰레드 생성 때 덧붙이는 채널별 규칙(P5·P6). Re:Al(5)은 훅 틀과 단계 구조까지, 다른 전문가 과정(3·4)은 클리닉 문구·지역 태그 제외만. */
+function getSnsV2SpecificRules_(catId, channel){
+  var id = parseInt(catId, 10);
+  var expert = (id === 3 || id === 4 || id === 5);
+  var lines = [];
+  if(expert) lines.push('[강사 교육 글] 온라인 문진·프로필 링크·지점 문구와 지역 태그(약수역운동·작전역운동 등)를 쓰지 않습니다.');
+  if(id === 5 && channel === 'insta'){
+    lines.push('[인스타 구조 — Re:Al]');
+    lines.push('- 훅: 「[상황] 시 회원이 [현상]하는 건 테크닉 문제가 아닐 수 있습니다 🤲」. 이모지는 훅 끝에 하나만.');
+    lines.push('- 캡션 블록 순서(빈 줄로 구분): 1) 질문형 상황 1문장(주어는 「회원이」, 「긴장」) 2) 원리 3문장(강사가 긴장한 채로 회원에게 접촉하면 → 그 긴장이 회원 근육에 저항 신호로 → 근방추 → 회원이 의도적으로 버티는 게 아니라 강사의 긴장 상태에 회원 몸이 먼저 반응) 3) 「강사가 힘을 빼는 방법은 두 가지입니다.」 + • 불릿 2개(방법 이름 → 구체 동작 2문장 → 회원이 얻는 결과 1문장, 불릿 사이 빈 줄) 4) 「손을 대기 전에 확인할 것은 셋입니다.」 3가지 + 해당 시 행동 1문장 5) 원리로 닫는 1문장.');
+    lines.push('- 원인 단어는 끝까지 「긴장/긴장 상태」. 슬로건·CTA·프로필 링크 문구를 넣지 않습니다(슬로건은 블로그에만).');
+    lines.push('- 해시태그 9개 내외: 브랜드(리얼무브먼트, ReAl) → 주제(패시브스트레칭) → 대상·분야(움직임지도, 강사교육, 움직임전문가) → 원리(스트레칭원리, 근방추) → 과정(움직임과정).');
+  }
+  if(id === 5 && channel === 'threads'){
+    lines.push('[쓰레드 구조 — Re:Al, 반말]');
+    lines.push('- 처음부터 끝까지 반말. 존댓말을 섞지 않습니다.');
+    lines.push('- body: 한 줄. 「[상황] 시 회원이 [현상]하는 이유, 테크닉의 문제일까?」 — 인스타 훅과 같은 상황·같은 용어. 해설 금지.');
+    lines.push('- comments: 정확히 4개. 1) 원리(근방추 + 강사가 긴장한 채로 접촉하면 회원 몸이 먼저 저항 신호로 받게 되는 것) 2) 방법1(호흡): 동작 → 회원이 얻는 결과까지 3) 방법2(체중): 방법 이름 먼저(「강사가 체중을 이용하는 방법,」) → 권유(~고려해봐) → 동작(뒷발→앞발, 팔은 연결만) 4) 자가 확인 3가지(「손 대기 전에 확인해.」).');
+    lines.push('- 슬로건·CTA·링크 없음.');
+  }
+  return lines.join('\n');
+}
 async function generateInstaFromBlog_(catId, blog, topic){
   var instaGuide = getCatPromptForGeneration_(catId, 'insta');
   var baseInfo = getBasePrompt();
@@ -43770,8 +44068,8 @@ async function generateInstaFromBlog_(catId, blog, topic){
           ? '지점 줄은 「작전역 2분 · 1:1 예약제」만.'
           : '지점 줄은 「약수역 3분 · 작전역 2분 · 1:1 예약제」.') +
         ' 저장·공유·팔로우·적신호 금지. hook 제외 180~380자\n'
-      : '- hook: 블로그 제목·후킹에서 **기억에 남는 한 줄** (이모지 1개 전후, 25자 내외 권장)\n' +
-        '- caption: 블로그·영상 범위의 시연 포인트 2~3개와 원리 한 줄. hook 제외 **200~400자**. 없는 성과·사례·숫자 금지\n') +
+      : '- hook: 「[상황] 시 회원이 [현상]하는 건 테크닉 문제가 아닐 수 있습니다 🤲」 틀. 상황을 맨 앞에, 끝에 이모지 1개. 「기술」은 「테크닉」으로 통일\n' +
+        '- caption: hook 제외 **500~750자**. 블로그·영상 범위 안에서 새 주장 없이. 없는 성과·사례·숫자 금지\n') +
     '- 입력·블로그·메모에 없는 일화·회원 사례·숫자·「오늘 세션에서 물어봤어요」 장면을 만들지 마세요\n' +
     '- 과정·철학·통념 뒤집기는 인스타가 아니라 쓰레드용 — 인스타는 **결과·장면**에 집중\n' +
     '- 블로그 700자대 본문·목차 전체 나열 금지. 읽고 나서도 떠오르는 **한 가지 메시지**에 집중\n' +
@@ -43781,8 +44079,9 @@ async function generateInstaFromBlog_(catId, blog, topic){
       ? (parseInt(catId, 10) === 2
         ? '- hashtags: 6~8개 (# 없이). 지역 태그는 작전역운동 등 인천. 약수역 태그는 넣지 마세요.\n\n'
         : '- hashtags: 6~8개 (# 없이). 지역 태그 약수역운동, 작전역운동을 포함하세요.\n\n')
-      : '- hashtags: 8~10개 (# 없이)\n\n') +
-    'JSON만:\n{"insta":{"hook":"...","caption":"...","carousel":[],"hashtags":["t1","t2"]}}\n\n' +
+      : '- hashtags: **9개 내외** (JSON에는 # 없이, 화면에서 #이 붙습니다). 브랜드 → 주제 → 대상·분야 → 원리 → 과정 순. 지역 태그는 넣지 않습니다\n- postTime: 추천 게시 시각 1개(KST, 예: 평일 19:30)\n\n') +
+    getContentRulesV2Text_(catId) + '\n' + getSnsV2SpecificRules_(catId, 'insta') + '\n\n' +
+    'JSON만:\n{"insta":{"hook":"...","caption":"...","carousel":[],"hashtags":["t1","t2"],"postTime":"..."}}\n\n' +
     '[블로그 원문]\n' + buildBlogSourceText_(blog, catId);
 
   var text = await callClaudePlanner_(prompt, { maxTokens: 2200, timeoutMs: INSTA_BG_TIMEOUT_MS });
@@ -45818,9 +46117,11 @@ JSON만 응답:
 "title": "${flowJsonTitleHint_(draft, '무엇이 끝이 아닌지 한 줄 (35자 내외). 목적어가 안 열리는 표현 금지')}",
 "hook": "끝이 아니라는 점과, 누가 어디서 멈추는지 2~3문장. 자막 조각·제작 과정 금지",
 "outline": ["읽을 항목을 한 줄에 하나. 각 줄은 완전한 문장","위·아래·왼쪽·오른쪽·모양·방향을 묶지 말 것"],
-"draft": "650~1,000자. 거기서 멈추면 어떤 정보가 빠지는지. 테크닉형은 원리·현장 적용, 연수 후기형은 실제 질문·역할의 경계. 참고·영상·사진 범위 안만. hook과 같은 문장 반복 금지",
-"cta": "수강·등록 유도 금지. 가벼운 마무리",
-"hashtags": ["태그1","태그2","태그3"]
+"draft": "원리 설명(본문 중심). 현장 장면 → 원리(근거, 완화 어미) → 방법 1·방법 2(구체 장면) → 손대기 전 자가 확인 3가지 → 과정 단계 연결. 본문 전체 약 1,900자. 참고·영상·사진 범위 안만. outline을 다시 풀지 말 것",
+"cta": "마무리: 대구형 결론 1문장 + 고정 슬로건. 수강·등록 유도·URL 금지",
+"references": "본문에 실제 쓴 근거 2~4개. 한 줄에 하나: 저자 (연도). 제목. 저널. 링크·DOI 금지. 근거가 없으면 빈 문자열",
+"evidenceFlags": ["근거보다 강한 표현이 남은 문장(없으면 빈 배열)"],
+"hashtags": ["태그1","태그2","태그3","태그4","태그5"]
 },
 ${expertImgJsonTail}
 }
@@ -45989,9 +46290,14 @@ window.genContent = async function(ev){
       DEFAULT_NEWS_CHANNELS_PROMPT,
       '',
       blogSrc ? ('[참고 블로그 초안 — 같은 소재를 소식용으로 압축·변형]\n' + blogSrc + '\n') : '',
-      (parseInt(catId, 10) === 2)
-        ? '리얼페이스 소식은 인천만. 약수역·약수 일정을 넣지 마세요.'
-        : '약수 소식은 약수역 3분, 인천 소식은 작전역 2분. 끝 행동은 하나.',
+      isExpertCourseCategory(parseInt(catId, 10))
+        ? '강사 교육 소식입니다. 클리닉 온라인 문진·증상 문구·지점 줄을 쓰지 마세요. 원데이 모집이면 일정·장소·정원을 먼저 쓰고, 끝 행동은 「프로필 링크/예약」 한 줄(URL 없음).'
+        : ((parseInt(catId, 10) === 2)
+          ? '리얼페이스 소식은 인천만. 약수역·약수 일정을 넣지 마세요.'
+          : '약수 소식은 약수역 3분, 인천 소식은 작전역 2분. 끝 행동은 하나.'),
+      '',
+      getContentRulesV2Text_(catId),
+      '네이버 태그는 특수문자를 제거합니다. 소식은 title 1줄 + body 3~5문장(문제 → 방법 두 가지 요약 → 과정 연결) + cta 1줄입니다.',
       'JSON만 출력:',
       '{',
       '  "news": {',

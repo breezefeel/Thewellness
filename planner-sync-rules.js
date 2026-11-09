@@ -1103,8 +1103,55 @@ var PlannerSyncRules = (function(){
     return issues;
   }
 
+  // 카드를 열거나 탭만 바꾼 경우에는 저장하지 않는다. 칸을 직접 고쳤고 내용이 달라질 때만 저장한다.
+  function plannerShouldPersistView(opts){
+    opts = opts || {};
+    if(!opts.userEdited) return false;
+    if(!opts.afterFp) return true;
+    if(!opts.beforeFp) return true;
+    return opts.beforeFp !== opts.afterFp;
+  }
+
+  function plannerSuggestKeywordLines(text){
+    var raw = String(text || '').replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim();
+    if(!raw) return [];
+    var lines = raw.split(/\r?\n/).map(function(line){
+      return line.replace(/^\s*(?:[-*•·]|\d+\s*[.)])\s*/, '').replace(/^["“「]|["”」]$/g, '').trim();
+    }).filter(function(line){
+      return line && !/^(?:아래|다음|제안|아이디어|키워드)\b.*[:：]$/.test(line);
+    });
+    if(lines.length === 1 && /[·|/]/.test(lines[0])){
+      var parts = lines[0].split(/\s*[·|/]\s*/).map(function(part){ return part.trim(); }).filter(Boolean);
+      if(parts.length > 1) lines = parts;
+    }
+    return lines.slice(0, 5);
+  }
+
+  function plannerLayoutFileListed(names){
+    var i;
+    for(i = 0; i < (names || []).length; i++){
+      if(String(names[i] || '') === '_layout.json') return true;
+    }
+    return false;
+  }
+
+  function plannerExplicitPublishText(item){
+    if(!item || typeof item !== 'object') return '';
+    return String(item.finalText || '').trim();
+  }
+
+  function plannerConnectionDropped(message){
+    var msg = String(message || '');
+    return /연결이 닫|연결 닫|Failed to fetch|NetworkError|Load failed|ERR_CONNECTION|ECONNRESET|network error|The network connection was lost/i.test(msg);
+  }
+
   return {
     plannerIsAuthFailure: plannerIsAuthFailure,
+    plannerShouldPersistView: plannerShouldPersistView,
+    plannerSuggestKeywordLines: plannerSuggestKeywordLines,
+    plannerLayoutFileListed: plannerLayoutFileListed,
+    plannerExplicitPublishText: plannerExplicitPublishText,
+    plannerConnectionDropped: plannerConnectionDropped,
     plannerNextMutation: plannerNextMutation,
     plannerFilterAckedOutbox: plannerFilterAckedOutbox,
     plannerNormalizeSyncJournal: plannerNormalizeSyncJournal,

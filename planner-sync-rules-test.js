@@ -544,6 +544,69 @@ var clean = R.plannerLintContent({ catId: 5, insta: { hook: '스트레칭 시 �
 assert(clean.length === 0, 'clean content has no issues (got ' + JSON.stringify(clean) + ')');
 assert(R.plannerLintContent({ catId: 0, blog: { draft: '회원이 아파요' } }).some(function(i){ return i.code === 'honorific'; }), 'CMT/도수 flags 회원');
 
+// 카드 정보 날짜·제목: 새로고침(서버 행 → 목록 카드)에서 빠지지 않는다.
+var metaTarget = R.plannerKeepDraftCardMeta({ id: 'd5-c1794226751677' }, { dateOverride: '2026-11-10', topicLocked: true });
+assert(metaTarget.dateOverride === '2026-11-10', 'dateOverride survives the server row merge');
+assert(metaTarget.topicLocked === true, 'topicLocked survives the server row merge');
+assert(R.plannerKeepDraftCardMeta({ dateOverride: '2026-11-10' }, { dateOverride: 'x' }).dateOverride === undefined, 'bad dateOverride from the server is dropped');
+assert(R.plannerAutoTitleMayRenameCard({ topic: '힘 적게 쓰는 패시브 스트레칭', topicLocked: true }, '하루 안에 패시브 스트레칭 순서를 다시 잡는 자리') === false, 'generated blog title does not rename a locked card');
+assert(R.plannerAutoTitleMayRenameCard({ topic: '옛 제목' }, '새 블로그 제목') === true, 'unlocked card still follows the blog title');
+assert(R.plannerAutoTitleMayRenameCard({ topic: '', topicLocked: true }, '새 제목') === true, 'empty locked title can be filled');
+
+function extractFn(src, name){
+  var start = src.indexOf('function ' + name + '(');
+  if(start < 0) throw new Error('missing ' + name);
+  var i = src.indexOf('{', start), depth = 0;
+  for(; i < src.length; i++){
+    var ch = src[i];
+    if(ch === '{') depth++;
+    else if(ch === '}'){ depth--; if(depth === 0) return src.slice(start, i + 1); }
+  }
+  throw new Error('unbalanced ' + name);
+}
+var rtCtx = {
+  PlannerSyncRules: R,
+  CATEGORIES: [],
+  state: { deletedDraftIds: {} },
+  imageSigFromValue_: function(){ return ''; },
+  applyResolvedUserAddedStepOrMisc_: function(){},
+  purgeDeletedDraftsFromCatalog_: function(){},
+  ensureSyncedContentDraftCards_: function(){}
+};
+for(var ci = 0; ci < 8; ci++) rtCtx.CATEGORIES.push({ drafts: [] });
+vm.createContext(rtCtx);
+['isUserAddedDraftId_', 'userAddedDraftTimestamp_', 'normalizeDraftRowForSync_', 'collectExtraDrafts', 'mergeExtraDrafts'].forEach(function(n){
+  vm.runInContext(extractFn(plannerSrc, n), rtCtx);
+});
+rtCtx.CATEGORIES[5].drafts.push({ id: 'd5-c1794226751677', topic: '힘 적게 쓰는 패시브 스트레칭', topicLocked: true, createdAt: '2026-11-09T03:00:00.000Z', dateOverride: '2026-11-10', roadmapStepId: 's1' });
+rtCtx.CATEGORIES[7].drafts.push({ id: 'd7-c1794227530433', topic: '추워지면 왜 몸이 더 뻐근할까요?', createdAt: '2026-11-09T04:00:00.000Z', dateOverride: '2026-11-11', roadmapStepId: 's1' });
+var saved = JSON.parse(JSON.stringify(vm.runInContext('collectExtraDrafts()', rtCtx)));
+assert(saved[5][0].dateOverride === '2026-11-10' && saved[5][0].topicLocked === true, 'saved row keeps dateOverride and topicLocked');
+rtCtx.CATEGORIES.forEach(function(c){ c.drafts = []; });
+rtCtx.__saved = saved;
+vm.runInContext('mergeExtraDrafts(__saved)', rtCtx);
+var back5 = rtCtx.CATEGORIES[5].drafts[0];
+var back7 = rtCtx.CATEGORIES[7].drafts[0];
+assert(back5 && back5.dateOverride === '2026-11-10', 'reload keeps 11/10 on d5 (got ' + (back5 && back5.dateOverride) + ')');
+assert(back5 && back5.topicLocked === true && back5.topic === '힘 적게 쓰는 패시브 스트레칭', 'reload keeps the locked card title');
+assert(back7 && back7.dateOverride === '2026-11-11', 'reload keeps 11/11 on d7');
+assert(back5 && R.plannerDraftListDate(back5).label === '11.10.', 'list date after reload is 11.10. (got ' + (back5 && R.plannerDraftListDate(back5).label) + ')');
+assert(back7 && !back7.topicLocked, 'cards never edited in 카드 정보 stay unlocked');
+assert(/draft\.topicLocked = true;\n    if\(ymd\) draft\.dateOverride/.test(plannerSrc), 'card info editor locks the title it saves');
+assert((plannerSrc.match(/syncDraftTopicFromTitle_\([^)]*auto: true \}\)/g) || []).length === 4, 'blog/community title auto paths pass auto: true');
+
+assert(R.plannerKeepDraftCardMeta({}, { dateOverride: null }).dateOverride === undefined, 'null dateOverride written by an old patch loads as no override');
+// 새로고침 뒤 본문만 저장해도 draft 행 패치에 dateOverride 삭제가 실리지 않는다.
+var fsCtx = {};
+vm.createContext(fsCtx);
+vm.runInContext(fs.readFileSync(path.join(__dirname, 'planner-field-sync.js'), 'utf8') + ';this.F = PlannerFieldSync;', fsCtx);
+var serverDraftRow = { catId: '5', value: saved[5][0] };
+var reloadedRow = { catId: '5', value: JSON.parse(JSON.stringify(vm.runInContext('collectExtraDrafts()', rtCtx)))[5][0] };
+reloadedRow.value.activityAt = '2026-11-09T13:00:00.000Z';
+var draftPlan = fsCtx.F.planOutboxSend(serverDraftRow, reloadedRow, 'draft:d5-c1794226751677', null);
+var draftPaths = (draftPlan.fieldPatch && draftPlan.fieldPatch.paths) || [];
+assert(draftPaths.indexOf('value.dateOverride') < 0, 'body save after reload does not patch dateOverride away (paths ' + draftPaths.join(',') + ')');
+
 if(failed){
   console.error(failed + ' assertion(s) failed');
   process.exit(1);

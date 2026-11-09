@@ -17327,7 +17327,7 @@ function normalizeDraftRowForSync_(draft){
   if(!draft || typeof draft !== 'object') return draft;
   var row = {};
   ['id','topic','angle','series','step','pillar','rationale','writingBrief','roadmapStepId','reviewHold','programCatId',
-    'shareMonth','createdAt','dateOverride','sourceNote','collab','youtubeAnalysis','updatedAt','activityAt','publishedChannels','dailyShareKind',
+    'shareMonth','createdAt','dateOverride','topicLocked','sourceNote','collab','youtubeAnalysis','updatedAt','activityAt','publishedChannels','dailyShareKind',
     'dailyThought','dailyWho','dailyWhat','dailyBody','articleKind','previousRoadmapStepId',
     'previousSeries','miscLocked','importDrawerSettled','drawerUserPlaced','articleFlow'].forEach(function(k){
     var v = draft[k];
@@ -24205,6 +24205,7 @@ function collectExtraDrafts(){
         shareMonth: d.shareMonth,
         createdAt: d.createdAt,
         dateOverride: d.dateOverride,
+        topicLocked: d.topicLocked ? true : undefined,
         activityAt: d.activityAt || '',
         publishedChannels: d.publishedChannels || [],
         sourceNote: d.sourceNote,
@@ -24259,6 +24260,13 @@ function mergeExtraDrafts(byCat){
         previousSeries: d.previousSeries || ''
       });
       var merged = cat.drafts[cat.drafts.length - 1];
+      // 카드 정보에서 정한 날짜·제목 고정이 새로고침 때 빠지면 날짜가 생성일로 돌아간다.
+      if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerKeepDraftCardMeta){
+        PlannerSyncRules.plannerKeepDraftCardMeta(merged, d);
+      } else {
+        if(d.dateOverride) merged.dateOverride = d.dateOverride;
+        if(d.topicLocked) merged.topicLocked = true;
+      }
       if(d.dailyShareKind) merged.dailyShareKind = d.dailyShareKind;
       if(d.dailyThought) merged.dailyThought = d.dailyThought;
       if(d.dailyWho) merged.dailyWho = d.dailyWho;
@@ -42668,7 +42676,7 @@ window.regenSheetField_ = async function(key, btn){
     if(meta.threadNorm){ content.thread = normalizeThreadBlock(block) || block; }
     if(key === 'blog.title' || key === 'community.title'){
       syncThumbnailOverlayHook_(content, catId);
-      syncDraftTopicFromTitle_(block[meta.__field], { draftId: draftId, save: false });
+      syncDraftTopicFromTitle_(block[meta.__field], { draftId: draftId, save: false, auto: true });
     }
     persistDraftContent_(draftId, content);
     renderSheetContent(content);
@@ -42768,7 +42776,7 @@ window.polishSheetField_ = async function(key, btn){
     if(meta.threadNorm){ content.thread = normalizeThreadBlock(block) || block; }
     if(key === 'blog.title' || key === 'community.title'){
       syncThumbnailOverlayHook_(content, catId);
-      syncDraftTopicFromTitle_(block[meta.__field], { draftId: draftId, save: false });
+      syncDraftTopicFromTitle_(block[meta.__field], { draftId: draftId, save: false, auto: true });
     }
     persistDraftContent_(draftId, content);
     renderSheetContent(content, { scrollFieldId: ta && ta.id });
@@ -43122,6 +43130,8 @@ window.openDraftInfoEditor_ = function(){
     if(!title){ if(typeof setAppToast === 'function') setAppToast('제목을 입력해 주세요.', { duration: 2500, variant: 'err' }); return; }
     if(ymd && !/^\d{4}-\d{2}-\d{2}$/.test(ymd)){ if(typeof setAppToast === 'function') setAppToast('날짜 형식이 맞지 않아요.', { duration: 2500, variant: 'err' }); return; }
     syncDraftTopicFromTitle_(title, { draftId: draftId, save: false });
+    // 여기서 정한 제목은 나중 생성·새로고침의 블로그 제목으로 바뀌지 않게 고정한다.
+    draft.topicLocked = true;
     if(ymd) draft.dateOverride = ymd; else delete draft.dateOverride;
     if(note.trim()) draft.sourceNote = note; else delete draft.sourceNote;
     stampDraftActivity_(draft);
@@ -43503,6 +43513,8 @@ function syncDraftTopicFromTitle_(title, opts){
   if(!next) return false;
   var draft = findDraftByIdAnywhere_(draftId);
   if(!draft) return false;
+  if(opts.auto && typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerAutoTitleMayRenameCard &&
+     !PlannerSyncRules.plannerAutoTitleMayRenameCard(draft, next)) return false;
   var prev = String(draft.topic || '').trim();
   var titleEl = document.getElementById('sheet-title');
   if(titleEl) titleEl.textContent = next;
@@ -43577,7 +43589,7 @@ function applySheetBlogEdits_(content){
   if(nextTitle && nextTitle !== prevTitle){
     var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
     syncThumbnailOverlayHook_(content, catId);
-    syncDraftTopicFromTitle_(nextTitle, { save: false });
+    syncDraftTopicFromTitle_(nextTitle, { save: false, auto: true });
   }
   var reelEl = document.getElementById('sheet-reel-caption');
   if(reelEl){
@@ -43880,7 +43892,7 @@ function applySheetCommunityEdits_(content){
   if(nextTitle && nextTitle !== prevTitle){
     var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
     syncThumbnailOverlayHook_(content, catId);
-    syncDraftTopicFromTitle_(nextTitle, { save: false });
+    syncDraftTopicFromTitle_(nextTitle, { save: false, auto: true });
   }
   return content;
 }

@@ -9,6 +9,27 @@ vm.runInContext(fs.readFileSync(file, 'utf8'), context);
 var R = context.PlannerSyncRules;
 var failed = 0;
 
+assert(R.plannerShouldPersistView({ userEdited: false, beforeFp: 'a', afterFp: 'b' }) === false, 'opening or switching tabs does not persist');
+assert(R.plannerShouldPersistView({ userEdited: true, beforeFp: 'a', afterFp: 'a' }) === false, 'same text after an edit does not persist');
+assert(R.plannerShouldPersistView({ userEdited: true, beforeFp: 'a', afterFp: 'b' }) === true, 'a real edit persists');
+assert(R.plannerSuggestKeywordLines('1. 목\n2. 어깨').length === 2, 'partial suggestions are kept');
+assert(R.plannerSuggestKeywordLines('').length === 0, 'empty suggestion is empty');
+assert(R.plannerSuggestKeywordLines('목 · 어깨 · 허리').length === 3, 'one-line suggestions split');
+assert(R.plannerLayoutFileListed(['a.jpg']) === false, 'missing layout file is not downloaded');
+assert(R.plannerLayoutFileListed(['_layout.json', 'a.jpg']) === true, 'listed layout file can be read');
+assert(R.plannerExplicitPublishText({ generated: '긴 초안 본문입니다', finalText: '' }) === '', 'generated text is not a publish mark');
+assert(R.plannerExplicitPublishText({ finalText: '사용자가 발행한 글' }) === '사용자가 발행한 글', 'explicit final text is a publish mark');
+assert(R.plannerConnectionDropped('스크립트 엔드포인트 연결 닫힘') === true, 'closed endpoint is a connection drop');
+assert(R.plannerConnectionDropped('저장했습니다') === false, 'a normal message is not a connection drop');
+
+var plannerSrc = fs.readFileSync(path.join(__dirname, 'planner.js'), 'utf8');
+var socialSrc = fs.readFileSync(path.join(__dirname, 'planner-social.js'), 'utf8');
+assert(plannerSrc.indexOf('if(state.activeTab !== t && state._sheetUserEdited)') >= 0, 'tab change saves only after an edit');
+assert(plannerSrc.indexOf('if(beforeLen > afterLen) persistDraftContent_') < 0, 'opening a card does not persist image normalization');
+assert(plannerSrc.indexOf('state._newItemKeepKeys = { topic: true }') >= 0, 'suggestions are not flushed away');
+assert(socialSrc.indexOf('hasLayout ? readLayout') >= 0, 'missing layout file is not requested');
+assert(socialSrc.indexOf("commitSheetTabPublish_(r.draft_id") < 0, 'a cloud post does not mark 발행완료 by itself');
+
 function assert(cond, msg){
   if(cond) return;
   failed++;

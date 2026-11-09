@@ -100,12 +100,16 @@ var PlannerSocial = (function(){
     return client().then(function(sb){
       return sb.storage.from(BUCKET).list(folder(draftId), { limit: 100, sortBy: { column: 'name', order: 'asc' } }).then(function(res){
         if(res.error) throw new Error(res.error.message);
-        var files = (res.data || []).filter(function(f){ return f && isMediaFileName(f.name); }).map(function(f){
+        var listed = res.data || [];
+        var hasLayout = typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerLayoutFileListed
+          ? PlannerSyncRules.plannerLayoutFileListed(listed.map(function(f){ return f && f.name; }))
+          : listed.some(function(f){ return f && f.name === '_layout.json'; });
+        var files = listed.filter(function(f){ return f && isMediaFileName(f.name); }).map(function(f){
           var path = folder(draftId) + '/' + f.name;
           return { name: f.name, path: path, url: sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl,
             type: isVideoName(f.name, f.metadata && f.metadata.mimetype) ? 'VIDEO' : 'IMAGE', cover: false, thumb: false };
         });
-        return readLayout(sb, draftId).then(function(layout){
+        return (hasLayout ? readLayout(sb, draftId) : Promise.resolve(null)).then(function(layout){
           layoutCache[draftId] = layout;
           var list = orderMedia(files, layout);
           cache[draftId] = list;
@@ -694,29 +698,9 @@ var PlannerSocial = (function(){
       '<button type="button" class="btn-pub" data-social-btn onclick="PlannerSocial.publishNow(\'' + platform + '\')">지금 올리기</button>';
   }
 
-  /** 예약 게시가 클라우드에서 올라간 뒤 → 플래너 발행 기록(tabPublished)에 반영 (기기마다 열 때 한 번) */
+  /** 예약 시각만 맞춘다. 발행완료는 사용자가 「직접 올림」을 눌렀을 때만 바꾼다. */
   function syncPublished(){
     if(typeof PlannerSyncSupabase === 'undefined' || !PlannerSyncSupabase.configured()) return;
-    var since = new Date(Date.now() - 30 * 86400000).toISOString();
-    PlannerSyncSupabase.client().then(function(sb){
-      return sb.from('social_posts').select('draft_id,cat_id,platform,published_at').eq('status', 'published').gte('published_at', since).limit(200);
-    }).then(function(res){
-      var changed = 0;
-      ((res && res.data) || []).forEach(function(r){
-        if(!r.draft_id) return;
-        var key = r.platform === 'instagram' ? 'insta' : 'threads';
-        var pub = state.published && state.published[r.draft_id];
-        if(pub && pub.tabPublished && pub.tabPublished[key]) return;
-        try {
-          commitSheetTabPublish_(r.draft_id, r.cat_id != null ? r.cat_id : getCatIdFromDraftId_(r.draft_id), key, { skipDom: true, at: r.published_at });
-          changed++;
-        } catch(e){}
-      });
-      if(changed){
-        try { renderTabs(); renderMain(); } catch(e2){}
-        toast('예약으로 올라간 게시물 ' + changed + '건을 발행완료로 표시했어요.', 'ok', 3500);
-      }
-    }).catch(function(){});
     PlannerSyncSupabase.client().then(function(sb){
       return sb.from('social_posts').select('id,draft_id,cat_id,platform,scheduled_at,topic').eq('status', 'scheduled').gte('scheduled_at', new Date().toISOString()).limit(200);
     }).then(function(res){

@@ -12987,9 +12987,18 @@ function notifyPlannerSyncIssue_(err, opts){
   opts = opts || {};
   if(typeof setAppToast !== 'function') return;
   var now = Date.now();
-  if(!opts.force && (now - _lastSyncFailToastAt_) < SYNC_FAIL_TOAST_COOLDOWN_MS_) return;
-  _lastSyncFailToastAt_ = now;
   var msg = String((err && err.message) || err || '').trim();
+  var dropped = !!(opts.connectionDrop || (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConnectionDropped(msg)));
+  if(!opts.force && !dropped && (now - _lastSyncFailToastAt_) < SYNC_FAIL_TOAST_COOLDOWN_MS_) return;
+  _lastSyncFailToastAt_ = now;
+  if(dropped){
+    setAppToast(
+      '서버 연결이 끊겼어요.\n' + (msg || '엔드포인트 연결이 닫혔습니다.') +
+        '\n이 내용을 서버 위에 덮어쓰지 않습니다. 직접 고친 글은 이 기기에 남아 있습니다.',
+      { duration: 7000, variant: 'err' }
+    );
+    return;
+  }
   var slow = isSyncTimeoutOrSlowError_(err);
   if(slow){
     setAppToast(
@@ -16540,8 +16549,10 @@ function isBackgroundSyncReason_(reason){
 
 function flushNewItemFieldsFromDom_(){
   if(!state || !state.newItem) return;
+  var keep = state._newItemKeepKeys || null;
   // 분석 중 disabled 칸은 화면이 옛 값이라, 메모리에 쌓인 분석 결과를 빈 칸으로 덮으면 안 된다.
   function take_(id, key){
+    if(keep && keep[key]) return;
     var el = document.getElementById(id);
     if(!el || el.disabled) return;
     state.newItem[key] = el.value;
@@ -16552,6 +16563,7 @@ function flushNewItemFieldsFromDom_(){
   take_('new-item-daily-who', 'dailyWho');
   take_('new-item-daily-what', 'dailyWhat');
   take_('new-item-daily-body', 'dailyBody');
+  if(keep) state._newItemKeepKeys = null;
 }
 function paintNewItemAnalysisFieldsToDom_(){
   if(!state || !state.newItem) return;
@@ -20156,12 +20168,16 @@ async function plannerGasPushNow_(){
     return { ok: true, revision: lastOkRevision, batches: round };
   } catch(err) {
     console.warn('[GAS push]', err);
+    var droppedConn = typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConnectionDropped(String((err && err.message) || err));
+    if(droppedConn && !state._explicitContentEdit) err.noRetry = true;
     var slow = isSyncTimeoutOrSlowError_(err);
-    plannerLastSyncError_ = slow
+    plannerLastSyncError_ = droppedConn
+      ? '서버 연결이 끊겨 덮어쓰지 않음'
+      : (slow
       ? '서버 응답이 지연되어 자동 재시도 중'
-      : String((err && err.message) || err);
+      : String((err && err.message) || err));
     if(!err.noRetry) schedulePlannerGasRetry_(err);
-    notifyPlannerSyncIssue_(err, { manual: false });
+    notifyPlannerSyncIssue_(err, { manual: false, connectionDrop: droppedConn });
     updateSyncStatusUI_();
     return { ok: false, error: err, slow: slow };
   } finally {
@@ -33417,14 +33433,17 @@ window.suggestNewItemKeywords_ = async function(){
   try {
     // 답이 중간에 잘리거나 한 줄에 여러 개가 오는 일이 있어 넉넉히 받고, 줄 수가 모자라도 있는 만큼 쓴다.
     var text = await callClaudePlanner_(prompt, { maxTokens: 1200 });
-    var lines = String(text || '').split(/\r?\n/).map(function(line){
-      return line.replace(/^\s*(?:[-*•·]|\d+\s*[.)])\s*/, '').replace(/^["“「]|["”」]$/g, '').trim();
-    }).filter(function(line){
-      return line && !/^(?:아래|다음|제안|아이디어|키워드)\b.*[:：]$/.test(line);
-    }).slice(0, 5);
-    if(!lines.length) throw new Error('제안을 받지 못했어요. 잠시 뒤 다시 눌러 주세요.');
-    var prevTopic = String(state.newItem.topic || '').trim();
+    var lines = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerSuggestKeywordLines)
+      ? PlannerSyncRules.plannerSuggestKeywordLines(text)
+      : [];
+    if(!lines.length){
+      var rawSuggest = String(text || '').trim();
+      throw new Error(rawSuggest
+        ? ('제안을 줄로 나누지 못했어요.\n' + rawSuggest.slice(0, 180))
+        : '제안을 받지 못했어요. 서버 응답이 비어 있습니다.');
+    }
     state.newItem.topic = lines.join('\n');
+    state._newItemKeepKeys = { topic: true };
     renderMain({ force: true });
     if(lines.length < 5 && typeof setAppToast === 'function'){
       setAppToast('제안이 ' + lines.length + '줄만 왔어요. 마음에 드는 줄만 남기거나 다시 눌러 주세요.', { duration: 4200, variant: 'ok' });
@@ -39788,7 +39807,7 @@ function renderTopicPhotoCard_(content){
   html += '<button type="button" class="img-tool-copy-btn" onclick="copyCommunityOrDailyImageSlot_(0, this)">프롬프트 복사</button>';
   html += '<button type="button" class="img-tool-copy-btn" onclick="rebuildTopicPhotoPrompt_()">프롬프트 재생성</button>';
   html += '</div></div>';
-  html += '<textarea class="sheet-edit" id="sheet-image-prompt-0" data-image-index="0" rows="8" oninput="autoGrowTextarea_(this);topicPhotoPromptEdited_(this)">' + escapeHtml(prompt) + '</textarea>';
+  html += '<textarea class="sheet-edit" id="sheet-image-prompt-0" data-image-index="0" rows="8" oninput="autoGrowTextarea_(this);markSheetUserEdited_();topicPhotoPromptEdited_(this)">' + escapeHtml(prompt) + '</textarea>';
   html += topicPhotoUserRefsHTML_();
   html += imageToolControlsHTML_();
   html += '<div id="topic-photo-preview" class="topic-photo-preview">' +
@@ -40872,17 +40891,15 @@ function openDetail(draftId, catId, tab, opts) {
   if(tab !== undefined && tab !== null && tab !== ''){
     state.activeTab = normalizeSheetTabForCategory_(tab, catId) || state.activeTab;
   }
+  state._sheetUserEdited = false;
   const content = getDraftContent_(draftId);
-  if(content && alignDraftTopicToBlogTitle_(draftId, content)){
-    try { save({ gasImmediate: true }); } catch(eTopic){}
-  }
   document.getElementById('sheet-title').textContent = stripClinicBlogTitlePrefix_(draft.topic);
   if(content){
-    var beforeLen = (content.images && content.images.gptVisuals) ? content.images.gptVisuals.length : 0;
-    normalizeContentImages_(content, catId);
-    var afterLen = (content.images && content.images.gptVisuals) ? content.images.gptVisuals.length : 0;
-    if(beforeLen > afterLen) persistDraftContent_(draftId, content);
-    renderSheetContent(content);
+    rememberDraftContentFp_(draftId, content);
+    var viewContent = content;
+    try { viewContent = JSON.parse(JSON.stringify(content)); } catch(eView){}
+    normalizeContentImages_(viewContent, catId);
+    renderSheetContent(viewContent);
   }
   else { renderSheetEmpty(draft, cat); }
   // 닫기 애니메이션 중 재오픈이면 예약된 unlock을 무효화
@@ -41019,6 +41036,7 @@ function renderSheetContent(content, opts) {
         sheetEditField_('참고 문헌', 'sheet-blog-references', b.references || '', { rows: 3, copy: true, help: '저자·연도·논문 제목·학술지만 한 줄에 하나. 링크 없음. 마무리 문장 뒤에 붙습니다.' }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         (isBranchBookingBlogCategory_(blogCatId) ? realMovementBlogFooterSheetHtml_(blogCatId) : expertCourseBlogFooterSheetHtml_(blogCatId)) +
+        reelCaptionSheetBlock_() +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>지금 올리기·예약하기</strong>는 글을 복사하고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙고, 버튼으로 날짜를 바꿀 수 있어요. <strong>수정된 블로그 최종본</strong>으로 인스타 캡션이 백그라운드에서 만들어져요.' +
         ((isBranchBookingBlogCategory_(blogCatId) || isExpertCourseCategory(blogCatId)) ? ' 하단 <strong>말미 링크</strong>는 고정으로 붙어요.' : '') + '</p>'
       );
@@ -41034,6 +41052,7 @@ function renderSheetContent(content, opts) {
         sheetEditField_('참고 문헌', 'sheet-blog-references', b.references || '', { rows: 3, copy: true, help: '저자·연도·논문 제목·학술지만 한 줄에 하나. 링크 없음. 마무리 문장 뒤에 붙습니다.' }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요 · 3~5개 권장', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         expertCourseBlogFooterSheetHtml_(blogCatId) +
+        reelCaptionSheetBlock_() +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>지금 올리기·예약하기</strong>는 저장·복사되고 글쓰기로 이동해요. 하단 <strong>말미 링크</strong>는 해당 과정 안내로 고정해서 붙어요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙습니다.</p>'
       );
     } else {
@@ -41047,6 +41066,7 @@ function renderSheetContent(content, opts) {
         sheetEditField_('마무리 CTA', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
         sheetEditField_('참고 문헌', 'sheet-blog-references', b.references || '', { rows: 3, copy: true, help: '저자·연도·논문 제목·학술지만 한 줄에 하나. 링크 없음. 마무리 문장 뒤에 붙습니다.' }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
+        reelCaptionSheetBlock_() +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>지금 올리기·예약하기</strong>는 블로그가 저장·복사되고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙습니다.</p>'
       );
     }
@@ -42168,7 +42188,7 @@ function sheetEditField_(label, id, value, opts){
     }
     tools += '</span>';
   }
-  var oninput = 'autoGrowTextarea_(this)' +
+  var oninput = 'autoGrowTextarea_(this);markSheetUserEdited_()' +
     (opts.regen ? ';onSheetFieldInput_(this)' : '') +
     (opts.stepPreview ? ';renderSelfCareStepsPreview_(this)' : '') +
     (opts.syncTopic ? ';onSheetTitleSyncTopic_(this)' : '');
@@ -43309,13 +43329,42 @@ function restoreCardRevision_(draftId, index){
   saveFocusedDraftChange_(draftId);
   if(typeof setAppToast === 'function') setAppToast('이전 버전으로 되돌렸습니다.', { duration: 3200, variant: 'ok' });
 }
-function persistDraftContent_(draftId, content){
+function markSheetUserEdited_(){
+  state._sheetUserEdited = true;
+}
+function rememberDraftContentFp_(draftId, content){
+  if(!draftId || !content || typeof PlannerFieldSync === 'undefined') return;
+  if(!state._draftContentFp) state._draftContentFp = {};
+  if(state._draftContentFp[draftId]) return;
+  var fp = PlannerFieldSync.historySnapshot(content).fp;
+  if(fp) state._draftContentFp[draftId] = fp;
+}
+function draftContentFp_(content){
+  if(!content || typeof PlannerFieldSync === 'undefined') return '';
+  return PlannerFieldSync.historySnapshot(content).fp || '';
+}
+function persistDraftContent_(draftId, content, opts){
+  opts = opts || {};
   flushSheetTitleBackgroundWork_({ save: false });
   var editedDraft = findDraftByIdAnywhere_(draftId);
-  var nextFp = content && typeof PlannerFieldSync !== 'undefined' ? PlannerFieldSync.historySnapshot(content).fp : '';
+  var nextFp = draftContentFp_(content);
+  if(!state._draftContentFp) state._draftContentFp = {};
+  var beforeFp = state._draftContentFp[draftId] || '';
+  var userEdited = !!(opts.userEdited || state._sheetUserEdited);
+  var shouldWrite = true;
+  if(opts.viewOnly) shouldWrite = false;
+  else if(userEdited && typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerShouldPersistView){
+    shouldWrite = PlannerSyncRules.plannerShouldPersistView({ userEdited: true, beforeFp: beforeFp, afterFp: nextFp });
+  }
+  if(!shouldWrite){
+    if(nextFp && !beforeFp) state._draftContentFp[draftId] = nextFp;
+    return;
+  }
+  if(nextFp) state._draftContentFp[draftId] = nextFp;
+  state._explicitContentEdit = true;
   var prevList = editedDraft ? cardRevisionList_(draftId) : [];
   var prevFp = prevList[0] && prevList[0].fp;
-  if(editedDraft && (!nextFp || !prevFp || nextFp !== prevFp)) stampDraftActivity_(editedDraft);
+  if(editedDraft && nextFp && nextFp !== prevFp) stampDraftActivity_(editedDraft);
   alignDraftTopicToBlogTitle_(draftId, content);
   if(!state.published[draftId]) state.published[draftId] = {};
   state.published[draftId].content = content;
@@ -43530,7 +43579,22 @@ function applySheetBlogEdits_(content){
     syncThumbnailOverlayHook_(content, catId);
     syncDraftTopicFromTitle_(nextTitle, { save: false });
   }
+  var reelEl = document.getElementById('sheet-reel-caption');
+  if(reelEl){
+    if(!content.insta || typeof content.insta !== 'object') content.insta = { hook: '', caption: '', carousel: [], hashtags: [] };
+    content.insta.reelCaption = sheetFieldText_(reelEl);
+  }
   return content;
+}
+
+function reelCaptionSheetBlock_(){
+  var content = null;
+  try { content = getDraftContent_(state.selectedId); } catch(eReel){}
+  var ig = (content && content.insta) || {};
+  return '<div class="cb"><div class="cb-label">릴스 캡션</div>' +
+    '<div class="publish-field-help" style="margin:4px 0 6px;">블로그 초안을 바탕으로 만들고, 이 칸에서 고칠 수 있어요.</div>' +
+    '<textarea class="sheet-edit" id="sheet-reel-caption" rows="5" oninput="autoGrowTextarea_(this);markSheetUserEdited_();refreshContentLint_()">' + escapeHtml(ig.reelCaption || '') + '</textarea>' +
+    '<div style="margin:4px 0;"><button type="button" class="img-tool-copy-btn" onclick="generateReelCaptionFromBlog_(this)">블로그로 릴스 캡션 만들기</button></div></div>';
 }
 
 function instaExtraFieldsHTML_(ig){
@@ -43548,7 +43612,7 @@ function instaExtraFieldsHTML_(ig){
     '<label for="sheet-insta-cover" style="font-size:12px;">커버 파일명</label>' + inp('sheet-insta-cover', ig.coverFilename, '예: 261107_리얼무브먼트_스트레칭_thumb.png') +
     '<div class="publish-field-help" style="margin:10px 0 4px;font-weight:600;">릴스</div>' +
     '<label for="sheet-reel-caption" style="font-size:12px;">릴스 캡션</label>' +
-    '<textarea class="sheet-edit" id="sheet-reel-caption" rows="5" oninput="autoGrowTextarea_(this);refreshContentLint_()">' + escapeHtml(ig.reelCaption || '') + '</textarea>' +
+    '<textarea class="sheet-edit" id="sheet-reel-caption" rows="5" oninput="autoGrowTextarea_(this);markSheetUserEdited_();refreshContentLint_()">' + escapeHtml(ig.reelCaption || '') + '</textarea>' +
     '<div style="margin:4px 0;display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="img-tool-copy-btn" onclick="generateReelCaptionFromBlog_(this)">블로그로 릴스 캡션 만들기</button></div>' +
     '<label for="sheet-reel-cover" style="font-size:12px;">릴스 커버 파일명</label>' + inp('sheet-reel-cover', ig.reelCoverFilename, '예: 261107_리얼무브먼트_스트레칭_cover.png') +
     '</div>';
@@ -43599,6 +43663,11 @@ window.generateReelCaptionFromBlog_ = async function(btn){
     if(capEl){ capEl.value = cap; if(typeof autoGrowTextarea_ === 'function') autoGrowTextarea_(capEl); }
     var cvEl = document.getElementById('sheet-reel-cover');
     if(cvEl && !cvEl.value.trim() && parsed.coverFilename) cvEl.value = String(parsed.coverFilename).trim();
+    if(!content.insta || typeof content.insta !== 'object') content.insta = { hook: '', caption: '', carousel: [], hashtags: [] };
+    content.insta.reelCaption = cap;
+    if(cvEl && cvEl.value) content.insta.reelCoverFilename = String(cvEl.value || '').trim();
+    markSheetUserEdited_();
+    try { persistDraftContent_(state.selectedId, content, { userEdited: true }); } catch(eReelSave){}
     window.refreshContentLint_();
     setAppToast('릴스 캡션을 넣었어요. 확인 후 저장하세요.', { duration: 3000, variant: 'ok' });
   } catch(e){
@@ -44561,13 +44630,14 @@ window.switchTab = function(t){
     if(t === 'community' || t === 'thread') t = 'blog';
     if(t !== 'blog' && t !== 'insta' && t !== 'threads' && t !== 'images' && t !== 'news') return;
   }
-  if(state.activeTab !== t){
+  if(state.activeTab !== t && state._sheetUserEdited){
     var c0 = getDraftContent_(state.selectedId);
     if(c0){
       applySheetEditsForTab_(c0, state.activeTab);
-      persistDraftContent_(state.selectedId, c0);
+      persistDraftContent_(state.selectedId, c0, { userEdited: true });
     }
   }
+  state._sheetUserEdited = false;
   state.activeTab = t;
   const content = getDraftContent_(state.selectedId);
   if(content) renderSheetContent(content);
@@ -44579,10 +44649,11 @@ window.switchTab = function(t){
 window.switchNewsChannel_ = function(ch){
   ch = normalizeNewsChannel_(ch);
   var content = getDraftContent_(state.selectedId);
-  if(content && state.activeTab === 'news'){
+  if(content && state.activeTab === 'news' && state._sheetUserEdited){
     applySheetNewsEdits_(content);
-    persistDraftContent_(state.selectedId, content);
+    persistDraftContent_(state.selectedId, content, { userEdited: true });
   }
+  state._sheetUserEdited = false;
   state.newsChannel = ch;
   if(content) renderSheetContent(content);
 };
@@ -44758,8 +44829,9 @@ function inferFinalTextsFromPromptData_(promptData){
   ['blog', 'insta', 'threads', 'image', 'community', 'thread'].forEach(function(key){
     var item = promptData[key];
     if(!item) return;
-    var val = String(item.finalText || '').trim();
-    if(!val) val = String(item.generated || '').trim();
+    var val = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerExplicitPublishText)
+      ? PlannerSyncRules.plannerExplicitPublishText(item)
+      : String(item.finalText || '').trim();
     if(val.length >= 10) out[key] = val;
   });
   return out;

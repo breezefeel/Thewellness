@@ -465,6 +465,25 @@ var PlannerSyncRules = (function(){
     return { label: label, edited: edited, ms: ms || 0 };
   }
 
+  // 서버·이 기기에서 받은 카드 행을 목록 카드에 옮길 때, 사용자가 카드 정보에서 정한 값을 빠뜨리지 않는다.
+  function plannerKeepDraftCardMeta(target, incoming){
+    if(!target || !incoming) return target;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(String(incoming.dateOverride || ''))) target.dateOverride = String(incoming.dateOverride);
+    else delete target.dateOverride;
+    if(incoming.topicLocked) target.topicLocked = true;
+    else delete target.topicLocked;
+    return target;
+  }
+
+  // 블로그·커뮤니티 제목이 자동으로 바뀔 때(생성·다듬기·저장) 카드 제목도 따라 바꿀지.
+  // 카드 정보에서 직접 정한 제목은 자동으로 바꾸지 않는다.
+  function plannerAutoTitleMayRenameCard(draft, nextTitle){
+    var next = String(nextTitle || '').trim();
+    if(!draft || !next) return false;
+    if(draft.topicLocked && String(draft.topic || '').trim()) return false;
+    return true;
+  }
+
   function plannerNoteDraftActivity(draft, iso){
     var next = {};
     Object.keys(draft || {}).forEach(function(key){ next[key] = draft[key]; });
@@ -1177,6 +1196,8 @@ var PlannerSyncRules = (function(){
     plannerDayKey: plannerDayKey,
     plannerMergePostEvents: plannerMergePostEvents,
     plannerNoteDraftActivity: plannerNoteDraftActivity,
+    plannerKeepDraftCardMeta: plannerKeepDraftCardMeta,
+    plannerAutoTitleMayRenameCard: plannerAutoTitleMayRenameCard,
     plannerDraftActivityDay: plannerDraftActivityDay,
     plannerAcceptedSentByKey: plannerAcceptedSentByKey,
     plannerTopicSlot: plannerTopicSlot,

@@ -14373,10 +14373,10 @@ const DEFAULT_CHATGPT_IMAGE_PROJECT_URL = 'https://www.mangoboard.net/aichat/des
 const DEFAULT_MANGO_DESIGNER_URL = 'https://www.mangoboard.net/aichat/designer';
 
 const COMMUNITY_FIXED_GREETING = `안녕하세요, 입주민 여러분 😊
-매주 한 번, 일상에서 바로 쓸 수 있는 건강 이야기 나눠드려요.`;
+일상에서 바로 쓸 수 있는 건강 이야기 나눠드려요.`;
 
 const COMMUNITY_FIXED_CLOSING = `궁금한 점은 언제든 편하게 문의해 주세요 😊
-힐자계 커뮤니티 힐링 센터`;
+커뮤니티 도서관 옆 · 1:1 예약제`;
 
 const DEFAULT_HEILJAGYAE_COMMUNITY_PROMPT = `힐스테이트 자이 계양 **아파트너(힐자계) 게시판**에 올라가는 글입니다.
 

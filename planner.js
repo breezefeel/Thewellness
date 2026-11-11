@@ -13601,7 +13601,12 @@ function getBlogStructureRulesText_(catId){
     lines.push('  · 본문에 과정 홍보를 넣지 않고, 결론을 반복하지 않습니다.');
     lines.push('  · 마무리(cta)는 짧은 슬로건 한 줄입니다.');
   }
-  lines.push('- 참고한 논문이 입력 메모에 있을 때만 blog.references에 한 줄씩(저자, 연도, 논문 제목, 학술지) 적습니다. 링크는 쓰지 않고, 없는 논문을 만들지 마세요. 앱이 마무리 문장 뒤·태그 앞에 붙입니다.');
+  if(isExpertCourseCategory(id)){
+    lines.push('- 검증된 근거 목록(API)이 있으면 그 목록에 있는 논문만 blog.references에 한 줄씩(저자 (연도). 제목. 저널.) 적습니다. 목록에 없는 논문을 지어내지 마세요. 링크·DOI는 쓰지 않습니다.');
+    lines.push('- 검증된 근거 목록이 비어 있으면 blog.references는 빈 문자열로 두세요. 없는 논문을 만들지 마세요.');
+  } else {
+    lines.push('- 참고한 논문이 입력 메모에 있을 때만 blog.references에 한 줄씩(저자, 연도, 논문 제목, 학술지) 적습니다. 링크는 쓰지 않고, 없는 논문을 만들지 마세요. 앱이 마무리 문장 뒤·태그 앞에 붙입니다.');
+  }
   lines.push('- 근거가 약한 내용은 표현을 부드럽게 쓰세요(「~할 수 있어요」「~로 보고돼요」). 「대부분」「반드시」「항상」「무조건」「누구나」 같은 단정은 쓰지 않습니다.');
   lines.push('- 「교정」이라는 말은 쓰지 마세요. 과정명·학회명(예: 국제얼굴교정학회, IFC 얼굴교정 과정)만 그대로 씁니다. 본문에서는 「바로잡기·정렬·균형」 같은 말로 바꿉니다.');
   if(id === 0 || id === 3){
@@ -13705,6 +13710,149 @@ function getNonClinicalTreatmentCopyRule_(){
 }
 /** CMT·IFC·Re:Al 움직임 과정 — 강연·영상 공유 톤 */
 function isExpertCourseCategory(catId){ return catId === 3 || catId === 4 || catId === 5; }
+
+function getDraftEvidenceList_(draft){
+  return (draft && Array.isArray(draft.evidenceList)) ? draft.evidenceList.filter(Boolean) : [];
+}
+function getDraftEvidenceCandidates_(draft){
+  return (draft && Array.isArray(draft.evidenceCandidates)) ? draft.evidenceCandidates.filter(Boolean) : [];
+}
+function escapeEvidenceAttr_(s){
+  return escapeHtml(String(s == null ? '' : s)).replace(/"/g, '&quot;');
+}
+function renderExpertEvidencePanelHTML_(draft, opts){
+  opts = opts || {};
+  if(!draft || !isExpertCourseCategory(opts.catId != null ? opts.catId : getCatIdFromDraftId_(draft.id))) return '';
+  var selected = getDraftEvidenceList_(draft);
+  var candidates = getDraftEvidenceCandidates_(draft);
+  var selectedIds = {};
+  selected.forEach(function(p){ if(p && p.id) selectedIds[p.id] = true; });
+  var rows = (candidates.length ? candidates : selected).map(function(p){
+    if(!p || !p.id) return '';
+    var checked = selectedIds[p.id] ? ' checked' : '';
+    var link = p.url ? (' <a href="' + escapeEvidenceAttr_(p.url) + '" target="_blank" rel="noopener noreferrer">원문</a>') : '';
+    return '<label class="evidence-candidate">' +
+      '<input type="checkbox" data-evidence-id="' + escapeEvidenceAttr_(p.id) + '" onchange="toggleEvidencePaper_(\'' + escapeEvidenceAttr_(p.id) + '\', this.checked)"' + checked + '>' +
+      '<span class="evidence-candidate-body">' +
+      '<strong>' + escapeHtml(p.citationLine || ((p.authors || '') + ' (' + (p.year || '') + '). ' + (p.title || ''))) + '</strong>' +
+      (p.abstractSummary ? ('<span class="evidence-abstract">' + escapeHtml(p.abstractSummary) + '</span>') : '') +
+      link +
+      '</span></label>';
+  }).join('');
+  return '<div class="evidence-panel" id="evidence-panel">' +
+    '<div class="evidence-panel-head">' +
+    '<div class="evidence-panel-title">근거 목록 <span>(' + selected.length + '편 선택)</span></div>' +
+    '<div class="evidence-panel-actions">' +
+    '<button type="button" class="img-tool-copy-btn" onclick="searchExpertEvidence_(this)">근거 찾기</button>' +
+    '<button type="button" class="img-tool-copy-btn" onclick="clearExpertEvidenceSelection_()">선택 비우기</button>' +
+    '</div></div>' +
+    '<p class="evidence-panel-help">주제·영상 맥락으로 PubMed/OpenAlex 공개 API에서 후보를 가져옵니다. 체크한 논문만 저장되며, 참고 문헌에는 API로 확인된 서지만 들어갑니다.</p>' +
+    (rows ? ('<div class="evidence-candidate-list">' + rows + '</div>') : '<p class="evidence-empty">아직 후보가 없어요. 「근거 찾기」를 눌러 주세요.</p>') +
+    '</div>';
+}
+
+window.searchExpertEvidence_ = async function(btn){
+  var draftId = state.selectedId;
+  var draft = draftId && findDraftByIdAnywhere_(draftId);
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  if(!draft || !isExpertCourseCategory(catId)){
+    setAppToast('전문가 과정 카드에서만 근거를 찾을 수 있어요.', { duration: 3200, variant: 'err' });
+    return;
+  }
+  if(typeof PlannerEvidence === 'undefined'){
+    setAppToast('근거 검색 모듈을 불러오지 못했어요.', { duration: 3500, variant: 'err' });
+    return;
+  }
+  var content = getDraftContent_(draftId);
+  var hook = '';
+  try {
+    if(content && content.blog) hook = content.blog.hook || '';
+    var hookEl = document.getElementById('sheet-blog-hook');
+    if(hookEl) hook = hookEl.value || hook;
+  } catch(eHook){}
+  var label = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '찾는 중…'; }
+  try {
+    var gasSearch = null;
+    if(typeof plannerGasJsonRequest_ === 'function' && getPlannerGasUrl_() && location.protocol !== 'file:'){
+      gasSearch = async function(q){
+        var data = await plannerGasJsonRequest_({ action: 'plannerSearchEvidence', query: q }, 25000);
+        if(data && data.result === 'success' && Array.isArray(data.papers)) return data.papers;
+        return [];
+      };
+    }
+    var papers = await PlannerEvidence.searchPapers(draft.topic, { topic: draft.topic, hook: hook, gasSearch: gasSearch, limit: 10 });
+    draft.evidenceCandidates = papers;
+    if(!Array.isArray(draft.evidenceList)) draft.evidenceList = [];
+    // 이미 선택한 항목은 후보에 없으면 후보 앞에 붙인다.
+    var candIds = {};
+    papers.forEach(function(p){ if(p && p.id) candIds[p.id] = true; });
+    draft.evidenceList.forEach(function(p){
+      if(p && p.id && !candIds[p.id]) papers.unshift(p);
+    });
+    draft.evidenceCandidates = papers;
+    stampDraftActivity_(draft);
+    saveFocusedDraftChange_(draftId);
+    var contentNow = getDraftContent_(draftId);
+    if(contentNow) renderSheetContent(contentNow);
+    else renderSheetEmpty(draft, CATEGORIES[catId]);
+    setAppToast(papers.length ? ('논문 후보 ' + papers.length + '편을 가져왔어요. 쓸 논문만 체크하세요.') : '검색 결과가 없어요. 주제·맥락을 조금 바꿔 보세요.', { duration: 4200, variant: papers.length ? 'ok' : 'err' });
+  } catch(e){
+    setAppToast('근거 찾기에 실패했어요: ' + ((e && e.message) || String(e)), { duration: 6500, variant: 'err' });
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = label || '근거 찾기'; }
+  }
+};
+
+window.toggleEvidencePaper_ = function(paperId, checked){
+  var draftId = state.selectedId;
+  var draft = draftId && findDraftByIdAnywhere_(draftId);
+  if(!draft || !paperId) return;
+  if(!Array.isArray(draft.evidenceList)) draft.evidenceList = [];
+  if(!Array.isArray(draft.evidenceCandidates)) draft.evidenceCandidates = [];
+  var pool = draft.evidenceCandidates.concat(draft.evidenceList);
+  var paper = null;
+  for(var i = 0; i < pool.length; i++){
+    if(pool[i] && pool[i].id === paperId){ paper = pool[i]; break; }
+  }
+  if(checked){
+    if(!paper) return;
+    if(!draft.evidenceList.some(function(p){ return p && p.id === paperId; })) draft.evidenceList.push(paper);
+  } else {
+    draft.evidenceList = draft.evidenceList.filter(function(p){ return p && p.id !== paperId; });
+  }
+  stampDraftActivity_(draft);
+  saveFocusedDraftChange_(draftId);
+  var head = document.querySelector('#evidence-panel .evidence-panel-title span');
+  if(head) head.textContent = '(' + draft.evidenceList.length + '편 선택)';
+};
+
+window.clearExpertEvidenceSelection_ = function(){
+  var draftId = state.selectedId;
+  var draft = draftId && findDraftByIdAnywhere_(draftId);
+  if(!draft) return;
+  draft.evidenceList = [];
+  stampDraftActivity_(draft);
+  saveFocusedDraftChange_(draftId);
+  var contentNow = getDraftContent_(draftId);
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  if(contentNow) renderSheetContent(contentNow);
+  else renderSheetEmpty(draft, CATEGORIES[catId]);
+};
+
+function appendVerifiedEvidenceToPrompt_(prompt, draft){
+  if(typeof PlannerEvidence === 'undefined') return prompt;
+  var block = PlannerEvidence.buildEvidencePromptBlock(getDraftEvidenceList_(draft));
+  if(!block) return prompt;
+  return String(prompt || '') + '\n\n' + block + '\n';
+}
+
+function applyVerifiedEvidenceReferences_(content, draft){
+  if(!content || !content.blog || typeof PlannerEvidence === 'undefined') return content;
+  var papers = getDraftEvidenceList_(draft);
+  content.blog.references = PlannerEvidence.filterReferencesToVerified(content.blog.references, papers);
+  return content;
+}
 function getExpertCourseTopicAudienceLine_(catId){
   if(catId === 3) return 'CMT 수강·복습 중인 도수·물리치료 동료에게 건네는 한 줄';
   if(catId === 4) return 'IFC 얼굴·구조 교육을 배우는 미용·도수·물리치료 동료에게 건네는 한 줄';
@@ -15799,7 +15947,7 @@ function buildExpertCourseBlogPrompt_(opts){
     '- outline: 3줄. ① 원인(강사 상태→회원 반응) ② 방법 두 가지를 한 문장에 ③ (선택) 과정 연결. 각 줄 완전한 문장\n' +
     '- draft: 순서 고정 — 현장 장면 → 원리(문헌 근거, 완화 어미) → 방법 1·방법 2(각각 구체 장면: 자세·발 위치·호흡 박자) → 손대기 전 자가 확인 3가지 → 과정 단계(Passive→Assisted Active→Resistive) 연결 1단락. outline을 다시 풀지 말 것\n' +
     '- cta(마무리): 대구형 결론 1문장 + 고정 슬로건. 수강·등록·시청·댓글 유도 금지. 예) 강사가 먼저 이완되어야 회원도 이완합니다. 시작은 항상 나로부터!\n' +
-    '- references: 마무리 다음. 「저자 (연도). 제목. 저널.」 형식, 링크·DOI 금지. 본문에 실제 쓴 근거만 2~4개\n' +
+    '- references: 마무리 다음. 「저자 (연도). 제목. 저널.」 형식, 링크·DOI 금지. **검증된 근거 목록에 있는 논문만**, 본문에 실제 쓴 것만. 목록이 비면 빈 문자열. 없는 논문을 만들지 말 것\n' +
     '- hashtags: 5개 내외. 네이버용이므로 특수문자 제거(Re:Al→ReAl). 브랜드·주제·대상 위주' +
     (programBlock ? '\n\n' + programBlock : '');
 }
@@ -17371,7 +17519,7 @@ function normalizeDraftRowForSync_(draft){
   ['id','topic','angle','series','step','pillar','rationale','writingBrief','roadmapStepId','reviewHold','programCatId',
     'shareMonth','createdAt','dateOverride','topicLocked','sourceNote','collab','youtubeAnalysis','updatedAt','activityAt','publishedChannels','dailyShareKind',
     'dailyThought','dailyWho','dailyWhat','dailyBody','articleKind','previousRoadmapStepId',
-    'previousSeries','miscLocked','importDrawerSettled','drawerUserPlaced','articleFlow'].forEach(function(k){
+    'previousSeries','miscLocked','importDrawerSettled','drawerUserPlaced','articleFlow','evidenceList','evidenceCandidates'].forEach(function(k){
     var v = draft[k];
     if(v == null || v === '') return;
     if(Array.isArray(v) && !v.length) return;
@@ -24458,7 +24606,9 @@ function collectExtraDrafts(){
         previousSeries: d.previousSeries,
         miscLocked: d.miscLocked,
         reviewHold: d.reviewHold ? true : undefined,
-        programCatId: d.programCatId != null ? d.programCatId : undefined
+        programCatId: d.programCatId != null ? d.programCatId : undefined,
+        evidenceList: Array.isArray(d.evidenceList) ? d.evidenceList : undefined,
+        evidenceCandidates: Array.isArray(d.evidenceCandidates) ? d.evidenceCandidates : undefined
       });
     });
   });
@@ -24505,6 +24655,8 @@ function mergeExtraDrafts(byCat){
       if(d.dailyWhat) merged.dailyWhat = d.dailyWhat;
       if(d.dailyBody) merged.dailyBody = d.dailyBody;
       if(Array.isArray(d.collab) && d.collab.length) merged.collab = d.collab.slice();
+      if(Array.isArray(d.evidenceList) && d.evidenceList.length) merged.evidenceList = d.evidenceList.slice();
+      if(Array.isArray(d.evidenceCandidates) && d.evidenceCandidates.length) merged.evidenceCandidates = d.evidenceCandidates.slice();
       if(d.miscLocked) merged.miscLocked = true;
       if(d.reviewHold) merged.reviewHold = true;
       if(d.programCatId != null) merged.programCatId = d.programCatId;
@@ -35680,10 +35832,26 @@ function normalizeMangoBrief_(brief){
 
 function normalizeImagesBlock(raw){
   if(!raw || typeof raw !== 'object') return null;
-  return {
+  var out = {
     gptVisuals: Array.isArray(raw.gptVisuals) ? raw.gptVisuals : [],
     mangoBrief: normalizeMangoBrief_(raw.mangoBrief)
   };
+  if(typeof raw.evidencePlacement === 'string' && raw.evidencePlacement.trim()){
+    out.evidencePlacement = raw.evidencePlacement.trim();
+  }
+  if(Array.isArray(raw.evidenceLinkedImages) && raw.evidenceLinkedImages.length){
+    out.evidenceLinkedImages = raw.evidenceLinkedImages.map(function(img){
+      if(!img || typeof img !== 'object') return null;
+      var row = {
+        name: String(img.name || '').trim() || 'evidence.png'
+      };
+      if(img.paperId) row.paperId = String(img.paperId);
+      // dataUrl 은 용량이 커서 sync 비교에 부담 — 기기 저장용으로만 유지
+      if(img.dataUrl) row.dataUrl = String(img.dataUrl);
+      return row;
+    }).filter(Boolean);
+  }
+  return out;
 }
 
 /** 구형 2장(썸네일+본문) 초안 호환 — 힐자계·레거시 */
@@ -40348,6 +40516,43 @@ window.fillImagePromptFromControls_ = function(){
   setAppToast('입력란에 넣었어요. GPT·나노바나나 버튼은 이 글을 그대로 보내요.', { duration: 3000, variant: 'ok' });
 };
 function imageToolControlsHTML_(){
+  var draftId = state.selectedId;
+  var draft = draftId && findDraftByIdAnywhere_(draftId);
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  var content = getDraftContent_(draftId) || {};
+  var images = content.images || {};
+  var placement = String(images.evidencePlacement || '');
+  var linked = Array.isArray(images.evidenceLinkedImages) ? images.evidenceLinkedImages : [];
+  var papers = getDraftEvidenceList_(draft);
+  var paperOpts = papers.map(function(p){
+    return '<option value="' + escapeEvidenceAttr_(p.id) + '">' + escapeHtml(trimEvidenceLabel_(p)) + '</option>';
+  }).join('');
+  var linkedHtml = linked.map(function(img, i){
+    return '<div class="evidence-linked-row">' +
+      '<span>' + escapeHtml(img.name || ('이미지 ' + (i + 1))) + '</span>' +
+      '<select onchange="linkEvidenceImageToPaper_(' + i + ', this.value)" aria-label="연결 근거">' +
+      '<option value="">근거 연결 없음</option>' +
+      papers.map(function(p){
+        return '<option value="' + escapeEvidenceAttr_(p.id) + '"' + (img.paperId === p.id ? ' selected' : '') + '>' +
+          escapeHtml(trimEvidenceLabel_(p)) + '</option>';
+      }).join('') +
+      '</select></div>';
+  }).join('');
+  var expertExtras = isExpertCourseCategory(catId)
+    ? ('<div class="evidence-image-box">' +
+      '<label class="evidence-placement-label">근거 이미지 넣을 문단</label>' +
+      '<textarea id="sheet-evidence-placement" class="sheet-edit" rows="2" placeholder="예: 원리 설명 2번째 문단 바로 아래" oninput="markSheetUserEdited_();saveEvidencePlacementFromSheet_()">' +
+      escapeHtml(placement) + '</textarea>' +
+      '<div class="evidence-panel-actions" style="margin-top:8px;">' +
+      '<button type="button" class="img-tool-copy-btn" onclick="copyNotebookLmEvidencePack_(this)">NotebookLM 자료 묶음 복사</button>' +
+      '<button type="button" class="img-tool-copy-btn" onclick="openNotebookLm_()">NotebookLM 열기</button>' +
+      '<label class="img-tool-copy-btn" style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;">근거 이미지 올리기' +
+      '<input type="file" accept="image/*" multiple hidden onchange="uploadEvidenceImages_(this)"></label>' +
+      '</div>' +
+      (linkedHtml ? ('<div class="evidence-linked-list">' + linkedHtml + '</div>') : '') +
+      (paperOpts ? '' : '<p class="evidence-empty">블로그 탭에서 근거를 선택한 뒤 이미지와 연결할 수 있어요.</p>') +
+      '</div>')
+    : '';
   return '<div class="image-tool-controls" style="margin:8px 0 0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;">' +
     '<label for="img-tool-type" style="font-weight:600;">종류</label>' +
     '<select id="img-tool-type"><option value="thumb">썸네일(4:5)</option><option value="evidence">근거 이미지</option><option value="cover">릴스 커버(9:16)</option></select>' +
@@ -40356,8 +40561,99 @@ function imageToolControlsHTML_(){
     '<button type="button" class="img-tool-copy-btn" onclick="copyImageToolPrompt_(this)">프롬프트 복사</button>' +
     '<button type="button" class="img-tool-copy-btn" onclick="copyImageToolPrompt_(this, \'notebooklm\')">NotebookLM 프롬프트 복사</button>' +
     '<button type="button" class="img-tool-copy-btn" onclick="fillImagePromptFromControls_()">입력란에 넣기</button>' +
-    '</div>';
+    '</div>' + expertExtras;
 }
+function trimEvidenceLabel_(p){
+  return String((p && (p.citationLine || p.title)) || '').slice(0, 48);
+}
+window.saveEvidencePlacementFromSheet_ = function(){
+  var draftId = state.selectedId;
+  if(!draftId) return;
+  var content = getDraftContent_(draftId);
+  if(!content) return;
+  if(!content.images || typeof content.images !== 'object') content.images = {};
+  var el = document.getElementById('sheet-evidence-placement');
+  content.images.evidencePlacement = el ? String(el.value || '').trim() : '';
+  state._sheetUserEdited = true;
+};
+window.linkEvidenceImageToPaper_ = function(index, paperId){
+  var draftId = state.selectedId;
+  var content = getDraftContent_(draftId);
+  if(!content || !content.images || !Array.isArray(content.images.evidenceLinkedImages)) return;
+  var row = content.images.evidenceLinkedImages[index];
+  if(!row) return;
+  if(paperId) row.paperId = paperId; else delete row.paperId;
+  state._sheetUserEdited = true;
+  persistDraftContent_(draftId, content, { userEdited: true });
+};
+window.uploadEvidenceImages_ = function(input){
+  var files = input && input.files ? Array.prototype.slice.call(input.files, 0) : [];
+  if(!files.length) return;
+  var draftId = state.selectedId;
+  var content = getDraftContent_(draftId);
+  if(!content){
+    setAppToast('먼저 초안을 만들어 주세요.', { duration: 3200, variant: 'err' });
+    return;
+  }
+  if(!content.images || typeof content.images !== 'object') content.images = {};
+  if(!Array.isArray(content.images.evidenceLinkedImages)) content.images.evidenceLinkedImages = [];
+  var left = files.length;
+  files.forEach(function(file){
+    var reader = new FileReader();
+    reader.onload = function(){
+      content.images.evidenceLinkedImages.push({
+        name: file.name || ('evidence-' + Date.now() + '.png'),
+        dataUrl: String(reader.result || ''),
+        paperId: ''
+      });
+      left--;
+      if(left <= 0){
+        state._sheetUserEdited = true;
+        persistDraftContent_(draftId, content, { userEdited: true });
+        renderSheetContent(content);
+        setAppToast('근거 이미지를 올렸어요. 연결할 논문을 고르세요.', { duration: 3600, variant: 'ok' });
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+  if(input) input.value = '';
+};
+window.copyNotebookLmEvidencePack_ = function(btn){
+  if(typeof PlannerEvidence === 'undefined'){
+    setAppToast('근거 모듈을 불러오지 못했어요.', { duration: 3200, variant: 'err' });
+    return;
+  }
+  var draftId = state.selectedId;
+  var draft = draftId && findDraftByIdAnywhere_(draftId);
+  var content = getDraftContent_(draftId);
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  if(!content || !content.blog){
+    setAppToast('블로그 초안이 있어야 자료 묶음을 복사할 수 있어요.', { duration: 3600, variant: 'err' });
+    return;
+  }
+  saveEvidencePlacementFromSheet_();
+  var images = content.images || {};
+  var pack = PlannerEvidence.buildNotebookLmPack({
+    blog: content.blog,
+    papers: getDraftEvidenceList_(draft),
+    placement: images.evidencePlacement,
+    linkedImages: images.evidenceLinkedImages,
+    imagePrompt: buildImageToolPrompt_('evidence', 'notebooklm', content, catId)
+  });
+  var label = btn ? btn.textContent : '';
+  writeClipboardRich_(pack, '', function(){
+    if(btn){
+      btn.textContent = '복사됨';
+      setTimeout(function(){ btn.textContent = label || 'NotebookLM 자료 묶음 복사'; }, 1400);
+    }
+    setAppToast('NotebookLM 자료 묶음을 복사했어요.', { duration: 2800, variant: 'ok' });
+  });
+};
+window.openNotebookLm_ = function(){
+  var url = (typeof PlannerEvidence !== 'undefined' && PlannerEvidence.NOTEBOOKLM_URL) || 'https://notebooklm.google.com/';
+  try { window.open(url, '_blank', 'noopener'); }
+  catch(eOpen){ setAppToast('NotebookLM을 열지 못했어요. 새 탭에서 notebooklm.google.com 을 열어 주세요.', { duration: 4200, variant: 'err' }); }
+};
 function topicPhotoPromptSection_(prompt, startMark, endMark){
   var text = String(prompt || '');
   var start = text.indexOf(startMark);
@@ -41673,9 +41969,11 @@ function renderSheetEmpty(draft, cat) {
         <div style="font-size:12px;color:#374151;line-height:1.65;white-space:pre-wrap;max-height:160px;overflow-y:auto;">${escapeHtml(draft.youtubeAnalysis)}</div>
       </div>`
     : '';
+  var evidenceHtml = isExpertCourseCategory(cat.id) ? renderExpertEvidencePanelHTML_(draft, { catId: cat.id }) : '';
   document.getElementById('sheet-body').innerHTML =
     buildDraftBrandBlockHTML_(draft, cat.id, true) +
     `${sourceNoteHtml}${ytAnalysisHtml}` +
+    evidenceHtml +
     `<div style="background:#F8F7F4;border-radius:12px;padding:28px 20px;text-align:center;" class="sheet-gen-cta">
       <div style="font-size:14px;color:#6B7280;line-height:1.7;margin-bottom:20px;">${genLine}</div>
       <button onclick="genContent(event)" style="background:linear-gradient(135deg,#2DD4BF,#0EA5E9);color:#fff;border:none;border-radius:12px;padding:13px 28px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;">초안 생성하기</button>
@@ -41744,12 +42042,13 @@ function renderSheetContent(content, opts) {
       bodyHTML = composeSheetTabLayout_(tab,
         addSourceHtml + sheetFullCopyBar_() +
         clinicBranchLabelSheetHtml_(blogCatId) +
+        renderExpertEvidencePanelHTML_(sheetDraft, { catId: blogCatId }) +
         sheetEditField_('제목', 'sheet-blog-title', b.title, { rows: 2, title: true, syncTopic: true, regen: 'blog.title', copy: true }) +
         sheetEditField_('영상·사진 맥락', 'sheet-blog-hook', b.hook, { rows: 4, help: '이번 영상·사진에서 다룬 장면·상황', regen: 'blog.hook', copy: true, paragraphs: true }) +
         sheetEditField_('시연·핵심 포인트', 'sheet-blog-outline', PlannerSyncRules.plannerOutlineDisplayText(b.outlineText, b.outline), { rows: 5, help: '손 위치·동작·주의사항 — 한 줄에 하나씩', regen: 'blog.outline', copy: true }) +
         sheetEditField_('원리 설명', 'sheet-blog-draft', b.draft, { rows: 12, help: '본문의 중심. 왜 이렇게 하는지·짧은 메커니즘', regen: 'blog.draft', copy: true, paragraphs: true }) +
         sheetEditField_('마무리', 'sheet-blog-cta', b.cta, { rows: 3, regen: 'blog.cta', copy: true, paragraphs: true }) +
-        sheetEditField_('참고 문헌', 'sheet-blog-references', b.references || '', { rows: 3, copy: true, help: '저자·연도·논문 제목·학술지만 한 줄에 하나. 링크 없음. 마무리 문장 뒤에 붙습니다.' }) +
+        sheetEditField_('참고 문헌', 'sheet-blog-references', b.references || '', { rows: 3, copy: true, help: 'API로 확인·선택한 근거만. 저자 (연도). 제목. 저널. · 링크 없음' }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요 · 3~5개 권장', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         expertCourseBlogFooterSheetHtml_(blogCatId) +
         reelCaptionSheetBlock_() +
@@ -47262,7 +47561,7 @@ JSON만 응답:
 "outline": ["읽을 항목을 한 줄에 하나. 각 줄은 완전한 문장","위·아래·왼쪽·오른쪽·모양·방향을 묶지 말 것"],
 "draft": "원리 설명(본문 중심). 현장 장면 → 원리(근거, 완화 어미) → 방법 1·방법 2(구체 장면) → 손대기 전 자가 확인 3가지 → 과정 단계 연결. 본문 전체 약 1,900자. 참고·영상·사진 범위 안만. outline을 다시 풀지 말 것",
 "cta": "마무리: 대구형 결론 1문장 + 고정 슬로건. 수강·등록 유도·URL 금지",
-"references": "본문에 실제 쓴 근거 2~4개. 한 줄에 하나: 저자 (연도). 제목. 저널. 링크·DOI 금지. 근거가 없으면 빈 문자열",
+"references": "검증된 근거 목록에 있는 논문만. 본문에 실제 쓴 것만. 한 줄에 하나: 저자 (연도). 제목. 저널. 링크·DOI 금지. 목록이 비면 빈 문자열",
 "evidenceFlags": ["근거보다 강한 표현이 남은 문장(없으면 빈 배열)"],
 "hashtags": ["태그1","태그2","태그3","태그4","태그5"]
 },
@@ -47283,6 +47582,7 @@ try {
 }
 
 prompt = appendDraftReferenceToPrompt_(prompt, draft, catId);
+if(isExpertCourseCategory(catId)) prompt = appendVerifiedEvidenceToPrompt_(prompt, draft);
 if(isUserAddedDraftId_(draft.id) && getDraftReferenceText_(draft)){
   prompt += '\n\n[추가 입력 충실도]\n이 초안은 「추가」로 만든 주제입니다. 블로그/쓰레드/게시판 **제목·본문의 핵심 메시지**가 위 [작성자 참고]와 주제·각도에서 **벗어나지 않게** 하세요.';
 }
@@ -47349,6 +47649,7 @@ if(beforeCleanup && typeof PlannerFieldSync !== 'undefined'){
 
 scrubNonManualPainWordInValue_(content, catId);
 if(content.blog) applyBlogWordRulesToBlock_(content.blog, catId);
+if(isExpertCourseCategory(catId) && content.blog) applyVerifiedEvidenceReferences_(content, draft);
 
 if(!state.published[jobDraftId]) state.published[jobDraftId]={};
 state.published[jobDraftId].content = content;
@@ -47406,6 +47707,26 @@ window.genContent = async function(ev){
   var draftId = state.selectedId;
   var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
   var tab = state.activeTab;
+
+  // 전문가 과정: 근거 목록이 비면 먼저 찾을지 묻고, 건너뛸 수 있다.
+  if(isExpertCourseCategory(catId) && (tab === 'blog' || !getDraftContent_(draftId))){
+    var draftForEvidence = findDraftByIdAnywhere_(draftId);
+    if(draftForEvidence && !getDraftEvidenceList_(draftForEvidence).length){
+      var findFirst = window.confirm('근거를 먼저 찾을까요?\n\n확인 = 근거 찾기\n취소 = 근거 없이 초안 생성');
+      if(findFirst){
+        state.activeTab = 'blog';
+        var contentPeek = getDraftContent_(draftId);
+        if(contentPeek) renderSheetContent(contentPeek);
+        else renderSheetEmpty(draftForEvidence, CATEGORIES[catId]);
+        setTimeout(function(){
+          var panel = document.getElementById('evidence-panel');
+          if(panel && panel.scrollIntoView) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          searchExpertEvidence_();
+        }, 60);
+        return;
+      }
+    }
+  }
 
   if(isBlogInstaCategory(catId) && tab === 'news'){
     if(!state.apiKey){

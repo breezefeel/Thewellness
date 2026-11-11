@@ -2415,6 +2415,31 @@ white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere;
 .sheet-edit:focus { outline: none; border-color: #2DD4BF; background: #fff; }
 .sheet-edit-title { font-size: 16px; font-weight: 700; color: #1A1A1A; }
 
+/* 전문가 과정 — 근거 찾기·NotebookLM */
+.evidence-panel {
+  margin: 0 0 14px; padding: 12px 14px; border: 1px solid #DBEAFE; border-radius: 12px;
+  background: #F8FBFF;
+}
+.evidence-panel-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.evidence-panel-title { font-size: 12px; font-weight: 800; color: #1E3A8A; }
+.evidence-panel-title span { font-weight: 600; color: #64748B; }
+.evidence-panel-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.evidence-panel-help, .evidence-empty { font-size: 11px; color: #64748B; line-height: 1.55; margin: 0 0 8px; }
+.evidence-candidate-list { display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow: auto; }
+.evidence-candidate {
+  display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px;
+  border: 1px solid #E2E8F0; border-radius: 10px; background: #fff; cursor: pointer;
+}
+.evidence-candidate input { margin-top: 3px; }
+.evidence-candidate-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 12px; color: #334155; line-height: 1.5; }
+.evidence-candidate-body strong { font-size: 12px; color: #0F172A; font-weight: 700; }
+.evidence-abstract { color: #64748B; font-size: 11px; }
+.evidence-image-box { width: 100%; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #CBD5E1; }
+.evidence-placement-label { display: block; font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 4px; }
+.evidence-linked-list { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.evidence-linked-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 12px; color: #334155; }
+.evidence-linked-row select { max-width: 100%; font-size: 12px; }
+
 /* 구분 박스: 박스별 재생성·복사 버튼 */
 .sheet-field-tools { display: inline-flex; gap: 6px; flex: 0 0 auto; text-transform: none; letter-spacing: normal; }
 .sheet-field-btn {

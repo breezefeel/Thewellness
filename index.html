@@ -71,8 +71,8 @@
 })();
 </script>
 <!-- CSS는 비차단 로드 — 렌더 막지 않음 -->
-<link rel="stylesheet" href="planner.css?v=416" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="planner.css?v=416"></noscript>
+<link rel="stylesheet" href="planner.css?v=417" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="planner.css?v=417"></noscript>
 <!-- 서비스워커는 head에서 등록하지 않음 — 문서 이동이 SW 대기(수십 초)에 걸리지 않게 함 -->
 </head>
 <body>
@@ -329,7 +329,24 @@
   </div>
 </div>
 
-<!-- Links modal (external site shortcuts) -->
+<!-- Publish schedule modal (header · 예약 현황) -->
+
+<div class="modal-overlay" id="schedule-modal-overlay" onclick="closePublishScheduleModal_(event)">
+  <div class="modal-box schedule-modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header" style="margin-bottom:8px;">
+      <div class="modal-title" style="margin:0;">예약 현황</div>
+      <button type="button" class="prompt-modal-close" onclick="closePublishScheduleModal_()" aria-label="닫기">×</button>
+    </div>
+    <div class="modal-desc" style="font-size:12px;margin-bottom:10px;">모든 카테고리의 발행·예약 일정입니다. 항목을 누르면 초안 화면이 열립니다. 목록만 열어서는 저장되지 않습니다.</div>
+    <label class="schedule-past-toggle">
+      <input type="checkbox" id="schedule-include-past" onchange="renderPublishScheduleList_()">
+      <span>지난 일정도 보기</span>
+    </label>
+    <div id="schedule-modal-list" class="schedule-modal-list" role="list"></div>
+  </div>
+</div>
+
+<!-- Links modal (external site shortcuts; header 버튼은 예약 현황으로 대체) -->
 
 <div class="modal-overlay" id="links-modal-overlay" onclick="closeLinksModal_(event)">
   <div class="modal-box links-modal-box" onclick="event.stopPropagation()">
@@ -448,7 +465,7 @@
     </div>
   </div>
   <div class="planner-head-right">
-    <button type="button" class="btn-links" id="btn-links" onclick="openLinksModal_()" title="자주 쓰는 링크 모음" aria-label="링크 모음"><span class="btn-links-ico" aria-hidden="true">🔗</span><span class="btn-links-label">링크</span></button>
+    <button type="button" class="btn-schedule" id="btn-schedule" onclick="openPublishScheduleModal_()" title="예약 현황" aria-label="예약 현황"><span class="btn-schedule-label">예약 현황</span><span class="btn-schedule-label-short" aria-hidden="true">예약</span></button>
     <button type="button" class="btn-sync-status" id="btn-sync-status" onclick="openSyncStatusModal_()" title="동기화 및 설정" aria-label="동기화 및 설정">
       <span class="sync-btn-main"><span class="sync-dot" id="sync-dot"></span><span id="sync-status-label">동기화</span></span>
       <span class="sync-btn-sub" id="sync-btn-sub">확인</span>
@@ -486,7 +503,7 @@
 <script src="planner-import.js?v=405"></script>
 <script src="planner-sync-supabase.js?v=399"></script>
 <script src="planner-field-sync.js?v=11"></script>
-<script src="planner.js?v=434" defer></script>
+<script src="planner.js?v=435" defer></script>
 <script src="planner-thumbs.js?v=399" defer></script>
 <script src="planner-social.js?v=10" defer></script>
 <script>
@@ -504,10 +521,26 @@ function closeLinksModal_(e){
   o.classList.remove('open');
   if(typeof unlockBodyScroll_ === 'function') unlockBodyScroll_();
 }
+function openPublishScheduleModal_(){
+  var o = document.getElementById('schedule-modal-overlay');
+  if(!o) return;
+  var alreadyOpen = o.classList.contains('open');
+  o.classList.add('open');
+  if(!alreadyOpen && typeof lockBodyScroll_ === 'function') lockBodyScroll_();
+  if(typeof renderPublishScheduleList_ === 'function') renderPublishScheduleList_();
+}
+function closePublishScheduleModal_(e){
+  if(e && e.target && e.target.id !== 'schedule-modal-overlay') return;
+  var o = document.getElementById('schedule-modal-overlay');
+  if(!o || !o.classList.contains('open')) return;
+  o.classList.remove('open');
+  if(typeof unlockBodyScroll_ === 'function') unlockBodyScroll_();
+}
 document.addEventListener('keydown', function(e){
   if(e.key !== 'Escape') return;
-  // planner.js 로드 후에는 오버레이 스택이 처리. 그 전에는 링크 모달만 닫기.
+  // planner.js 로드 후에는 오버레이 스택이 처리. 그 전에는 예약·링크 모달만 닫기.
   if(typeof closeTopmostPlannerOverlay_ === 'function') return;
+  closePublishScheduleModal_();
   closeLinksModal_();
 });
 </script>

@@ -2,10 +2,10 @@
 var fs = require('fs');
 var vm = require('vm');
 var path = require('path');
-var file = path.join(__dirname, 'planner-sync-rules.js');
-var context = {};
+var context = { module: { exports: {} }, exports: {} };
 vm.createContext(context);
-vm.runInContext(fs.readFileSync(file, 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, 'planner-banned-words.js'), 'utf8'), context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, 'planner-sync-rules.js'), 'utf8'), context);
 var R = context.PlannerSyncRules;
 var failed = 0;
 
@@ -24,7 +24,7 @@ assert(R.plannerConnectionDropped('저장했습니다') === false, 'a normal mes
 
 var plannerSrc = fs.readFileSync(path.join(__dirname, 'planner.js'), 'utf8');
 var socialSrc = fs.readFileSync(path.join(__dirname, 'planner-social.js'), 'utf8');
-assert(plannerSrc.indexOf('if(state.activeTab !== t && state._sheetUserEdited)') >= 0, 'tab change saves only after an edit');
+assert(plannerSrc.indexOf('requestCloseSheet_') >= 0, 'card close asks before saving unsaved edits');
 assert(plannerSrc.indexOf('if(beforeLen > afterLen) persistDraftContent_') < 0, 'opening a card does not persist image normalization');
 assert(plannerSrc.indexOf('state._newItemKeepKeys = { topic: true }') >= 0, 'suggestions are not flushed away');
 assert(socialSrc.indexOf('hasLayout ? readLayout') >= 0, 'missing layout file is not requested');
@@ -476,10 +476,11 @@ var skipBad = R.plannerMergePostEvents([NaN, d30], [[undefined, d31]]);
 assert(skipBad.events.length === 2, 'unreadable values are skipped');
 
 // 직접 적은 「YYYY-MM-DD」는 어느 시간대 기기에서도 같은 달력 날짜로 읽혀야 한다 (미국 기기에서 하루 밀리면 안 됨)
+var rulesFile = path.join(__dirname, 'planner-sync-rules.js');
 ['Asia/Seoul', 'America/New_York', 'America/Los_Angeles', 'UTC'].forEach(function(tz){
   var out = require('child_process').execFileSync(process.execPath, ['-e',
     "var fs=require('fs'),vm=require('vm');var c={};vm.createContext(c);" +
-    "vm.runInContext(fs.readFileSync(" + JSON.stringify(file) + ",'utf8'),c);var R=c.PlannerSyncRules;" +
+    "vm.runInContext(fs.readFileSync(" + JSON.stringify(rulesFile) + ",'utf8'),c);var R=c.PlannerSyncRules;" +
     "var ms=R.plannerParsePublishStamp('2026-10-31',NaN);var bad=R.plannerParsePublishStamp('2026-02-31',123);" +
     "console.log(R.plannerDayKey(ms)+'|'+bad);"
   ], { env: Object.assign({}, process.env, { TZ: tz }) }).toString().trim();
@@ -543,6 +544,11 @@ assert(!/blog:strong.*title/.test(JSON.stringify(lint.filter(function(i){ return
 var clean = R.plannerLintContent({ catId: 5, insta: { hook: '스트레칭 시 회원이 긴장해요 🤲', caption: '본문입니다.', hashtags: ['1','2','3','4','5','6','7','8','9'] }, threads: { body: '한 줄?', comment: 'a\n\nb\n\nc\n\nd' } });
 assert(clean.length === 0, 'clean content has no issues (got ' + JSON.stringify(clean) + ')');
 assert(R.plannerLintContent({ catId: 0, blog: { draft: '회원이 아파요' } }).some(function(i){ return i.code === 'honorific'; }), 'CMT/도수 flags 회원');
+assert(R.plannerLintContent({ catId: 2, blog: { selfCare: '적신호면 병원 진료를 먼저 받으세요.' }, visible: { blog: ['selfCare'] } }).some(function(i){ return i.code === 'forbidden' && /진료/.test(i.msg || ''); }), '병원 진료 still flags 진료');
+assert(!R.plannerLintContent({ catId: 2, blog: { selfCare: '괜찮아요', draft: '숨은 칸에 진료' }, visible: { blog: ['title', 'problem', 'selfCare', 'explanation', 'cta'] } }).some(function(i){ return /진료/.test(i.msg || ''); }), 'hidden draft is skipped');
+assert((R.plannerLintContent({ catId: 2, blog: { selfCare: '혼자 진료하지 마세요' }, visible: { blog: ['selfCare'] } })[0] || {}).excerpt, 'lint includes excerpt for jump');
+assert(R.plannerLintContent({ catId: 2, news: { naver: { body: '통증 치료 안내' } }, visible: { news: ['naver.body'] } }).some(function(i){ return i.code === 'caution' && /치료/.test(i.msg || ''); }), '치료 is caution in 소식');
+assert(!R.plannerLintContent({ catId: 2, blog: { cta: '통증 치료 안내' }, visible: { blog: ['cta'] } }).some(function(i){ return /치료/.test(i.msg || ''); }), '치료 is not flagged in blog');
 
 // 카드 정보 날짜·제목: 새로고침(서버 행 → 목록 카드)에서 빠지지 않는다.
 var metaTarget = R.plannerKeepDraftCardMeta({ id: 'd5-c1794226751677' }, { dateOverride: '2026-11-10', topicLocked: true });
@@ -593,7 +599,9 @@ assert(back7 && back7.dateOverride === '2026-11-11', 'reload keeps 11/11 on d7')
 assert(back5 && R.plannerDraftListDate(back5).label === '11.10.', 'list date after reload is 11.10. (got ' + (back5 && R.plannerDraftListDate(back5).label) + ')');
 assert(back7 && !back7.topicLocked, 'cards never edited in 카드 정보 stay unlocked');
 assert(/draft\.topicLocked = true;\n    if\(ymd\) draft\.dateOverride/.test(plannerSrc), 'card info editor locks the title it saves');
-assert((plannerSrc.match(/syncDraftTopicFromTitle_\([^)]*auto: true \}\)/g) || []).length === 4, 'blog/community title auto paths pass auto: true');
+// 카드 제목 필드 입력은 저장 전까지 previewOnly. auto:true 는 재생성 경로만.
+assert((plannerSrc.match(/syncDraftTopicFromTitle_\([^)]*auto: true \}\)/g) || []).length === 2, 'regen title auto paths pass auto: true');
+assert(/previewOnly:\s*true/.test(plannerSrc) && /commitSheetTitleIfNeeded_/.test(plannerSrc), 'title edits stay preview until save');
 
 assert(R.plannerKeepDraftCardMeta({}, { dateOverride: null }).dateOverride === undefined, 'null dateOverride written by an old patch loads as no override');
 // 새로고침 뒤 본문만 저장해도 draft 행 패치에 dateOverride 삭제가 실리지 않는다.

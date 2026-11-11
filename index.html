@@ -71,8 +71,8 @@
 })();
 </script>
 <!-- CSS는 비차단 로드 — 렌더 막지 않음 -->
-<link rel="stylesheet" href="planner.css?v=422" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="planner.css?v=422"></noscript>
+<link rel="stylesheet" href="planner.css?v=424" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="planner.css?v=424"></noscript>
 <!-- 서비스워커는 head에서 등록하지 않음 — 문서 이동이 SW 대기(수십 초)에 걸리지 않게 함 -->
 </head>
 <body>
@@ -131,16 +131,28 @@
 
 <!-- Detail Overlay -->
 
-<div class="detail-overlay" id="detail-overlay">
-  <div class="detail-sheet" id="detail-sheet">
+<div class="detail-overlay" id="detail-overlay" onclick="onDetailOverlayClick_(event)">
+  <div class="detail-sheet" id="detail-sheet" onclick="event.stopPropagation()">
     <div class="sheet-handle" title="시트 핸들" aria-hidden="true"></div>
     <div class="sheet-header">
       <div class="sheet-title" id="sheet-title"></div>
       <button type="button" class="sheet-edit-info" id="sheet-edit-info" onclick="openDraftInfoEditor_(); event.stopPropagation();" aria-label="카드 제목·날짜·메모 고치기">카드 정보</button>
-      <button type="button" class="sheet-close" onclick="closeSheet(); event.stopPropagation();" aria-label="닫기">닫기</button>
+      <button type="button" class="sheet-close" onclick="requestCloseSheet_(); event.stopPropagation();" aria-label="닫기">닫기</button>
     </div>
     <div class="sheet-body" id="sheet-body"></div>
     <div class="sheet-actions" id="sheet-actions"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="sheet-leave-overlay" role="dialog" aria-modal="true" aria-labelledby="sheet-leave-title" onclick="sheetLeaveCancel_(event)">
+  <div class="plan-ws-leave-box" onclick="event.stopPropagation()">
+    <h2 id="sheet-leave-title" class="plan-ws-leave-title">저장하지 않은 변경이 있어요</h2>
+    <p class="plan-ws-leave-msg">저장할까요? 「저장 안 함」을 누르면 방금 고친 내용은 버려요.</p>
+    <div class="plan-ws-leave-actions">
+      <button type="button" class="modal-btn" onclick="sheetLeaveSave_()">저장</button>
+      <button type="button" class="modal-btn-ghost plan-ws-leave-discard" onclick="sheetLeaveDiscard_()">저장 안 함</button>
+      <button type="button" class="modal-btn-ghost" onclick="sheetLeaveCancel_()">취소</button>
+    </div>
   </div>
 </div>
 
@@ -501,11 +513,12 @@
 <script src="ops-channel-review-seed.js?v=1"></script>
 <script src="planner-reel.js?v=27"></script>
 <script src="planner-sync-config.js?v=1"></script>
-<script src="planner-sync-rules.js?v=419"></script>
-<script src="planner-import.js?v=405"></script>
+<script src="planner-banned-words.js?v=2"></script>
+<script src="planner-sync-rules.js?v=421"></script>
+<script src="planner-import.js?v=407"></script>
 <script src="planner-sync-supabase.js?v=399"></script>
 <script src="planner-field-sync.js?v=11"></script>
-<script src="planner.js?v=440" defer></script>
+<script src="planner.js?v=443" defer></script>
 <script src="planner-thumbs.js?v=399" defer></script>
 <script src="planner-social.js?v=10" defer></script>
 <script>

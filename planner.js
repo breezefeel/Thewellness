@@ -12982,43 +12982,62 @@ function isSyncTimeoutOrSlowError_(err){
   return /시간이 초과|응답 시간이|Timed out|timeout|AbortError|네트워크가 느리|시간이 더|오래 걸/i.test(msg);
 }
 
-/** 자동 동기화 이슈 토스트 — 실패를 남발하지 않고, 지연은 ‘진행/재시도’로 안내 */
+/** 자동 동기화 이슈 토스트 — iPhone(390)에서도 2줄 이내. 닫기 확인 중에는 띄우지 않음. */
 function notifyPlannerSyncIssue_(err, opts){
   opts = opts || {};
   if(typeof setAppToast !== 'function') return;
+  try {
+    var leaveOv = document.getElementById('sheet-leave-overlay');
+    if(leaveOv && leaveOv.classList.contains('open')) return;
+  } catch(eLeaveToast){}
   var now = Date.now();
-  var msg = String((err && err.message) || err || '').trim();
-  var dropped = !!(opts.connectionDrop || (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConnectionDropped(msg)));
+  var rawMsg = String((err && err.message) || err || '').trim();
+  var dropped = !!(opts.connectionDrop ||
+    (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConnectionDropped(rawMsg)) ||
+    /Failed to fetch|NetworkError|Load failed|ERR_CONNECTION|ECONNRESET/i.test(rawMsg));
   if(!opts.force && !dropped && (now - _lastSyncFailToastAt_) < SYNC_FAIL_TOAST_COOLDOWN_MS_) return;
   _lastSyncFailToastAt_ = now;
-  if(dropped){
-    setAppToast(
-      '서버 연결이 끊겼어요.\n' + (msg || '엔드포인트 연결이 닫혔습니다.') +
-        '\n이 내용을 서버 위에 덮어쓰지 않습니다. 직접 고친 글은 이 기기에 남아 있습니다.',
-      { duration: 7000, variant: 'err' }
-    );
+  var reason = '';
+  try {
+    // 분류는 원문(rawMsg)으로 — sanitize 전에 용량·충돌을 판별한다.
+    reason = describeSyncFailureReason_({
+      error: err,
+      message: rawMsg,
+      heldOnly: !!opts.heldOnly,
+      stalled: !!opts.stalled
+    });
+  } catch(eReason){
+    reason = sanitizeSyncErrorMessage_(rawMsg);
+  }
+  reason = sanitizeSyncErrorMessage_(reason) || '동기화를 끝내지 못했어요.';
+  // 이미 행동 안내가 문장에 있으면 1줄만.
+  if(/지금 동기화|다시 시도/.test(reason) && reason.indexOf('\n') < 0){
+    setAppToast(reason, { duration: opts.manual ? 4800 : 4000, variant: opts.manual ? 'err' : 'ok' });
     return;
   }
-  var slow = isSyncTimeoutOrSlowError_(err);
-  if(slow){
-    setAppToast(
-      '서버 응답이 조금 오래 걸려요. 동기화는 이어가고, 자동으로 다시 시도합니다.\n이 기기 저장은 유지됩니다.',
-      { duration: 4800, variant: 'ok' }
-    );
-    return;
+  var line1 = reason.split('\n')[0].replace(/\s+/g, ' ').trim();
+  // 390px에서 한 줄이 너무 길면 잘라 2줄 초과를 막는다.
+  if(line1.length > 22) line1 = line1.slice(0, 21) + '…';
+  var line2 = '';
+  if(dropped || /네트워크/.test(line1)){
+    line2 = '「지금 동기화」로 다시 시도하세요.';
+  } else if(isSyncTimeoutOrSlowError_(err) || /응답이 느려|지연/.test(line1)){
+    line2 = '자동으로 다시 시도합니다.';
+  } else if(/버전|충돌|선택 대기/.test(line1)){
+    line2 = '충돌 창에서 골라 주세요.';
+  } else if(/너무 커|용량/.test(line1)){
+    line2 = '줄인 뒤 다시 시도해 주세요.';
+  } else if(/서버에 잠시/.test(line1)){
+    line2 = '잠시 후 다시 시도해 주세요.';
+  } else if(opts.manual){
+    line2 = '「지금 동기화」로 다시 시도하세요.';
+  } else {
+    line2 = '자동으로 다시 시도합니다.';
   }
-  if(opts.manual){
-    setAppToast(
-      '동기화를 아직 끝내지 못했어요.\n' + (msg || '잠시 후 다시 시도해 주세요.') +
-        '\n이 기기 저장은 유지됩니다.',
-      { duration: 5500, variant: 'err' }
-    );
-    return;
-  }
-  setAppToast(
-    '서버 반영이 잠시 지연됐어요. 이 기기 저장은 유지되고, 자동으로 다시 시도합니다.',
-    { duration: 4200, variant: 'ok' }
-  );
+  setAppToast(line1 + '\n' + line2, {
+    duration: opts.manual || dropped ? 5200 : 4000,
+    variant: (opts.manual || dropped || /멈췄|커요|버전|문제/.test(line1)) ? 'err' : 'ok'
+  });
 }
 var detailHashSyncLock_ = false;
 var searchDebounceTimer = null;
@@ -13905,8 +13924,12 @@ function closeTopmostPlannerOverlay_(){
     closePlanWorkshop_();
     return true;
   }
+  if(plannerOverlayIsOpen_('sheet-leave-overlay')){
+    sheetLeaveCancel_();
+    return true;
+  }
   if(plannerOverlayIsOpen_('detail-overlay')){
-    closeSheet();
+    requestCloseSheet_();
     return true;
   }
   return false;
@@ -16666,6 +16689,16 @@ function setAppToast(message, options) {
   var variant = options.variant || '';
   var el = document.getElementById('app-toast');
   if (!el) return;
+  // 카드 닫기 확인(저장/저장 안 함/취소)이 열려 있으면 버튼을 가리지 않도록 토스트를 숨긴다.
+  try {
+    var leaveOv = document.getElementById('sheet-leave-overlay');
+    if(leaveOv && leaveOv.classList.contains('open')){
+      clearTimeout(appToastTimer);
+      el.classList.remove('show');
+      el.style.bottom = '';
+      return;
+    }
+  } catch(eLeaveHide){}
   var focusSnap = captureTextFieldFocus_();
   var wasTyping = !!focusSnap;
   clearTimeout(appToastTimer);
@@ -17859,17 +17892,28 @@ function shouldAdoptServerAsTruth_(remotePayload, remoteRevision){
   remoteRevision = parseInt(remoteRevision, 10) || getPayloadRevision_(remotePayload) || 0;
   if(!remoteRevision) return false;
   if(state._emptyServerSeed && state.syncNeedsSnapshot) return false;
+  // 대기열·보류 충돌·보호된 수정이 있으면 서버 값으로 이 기기 편집을 지우지 않는다.
+  if(outboxHasProtectedMutations_()) return false;
+  if(hasSendableOutboxOps_()) return false;
+  if(countSnoozedHeldOps_() > 0) return false;
+  if(state._sessionUserEdit && hasPendingLocalSyncChanges_()) return false;
   // 이 화면에서 직접 고친 적이 없는 데스크탑은 서버가 기준. 로컬 잔재로 다시 올리지 않음.
   if(isPlannerDesktopBrowser_() && !state._sessionUserEdit) return true;
   var unpushed = countRealUnpushedMutations_();
   if(unpushed > 0 && unpushed <= REAL_UNPUSHED_PUSH_MAX_) return false;
-  if(outboxHasProtectedMutations_()) return false;
   try {
     if(localContentRicherThan_(getPersistPayload(), remotePayload)) return false;
   } catch(eY){}
   return true;
 }
 function adoptServerAsAuthority_(remotePayload, remoteRevision){
+  // 보호된 로컬 수정·보류 충돌이 남아 있으면 대기열을 비우지 않는다(서버 덮어쓰기 금지).
+  if(outboxHasProtectedMutations_() || hasSendableOutboxOps_() || countSnoozedHeldOps_() > 0){
+    try { applyServerPayloadPreservingOutbox_(remotePayload, remoteRevision); } catch(eKeep){
+      console.warn('[서버 병합·로컬 유지]', eKeep);
+    }
+    return;
+  }
   adoptServerPayloadAuthoritatively_(remotePayload, remoteRevision);
   state._postAdoptMigration = false;
   state.syncDirty = false;
@@ -19707,6 +19751,76 @@ function clearPlannerGasRetry_(){
   plannerGasRetryDueAt_ = 0;
   plannerLastSyncError_ = '';
 }
+/** 영문·HTTP 원문을 토스트/헤더에 쓰지 않도록 한국어 한 문장으로 바꿈. */
+function sanitizeSyncErrorMessage_(raw){
+  var msg = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
+  if(!msg) return '';
+  if(/Failed to fetch|NetworkError|Load failed|ERR_CONNECTION|ECONNRESET|The network connection was lost/i.test(msg)){
+    return '네트워크 연결이 끊겼어요.';
+  }
+  // 413은 용량 거절 — 일반 서버 오류로 묶지 않는다.
+  if(/\bHTTP\s*413\b|\b413\b|entity too|request entity/i.test(msg)){
+    return '올릴 내용이 너무 커요.';
+  }
+  if(/\bHTTP\s*[45]\d\d\b|\bstatus\s*[45]\d\d\b|\b(?:500|502|503|504)\b(?:\s|$)|Internal Server Error|Bad Gateway|Service Unavailable|Gateway Timeout/i.test(msg)){
+    return '서버에 잠시 문제가 있어요.';
+  }
+  if(/TypeError|SyntaxError|ReferenceError|Unhandled|Exception|at\s+\S+\s+\(/i.test(msg) && /[A-Za-z]{4,}/.test(msg)){
+    return '동기화 중 오류가 났어요.';
+  }
+  // 한글이 거의 없고 영어/기호만이면 일반 문장으로.
+  var hangul = (msg.match(/[가-힣]/g) || []).length;
+  if(hangul < 2 && /[A-Za-z]{3,}/.test(msg)){
+    return '동기화를 끝내지 못했어요.';
+  }
+  return msg;
+}
+/** 실패·정체 원인을 사람이 읽을 짧은 문장으로. 헤더·토스트 공통. */
+function describeSyncFailureReason_(opts){
+  opts = opts || {};
+  var held = typeof opts.held === 'number' ? opts.held : countSnoozedHeldOps_();
+  var remain = typeof opts.remain === 'number' ? opts.remain : countPendingSyncItems_();
+  var raw = String(opts.message || plannerLastSyncError_ || (opts.error && opts.error.message) || '').trim();
+  // 분류는 원문(raw)으로 — sanitize 전에 용량·충돌을 가리지 않는다.
+  if(opts.heldOnly || (held > 0 && remain < 1 && !hasSendableOutboxOps_())){
+    return '선택 대기 ' + held + '건이 있어요.';
+  }
+  if(opts.stalled && remain > 0){
+    return '전송이 멈췄어요 (' + remain + '건).';
+  }
+  if(/payload|본문|용량|너무 크|413|entity too|request entity/i.test(raw)){
+    return '올릴 내용이 너무 커요.';
+  }
+  if(/conflict|충돌|revision|버전|baseRevision|stale|선택 대기/i.test(raw)){
+    return '서버와 버전이 달라요.';
+  }
+  if((typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConnectionDropped(raw)) ||
+     /네트워크 연결이 끊|Failed to fetch|NetworkError|Load failed/i.test(raw)){
+    return '네트워크 연결이 끊겼어요.';
+  }
+  if(isSyncTimeoutOrSlowError_({ message: raw }) || /서버 응답이 지연|응답이 느려/.test(raw)){
+    return '서버 응답이 느려요.';
+  }
+  var msg = sanitizeSyncErrorMessage_(raw);
+  if(/서버에 잠시 문제가/.test(msg)) return msg;
+  if(msg) return msg;
+  if(remain > 0) return '아직 반영되지 않은 변경이 ' + remain + '건 있어요.';
+  return '동기화를 끝내지 못했어요.';
+}
+/** 「동기화」·「지금 동기화」: 재시도 타이머를 지우고 남은 건을 즉시 다시 보낸다. */
+function forceImmediateSyncRetry_(){
+  try {
+    if(plannerGasRetryTimer_){
+      clearTimeout(plannerGasRetryTimer_);
+      plannerGasRetryTimer_ = null;
+      plannerGasRetryDueAt_ = 0;
+    }
+  } catch(eClr){}
+  if(!hasPendingLocalSyncChanges_() || plannerSyncConflictPending_ || plannerBootstrapChoicePending_) return false;
+  if(!plannerSyncBootstrapReady_ || !state._bootstrapChoiceDone) return false;
+  try { schedulePlannerGasPush_(true); } catch(eKick){ return false; }
+  return true;
+}
 function schedulePlannerGasRetry_(error){
   if(plannerSafeModeBlocksSync_()) return;
   if(!hasPendingLocalSyncChanges_() || !plannerSyncBootstrapReady_ || plannerSyncConflictPending_) return;
@@ -19715,9 +19829,23 @@ function schedulePlannerGasRetry_(error){
   plannerGasRetryCount_++;
   var slow = isSyncTimeoutOrSlowError_(error);
   if(slow) _syncFastAckPending_ = true;
-  plannerLastSyncError_ = slow
-    ? '서버 응답이 지연되어 자동 재시도 중'
-    : String((error && error.message) || error || '서버 동기화 지연');
+  // 재시도 대기 중에도 영문 원문(Failed to fetch 등)을 헤더에 넣지 않는다.
+  var friendly = '';
+  try {
+    friendly = describeSyncFailureReason_({
+      error: error,
+      message: (error && error.message) || error
+    });
+  } catch(eFriend){
+    friendly = '';
+  }
+  if(slow){
+    plannerLastSyncError_ = '서버 응답이 지연되어 자동 재시도 중';
+  } else if(friendly){
+    plannerLastSyncError_ = friendly;
+  } else {
+    plannerLastSyncError_ = '동기화를 끝내지 못했어요. 잠시 후 다시 시도합니다.';
+  }
   var delay = slow
     ? Math.min(45000, 20000 * Math.pow(2, Math.min(plannerGasRetryCount_ - 1, 1)))
     : Math.min(60 * 1000, 3000 * Math.pow(2, Math.min(plannerGasRetryCount_ - 1, 6)));
@@ -19856,8 +19984,10 @@ async function plannerGasPushNow_(){
       clearPlannerGasRetry_();
       _syncTransferStartedAt_ = 0;
       try { clearDividedSaveToast_(); } catch(eHeldToast){}
+      var heldMsg = describeSyncFailureReason_({ heldOnly: true });
+      plannerLastSyncError_ = heldMsg;
       try { updateSyncStatusUI_(); } catch(eHeldUi){}
-      return { ok: true, held: true };
+      return { ok: true, held: true, heldCount: countSnoozedHeldOps_(), message: heldMsg };
     }
     var requestDirtyGeneration = plannerDirtyGeneration_;
     var usePatch = mutations.length > 0 && state.syncProtocolVersion >= 2;
@@ -20173,22 +20303,31 @@ async function plannerGasPushNow_(){
     }
     break;
     }
-    if(hasSendableOutboxOps_() && !plannerSyncConflictPending_ && !state._generalUploadOnly && !state._gapUploadActive) schedulePlannerGasPush_(true);
+    if(hasSendableOutboxOps_() && !plannerSyncConflictPending_ && !state._generalUploadOnly && !state._gapUploadActive){
+      var remainAfter = countPendingSyncItems_();
+      var stalledMsg = describeSyncFailureReason_({ stalled: true, remain: remainAfter });
+      plannerLastSyncError_ = stalledMsg;
+      // 라운드를 돌렸는데도 보낼 건이 남으면 성공으로 치지 않는다(완료 토스트·서버 rev 오해 방지).
+      schedulePlannerGasRetry_(new Error(stalledMsg));
+      try { updateSyncStatusUI_(); } catch(eStallUi){}
+      return { ok: false, stalled: true, remain: remainAfter, error: new Error(stalledMsg), message: stalledMsg };
+    }
     return { ok: true, revision: lastOkRevision, batches: round };
   } catch(err) {
     console.warn('[GAS push]', err);
     var droppedConn = typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConnectionDropped(String((err && err.message) || err));
     if(droppedConn && !state._explicitContentEdit) err.noRetry = true;
     var slow = isSyncTimeoutOrSlowError_(err);
-    plannerLastSyncError_ = droppedConn
-      ? '서버 연결이 끊겨 덮어쓰지 않음'
-      : (slow
-      ? '서버 응답이 지연되어 자동 재시도 중'
-      : String((err && err.message) || err));
+    var friendly = describeSyncFailureReason_({ error: err, message: (err && err.message) || err });
+    plannerLastSyncError_ = friendly;
     if(!err.noRetry) schedulePlannerGasRetry_(err);
-    notifyPlannerSyncIssue_(err, { manual: false, connectionDrop: droppedConn });
+    try {
+      var toastErr = new Error(friendly);
+      toastErr.noRetry = !!(err && err.noRetry);
+      notifyPlannerSyncIssue_(toastErr, { manual: false, connectionDrop: droppedConn });
+    } catch(eToast){}
     updateSyncStatusUI_();
-    return { ok: false, error: err, slow: slow };
+    return { ok: false, error: err, slow: slow, message: friendly };
   } finally {
     clearSyncSending_();
     // 나눠 저장 안내는 전송 중에만 맞는 말이다. 끝난 뒤에는 남기지 않는다.
@@ -20798,15 +20937,43 @@ function formatSyncPendingPhrase_(n, snapshot){
   if(n > 0) return n + '건';
   return '';
 }
+function isSyncHeaderNetworkError_(errText){
+  var err = String(errText || '');
+  if(!err) return false;
+  // 「네트워크」는 실제 연결 실패에만. 정체 안내문(…네트워크·용량…)은 제외.
+  if(/줄지 않았|전송 멈춤|버전 충돌·네트워크/.test(err)) return false;
+  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConnectionDropped(err)) return true;
+  return /네트워크 연결이 끊|연결이 끊겼|오프라인|onLine === false/i.test(err);
+}
 function formatSyncHeaderSub_(info){
   if(info && info.loginRequired) return '로그인 필요';
   var n = info.pendingCount || 0;
+  var held = info.heldCount || 0;
   var left = n > 0 ? ('남은 ' + n + '건') : '';
+  var err = info && info.lastError ? String(info.lastError) : '';
+  // 충돌 선택 대기(보류) — phase·건수 모두. lastError 때문에 queued로 잡혀도 이걸 우선.
+  if(info.phase === 'held' || (held > 0 && n < 1)) return '선택 대기 ' + held + '건';
+  // 대기열이 줄지 않음(정체) — 전송 멈춤으로 표시.
+  var stalled = !!(info && info.stalled) || /줄지 않았|전송 멈춤/.test(err);
+  if(stalled && n > 0 && info.phase !== 'transferring'){
+    return '전송 멈춤 · ' + n + '건';
+  }
+  var shortFail = '';
+  if(err){
+    if(/줄지 않았|전송 멈춤/.test(err)) shortFail = '전송 멈춤';
+    else if(isSyncHeaderNetworkError_(err)) shortFail = '네트워크';
+    else if(/충돌|버전/.test(err)) shortFail = '버전 충돌';
+    else if(/용량|커서|거절|너무 커|413|entity too/i.test(err)) shortFail = '용량';
+    else if(/지연|응답|느려/.test(err)) shortFail = '응답 지연';
+    // 「선택 대기」는 shortFail로 queued에 붙이지 않는다(held 전용).
+    // Failed to fetch 등 원문은 shortFail 에 넣지 않는다.
+  }
   if(info.phase === 'transferring'){
     var bits = [];
     if(left) bits.push(left);
     if(info.sendingNow > 0 && n > info.sendingNow) bits.push('이번 ' + info.sendingNow);
     if(plannerGasRetryCount_ > 0) bits.push('재시도 ' + plannerGasRetryCount_ + '회');
+    if(shortFail) bits.push(shortFail);
     var elapsed = formatSyncElapsed_();
     if(elapsed) bits.push(elapsed);
     return bits.join(' · ') || '전송 중';
@@ -20814,22 +20981,25 @@ function formatSyncHeaderSub_(info){
   if(info.phase === 'retry_wait'){
     var sec = info.retryInSec || 0;
     var wait = sec > 0 ? (sec + '초 후 확인') : '재시도';
-    return left ? (left + ' · ' + wait) : wait;
+    var retryBits = [];
+    if(left) retryBits.push(left);
+    if(shortFail) retryBits.push(shortFail);
+    retryBits.push(wait);
+    return retryBits.join(' · ');
   }
   if(info.phase === 'queued'){
-    return left || '곧 전송';
+    return shortFail ? ((left || '곧 전송') + ' · ' + shortFail) : (left || '곧 전송');
   }
   if(info.phase === 'checking') return '서버 확인';
   if(info.phase === 'conflict') return '충돌 선택';
   if(plannerSafeModeBlocksSync_()) return '안전 모드 · 대기 ' + (info.pendingCount || 0) + '건';
-  if(info.phase === 'held') return '선택 대기 ' + (info.heldCount || 0) + '건';
   if(info.phase === 'pull') return '받을 내용';
   if(info.phase === 'pending'){
-    return left || '반영 대기';
+    return shortFail ? ((left || '반영 대기') + ' · ' + shortFail) : (left || '반영 대기');
   }
   if(info.phase === 'topic_gap') return '선택 필요';
   if(info.overall === 'ok') return '최신 · ' + info.localRev;
-  if(info.overall === 'warn') return left ? ('다시 시도 · ' + left) : '확인 필요';
+  if(info.overall === 'warn') return left ? ('다시 시도 · ' + left) : (shortFail || '확인 필요');
   return String(info.localRev || '');
 }
 let _syncPendingKickAt_ = 0;
@@ -20951,6 +21121,11 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(queuedPush){
     phase = 'queued';
     overall = 'pending';
+  } else if(pendingCount === 0 && heldCount > 0 && (serverPending || drivePending || localPending)){
+    // 보류(held)는 lastError·queued 보다 먼저. 「곧 전송 · 선택 대기」 오표기 방지.
+    phase = 'held';
+    overall = 'warn';
+    plannerLastSyncError_ = '';
   } else if(plannerLastSyncError_ && !retryScheduled){
     if(serverOn && localPending){
       phase = 'queued';
@@ -20965,10 +21140,6 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(remoteNewer && !serverPending && !drivePending){
     phase = 'pull';
     overall = 'pending';
-  } else if((serverPending || drivePending) && pendingCount === 0 && heldCount > 0){
-    // 남은 것이 전부 「나중에」로 보류한 충돌뿐이다. 올릴 대기가 아니라 사용자의 선택을 기다리는 상태.
-    phase = 'held';
-    overall = 'warn';
   } else if(serverPending || drivePending || (serverOn && !serverRev && localRev > 0 && pendingCount > 0)){
     phase = 'pending';
     overall = 'pending';
@@ -21011,11 +21182,24 @@ function getSyncStatusInfo_(remoteMeta){
     }
     actionHint = '기다리면 됩니다. 헤더 「동기화」는 눌러도 되고, 안 눌러도 자동으로 끝납니다.';
   } else if(phase === 'retry_wait'){
-    summary = '서버 응답이 느려 자동 재시도 대기 중이에요' +
+    var retryReason = '';
+    try {
+      retryReason = describeSyncFailureReason_({
+        error: { message: plannerLastSyncError_ },
+        message: plannerLastSyncError_,
+        remain: pendingCount
+      });
+    } catch(eRetryReason){
+      retryReason = String(plannerLastSyncError_ || '').trim();
+    }
+    if(/Failed to fetch|NetworkError|Load failed/i.test(retryReason)){
+      retryReason = '네트워크 연결이 끊겼어요.';
+    }
+    summary = '자동 재시도 대기 중이에요' +
       (plannerGasRetryCount_ ? ' (' + plannerGasRetryCount_ + '회차)' : '') +
       (retryInSec ? ', ' + retryInSec + '초 후' : '') +
       (pendingCount ? ', 남은 약 ' + pendingCount + '건' : '') +
-      (plannerLastSyncError_ ? '. ' + plannerLastSyncError_ : '.');
+      (retryReason ? '. ' + retryReason : '.');
     actionHint = '기본적으로 기다리면 됩니다. 급하면 「동기화」→ 하단 「지금 동기화」를 누르세요.';
   } else if(phase === 'queued'){
     summary = '곧 자동으로 올리도록 예약돼 있어요.' +
@@ -21065,6 +21249,7 @@ function getSyncStatusInfo_(remoteMeta){
 
   var lastReason = '';
   try { lastReason = localStorage.getItem(SYNC_LAST_REASON_KEY) || ''; } catch(e2){}
+  var stalledFlag = /줄지 않았|전송 멈춤/.test(String(plannerLastSyncError_ || ''));
   return {
     localRev: localRev,
     localAt: localAt,
@@ -21093,6 +21278,7 @@ function getSyncStatusInfo_(remoteMeta){
     remoteNewer: remoteNewer,
     retryScheduled: retryScheduled,
     lastError: plannerLastSyncError_,
+    stalled: stalledFlag,
     loginRequired: loginRequired,
     overall: overall,
     summary: summary,
@@ -21509,6 +21695,8 @@ window.openSyncStatusModal_ = async function(){
   var alreadyOpen = overlay.classList.contains('open');
   overlay.classList.add('open');
   if(!alreadyOpen) lockBodyScroll_();
+  // 헤더 「동기화」: 대기·재시도 중이던 남은 건을 즉시 다시 보낸다.
+  try { forceImmediateSyncRetry_(); } catch(eKickOpen){}
   try {
     if(clearStuckSyncFlagsIfClean_(null)){
       save({ skipDriveUpload: true, skipGasPush: true, skipMarkDirty: true, skipEntityStamp: true });
@@ -21516,6 +21704,9 @@ window.openSyncStatusModal_ = async function(){
   } catch(eClr0){}
   refreshSyncStatusBodyHtml_(getSyncStatusInfo_());
   refreshSyncHistoryInModal_();
+  try {
+    if(err && plannerLastSyncError_) err.textContent = plannerLastSyncError_;
+  } catch(eErrShow){}
   var waitNote = document.createElement('div');
   waitNote.className = 'sync-status-row-meta sync-status-wait-note';
   waitNote.style.padding = '4px 2px';
@@ -22960,21 +23151,17 @@ function renderPlannerConflictUi_(pending){
       var i = group.indexes[0];
       var conflict = conflicts[i];
       var key = String(conflict.key || '');
-      var preferLocal = (key.indexOf('generated:') === 0 || key.indexOf('published:') === 0) &&
-        hasUsableAiDraftContent_(unwrapSyncEntityValue_(conflict.local)) &&
-        !hasUsableAiDraftContent_(unwrapSyncEntityValue_(conflict.remote));
-      var remoteChecked = preferLocal ? '' : ' checked';
-      var localChecked = preferLocal ? ' checked' : '';
-      var hint = preferLocal
-        ? '<div class="sync-conflict-name-sub" style="font-size:11px;color:#B45309;margin-top:4px;">이 기기 초안 본문이 있어요. 「이 기기」 권장.</div>'
-        : '';
+      // 기본은 「이 기기」. 서버 기본이면 로컬 편집이 지워질 수 있다.
+      var remoteChecked = '';
+      var localChecked = ' checked';
+      var hint = '<div class="sync-conflict-name-sub" style="font-size:11px;color:#B45309;margin-top:4px;">기본은 이 기기입니다. 서버를 고르면 이 기기 수정이 바뀔 수 있어요.</div>';
       return '<div class="sync-conflict-item">' +
         '<div class="sync-conflict-name">' + escapeHtml(group.label || plannerConflictLabel_(conflict.key)) + '</div>' + conflictDiffLineHTML_(conflict) + conflictFieldCompareHTML_(conflict) + hint +
         '<div class="sync-conflict-options">' +
-          '<label class="sync-conflict-option"><input type="radio" name="sync-conflict-' + i + '" value="remote"' + remoteChecked + '>' +
-            '<span><strong>서버 기준' + escapeHtml(remoteBy) + '</strong><span class="sync-conflict-preview">' + escapeHtml(plannerConflictPreview_(conflict.remote)) + '</span></span></label>' +
           '<label class="sync-conflict-option"><input type="radio" name="sync-conflict-' + i + '" value="local"' + localChecked + '>' +
             '<span><strong>이 기기 기준' + escapeHtml(localBy) + '</strong><span class="sync-conflict-preview">' + escapeHtml(plannerConflictPreview_(conflict.local)) + '</span></span></label>' +
+          '<label class="sync-conflict-option"><input type="radio" name="sync-conflict-' + i + '" value="remote"' + remoteChecked + '>' +
+            '<span><strong>서버 기준' + escapeHtml(remoteBy) + '</strong><span class="sync-conflict-preview">' + escapeHtml(plannerConflictPreview_(conflict.remote)) + '</span></span></label>' +
         '</div></div>';
     }).join('');
     if(hidden > 0){
@@ -23701,6 +23888,7 @@ window.closeSyncPreviewModal_ = function(ev){
 window.startManualSyncPreview_ = async function(){
   var err = document.getElementById('sync-status-err');
   if(err) err.textContent = '';
+  try { forceImmediateSyncRetry_(); } catch(eKickPrev){}
   var previewOv = document.getElementById('sync-preview-overlay');
   var previewBody = document.getElementById('sync-preview-body');
   if(!previewOv || !previewBody) return runManualFullSync_();
@@ -23962,13 +24150,20 @@ window.confirmManualSyncFromPreview_ = async function(){
         }, 500);
       })
     ]);
-    finishProgress(!plannerSyncConflictPending_);
+    var heldAfter = 0;
+    var remainAfter = 0;
+    try { heldAfter = countSnoozedHeldOps_(); } catch(eH){}
+    try { remainAfter = countPendingSyncItems_(); } catch(eR){}
+    // 보류·남은 건이 있으면 「동기화 완료」로 끝내지 않는다.
+    finishProgress(!plannerSyncConflictPending_ && heldAfter < 1 && remainAfter < 1);
   } catch(eRun){
     finishProgress(false);
-    var msg = (eRun && eRun.message) ? eRun.message : String(eRun);
+    var msg = describeSyncFailureReason_({ error: eRun, message: (eRun && eRun.message) || eRun });
     var err = document.getElementById('sync-status-err');
     if(err) err.textContent = msg;
-    notifyPlannerSyncIssue_(eRun, { manual: true, force: true });
+    try {
+      notifyPlannerSyncIssue_(new Error(msg), { manual: true, force: true });
+    } catch(eN){}
   } finally {
     clearTimeout(hardTimer);
     var btn = document.getElementById('btn-sync-now');
@@ -24049,6 +24244,7 @@ window.runManualFullSync_ = async function(opts){
   var err = document.getElementById('sync-status-err');
   if(btn) btn.disabled = true;
   if(err) err.textContent = '';
+  try { forceImmediateSyncRetry_(); } catch(eKickMan){}
   updateSyncStatusUI_();
   if(!opts.fromPreview) savePreSyncBackup_();
   try {
@@ -24057,8 +24253,21 @@ window.runManualFullSync_ = async function(opts){
     var pushResult = { ok: true, skipped: true };
     if(isServerSyncConfigured_()){
       pushResult = await plannerGasPushNow_();
+      if(pushResult && pushResult.held){
+        var heldN = pushResult.heldCount || countSnoozedHeldOps_();
+        var heldToast = '선택 대기 ' + heldN + '건이 있어요. 충돌을 고르기 전에는 완료로 보지 않아요.';
+        if(err) err.textContent = heldToast;
+        if(typeof setAppToast === 'function') setAppToast(heldToast, { duration: 5600, variant: 'ok' });
+        return;
+      }
       if(!pushResult || !pushResult.ok){
-        throw (pushResult && pushResult.error) || new Error(pushResult && pushResult.conflict ? '동기화 충돌을 먼저 확인해 주세요.' : '서버 저장을 완료하지 못했습니다.');
+        var failMsg = describeSyncFailureReason_({
+          error: pushResult && pushResult.error,
+          message: (pushResult && (pushResult.message || (pushResult.error && pushResult.error.message))) || '',
+          stalled: !!(pushResult && pushResult.stalled),
+          remain: pushResult && pushResult.remain
+        });
+        throw (pushResult && pushResult.error) || new Error(pushResult && pushResult.conflict ? '동기화 충돌을 먼저 확인해 주세요.' : failMsg);
       }
     }
     if(hasDriveValidToken_()){
@@ -24066,18 +24275,30 @@ window.runManualFullSync_ = async function(opts){
     }
     _syncStatusModalRemote = await fetchServerSyncMeta_();
     refreshSyncStatusBodyHtml_(getSyncStatusInfo_());
+    var remainN = 0;
+    var heldLeft = 0;
+    try { remainN = countPendingSyncItems_(); } catch(eRem){}
+    try { heldLeft = countSnoozedHeldOps_(); } catch(eHeld){}
     var detail = '';
     if(opts.preview && opts.preview.subGoalHtml) detail = '\n주제 단계 배치 차이가 있었어요. 화면을 확인해 주세요.';
     if(typeof setAppToast === 'function'){
-      setAppToast((changed ? '최신 데이터를 받아 서버 저장까지 확인했어요.' : '서버와 최신 상태가 일치해요.') + detail, { duration: 5200, variant: 'ok' });
-    }
-    if(plannerSyncConflictPending_){
-      if(typeof setAppToast === 'function') setAppToast('충돌 항목을 선택해 주세요.', { duration: 4000, variant: 'ok' });
+      if(plannerSyncConflictPending_){
+        setAppToast('충돌 항목을 선택해 주세요.', { duration: 4000, variant: 'ok' });
+      } else if(heldLeft > 0){
+        setAppToast('선택 대기 ' + heldLeft + '건이 있어요. 고르기 전에는 완료로 보지 않아요.' + detail, { duration: 5600, variant: 'ok' });
+      } else if(remainN > 0){
+        setAppToast('아직 남은 ' + remainN + '건이 있어요. 자동으로 이어 올리거나 「지금 동기화」를 다시 눌러 주세요.' + detail, { duration: 5600, variant: 'ok' });
+      } else {
+        setAppToast((changed ? '최신 데이터를 받아 서버 저장까지 확인했어요.' : '서버와 최신 상태가 일치해요.') + detail, { duration: 5200, variant: 'ok' });
+      }
     }
   } catch(e3){
-    var msg = (e3 && e3.message) ? e3.message : String(e3);
+    var msg = describeSyncFailureReason_({ error: e3, message: (e3 && e3.message) || e3 });
     if(err) err.textContent = msg;
-    notifyPlannerSyncIssue_(e3, { manual: true, force: true });
+    try {
+      var manErr = new Error(msg);
+      notifyPlannerSyncIssue_(manErr, { manual: true, force: true });
+    } catch(eManToast){}
     throw e3;
   } finally {
     if(btn) btn.disabled = false;
@@ -30183,6 +30404,86 @@ window.getChannelPlan_ = getChannelPlan_;
 window.setChannelPlan_ = setChannelPlan_;
 window.clearChannelPlanByPostId_ = clearChannelPlanByPostId_;
 window.opsPlanChipLabel_ = opsPlanChipLabel_;
+
+/** 네이버·Meta 등에서 직접 건 예약. channelPlan과 분리 — 플래너 자동 예약·발행 상태를 바꾸지 않는다. */
+function getExternalReserveAt_(draftId, channelKey){
+  var pub = draftId && state.published && state.published[draftId];
+  var er = pub && pub.externalReserve && pub.externalReserve[channelKey];
+  return er && er.at ? String(er.at) : '';
+}
+function isoToDatetimeLocalValue_(iso){
+  var dt = new Date(iso);
+  if(isNaN(dt.getTime())) return '';
+  var pad = function(n){ return String(n).padStart(2, '0'); };
+  return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate()) +
+    'T' + pad(dt.getHours()) + ':' + pad(dt.getMinutes());
+}
+function datetimeLocalValueToIso_(val){
+  var raw = String(val || '').trim();
+  if(!raw) return '';
+  var dt = new Date(raw);
+  if(isNaN(dt.getTime())) return '';
+  return dt.toISOString();
+}
+function setExternalReserveAt_(draftId, catId, channelKey, isoOrEmpty){
+  if(!draftId || !channelKey) return;
+  if(!state.published) state.published = {};
+  if(!state.published[draftId]) state.published[draftId] = {};
+  var pub = state.published[draftId];
+  if(!pub.externalReserve) pub.externalReserve = {};
+  var nextIso = String(isoOrEmpty || '').trim();
+  if(!nextIso){
+    delete pub.externalReserve[channelKey];
+  } else {
+    pub.externalReserve[channelKey] = { at: nextIso };
+  }
+  if(catId != null) pub.catId = catId;
+  if(!pub.topic){
+    var cat = CATEGORIES[catId != null ? catId : getCatIdFromDraftId_(draftId)];
+    var draft = cat && cat.drafts && cat.drafts.find(function(d){ return d.id === draftId; });
+    if(draft && draft.topic) pub.topic = draft.topic;
+  }
+  // 발행 상태·channelPlan·자동 예약은 건드리지 않는다. 기록만 저장.
+  state._sessionUserEdit = true;
+  try {
+    enqueueSyncOutboxChanges_(['published:' + draftId], getPersistPayload());
+  } catch(eEnq){}
+  save({ skipDriveUpload: true, skipGasPush: false });
+  try { updatePublishScheduleHeaderCount_(); } catch(eCnt){}
+  try { refreshPublishScheduleIfOpen_(); } catch(eRef){}
+}
+function externalReserveSheetBlock_(channelKey){
+  var draftId = state.selectedId;
+  if(!draftId || !channelKey) return '';
+  var cur = getExternalReserveAt_(draftId, channelKey);
+  var localVal = cur ? isoToDatetimeLocalValue_(cur) : '';
+  return '<div class="cb external-reserve-block" style="margin-top:12px;">' +
+    '<div class="cb-label">외부 예약 일시</div>' +
+    '<div class="publish-field-help" style="margin:4px 0 6px;line-height:1.45;">네이버 에디터·Meta 등에서 직접 걸어 둔 예약만 적어요. 플래너가 자동으로 올리지 않고, 발행 상태도 바꾸지 않아요. 예약 현황 목록에만 표시됩니다.</div>' +
+    '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+      '<input type="datetime-local" class="sheet-edit" id="sheet-external-reserve-' + escapeHtml(channelKey) + '" value="' + escapeHtml(localVal) + '" ' +
+        'onchange="onExternalReserveInput_(\'' + jsAttrString_(channelKey) + '\', this.value)" style="flex:1;min-width:180px;box-sizing:border-box;">' +
+      '<button type="button" class="img-tool-copy-btn" onclick="onExternalReserveInput_(\'' + jsAttrString_(channelKey) + '\',\'\')">지우기</button>' +
+    '</div></div>';
+}
+window.onExternalReserveInput_ = function(channelKey, value){
+  var draftId = state.selectedId;
+  if(!draftId || !channelKey) return;
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
+  var iso = value ? datetimeLocalValueToIso_(value) : '';
+  if(value && !iso){
+    if(typeof setAppToast === 'function') setAppToast('날짜·시간을 확인해 주세요.', { duration: 3200, variant: 'err' });
+    return;
+  }
+  setExternalReserveAt_(draftId, catId, channelKey, iso);
+  var el = document.getElementById('sheet-external-reserve-' + channelKey);
+  if(el) el.value = iso ? isoToDatetimeLocalValue_(iso) : '';
+  if(typeof setAppToast === 'function'){
+    setAppToast(iso ? '외부 예약을 기록했어요. 예약 현황에 표시됩니다.' : '외부 예약 기록을 지웠어요.', { duration: 3200, variant: 'ok' });
+  }
+};
+window.getExternalReserveAt_ = getExternalReserveAt_;
+window.setExternalReserveAt_ = setExternalReserveAt_;
 function collectOpsPlanByDay_(){
   var days = {};
   var start = new Date();
@@ -30351,9 +30652,9 @@ function isPublishScheduleModalOpen_(){
   return !!(o && o.classList.contains('open'));
 }
 /**
- * 예약된 글만. 정렬은 채널 예약(channelPlan.at) 기준.
+ * 예약된 글만. 정렬은 채널 예약(channelPlan.at) + 외부 예약(externalReserve.at) 기준.
  * 행: 카테고리 / 주제 / 채널 예약 배지(날짜 포함) / 최근 수정일
- * 읽기만 — 저장·상태 변경 없음.
+ * 읽기만 — 저장·상태 변경 없음. 외부 예약은 표시만 하며 자동 예약을 일으키지 않는다.
  */
 function collectPublishScheduleRows_(opts){
   opts = opts || {};
@@ -30366,6 +30667,30 @@ function collectPublishScheduleRows_(opts){
   var rows = [];
   var channelOrder = ['blog', 'insta', 'threads', 'news', 'newsNaver', 'newsKakao', 'newsKarrot', 'sonsik', 'community', 'thread'];
   var i, j, cat, draft, pub, plan, catLabel, title;
+  function pushReservation_(reservations, channelKey, at, isExternal){
+    if(!at) return;
+    if(pub && pub.tabPublished && pub.tabPublished[channelKey] && !isExternal) return;
+    var planMs = Date.parse(at);
+    if(isNaN(planMs)) return;
+    var whenShort = formatScheduleBadgeDate_(at);
+    if(!whenShort) return;
+    var badgeKey = scheduleChannelBadgeKey_(channelKey);
+    if(filterChannel && badgeKey !== filterChannel) return;
+    var note = scheduleBadgeTimingNote_(at);
+    if(isExternal) note = note ? ('외부 · ' + note) : '외부';
+    reservations.push({
+      key: channelKey,
+      badgeKey: badgeKey,
+      label: scheduleChannelBadgeLabel_(channelKey),
+      at: at,
+      ms: planMs,
+      whenShort: whenShort,
+      note: note,
+      isToday: /오늘/.test(note),
+      needsConfirm: /확인 필요/.test(note),
+      isExternal: !!isExternal
+    });
+  }
   for(i = 0; i < CATEGORIES.length; i++){
     cat = CATEGORIES[i];
     if(!cat || !cat.drafts || !cat.drafts.length) continue;
@@ -30381,25 +30706,20 @@ function collectPublishScheduleRows_(opts){
         Object.keys(plan).forEach(function(channelKey){
           var item = plan[channelKey];
           if(!item || !item.at) return;
-          if(pub && pub.tabPublished && pub.tabPublished[channelKey]) return;
-          var planMs = Date.parse(item.at);
-          if(isNaN(planMs)) return;
-          var whenShort = formatScheduleBadgeDate_(item.at);
-          if(!whenShort) return;
-          var badgeKey = scheduleChannelBadgeKey_(channelKey);
-          if(filterChannel && badgeKey !== filterChannel) return;
-          var note = scheduleBadgeTimingNote_(item.at);
-          reservations.push({
-            key: channelKey,
-            badgeKey: badgeKey,
-            label: scheduleChannelBadgeLabel_(channelKey),
-            at: item.at,
-            ms: planMs,
-            whenShort: whenShort,
-            note: note,
-            isToday: note === '오늘',
-            needsConfirm: note === '확인 필요'
+          pushReservation_(reservations, channelKey, item.at, false);
+        });
+      }
+      var external = pub && pub.externalReserve;
+      if(external){
+        Object.keys(external).forEach(function(channelKey){
+          var item = external[channelKey];
+          if(!item || !item.at) return;
+          // 같은 채널·같은 시각의 플래너 예약과 중복이면 외부만 따로 표시하지 않음
+          var dup = reservations.some(function(r){
+            return !r.isExternal && r.key === channelKey && Math.abs(r.ms - Date.parse(item.at)) < 60000;
           });
+          if(dup) return;
+          pushReservation_(reservations, channelKey, item.at, true);
         });
       }
       if(!reservations.length) continue;
@@ -30485,12 +30805,14 @@ function renderScheduleReservationBadgesHTML_(badges){
     var extra = '';
     if(b.isToday) extra += ' is-today';
     if(b.needsConfirm) extra += ' needs-confirm';
+    if(b.isExternal) extra += ' is-external';
     var cls = 'schedule-res-badge schedule-res-' + escapeHtml(b.badgeKey || b.key || 'etc') + extra;
     var noteHtml = b.note
       ? '<span class="schedule-res-note">' + escapeHtml(b.note) + '</span>'
       : '';
-    var aria = String(b.label || '') + ' ' + String(b.whenShort || '') + (b.note ? (' ' + b.note) : '');
-    // 채널 이름은 상단 색상 안내·필터에만 두고, 배지에는 일시(+오늘/확인 필요)만
+    var aria = String(b.label || '') + ' ' + String(b.whenShort || '') + (b.note ? (' ' + b.note) : '') +
+      (b.isExternal ? ' 외부 예약' : '');
+    // 채널 이름은 상단 색상 안내·필터에만 두고, 배지에는 일시(+오늘/확인 필요/외부)만
     return '<span class="' + cls + '" title="' + escapeHtml(aria.trim()) + '" aria-label="' + escapeHtml(aria.trim()) + '">' +
       '<span class="schedule-res-when">' + escapeHtml(b.whenShort || '') + '</span>' +
       noteHtml +
@@ -35010,7 +35332,10 @@ function onPlannerHashChange_(){
   var m = h.match(/^open\/([^/]+)\/(\d+)(?:\/([a-z]+))?$/);
   if(!m){
     var ov = document.getElementById('detail-overlay');
-    if(ov && ov.classList.contains('open')) closeSheetUiOnly_();
+    if(ov && ov.classList.contains('open')){
+      // 뒤로가기·해시 제거도 저장 확인과 같은 규칙
+      requestCloseSheet_({ fromHash: true });
+    }
     return;
   }
   var draftId = decodeURIComponent(m[1]);
@@ -41261,16 +41586,20 @@ function openDetail(draftId, catId, tab, opts) {
     state.activeTab = normalizeSheetTabForCategory_(tab, catId) || state.activeTab;
   }
   state._sheetUserEdited = false;
+  state._sheetDomDirty = false;
   const content = getDraftContent_(draftId);
   document.getElementById('sheet-title').textContent = stripClinicBlogTitlePrefix_(draft.topic);
   if(content){
-    rememberDraftContentFp_(draftId, content);
+    captureSheetBaseline_(draftId);
     var viewContent = content;
     try { viewContent = JSON.parse(JSON.stringify(content)); } catch(eView){}
     normalizeContentImages_(viewContent, catId);
     renderSheetContent(viewContent);
   }
-  else { renderSheetEmpty(draft, cat); }
+  else {
+    captureSheetBaseline_(draftId);
+    renderSheetEmpty(draft, cat);
+  }
   // 닫기 애니메이션 중 재오픈이면 예약된 unlock을 무효화
   _detailCloseGen_ += 1;
   var detailOv = document.getElementById('detail-overlay');
@@ -41406,6 +41735,8 @@ function renderSheetContent(content, opts) {
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         (isBranchBookingBlogCategory_(blogCatId) ? realMovementBlogFooterSheetHtml_(blogCatId) : expertCourseBlogFooterSheetHtml_(blogCatId)) +
         reelCaptionSheetBlock_() +
+        externalReserveSheetBlock_('blog') +
+        '<div id="content-lint-box" class="content-lint-box">' + contentLintHTML_(content) + '</div>' +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. <strong>지금 올리기·예약하기</strong>는 글을 복사하고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙고, 버튼으로 날짜를 바꿀 수 있어요. <strong>수정된 블로그 최종본</strong>으로 인스타 캡션이 백그라운드에서 만들어져요.' +
         ((isBranchBookingBlogCategory_(blogCatId) || isExpertCourseCategory(blogCatId)) ? ' 하단 <strong>말미 링크</strong>는 고정으로 붙어요.' : '') + '</p>'
       );
@@ -41422,6 +41753,8 @@ function renderSheetContent(content, opts) {
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요 · 3~5개 권장', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         expertCourseBlogFooterSheetHtml_(blogCatId) +
         reelCaptionSheetBlock_() +
+        externalReserveSheetBlock_('blog') +
+        '<div id="content-lint-box" class="content-lint-box">' + contentLintHTML_(content) + '</div>' +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>지금 올리기·예약하기</strong>는 저장·복사되고 글쓰기로 이동해요. 하단 <strong>말미 링크</strong>는 해당 과정 안내로 고정해서 붙어요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙습니다.</p>'
       );
     } else {
@@ -41436,6 +41769,8 @@ function renderSheetContent(content, opts) {
         sheetEditField_('참고 문헌', 'sheet-blog-references', b.references || '', { rows: 3, copy: true, help: '저자·연도·논문 제목·학술지만 한 줄에 하나. 링크 없음. 마무리 문장 뒤에 붙습니다.' }) +
         sheetEditField_('해시태그', 'sheet-blog-hashtags', (b.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'blog.hashtags', copy: true, copyHashtags: true }) +
         reelCaptionSheetBlock_() +
+        externalReserveSheetBlock_('blog') +
+        '<div id="content-lint-box" class="content-lint-box">' + contentLintHTML_(content) + '</div>' +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;">각 박스를 수정하거나 <strong>재생성</strong>으로 그 부분만 다시 만들 수 있어요. 다듬은 뒤 <strong>지금 올리기·예약하기</strong>는 블로그가 저장·복사되고 글쓰기로 이동해요. 데스크탑은 글쓰기 페이지, 모바일·태블릿은 블로그 앱입니다. 예약하면 브랜딩 날짜 칩에 점이 붙습니다.</p>'
       );
     }
@@ -41455,6 +41790,7 @@ function renderSheetContent(content, opts) {
         sheetEditField_('캡션 (짧은 본문)', 'sheet-insta-caption', instaCaption, { rows: 10, regen: 'insta.caption', copy: true, paragraphs: true }) +
         sheetEditField_('해시태그', 'sheet-insta-hashtags', (ig.hashtags || []).join(' '), { rows: 2, help: '띄어쓰기로 구분 · 넣은 #은 그대로 둬요', regen: 'insta.hashtags', copy: true, copyHashtags: true }) +
         instaExtraFieldsHTML_(ig) +
+        externalReserveSheetBlock_('insta') +
         '<div id="content-lint-box" class="content-lint-box">' + contentLintHTML_(content) + '</div>' +
         instagramCollabSheetHtml_(state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId)) +
         '<div data-social-slot="insta"></div>' +
@@ -41478,6 +41814,8 @@ function renderSheetContent(content, opts) {
         sheetFullCopyBar_() +
         sheetEditField_('본문 (한 줄)', 'sheet-threads-body', getThreadsBodyText_(ths), { rows: 5, regen: 'threads.body', copy: true, help: '첫 훅 한 줄만. 일반인 글은 자가 점검 질문으로 끝내세요. 해설은 댓글로.', paragraphs: true }) +
         sheetEditField_('댓글 (4개 · 빈 줄로 구분)', 'sheet-threads-comment', getThreadsCommentText_(ths), { rows: 12, regen: 'threads.comment', copy: true, help: '빈 줄로 나뉜 단락이 댓글 하나입니다(정확히 4개, 하나에 1~2문장). 빈 줄이 있으면 그 경계를 유지하고, 빈 줄이 없을 때만 마침표로 나눕니다.', paragraphs: true }) +
+        externalReserveSheetBlock_('threads') +
+        '<div id="content-lint-box" class="content-lint-box">' + contentLintHTML_(content) + '</div>' +
         '<div data-social-slot="threads"></div>' +
         '<p class="empty-note" style="padding:8px 0 0;font-size:11px;color:#9CA3AF;line-height:1.55;"><strong>지금 올리기·예약하기</strong>는 본문을 올리고, 댓글 박스의 <strong>빈 줄마다</strong> 바로 아래 내 댓글로 이어 올립니다. 앱에서 직접 올렸다면 <strong>직접 올림</strong>을 누르세요.</p>';
     }
@@ -41502,7 +41840,8 @@ function renderSheetContent(content, opts) {
         sheetEditField_('제목 · 첫 줄', 'sheet-news-title', newsItem.title || '', { rows: 2, title: true, regen: 'news.title', copy: true }) +
         sheetEditField_('본문', 'sheet-news-body', newsItem.body || '', { rows: 10, regen: 'news.body', copy: true, paragraphs: true, help: chLabel + ' 톤에 맞게 다듬으세요' }) +
         sheetEditField_('CTA', 'sheet-news-cta', newsItem.cta || '', { rows: 3, regen: 'news.cta', copy: true, paragraphs: true }) +
-        renderNewsPostLinksBarHTML_()
+        renderNewsPostLinksBarHTML_() +
+        externalReserveSheetBlock_(newsCh === 'naver' ? 'newsNaver' : (newsCh === 'kakao' ? 'newsKakao' : (newsCh === 'karrot' ? 'newsKarrot' : 'news')))
       );
     }
   } else if(tab==='community'){
@@ -41542,11 +41881,11 @@ function renderSheetContent(content, opts) {
     ? '<button type="button" class="btn-save-draft" onpointerdown="holdSheetSavePush_()" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' + PlannerSocial.actionsHTML(tab)
     : blogPlanTab
       ? '<button type="button" class="btn-save-draft" onpointerdown="holdSheetSavePush_()" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
-        '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
+        '<button type="button" class="btn-sheet-close-action" onclick="requestCloseSheet_()">닫기</button>' +
         blogScheduleButtonHTML_() +
         '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">지금 올리기</button>'
       : '<button type="button" class="btn-save-draft" onpointerdown="holdSheetSavePush_()" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
-        '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
+        '<button type="button" class="btn-sheet-close-action" onclick="requestCloseSheet_()">닫기</button>' +
         (isDailyImages ? '' : '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">발행완료</button>')
   );
   if(typeof PlannerSocial !== 'undefined' && document.querySelector('#sheet-body [data-social-slot]')) PlannerSocial.hydrate();
@@ -42557,7 +42896,7 @@ function sheetEditField_(label, id, value, opts){
     }
     tools += '</span>';
   }
-  var oninput = 'autoGrowTextarea_(this);markSheetUserEdited_()' +
+  var oninput = 'autoGrowTextarea_(this);markSheetUserEdited_();if(typeof refreshContentLint_===\'function\')refreshContentLint_()' +
     (opts.regen ? ';onSheetFieldInput_(this)' : '') +
     (opts.stepPreview ? ';renderSelfCareStepsPreview_(this)' : '') +
     (opts.syncTopic ? ';onSheetTitleSyncTopic_(this)' : '');
@@ -42851,16 +43190,16 @@ function noteSheetDraftActivity_(){
   pushCardRevision_(state.selectedId);
 }
 function scheduleSheetQuietSave_(){
-  if(_sheetQuietSaveTimer_) clearTimeout(_sheetQuietSaveTimer_);
-  _sheetQuietSaveTimer_ = setTimeout(flushSheetQuietSave_, 1000);
+  // 자동 저장하지 않는다. 닫을 때 「저장 / 저장 안 함 / 취소」로만 반영.
+  // 타이머는 쓰지 않고 dirty 표시만 남긴다.
+  if(_sheetQuietSaveTimer_){
+    clearTimeout(_sheetQuietSaveTimer_);
+    _sheetQuietSaveTimer_ = 0;
+  }
 }
 function flushSheetQuietSave_(){
+  // 이전 자동 저장 경로. 닫기·명시적 「저장」 전에는 디스크에 쓰지 않는다.
   _sheetQuietSaveTimer_ = 0;
-  if(sheetQuietSaving_) return;
-  if(!state._sheetDomDirty) return;
-  sheetQuietSaving_ = true;
-  try { flushSheetQuietSaveBody_(); }
-  finally { sheetQuietSaving_ = false; }
 }
 function flushSheetQuietSaveBody_(){
   if(!state._sheetDomDirty) return;
@@ -42912,12 +43251,17 @@ function clearSheetSaveHold_(){
 window.onSheetFieldBlur_ = function(ev){
   var next = ev && ev.relatedTarget;
   if(next && next.closest && next.closest('.btn-save-draft')) holdSheetSavePush_();
-  if(sheetQuietSaving_ || sheetSectionPainting_) return;
-  if(_sheetQuietSaveTimer_){
-    clearTimeout(_sheetQuietSaveTimer_);
-    _sheetQuietSaveTimer_ = 0;
+  // 닫기·바깥 클릭으로 포커스가 빠질 때 자동 저장하지 않는다.
+  if(next && next.closest && (
+    next.closest('.sheet-close') ||
+    next.closest('.btn-sheet-close-action') ||
+    next.closest('#sheet-leave-overlay')
+  )){
+    cancelSheetQuietSave_();
+    return;
   }
-  flushSheetQuietSave_();
+  if(sheetQuietSaving_ || sheetSectionPainting_) return;
+  cancelSheetQuietSave_();
 };
 function updateSheetFieldPolishBtn_(ta){
   if(!ta || !ta.id) return;
@@ -43821,8 +44165,8 @@ function flushSheetTitleBackgroundWork_(opts){
   var pending = sheetTitleBgPending_;
   if(!pending) return false;
   sheetTitleBgPending_ = null;
+  // 파생 UI(망고 제목·오버레이)만. 자동 save / topic 확정은 하지 않는다.
   applySheetTitleDerivedWork_(pending.draftId, pending.title);
-  if(opts.save !== false) save();
   return true;
 }
 window.flushSheetTitleBackgroundWork_ = flushSheetTitleBackgroundWork_;
@@ -43837,7 +44181,7 @@ function scheduleSheetTitleBackgroundWork_(draftId, title){
   }
   sheetTitleBgTimer_ = setTimeout(function(){
     sheetTitleBgTimer_ = null;
-    var kick = function(){ flushSheetTitleBackgroundWork_({ save: true }); };
+    var kick = function(){ flushSheetTitleBackgroundWork_({}); };
     if(typeof requestIdleCallback === 'function'){
       sheetTitleBgIdleId_ = requestIdleCallback(function(){
         sheetTitleBgIdleId_ = 0;
@@ -43876,6 +44220,13 @@ function syncDraftTopicFromTitle_(title, opts){
   if(!draft) return false;
   if(opts.auto && typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerAutoTitleMayRenameCard &&
      !PlannerSyncRules.plannerAutoTitleMayRenameCard(draft, next)) return false;
+  // 미리보기만: 목록·헤더 표시만 바꾸고 draft.topic / 동기화 대기열은 건드리지 않는다.
+  if(opts.previewOnly){
+    var previewEl = document.getElementById('sheet-title');
+    if(previewEl) previewEl.textContent = next;
+    paintSheetTitleSurfaces_(draftId, next);
+    return false;
+  }
   var prev = String(draft.topic || '').trim();
   var titleEl = document.getElementById('sheet-title');
   if(titleEl) titleEl.textContent = next;
@@ -43893,10 +44244,28 @@ function syncDraftTopicFromTitle_(title, opts){
   if(opts.save !== false) saveFocusedDraftChange_(draftId);
   return true;
 }
+/** 입력 중인 제목을 draft.topic 으로 확정(저장 시에만). */
+function commitSheetTitleIfNeeded_(opts){
+  opts = opts || {};
+  var draftId = opts.draftId || state.selectedId;
+  if(!draftId) return false;
+  var title = state._sheetPendingTitle;
+  if(title == null){
+    var el = document.getElementById('sheet-blog-title') || document.getElementById('sheet-community-title') ||
+      document.getElementById('sheet-thread-title');
+    if(el) title = el.value;
+  }
+  if(title == null) return false;
+  state._sheetPendingTitle = null;
+  return syncDraftTopicFromTitle_(title, { draftId: draftId, save: false, auto: !!opts.auto });
+}
 window.onSheetTitleSyncTopic_ = function(el){
   var title = el ? el.value : '';
-  syncDraftTopicFromTitle_(title, { save: false });
-  paintSheetTitleSurfaces_(state.selectedId, title);
+  markSheetUserEdited_();
+  state._sheetDomDirty = true;
+  state._sheetPendingTitle = title;
+  // 저장 전에는 미리보기만. published.topic·대기열에 바로 넣지 않는다.
+  syncDraftTopicFromTitle_(title, { previewOnly: true });
   scheduleSheetTitleBackgroundWork_(state.selectedId, title);
 };
 
@@ -43950,7 +44319,8 @@ function applySheetBlogEdits_(content){
   if(nextTitle && nextTitle !== prevTitle){
     var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
     syncThumbnailOverlayHook_(content, catId);
-    syncDraftTopicFromTitle_(nextTitle, { save: false, auto: true });
+    // topic 확정은 저장 시 commitSheetTitleIfNeeded_ 에서만. 여기서는 미리보기.
+    syncDraftTopicFromTitle_(nextTitle, { previewOnly: true });
   }
   var reelEl = document.getElementById('sheet-reel-caption');
   if(reelEl){
@@ -43990,23 +44360,176 @@ function instaExtraFieldsHTML_(ig){
     '<label for="sheet-reel-cover" style="font-size:12px;">릴스 커버 파일명</label>' + inp('sheet-reel-cover', ig.reelCoverFilename, '예: 261107_리얼무브먼트_스트레칭_cover.png') +
     '</div>';
 }
+/** 화면에 보이는(또는 현재 포맷의) 칸만 점검한다. 숨은 draft·말미 고정문 오탐 방지. */
+function contentLintVisibleFields_(content){
+  var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
+  var visible = { blog: [], insta: [], threads: [], reel: [], news: [] };
+  var blogMap = [
+    ['sheet-blog-title', 'title'], ['sheet-blog-problem', 'problem'], ['sheet-blog-selfcare', 'selfCare'],
+    ['sheet-blog-explanation', 'explanation'], ['sheet-blog-hook', 'hook'], ['sheet-blog-outline', 'outline'],
+    ['sheet-blog-draft', 'draft'], ['sheet-blog-cta', 'cta'], ['sheet-blog-references', 'references'],
+    ['sheet-blog-hashtags', 'hashtags']
+  ];
+  blogMap.forEach(function(pair){
+    if(document.getElementById(pair[0])) visible.blog.push(pair[1]);
+  });
+  if(!visible.blog.length){
+    if(blogUsesStructuredGeneralFormat_(catId, content && content.blog)){
+      visible.blog = ['title', 'problem', 'selfCare', 'explanation', 'cta', 'references', 'hashtags'];
+    } else {
+      visible.blog = ['title', 'hook', 'outline', 'draft', 'cta', 'references', 'hashtags'];
+    }
+  }
+  [
+    ['sheet-insta-hook', 'hook'], ['sheet-insta-caption', 'caption'], ['sheet-insta-hashtags', 'hashtags']
+  ].forEach(function(pair){
+    if(document.getElementById(pair[0])) visible.insta.push(pair[1]);
+  });
+  if(!visible.insta.length && content && content.insta){
+    visible.insta = ['hook', 'caption', 'hashtags'];
+  }
+  [
+    ['sheet-threads-body', 'body'], ['sheet-threads-comment', 'comment']
+  ].forEach(function(pair){
+    if(document.getElementById(pair[0])) visible.threads.push(pair[1]);
+  });
+  if(!visible.threads.length && content && content.threads){
+    visible.threads = ['body', 'comment'];
+  }
+  if(document.getElementById('sheet-reel-caption')) visible.reel = ['caption'];
+  var newsCh = typeof getNewsChannel_ === 'function' ? getNewsChannel_() : 'naver';
+  [
+    ['sheet-news-title', newsCh + '.title'],
+    ['sheet-news-body', newsCh + '.body'],
+    ['sheet-news-cta', newsCh + '.cta']
+  ].forEach(function(pair){
+    if(document.getElementById(pair[0])) visible.news.push(pair[1]);
+  });
+  if(!visible.news.length && content && content.news){
+    ['naver', 'kakao', 'karrot'].forEach(function(ch){
+      visible.news.push(ch + '.title', ch + '.body', ch + '.cta');
+    });
+  }
+  return visible;
+}
 function contentLintHTML_(content){
   if(!content) return '';
   var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
+  var blog = content.blog ? Object.assign({}, content.blog) : null;
+  var liveBlog = readSheetBlogEdits_();
+  if(blog && liveBlog) Object.assign(blog, liveBlog);
   var ig = content.insta ? Object.assign({}, content.insta) : null;
   var live = document.getElementById('sheet-insta-hook') ? readSheetInstaEdits_() : null;
   if(ig && live) Object.assign(ig, live);
-  var issues = PlannerSyncRules.plannerLintContent({ catId: catId, blog: content.blog || null, insta: ig, threads: content.threads || null, expectedComments: 4 });
-  if(ig && ig.reelCaption){
-    PlannerSyncRules.plannerLintContent({ catId: catId, blog: { hook: ig.reelCaption } }).forEach(function(x){ x.channel = 'reel'; x.field = 'caption'; issues.push(x); });
+  var th = content.threads ? Object.assign({}, content.threads) : null;
+  if(th){
+    var bodyEl = document.getElementById('sheet-threads-body');
+    var commentEl = document.getElementById('sheet-threads-comment');
+    if(bodyEl) th.body = sheetFieldText_(bodyEl);
+    if(commentEl) th.comment = sheetFieldText_(commentEl);
+  }
+  var news = content.news ? JSON.parse(JSON.stringify(content.news)) : null;
+  if(news && document.getElementById('sheet-news-title')){
+    var newsChLive = typeof getNewsChannel_ === 'function' ? getNewsChannel_() : 'naver';
+    if(!news[newsChLive]) news[newsChLive] = { title: '', body: '', cta: '' };
+    news[newsChLive].title = sheetFieldText_(document.getElementById('sheet-news-title'));
+    news[newsChLive].body = sheetFieldText_(document.getElementById('sheet-news-body'));
+    news[newsChLive].cta = sheetFieldText_(document.getElementById('sheet-news-cta'));
+  }
+  var visible = contentLintVisibleFields_(content);
+  var issues = PlannerSyncRules.plannerLintContent({
+    catId: catId,
+    blog: blog,
+    insta: ig,
+    threads: th,
+    news: news,
+    expectedComments: 4,
+    visible: visible
+  });
+  if(ig && ig.reelCaption && (!visible.reel || visible.reel.indexOf('caption') >= 0)){
+    PlannerSyncRules.plannerLintContent({
+      catId: catId,
+      blog: { hook: ig.reelCaption },
+      visible: { blog: ['hook'] }
+    }).forEach(function(x){ x.channel = 'reel'; x.field = 'caption'; issues.push(x); });
   }
   if(!issues.length) return '<div style="font-size:12px;color:#047857;padding:6px 0;">자동 점검: 걸리는 곳이 없어요.</div>';
-  var chLabel = { blog: '블로그', insta: '인스타', threads: '쓰레드', reel: '릴스' };
-  return '<div style="font-size:12px;color:#B45309;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 10px;margin:8px 0;line-height:1.55;">' +
-    '<strong>자동 점검 ' + issues.length + '건</strong> (저장은 막지 않아요)<ul style="margin:4px 0 0 16px;padding:0;">' +
-    issues.slice(0, 12).map(function(x){ return '<li>' + escapeHtml((chLabel[x.channel] || x.channel) + ' · ' + x.field + ': ' + x.msg) + '</li>'; }).join('') +
-    '</ul></div>';
+  var chLabel = { blog: '블로그', insta: '인스타', threads: '쓰레드', reel: '릴스', news: '소식', ads: '광고' };
+  var hard = issues.filter(function(x){ return x.code !== 'caution'; });
+  var soft = issues.filter(function(x){ return x.code === 'caution'; });
+  function lintItemHtml_(x, color){
+    var label = (chLabel[x.channel] || x.channel) + ' · ' + x.field + ': ' + x.msg;
+    var excerpt = x.excerpt ? (' — 「' + x.excerpt + '」') : '';
+    return '<li style="margin:2px 0;"><button type="button" class="content-lint-jump" onclick="jumpContentLintIssue_(\'' +
+      jsAttrString_(x.channel || '') + '\',\'' + jsAttrString_(x.field || '') + '\',\'' + jsAttrString_(x.excerpt || '') + '\')" style="all:unset;cursor:pointer;color:' + color + ';text-decoration:underline;text-underline-offset:2px;">' +
+      escapeHtml(label + excerpt) + '</button></li>';
+  }
+  var html = '';
+  if(hard.length){
+    html += '<div style="font-size:12px;color:#B45309;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 10px;margin:8px 0;line-height:1.55;">' +
+      '<strong>자동 점검 ' + hard.length + '건</strong> (저장은 막지 않아요 · 누르면 위치로)<ul style="margin:4px 0 0 16px;padding:0;">' +
+      hard.slice(0, 12).map(function(x){ return lintItemHtml_(x, '#B45309'); }).join('') +
+      '</ul></div>';
+  }
+  if(soft.length){
+    html += '<div style="font-size:12px;color:#92400E;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:8px 10px;margin:8px 0;line-height:1.55;">' +
+      '<strong>주의 ' + soft.length + '건</strong> (오류 아님 · 광고·소식 표현 점검)<ul style="margin:4px 0 0 16px;padding:0;">' +
+      soft.slice(0, 8).map(function(x){ return lintItemHtml_(x, '#C2410C'); }).join('') +
+      '</ul></div>';
+  }
+  return html;
 }
+window.jumpContentLintIssue_ = function(channel, field, excerpt){
+  var idMap = {
+    'blog.title': 'sheet-blog-title',
+    'blog.problem': 'sheet-blog-problem',
+    'blog.selfCare': 'sheet-blog-selfcare',
+    'blog.explanation': 'sheet-blog-explanation',
+    'blog.hook': 'sheet-blog-hook',
+    'blog.outline': 'sheet-blog-outline',
+    'blog.draft': 'sheet-blog-draft',
+    'blog.cta': 'sheet-blog-cta',
+    'blog.references': 'sheet-blog-references',
+    'blog.hashtags': 'sheet-blog-hashtags',
+    'insta.hook': 'sheet-insta-hook',
+    'insta.caption': 'sheet-insta-caption',
+    'insta.hashtags': 'sheet-insta-hashtags',
+    'threads.body': 'sheet-threads-body',
+    'threads.comment': 'sheet-threads-comment',
+    'reel.caption': 'sheet-reel-caption',
+    'news.naver.title': 'sheet-news-title',
+    'news.naver.body': 'sheet-news-body',
+    'news.naver.cta': 'sheet-news-cta',
+    'news.kakao.title': 'sheet-news-title',
+    'news.kakao.body': 'sheet-news-body',
+    'news.kakao.cta': 'sheet-news-cta',
+    'news.karrot.title': 'sheet-news-title',
+    'news.karrot.body': 'sheet-news-body',
+    'news.karrot.cta': 'sheet-news-cta'
+  };
+  var tabMap = { blog: 'blog', insta: 'insta', threads: 'threads', reel: 'insta', news: 'news' };
+  var wantTab = tabMap[channel] || '';
+  var fieldId = idMap[String(channel || '') + '.' + String(field || '')] || '';
+  function focusField(){
+    if(fieldId && typeof scrollSheetFieldHeaderIntoView_ === 'function'){
+      scrollSheetFieldHeaderIntoView_(fieldId);
+    }
+    var el = fieldId ? document.getElementById(fieldId) : null;
+    if(el && typeof el.focus === 'function'){
+      try { el.focus({ preventScroll: true }); } catch(eF){ try { el.focus(); } catch(eF2){} }
+    }
+    if(excerpt && typeof setAppToast === 'function'){
+      setAppToast('해당 문장: 「' + String(excerpt).slice(0, 100) + '」', { duration: 4500, variant: 'ok' });
+    }
+  }
+  if(wantTab && state.activeTab !== wantTab && typeof switchTab === 'function'){
+    try { switchTab(wantTab); } catch(eTab){}
+    setTimeout(focusField, 80);
+    setTimeout(focusField, 280);
+    return;
+  }
+  focusField();
+};
 window.refreshContentLint_ = function(){
   var box = document.getElementById('content-lint-box');
   if(!box) return;
@@ -44253,7 +44776,8 @@ function applySheetCommunityEdits_(content){
   if(nextTitle && nextTitle !== prevTitle){
     var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
     syncThumbnailOverlayHook_(content, catId);
-    syncDraftTopicFromTitle_(nextTitle, { save: false, auto: true });
+    // 주제 확정은 저장 시 commitSheetTitleIfNeeded_ 에서만.
+    syncDraftTopicFromTitle_(nextTitle, { previewOnly: true });
   }
   return content;
 }
@@ -44651,7 +45175,9 @@ window.onSheetDraftSave_ = function(){
   sectionChanged = sheetSectionLayoutChanged_;
   photoFromBlog = tab === 'blog' && refreshTopicPhotoPromptFromBlog_(content, draftId, state.selectedCatId);
   if(isDailyShareCategory(state.selectedCatId)) persistSheetDailyFactsToDraft_();
+  try { commitSheetTitleIfNeeded_({ draftId: draftId, auto: false }); } catch(eTitleCommit){}
   persistDraftContent_(draftId, content);
+  captureSheetBaseline_(draftId);
   try { schedulePlannerGasPush_(true); } catch(eOnePush){}
   if(sectionChanged) paintSheetAfterSectionSplit_(content);
   if(isDailyShareCategory(state.selectedCatId) && tab === 'images'){
@@ -45003,17 +45529,21 @@ window.switchTab = function(t){
     if(t === 'community' || t === 'thread') t = 'blog';
     if(t !== 'blog' && t !== 'insta' && t !== 'threads' && t !== 'images' && t !== 'news') return;
   }
-  if(state.activeTab !== t && state._sheetUserEdited){
+  // 탭만 바꿀 때는 저장·수정일·발행 상태를 바꾸지 않는다. 화면 값은 메모리에만 반영.
+  var keepDirty = !!(state._sheetUserEdited || state._sheetDomDirty);
+  if(state.activeTab !== t && keepDirty){
     var c0 = getDraftContent_(state.selectedId);
     if(c0){
-      applySheetEditsForTab_(c0, state.activeTab);
-      persistDraftContent_(state.selectedId, c0, { userEdited: true });
+      try { applySheetEditsForTab_(c0, state.activeTab); } catch(eTabMem){}
     }
   }
-  state._sheetUserEdited = false;
   state.activeTab = t;
   const content = getDraftContent_(state.selectedId);
   if(content) renderSheetContent(content);
+  if(keepDirty){
+    state._sheetUserEdited = true;
+    state._sheetDomDirty = true;
+  }
   if(state.selectedId && state.selectedCatId != null){
     setOpenDetailHash_(state.selectedId, state.selectedCatId, t);
   }
@@ -45022,25 +45552,193 @@ window.switchTab = function(t){
 window.switchNewsChannel_ = function(ch){
   ch = normalizeNewsChannel_(ch);
   var content = getDraftContent_(state.selectedId);
-  if(content && state.activeTab === 'news' && state._sheetUserEdited){
-    applySheetNewsEdits_(content);
-    persistDraftContent_(state.selectedId, content, { userEdited: true });
+  var keepDirty = !!(state._sheetUserEdited || state._sheetDomDirty);
+  // 소식 채널 칩만 바꿀 때도 저장하지 않는다.
+  if(content && state.activeTab === 'news' && keepDirty){
+    try { applySheetNewsEdits_(content); } catch(eNewsMem){}
   }
-  state._sheetUserEdited = false;
   state.newsChannel = ch;
   if(content) renderSheetContent(content);
+  if(keepDirty){
+    state._sheetUserEdited = true;
+    state._sheetDomDirty = true;
+  }
 };
 
 function setSheetActionsHtml_(inner){
   document.getElementById('sheet-actions').innerHTML = inner || '';
   scheduleAppToastLift_();
 }
-function closeSheet(){
+function closeSheet(opts){
+  opts = opts || {};
+  if(!opts.force){
+    requestCloseSheet_(opts);
+    return;
+  }
   var ov = document.getElementById('detail-overlay');
   var wasOpen = !!(ov && ov.classList.contains('open'));
+  hideSheetLeaveDialog_();
+  cancelSheetQuietSave_();
+  state._sheetDomDirty = false;
+  state._sheetUserEdited = false;
+  state._sheetPendingTitle = null;
+  state._sheetBaselineContent = null;
+  state._sheetBaselineTopic = null;
+  state._sheetBaselineDraftId = null;
+  state._sheetCloseFromHash_ = false;
   closeSheetUiOnly_();
   if(wasOpen) clearOpenDetailHash_();
 }
+function cancelSheetQuietSave_(){
+  if(_sheetQuietSaveTimer_){
+    clearTimeout(_sheetQuietSaveTimer_);
+    _sheetQuietSaveTimer_ = 0;
+  }
+}
+function captureSheetBaseline_(draftId){
+  draftId = draftId || state.selectedId;
+  if(!draftId) return;
+  var content = getDraftContent_(draftId);
+  try {
+    state._sheetBaselineContent = content ? JSON.parse(JSON.stringify(content)) : null;
+  } catch(eSnap){
+    state._sheetBaselineContent = null;
+  }
+  var draft = findDraftByIdAnywhere_(draftId);
+  state._sheetBaselineTopic = draft ? String(draft.topic || '') : '';
+  state._sheetBaselineDraftId = draftId;
+  state._sheetPendingTitle = null;
+  if(!state._draftContentFp) state._draftContentFp = {};
+  if(content) state._draftContentFp[draftId] = draftContentFp_(content);
+  state._sheetDomDirty = false;
+  state._sheetUserEdited = false;
+  cancelSheetQuietSave_();
+}
+function sheetWorkingContentClone_(){
+  var draftId = state.selectedId;
+  if(!draftId) return null;
+  var live = getDraftContent_(draftId);
+  if(!live) return null;
+  var clone;
+  try { clone = JSON.parse(JSON.stringify(live)); } catch(eCl){ return null; }
+  try { applySheetEditsForTab_(clone, state.activeTab); } catch(eEd){}
+  return clone;
+}
+function sheetPendingTitleChanged_(){
+  if(state._sheetPendingTitle == null || !state.selectedId) return false;
+  var base = state._sheetBaselineDraftId === state.selectedId && state._sheetBaselineTopic != null
+    ? state._sheetBaselineTopic
+    : '';
+  if(base === '' && state._sheetBaselineDraftId !== state.selectedId){
+    var d = findDraftByIdAnywhere_(state.selectedId);
+    base = d ? String(d.topic || '') : '';
+  }
+  return String(state._sheetPendingTitle || '').trim() !== String(base || '').trim();
+}
+function sheetHasUnsavedChanges_(){
+  if(!state.selectedId) return false;
+  if(sheetPendingTitleChanged_()) return true;
+  if(state._sheetDomDirty || state._sheetUserEdited){
+    var working = sheetWorkingContentClone_();
+    if(!working) return !!(state._sheetDomDirty || state._sheetUserEdited);
+    var nowFp = draftContentFp_(working);
+    var baseFp = '';
+    if(state._sheetBaselineDraftId === state.selectedId && state._sheetBaselineContent){
+      baseFp = draftContentFp_(state._sheetBaselineContent);
+    } else if(state._draftContentFp){
+      baseFp = state._draftContentFp[state.selectedId] || '';
+    }
+    if(baseFp && nowFp) return baseFp !== nowFp;
+    return true;
+  }
+  return false;
+}
+function dismissAppToast_(){
+  try {
+    var el = document.getElementById('app-toast');
+    if(!el) return;
+    clearTimeout(appToastTimer);
+    el.classList.remove('show');
+    el.style.bottom = '';
+  } catch(eToast){}
+}
+function showSheetLeaveDialog_(){
+  dismissAppToast_();
+  openScrollLockedOverlayEl_(document.getElementById('sheet-leave-overlay'));
+}
+function hideSheetLeaveDialog_(){
+  closeScrollLockedOverlayEl_(document.getElementById('sheet-leave-overlay'));
+}
+window.requestCloseSheet_ = function(opts){
+  opts = opts || {};
+  if(opts.force){
+    closeSheet({ force: true });
+    return;
+  }
+  var ov = document.getElementById('detail-overlay');
+  if(!(ov && ov.classList.contains('open'))) return;
+  cancelSheetQuietSave_();
+  if(!sheetHasUnsavedChanges_()){
+    closeSheet({ force: true });
+    return;
+  }
+  state._sheetCloseFromHash_ = !!opts.fromHash;
+  showSheetLeaveDialog_();
+};
+window.onDetailOverlayClick_ = function(ev){
+  if(!ev || ev.target !== document.getElementById('detail-overlay')) return;
+  requestCloseSheet_();
+};
+window.sheetLeaveCancel_ = function(ev){
+  if(ev && ev.target && ev.currentTarget && ev.target !== ev.currentTarget) return;
+  hideSheetLeaveDialog_();
+  if(state._sheetCloseFromHash_ && state.selectedId != null && state.selectedCatId != null){
+    try { setOpenDetailHash_(state.selectedId, state.selectedCatId, state.activeTab); } catch(eHash){}
+  }
+  state._sheetCloseFromHash_ = false;
+};
+window.sheetLeaveDiscard_ = function(){
+  hideSheetLeaveDialog_();
+  var draftId = state.selectedId;
+  if(draftId && state._sheetBaselineDraftId === draftId && state._sheetBaselineContent){
+    try {
+      var restored = JSON.parse(JSON.stringify(state._sheetBaselineContent));
+      if(!state.published[draftId]) state.published[draftId] = {};
+      state.published[draftId].content = restored;
+      state.generatedOnly[draftId] = restored;
+      if(!state._draftContentFp) state._draftContentFp = {};
+      state._draftContentFp[draftId] = draftContentFp_(restored);
+    } catch(eRest){}
+  }
+  // 제목(미리보기)도 열 때 값으로 되돌린다. 저장하지 않았으면 draft.topic 은 원래대로.
+  if(draftId && state._sheetBaselineDraftId === draftId && state._sheetBaselineTopic != null){
+    var draft = findDraftByIdAnywhere_(draftId);
+    var topic = String(state._sheetBaselineTopic || '');
+    if(draft) draft.topic = topic;
+    if(state.published[draftId]) state.published[draftId].topic = topic;
+    try { paintSheetTitleSurfaces_(draftId, topic); } catch(ePaint){}
+    var sheetTitle = document.getElementById('sheet-title');
+    if(sheetTitle) sheetTitle.textContent = topic;
+  }
+  state._sheetPendingTitle = null;
+  state._sheetDomDirty = false;
+  state._sheetUserEdited = false;
+  cancelSheetQuietSave_();
+  closeSheet({ force: true });
+};
+window.sheetLeaveSave_ = function(){
+  hideSheetLeaveDialog_();
+  try {
+    if(typeof onSheetDraftSave_ === 'function') onSheetDraftSave_();
+  } catch(eSave){
+    if(typeof setAppToast === 'function'){
+      setAppToast('저장하지 못했어요. ' + ((eSave && eSave.message) || eSave), { duration: 4200, variant: 'err' });
+    }
+    return;
+  }
+  captureSheetBaseline_(state.selectedId);
+  closeSheet({ force: true });
+};
 
 // planner-detail-publish.js — 브랜딩 플래너 detail
 function getCatIdFromDraftId_(draftId){

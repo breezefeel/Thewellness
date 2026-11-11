@@ -4,6 +4,7 @@ var vm = require('vm');
 var path = require('path');
 var context = {};
 vm.createContext(context);
+vm.runInContext(fs.readFileSync(path.join(__dirname, 'planner-banned-words.js'), 'utf8'), context);
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'planner-import.js'), 'utf8'), context);
 var I = context.PlannerImport;
 var failed = 0;

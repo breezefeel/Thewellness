@@ -133,19 +133,16 @@ var PlannerImport = (function(){
     return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d;
   }
   function bannedWords(text){
-    if(typeof PlannerBannedWords !== 'undefined' && PlannerBannedWords.findHits){
-      return PlannerBannedWords.findHits(text);
-    }
-    // planner-banned-words.js 미로드 시 폴백 — 목록은 PlannerBannedWords.FORBID 와 맞춘다.
-    var fallback = (typeof PlannerBannedWords !== 'undefined' && PlannerBannedWords.FORBID)
-      ? PlannerBannedWords.FORBID
-      : ['한 번에', '끝내기', '페이스리프트', '펴는', '완치', '진료', '더웰니스', '경락'];
+    if(typeof PlannerBannedWords === 'undefined') return [];
+    if(PlannerBannedWords.findHits) return PlannerBannedWords.findHits(text);
+    // findHits 없을 때만 FORBID 목록으로 검사(교정은 isBareGyojung).
+    var list = PlannerBannedWords.FORBID || [];
     var found = [];
     var src = String(text == null ? '' : text);
-    if(/교정/.test(src) && !/(과정|학회)/.test(src)) found.push('교정');
-    for(var i = 0; i < fallback.length; i++){
-      var word = fallback[i];
-      if(src.indexOf(word) >= 0) found.push(word);
+    if(PlannerBannedWords.isBareGyojung && PlannerBannedWords.isBareGyojung(src)) found.push('교정');
+    else if(/교정/.test(src) && !/(과정|학회)/.test(src)) found.push('교정');
+    for(var i = 0; i < list.length; i++){
+      if(src.indexOf(list[i]) >= 0) found.push(list[i]);
     }
     return found;
   }
@@ -341,9 +338,9 @@ var PlannerImport = (function(){
 
   return {
     PROGRAMS: PROGRAMS,
-    BANNED_WORDS: (typeof PlannerBannedWords !== 'undefined' && PlannerBannedWords.forbiddenList)
-      ? PlannerBannedWords.forbiddenList()
-      : ['한 번에', '끝내기', '페이스리프트', '펴는', '완치', '진료', '더웰니스', '경락'],
+    BANNED_WORDS: (typeof PlannerBannedWords !== 'undefined' && PlannerBannedWords.FORBID)
+      ? PlannerBannedWords.FORBID.slice()
+      : [],
     parse: parse,
     inspect: inspect,
     batch: batch

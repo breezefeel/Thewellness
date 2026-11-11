@@ -1075,10 +1075,9 @@ var PlannerSyncRules = (function(){
       if(excerpt) row.excerpt = String(excerpt).replace(/\s+/g, ' ').trim().slice(0, 120);
       issues.push(row);
     }
-    var FORBID = BW && BW.forbiddenList ? BW.forbiddenList()
-      : ['한 번에', '끝내기', '페이스리프트', '펴는', '완치', '진료', '더웰니스', '경락'];
+    var FORBID = BW && BW.FORBID ? BW.FORBID : [];
     var CAUTION = BW && BW.cautionList ? BW.cautionList()
-      : [{ word: '치료', channels: ['news', 'ads'] }];
+      : (BW && BW.CAUTION ? BW.CAUTION : []);
     function eachLine(text, fn){
       String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n').forEach(fn);
     }

@@ -12982,7 +12982,7 @@ function isSyncTimeoutOrSlowError_(err){
   return /시간이 초과|응답 시간이|Timed out|timeout|AbortError|네트워크가 느리|시간이 더|오래 걸/i.test(msg);
 }
 
-/** 자동 동기화 이슈 토스트 — 최대 2줄(이유 + 다음에 할 일). 닫기 확인 중에는 띄우지 않음. */
+/** 자동 동기화 이슈 토스트 — iPhone(390)에서도 2줄 이내. 닫기 확인 중에는 띄우지 않음. */
 function notifyPlannerSyncIssue_(err, opts){
   opts = opts || {};
   if(typeof setAppToast !== 'function') return;
@@ -12991,45 +12991,53 @@ function notifyPlannerSyncIssue_(err, opts){
     if(leaveOv && leaveOv.classList.contains('open')) return;
   } catch(eLeaveToast){}
   var now = Date.now();
-  var msg = String((err && err.message) || err || '').trim();
-  var dropped = !!(opts.connectionDrop || (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConnectionDropped(msg)));
+  var rawMsg = String((err && err.message) || err || '').trim();
+  var dropped = !!(opts.connectionDrop ||
+    (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConnectionDropped(rawMsg)) ||
+    /Failed to fetch|NetworkError|Load failed|ERR_CONNECTION|ECONNRESET/i.test(rawMsg));
   if(!opts.force && !dropped && (now - _lastSyncFailToastAt_) < SYNC_FAIL_TOAST_COOLDOWN_MS_) return;
   _lastSyncFailToastAt_ = now;
   var reason = '';
   try {
+    // 분류는 원문(rawMsg)으로 — sanitize 전에 용량·충돌을 판별한다.
     reason = describeSyncFailureReason_({
       error: err,
-      message: msg,
+      message: rawMsg,
       heldOnly: !!opts.heldOnly,
       stalled: !!opts.stalled
     });
   } catch(eReason){
-    reason = msg;
+    reason = sanitizeSyncErrorMessage_(rawMsg);
   }
-  reason = String(reason || '').replace(/\s+/g, ' ').trim();
-  // 영문 원문(Failed to fetch 등)이 남으면 한글 문장으로 바꾼다.
-  if(/Failed to fetch|NetworkError|Load failed|ERR_CONNECTION|ECONNRESET/i.test(reason)){
-    reason = '네트워크 연결이 끊겼어요.';
-    dropped = true;
-  }
-  if(dropped){
-    setAppToast('네트워크 연결이 끊겼어요.\n연결 후 「지금 동기화」를 눌러 주세요.', { duration: 5600, variant: 'err' });
+  reason = sanitizeSyncErrorMessage_(reason) || '동기화를 끝내지 못했어요.';
+  // 이미 행동 안내가 문장에 있으면 1줄만.
+  if(/지금 동기화|다시 시도/.test(reason) && reason.indexOf('\n') < 0){
+    setAppToast(reason, { duration: opts.manual ? 4800 : 4000, variant: opts.manual ? 'err' : 'ok' });
     return;
   }
-  var slow = isSyncTimeoutOrSlowError_(err);
-  if(slow){
-    setAppToast('서버 응답이 지연되고 있어요.\n자동으로 다시 시도합니다.', { duration: 4200, variant: 'ok' });
-    return;
+  var line1 = reason.split('\n')[0].replace(/\s+/g, ' ').trim();
+  // 390px에서 한 줄이 너무 길면 잘라 2줄 초과를 막는다.
+  if(line1.length > 22) line1 = line1.slice(0, 21) + '…';
+  var line2 = '';
+  if(dropped || /네트워크/.test(line1)){
+    line2 = '「지금 동기화」로 다시 시도하세요.';
+  } else if(isSyncTimeoutOrSlowError_(err) || /응답이 느려|지연/.test(line1)){
+    line2 = '자동으로 다시 시도합니다.';
+  } else if(/버전|충돌|선택 대기/.test(line1)){
+    line2 = '충돌 창에서 골라 주세요.';
+  } else if(/너무 커|용량/.test(line1)){
+    line2 = '줄인 뒤 다시 시도해 주세요.';
+  } else if(/서버에 잠시/.test(line1)){
+    line2 = '잠시 후 다시 시도해 주세요.';
+  } else if(opts.manual){
+    line2 = '「지금 동기화」로 다시 시도하세요.';
+  } else {
+    line2 = '자동으로 다시 시도합니다.';
   }
-  var next = opts.manual
-    ? '「지금 동기화」로 다시 시도해 주세요.'
-    : '이 기기 저장은 유지되며 자동으로 다시 시도합니다.';
-  if(!reason) reason = '동기화를 끝내지 못했어요.';
-  if(/지금 동기화|다시 시도|이 기기 저장/.test(reason)){
-    setAppToast(reason, { duration: opts.manual ? 5200 : 4200, variant: opts.manual ? 'err' : 'ok' });
-    return;
-  }
-  setAppToast(reason + '\n' + next, { duration: opts.manual ? 5200 : 4200, variant: opts.manual ? 'err' : 'ok' });
+  setAppToast(line1 + '\n' + line2, {
+    duration: opts.manual || dropped ? 5200 : 4000,
+    variant: (opts.manual || dropped || /멈췄|커요|버전|문제/.test(line1)) ? 'err' : 'ok'
+  });
 }
 var detailHashSyncLock_ = false;
 var searchDebounceTimer = null;
@@ -19743,33 +19751,61 @@ function clearPlannerGasRetry_(){
   plannerGasRetryDueAt_ = 0;
   plannerLastSyncError_ = '';
 }
-/** 실패·정체 원인을 사람이 읽을 문장으로. 헤더·토스트 공통. */
+/** 영문·HTTP 원문을 토스트/헤더에 쓰지 않도록 한국어 한 문장으로 바꿈. */
+function sanitizeSyncErrorMessage_(raw){
+  var msg = String(raw == null ? '' : raw).replace(/\s+/g, ' ').trim();
+  if(!msg) return '';
+  if(/Failed to fetch|NetworkError|Load failed|ERR_CONNECTION|ECONNRESET|The network connection was lost/i.test(msg)){
+    return '네트워크 연결이 끊겼어요.';
+  }
+  // 413은 용량 거절 — 일반 서버 오류로 묶지 않는다.
+  if(/\bHTTP\s*413\b|\b413\b|entity too|request entity/i.test(msg)){
+    return '올릴 내용이 너무 커요.';
+  }
+  if(/\bHTTP\s*[45]\d\d\b|\bstatus\s*[45]\d\d\b|\b(?:500|502|503|504)\b(?:\s|$)|Internal Server Error|Bad Gateway|Service Unavailable|Gateway Timeout/i.test(msg)){
+    return '서버에 잠시 문제가 있어요.';
+  }
+  if(/TypeError|SyntaxError|ReferenceError|Unhandled|Exception|at\s+\S+\s+\(/i.test(msg) && /[A-Za-z]{4,}/.test(msg)){
+    return '동기화 중 오류가 났어요.';
+  }
+  // 한글이 거의 없고 영어/기호만이면 일반 문장으로.
+  var hangul = (msg.match(/[가-힣]/g) || []).length;
+  if(hangul < 2 && /[A-Za-z]{3,}/.test(msg)){
+    return '동기화를 끝내지 못했어요.';
+  }
+  return msg;
+}
+/** 실패·정체 원인을 사람이 읽을 짧은 문장으로. 헤더·토스트 공통. */
 function describeSyncFailureReason_(opts){
   opts = opts || {};
   var held = typeof opts.held === 'number' ? opts.held : countSnoozedHeldOps_();
   var remain = typeof opts.remain === 'number' ? opts.remain : countPendingSyncItems_();
-  var msg = String(opts.message || plannerLastSyncError_ || (opts.error && opts.error.message) || '').trim();
+  var raw = String(opts.message || plannerLastSyncError_ || (opts.error && opts.error.message) || '').trim();
+  // 분류는 원문(raw)으로 — sanitize 전에 용량·충돌을 가리지 않는다.
   if(opts.heldOnly || (held > 0 && remain < 1 && !hasSendableOutboxOps_())){
-    return '충돌을 「나중에」로 미룬 항목이 ' + held + '건 있어요. 고르기 전에는 올라가지 않아요.';
+    return '선택 대기 ' + held + '건이 있어요.';
   }
   if(opts.stalled && remain > 0){
-    return '전송이 멈췄어요. 대기열 ' + remain + '건이 줄지 않았어요. 「지금 동기화」로 바로 다시 시도해 주세요.';
+    return '전송이 멈췄어요 (' + remain + '건).';
   }
-  if(/payload|본문|용량|너무 크|413|entity too|request entity/i.test(msg)){
-    return '올릴 내용이 커서 서버가 거절했어요. 이 기기 수정은 그대로 두고, 잠시 뒤 다시 시도해 주세요.';
+  if(/payload|본문|용량|너무 크|413|entity too|request entity/i.test(raw)){
+    return '올릴 내용이 너무 커요.';
   }
-  if(/conflict|충돌|revision|버전|baseRevision|stale/i.test(msg)){
-    return '서버 버전과 달라 충돌이 났어요. 충돌 창에서 이 기기/서버를 고르거나, 보류 중이면 「선택 대기」로 남아 있어요.';
+  if(/conflict|충돌|revision|버전|baseRevision|stale|선택 대기/i.test(raw)){
+    return '서버와 버전이 달라요.';
   }
-  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConnectionDropped(msg)){
-    return '네트워크 연결이 끊겼어요. 이 기기 수정은 유지됩니다. 연결 후 「지금 동기화」를 눌러 주세요.';
+  if((typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConnectionDropped(raw)) ||
+     /네트워크 연결이 끊|Failed to fetch|NetworkError|Load failed/i.test(raw)){
+    return '네트워크 연결이 끊겼어요.';
   }
-  if(isSyncTimeoutOrSlowError_({ message: msg })){
-    return '서버 응답이 지연되고 있어요. 이 기기 저장은 유지되며, 「지금 동기화」로 바로 재시도할 수 있어요.';
+  if(isSyncTimeoutOrSlowError_({ message: raw }) || /서버 응답이 지연|응답이 느려/.test(raw)){
+    return '서버 응답이 느려요.';
   }
+  var msg = sanitizeSyncErrorMessage_(raw);
+  if(/서버에 잠시 문제가/.test(msg)) return msg;
   if(msg) return msg;
-  if(remain > 0) return '아직 서버에 반영되지 않은 변경이 ' + remain + '건 있어요.';
-  return '동기화를 끝내지 못했어요. 이 기기 저장은 유지됩니다.';
+  if(remain > 0) return '아직 반영되지 않은 변경이 ' + remain + '건 있어요.';
+  return '동기화를 끝내지 못했어요.';
 }
 /** 「동기화」·「지금 동기화」: 재시도 타이머를 지우고 남은 건을 즉시 다시 보낸다. */
 function forceImmediateSyncRetry_(){
@@ -20915,8 +20951,8 @@ function formatSyncHeaderSub_(info){
   var held = info.heldCount || 0;
   var left = n > 0 ? ('남은 ' + n + '건') : '';
   var err = info && info.lastError ? String(info.lastError) : '';
-  // 충돌 선택 대기(보류) — 보낼 건이 아니라 고르기 전.
-  if(info.phase === 'held') return '선택 대기 ' + held + '건';
+  // 충돌 선택 대기(보류) — phase·건수 모두. lastError 때문에 queued로 잡혀도 이걸 우선.
+  if(info.phase === 'held' || (held > 0 && n < 1)) return '선택 대기 ' + held + '건';
   // 대기열이 줄지 않음(정체) — 전송 멈춤으로 표시.
   var stalled = !!(info && info.stalled) || /줄지 않았|전송 멈춤/.test(err);
   if(stalled && n > 0 && info.phase !== 'transferring'){
@@ -20925,11 +20961,11 @@ function formatSyncHeaderSub_(info){
   var shortFail = '';
   if(err){
     if(/줄지 않았|전송 멈춤/.test(err)) shortFail = '전송 멈춤';
-    else if(/선택 대기|나중에/.test(err)) shortFail = '선택 대기';
     else if(isSyncHeaderNetworkError_(err)) shortFail = '네트워크';
     else if(/충돌|버전/.test(err)) shortFail = '버전 충돌';
-    else if(/용량|커서|거절|413|entity too/i.test(err)) shortFail = '용량';
-    else if(/지연|응답/.test(err)) shortFail = '응답 지연';
+    else if(/용량|커서|거절|너무 커|413|entity too/i.test(err)) shortFail = '용량';
+    else if(/지연|응답|느려/.test(err)) shortFail = '응답 지연';
+    // 「선택 대기」는 shortFail로 queued에 붙이지 않는다(held 전용).
     // Failed to fetch 등 원문은 shortFail 에 넣지 않는다.
   }
   if(info.phase === 'transferring'){
@@ -21085,6 +21121,11 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(queuedPush){
     phase = 'queued';
     overall = 'pending';
+  } else if(pendingCount === 0 && heldCount > 0 && (serverPending || drivePending || localPending)){
+    // 보류(held)는 lastError·queued 보다 먼저. 「곧 전송 · 선택 대기」 오표기 방지.
+    phase = 'held';
+    overall = 'warn';
+    plannerLastSyncError_ = '';
   } else if(plannerLastSyncError_ && !retryScheduled){
     if(serverOn && localPending){
       phase = 'queued';
@@ -21099,10 +21140,6 @@ function getSyncStatusInfo_(remoteMeta){
   } else if(remoteNewer && !serverPending && !drivePending){
     phase = 'pull';
     overall = 'pending';
-  } else if((serverPending || drivePending) && pendingCount === 0 && heldCount > 0){
-    // 남은 것이 전부 「나중에」로 보류한 충돌뿐이다. 올릴 대기가 아니라 사용자의 선택을 기다리는 상태.
-    phase = 'held';
-    overall = 'warn';
   } else if(serverPending || drivePending || (serverOn && !serverRev && localRev > 0 && pendingCount > 0)){
     phase = 'pending';
     overall = 'pending';

@@ -1,6 +1,6 @@
-/* 금지어·주의어 목록 (한곳). planner-sync-rules / 자동 점검이 그대로 쓴다. */
+/* 금지어·주의어 목록 (한곳). planner-sync-rules / planner-import / 자동 점검이 그대로 쓴다. */
 var PlannerBannedWords = (function(){
-  /** 본문에 쓰면 안 되는 말. 「교정」은 과정명·학회명에서만 예외. */
+  /** 본문에 쓰면 안 되는 말. 「교정」은 과정명·학회명에서만 예외(아래 isBareGyojung). */
   var FORBIDDEN = Object.freeze([
     '한 번에',
     '끝내기',
@@ -11,6 +11,8 @@ var PlannerBannedWords = (function(){
     '더웰니스',
     '경락'
   ]);
+  /** 별칭 — 호출부·문서에서 FORBID 로 참조 */
+  var FORBID = FORBIDDEN;
   /**
    * 주의(caution)만. 오류(forbidden)가 아니다.
    * 광고·소식 칸에서만 본다.
@@ -37,18 +39,35 @@ var PlannerBannedWords = (function(){
     var list = (entry && entry.channels) || [];
     if(!list.length) return false;
     if(list.indexOf(ch) >= 0) return true;
-    // 소식 하위 키(newsNaver 등)도 소식으로 본다
     if(list.indexOf('news') >= 0 && /^news/i.test(ch)) return true;
     return false;
+  }
+  /** 텍스트에서 걸린 금지어 목록(교정 포함). import·점검 공통. */
+  function findHits(text){
+    var t = String(text == null ? '' : text);
+    var found = [];
+    var seen = {};
+    function push(w){
+      if(!w || seen[w]) return;
+      seen[w] = true;
+      found.push(w);
+    }
+    if(isBareGyojung(t)) push('교정');
+    FORBIDDEN.forEach(function(w){
+      if(t.indexOf(w) >= 0) push(w);
+    });
+    return found;
   }
 
   return {
     FORBIDDEN: FORBIDDEN,
+    FORBID: FORBID,
     CAUTION: CAUTION,
     forbiddenList: forbiddenList,
     cautionList: cautionList,
     isBareGyojung: isBareGyojung,
-    channelAllowsCaution: channelAllowsCaution
+    channelAllowsCaution: channelAllowsCaution,
+    findHits: findHits
   };
 })();
 if(typeof module !== 'undefined' && module.exports){

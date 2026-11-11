@@ -599,7 +599,9 @@ assert(back7 && back7.dateOverride === '2026-11-11', 'reload keeps 11/11 on d7')
 assert(back5 && R.plannerDraftListDate(back5).label === '11.10.', 'list date after reload is 11.10. (got ' + (back5 && R.plannerDraftListDate(back5).label) + ')');
 assert(back7 && !back7.topicLocked, 'cards never edited in 카드 정보 stay unlocked');
 assert(/draft\.topicLocked = true;\n    if\(ymd\) draft\.dateOverride/.test(plannerSrc), 'card info editor locks the title it saves');
-assert((plannerSrc.match(/syncDraftTopicFromTitle_\([^)]*auto: true \}\)/g) || []).length === 4, 'blog/community title auto paths pass auto: true');
+// 카드 제목 필드 입력은 저장 전까지 previewOnly. auto:true 는 재생성 경로만.
+assert((plannerSrc.match(/syncDraftTopicFromTitle_\([^)]*auto: true \}\)/g) || []).length === 2, 'regen title auto paths pass auto: true');
+assert(/previewOnly:\s*true/.test(plannerSrc) && /commitSheetTitleIfNeeded_/.test(plannerSrc), 'title edits stay preview until save');
 
 assert(R.plannerKeepDraftCardMeta({}, { dateOverride: null }).dateOverride === undefined, 'null dateOverride written by an old patch loads as no override');
 // 새로고침 뒤 본문만 저장해도 draft 행 패치에 dateOverride 삭제가 실리지 않는다.

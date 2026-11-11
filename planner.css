@@ -2597,8 +2597,9 @@ max-width: 400px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,.2);
 .brand-modal-box { max-width: 440px; }
 
 #plan-workshop-overlay { align-items: flex-end; padding: 0; }
-#plan-ws-leave-overlay {
-  z-index: 330;
+#plan-ws-leave-overlay,
+#sheet-leave-overlay {
+  z-index: 340;
   align-items: center;
   justify-content: center;
   padding: 16px;
@@ -4110,6 +4111,13 @@ pointer-events: none;
 .app-toast--err { border: 1px solid #F87171; }
 body:has(#color-preview-overlay.open) .app-toast.show {
   z-index: 350;
+}
+/* 닫기 확인 다이얼로그가 열려 있으면 토스트를 숨겨 버튼을 가리지 않는다(iPhone). */
+body:has(#sheet-leave-overlay.open) .app-toast,
+body:has(#plan-ws-leave-overlay.open) .app-toast {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateX(-50%) translateY(120%) !important;
 }
 @media (max-width: 768px) {
 body:has(#detail-sheet.open) .app-toast.show,

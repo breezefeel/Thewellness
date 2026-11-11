@@ -12982,43 +12982,54 @@ function isSyncTimeoutOrSlowError_(err){
   return /시간이 초과|응답 시간이|Timed out|timeout|AbortError|네트워크가 느리|시간이 더|오래 걸/i.test(msg);
 }
 
-/** 자동 동기화 이슈 토스트 — 실패를 남발하지 않고, 지연은 ‘진행/재시도’로 안내 */
+/** 자동 동기화 이슈 토스트 — 최대 2줄(이유 + 다음에 할 일). 닫기 확인 중에는 띄우지 않음. */
 function notifyPlannerSyncIssue_(err, opts){
   opts = opts || {};
   if(typeof setAppToast !== 'function') return;
+  try {
+    var leaveOv = document.getElementById('sheet-leave-overlay');
+    if(leaveOv && leaveOv.classList.contains('open')) return;
+  } catch(eLeaveToast){}
   var now = Date.now();
   var msg = String((err && err.message) || err || '').trim();
   var dropped = !!(opts.connectionDrop || (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConnectionDropped(msg)));
   if(!opts.force && !dropped && (now - _lastSyncFailToastAt_) < SYNC_FAIL_TOAST_COOLDOWN_MS_) return;
   _lastSyncFailToastAt_ = now;
+  var reason = '';
+  try {
+    reason = describeSyncFailureReason_({
+      error: err,
+      message: msg,
+      heldOnly: !!opts.heldOnly,
+      stalled: !!opts.stalled
+    });
+  } catch(eReason){
+    reason = msg;
+  }
+  reason = String(reason || '').replace(/\s+/g, ' ').trim();
+  // 영문 원문(Failed to fetch 등)이 남으면 한글 문장으로 바꾼다.
+  if(/Failed to fetch|NetworkError|Load failed|ERR_CONNECTION|ECONNRESET/i.test(reason)){
+    reason = '네트워크 연결이 끊겼어요.';
+    dropped = true;
+  }
   if(dropped){
-    setAppToast(
-      '서버 연결이 끊겼어요.\n' + (msg || '엔드포인트 연결이 닫혔습니다.') +
-        '\n이 내용을 서버 위에 덮어쓰지 않습니다. 직접 고친 글은 이 기기에 남아 있습니다.',
-      { duration: 7000, variant: 'err' }
-    );
+    setAppToast('네트워크 연결이 끊겼어요.\n연결 후 「지금 동기화」를 눌러 주세요.', { duration: 5600, variant: 'err' });
     return;
   }
   var slow = isSyncTimeoutOrSlowError_(err);
   if(slow){
-    setAppToast(
-      '서버 응답이 조금 오래 걸려요. 동기화는 이어가고, 자동으로 다시 시도합니다.\n이 기기 저장은 유지됩니다.',
-      { duration: 4800, variant: 'ok' }
-    );
+    setAppToast('서버 응답이 지연되고 있어요.\n자동으로 다시 시도합니다.', { duration: 4200, variant: 'ok' });
     return;
   }
-  if(opts.manual){
-    setAppToast(
-      '동기화를 아직 끝내지 못했어요.\n' + (msg || '잠시 후 다시 시도해 주세요.') +
-        '\n이 기기 저장은 유지됩니다.',
-      { duration: 5500, variant: 'err' }
-    );
+  var next = opts.manual
+    ? '「지금 동기화」로 다시 시도해 주세요.'
+    : '이 기기 저장은 유지되며 자동으로 다시 시도합니다.';
+  if(!reason) reason = '동기화를 끝내지 못했어요.';
+  if(/지금 동기화|다시 시도|이 기기 저장/.test(reason)){
+    setAppToast(reason, { duration: opts.manual ? 5200 : 4200, variant: opts.manual ? 'err' : 'ok' });
     return;
   }
-  setAppToast(
-    '서버 반영이 잠시 지연됐어요. 이 기기 저장은 유지되고, 자동으로 다시 시도합니다.',
-    { duration: 4200, variant: 'ok' }
-  );
+  setAppToast(reason + '\n' + next, { duration: opts.manual ? 5200 : 4200, variant: opts.manual ? 'err' : 'ok' });
 }
 var detailHashSyncLock_ = false;
 var searchDebounceTimer = null;
@@ -16670,6 +16681,16 @@ function setAppToast(message, options) {
   var variant = options.variant || '';
   var el = document.getElementById('app-toast');
   if (!el) return;
+  // 카드 닫기 확인(저장/저장 안 함/취소)이 열려 있으면 버튼을 가리지 않도록 토스트를 숨긴다.
+  try {
+    var leaveOv = document.getElementById('sheet-leave-overlay');
+    if(leaveOv && leaveOv.classList.contains('open')){
+      clearTimeout(appToastTimer);
+      el.classList.remove('show');
+      el.style.bottom = '';
+      return;
+    }
+  } catch(eLeaveHide){}
   var focusSnap = captureTextFieldFocus_();
   var wasTyping = !!focusSnap;
   clearTimeout(appToastTimer);
@@ -19732,7 +19753,7 @@ function describeSyncFailureReason_(opts){
     return '충돌을 「나중에」로 미룬 항목이 ' + held + '건 있어요. 고르기 전에는 올라가지 않아요.';
   }
   if(opts.stalled && remain > 0){
-    return '대기열 ' + remain + '건이 줄지 않았어요. 버전 충돌·네트워크·용량 문제일 수 있어요. 「지금 동기화」로 바로 다시 시도해 주세요.';
+    return '전송이 멈췄어요. 대기열 ' + remain + '건이 줄지 않았어요. 「지금 동기화」로 바로 다시 시도해 주세요.';
   }
   if(/payload|본문|용량|너무 크|413|entity too|request entity/i.test(msg)){
     return '올릴 내용이 커서 서버가 거절했어요. 이 기기 수정은 그대로 두고, 잠시 뒤 다시 시도해 주세요.';
@@ -19772,9 +19793,23 @@ function schedulePlannerGasRetry_(error){
   plannerGasRetryCount_++;
   var slow = isSyncTimeoutOrSlowError_(error);
   if(slow) _syncFastAckPending_ = true;
-  plannerLastSyncError_ = slow
-    ? '서버 응답이 지연되어 자동 재시도 중'
-    : String((error && error.message) || error || '서버 동기화 지연');
+  // 재시도 대기 중에도 영문 원문(Failed to fetch 등)을 헤더에 넣지 않는다.
+  var friendly = '';
+  try {
+    friendly = describeSyncFailureReason_({
+      error: error,
+      message: (error && error.message) || error
+    });
+  } catch(eFriend){
+    friendly = '';
+  }
+  if(slow){
+    plannerLastSyncError_ = '서버 응답이 지연되어 자동 재시도 중';
+  } else if(friendly){
+    plannerLastSyncError_ = friendly;
+  } else {
+    plannerLastSyncError_ = '동기화를 끝내지 못했어요. 잠시 후 다시 시도합니다.';
+  }
   var delay = slow
     ? Math.min(45000, 20000 * Math.pow(2, Math.min(plannerGasRetryCount_ - 1, 1)))
     : Math.min(60 * 1000, 3000 * Math.pow(2, Math.min(plannerGasRetryCount_ - 1, 6)));
@@ -20866,19 +20901,36 @@ function formatSyncPendingPhrase_(n, snapshot){
   if(n > 0) return n + '건';
   return '';
 }
+function isSyncHeaderNetworkError_(errText){
+  var err = String(errText || '');
+  if(!err) return false;
+  // 「네트워크」는 실제 연결 실패에만. 정체 안내문(…네트워크·용량…)은 제외.
+  if(/줄지 않았|전송 멈춤|버전 충돌·네트워크/.test(err)) return false;
+  if(typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerConnectionDropped(err)) return true;
+  return /네트워크 연결이 끊|연결이 끊겼|오프라인|onLine === false/i.test(err);
+}
 function formatSyncHeaderSub_(info){
   if(info && info.loginRequired) return '로그인 필요';
   var n = info.pendingCount || 0;
+  var held = info.heldCount || 0;
   var left = n > 0 ? ('남은 ' + n + '건') : '';
+  var err = info && info.lastError ? String(info.lastError) : '';
+  // 충돌 선택 대기(보류) — 보낼 건이 아니라 고르기 전.
+  if(info.phase === 'held') return '선택 대기 ' + held + '건';
+  // 대기열이 줄지 않음(정체) — 전송 멈춤으로 표시.
+  var stalled = !!(info && info.stalled) || /줄지 않았|전송 멈춤/.test(err);
+  if(stalled && n > 0 && info.phase !== 'transferring'){
+    return '전송 멈춤 · ' + n + '건';
+  }
   var shortFail = '';
-  if(info && info.lastError){
-    var err = String(info.lastError);
-    if(/네트워크|연결/.test(err)) shortFail = '네트워크';
-    else if(/충돌|버전/.test(err)) shortFail = '버전 충돌';
-    else if(/용량|커서|거절/.test(err)) shortFail = '용량';
+  if(err){
+    if(/줄지 않았|전송 멈춤/.test(err)) shortFail = '전송 멈춤';
     else if(/선택 대기|나중에/.test(err)) shortFail = '선택 대기';
+    else if(isSyncHeaderNetworkError_(err)) shortFail = '네트워크';
+    else if(/충돌|버전/.test(err)) shortFail = '버전 충돌';
+    else if(/용량|커서|거절|413|entity too/i.test(err)) shortFail = '용량';
     else if(/지연|응답/.test(err)) shortFail = '응답 지연';
-    else if(/줄지 않았/.test(err)) shortFail = '정체';
+    // Failed to fetch 등 원문은 shortFail 에 넣지 않는다.
   }
   if(info.phase === 'transferring'){
     var bits = [];
@@ -20905,7 +20957,6 @@ function formatSyncHeaderSub_(info){
   if(info.phase === 'checking') return '서버 확인';
   if(info.phase === 'conflict') return '충돌 선택';
   if(plannerSafeModeBlocksSync_()) return '안전 모드 · 대기 ' + (info.pendingCount || 0) + '건';
-  if(info.phase === 'held') return '선택 대기 ' + (info.heldCount || 0) + '건';
   if(info.phase === 'pull') return '받을 내용';
   if(info.phase === 'pending'){
     return shortFail ? ((left || '반영 대기') + ' · ' + shortFail) : (left || '반영 대기');
@@ -21094,11 +21145,24 @@ function getSyncStatusInfo_(remoteMeta){
     }
     actionHint = '기다리면 됩니다. 헤더 「동기화」는 눌러도 되고, 안 눌러도 자동으로 끝납니다.';
   } else if(phase === 'retry_wait'){
-    summary = '서버 응답이 느려 자동 재시도 대기 중이에요' +
+    var retryReason = '';
+    try {
+      retryReason = describeSyncFailureReason_({
+        error: { message: plannerLastSyncError_ },
+        message: plannerLastSyncError_,
+        remain: pendingCount
+      });
+    } catch(eRetryReason){
+      retryReason = String(plannerLastSyncError_ || '').trim();
+    }
+    if(/Failed to fetch|NetworkError|Load failed/i.test(retryReason)){
+      retryReason = '네트워크 연결이 끊겼어요.';
+    }
+    summary = '자동 재시도 대기 중이에요' +
       (plannerGasRetryCount_ ? ' (' + plannerGasRetryCount_ + '회차)' : '') +
       (retryInSec ? ', ' + retryInSec + '초 후' : '') +
       (pendingCount ? ', 남은 약 ' + pendingCount + '건' : '') +
-      (plannerLastSyncError_ ? '. ' + plannerLastSyncError_ : '.');
+      (retryReason ? '. ' + retryReason : '.');
     actionHint = '기본적으로 기다리면 됩니다. 급하면 「동기화」→ 하단 「지금 동기화」를 누르세요.';
   } else if(phase === 'queued'){
     summary = '곧 자동으로 올리도록 예약돼 있어요.' +
@@ -21148,6 +21212,7 @@ function getSyncStatusInfo_(remoteMeta){
 
   var lastReason = '';
   try { lastReason = localStorage.getItem(SYNC_LAST_REASON_KEY) || ''; } catch(e2){}
+  var stalledFlag = /줄지 않았|전송 멈춤/.test(String(plannerLastSyncError_ || ''));
   return {
     localRev: localRev,
     localAt: localAt,
@@ -21176,6 +21241,7 @@ function getSyncStatusInfo_(remoteMeta){
     remoteNewer: remoteNewer,
     retryScheduled: retryScheduled,
     lastError: plannerLastSyncError_,
+    stalled: stalledFlag,
     loginRequired: loginRequired,
     overall: overall,
     summary: summary,
@@ -44062,8 +44128,8 @@ function flushSheetTitleBackgroundWork_(opts){
   var pending = sheetTitleBgPending_;
   if(!pending) return false;
   sheetTitleBgPending_ = null;
+  // 파생 UI(망고 제목·오버레이)만. 자동 save / topic 확정은 하지 않는다.
   applySheetTitleDerivedWork_(pending.draftId, pending.title);
-  if(opts.save !== false) save();
   return true;
 }
 window.flushSheetTitleBackgroundWork_ = flushSheetTitleBackgroundWork_;
@@ -44078,7 +44144,7 @@ function scheduleSheetTitleBackgroundWork_(draftId, title){
   }
   sheetTitleBgTimer_ = setTimeout(function(){
     sheetTitleBgTimer_ = null;
-    var kick = function(){ flushSheetTitleBackgroundWork_({ save: true }); };
+    var kick = function(){ flushSheetTitleBackgroundWork_({}); };
     if(typeof requestIdleCallback === 'function'){
       sheetTitleBgIdleId_ = requestIdleCallback(function(){
         sheetTitleBgIdleId_ = 0;
@@ -44117,6 +44183,13 @@ function syncDraftTopicFromTitle_(title, opts){
   if(!draft) return false;
   if(opts.auto && typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerAutoTitleMayRenameCard &&
      !PlannerSyncRules.plannerAutoTitleMayRenameCard(draft, next)) return false;
+  // 미리보기만: 목록·헤더 표시만 바꾸고 draft.topic / 동기화 대기열은 건드리지 않는다.
+  if(opts.previewOnly){
+    var previewEl = document.getElementById('sheet-title');
+    if(previewEl) previewEl.textContent = next;
+    paintSheetTitleSurfaces_(draftId, next);
+    return false;
+  }
   var prev = String(draft.topic || '').trim();
   var titleEl = document.getElementById('sheet-title');
   if(titleEl) titleEl.textContent = next;
@@ -44134,10 +44207,28 @@ function syncDraftTopicFromTitle_(title, opts){
   if(opts.save !== false) saveFocusedDraftChange_(draftId);
   return true;
 }
+/** 입력 중인 제목을 draft.topic 으로 확정(저장 시에만). */
+function commitSheetTitleIfNeeded_(opts){
+  opts = opts || {};
+  var draftId = opts.draftId || state.selectedId;
+  if(!draftId) return false;
+  var title = state._sheetPendingTitle;
+  if(title == null){
+    var el = document.getElementById('sheet-blog-title') || document.getElementById('sheet-community-title') ||
+      document.getElementById('sheet-thread-title');
+    if(el) title = el.value;
+  }
+  if(title == null) return false;
+  state._sheetPendingTitle = null;
+  return syncDraftTopicFromTitle_(title, { draftId: draftId, save: false, auto: !!opts.auto });
+}
 window.onSheetTitleSyncTopic_ = function(el){
   var title = el ? el.value : '';
-  syncDraftTopicFromTitle_(title, { save: false });
-  paintSheetTitleSurfaces_(state.selectedId, title);
+  markSheetUserEdited_();
+  state._sheetDomDirty = true;
+  state._sheetPendingTitle = title;
+  // 저장 전에는 미리보기만. published.topic·대기열에 바로 넣지 않는다.
+  syncDraftTopicFromTitle_(title, { previewOnly: true });
   scheduleSheetTitleBackgroundWork_(state.selectedId, title);
 };
 
@@ -44191,7 +44282,8 @@ function applySheetBlogEdits_(content){
   if(nextTitle && nextTitle !== prevTitle){
     var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
     syncThumbnailOverlayHook_(content, catId);
-    syncDraftTopicFromTitle_(nextTitle, { save: false, auto: true });
+    // topic 확정은 저장 시 commitSheetTitleIfNeeded_ 에서만. 여기서는 미리보기.
+    syncDraftTopicFromTitle_(nextTitle, { previewOnly: true });
   }
   var reelEl = document.getElementById('sheet-reel-caption');
   if(reelEl){
@@ -44647,7 +44739,8 @@ function applySheetCommunityEdits_(content){
   if(nextTitle && nextTitle !== prevTitle){
     var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
     syncThumbnailOverlayHook_(content, catId);
-    syncDraftTopicFromTitle_(nextTitle, { save: false, auto: true });
+    // 주제 확정은 저장 시 commitSheetTitleIfNeeded_ 에서만.
+    syncDraftTopicFromTitle_(nextTitle, { previewOnly: true });
   }
   return content;
 }
@@ -45045,6 +45138,7 @@ window.onSheetDraftSave_ = function(){
   sectionChanged = sheetSectionLayoutChanged_;
   photoFromBlog = tab === 'blog' && refreshTopicPhotoPromptFromBlog_(content, draftId, state.selectedCatId);
   if(isDailyShareCategory(state.selectedCatId)) persistSheetDailyFactsToDraft_();
+  try { commitSheetTitleIfNeeded_({ draftId: draftId, auto: false }); } catch(eTitleCommit){}
   persistDraftContent_(draftId, content);
   captureSheetBaseline_(draftId);
   try { schedulePlannerGasPush_(true); } catch(eOnePush){}
@@ -45450,7 +45544,9 @@ function closeSheet(opts){
   cancelSheetQuietSave_();
   state._sheetDomDirty = false;
   state._sheetUserEdited = false;
+  state._sheetPendingTitle = null;
   state._sheetBaselineContent = null;
+  state._sheetBaselineTopic = null;
   state._sheetBaselineDraftId = null;
   state._sheetCloseFromHash_ = false;
   closeSheetUiOnly_();
@@ -45471,7 +45567,10 @@ function captureSheetBaseline_(draftId){
   } catch(eSnap){
     state._sheetBaselineContent = null;
   }
+  var draft = findDraftByIdAnywhere_(draftId);
+  state._sheetBaselineTopic = draft ? String(draft.topic || '') : '';
   state._sheetBaselineDraftId = draftId;
+  state._sheetPendingTitle = null;
   if(!state._draftContentFp) state._draftContentFp = {};
   if(content) state._draftContentFp[draftId] = draftContentFp_(content);
   state._sheetDomDirty = false;
@@ -45488,8 +45587,20 @@ function sheetWorkingContentClone_(){
   try { applySheetEditsForTab_(clone, state.activeTab); } catch(eEd){}
   return clone;
 }
+function sheetPendingTitleChanged_(){
+  if(state._sheetPendingTitle == null || !state.selectedId) return false;
+  var base = state._sheetBaselineDraftId === state.selectedId && state._sheetBaselineTopic != null
+    ? state._sheetBaselineTopic
+    : '';
+  if(base === '' && state._sheetBaselineDraftId !== state.selectedId){
+    var d = findDraftByIdAnywhere_(state.selectedId);
+    base = d ? String(d.topic || '') : '';
+  }
+  return String(state._sheetPendingTitle || '').trim() !== String(base || '').trim();
+}
 function sheetHasUnsavedChanges_(){
   if(!state.selectedId) return false;
+  if(sheetPendingTitleChanged_()) return true;
   if(state._sheetDomDirty || state._sheetUserEdited){
     var working = sheetWorkingContentClone_();
     if(!working) return !!(state._sheetDomDirty || state._sheetUserEdited);
@@ -45505,7 +45616,17 @@ function sheetHasUnsavedChanges_(){
   }
   return false;
 }
+function dismissAppToast_(){
+  try {
+    var el = document.getElementById('app-toast');
+    if(!el) return;
+    clearTimeout(appToastTimer);
+    el.classList.remove('show');
+    el.style.bottom = '';
+  } catch(eToast){}
+}
 function showSheetLeaveDialog_(){
+  dismissAppToast_();
   openScrollLockedOverlayEl_(document.getElementById('sheet-leave-overlay'));
 }
 function hideSheetLeaveDialog_(){
@@ -45552,6 +45673,17 @@ window.sheetLeaveDiscard_ = function(){
       state._draftContentFp[draftId] = draftContentFp_(restored);
     } catch(eRest){}
   }
+  // 제목(미리보기)도 열 때 값으로 되돌린다. 저장하지 않았으면 draft.topic 은 원래대로.
+  if(draftId && state._sheetBaselineDraftId === draftId && state._sheetBaselineTopic != null){
+    var draft = findDraftByIdAnywhere_(draftId);
+    var topic = String(state._sheetBaselineTopic || '');
+    if(draft) draft.topic = topic;
+    if(state.published[draftId]) state.published[draftId].topic = topic;
+    try { paintSheetTitleSurfaces_(draftId, topic); } catch(ePaint){}
+    var sheetTitle = document.getElementById('sheet-title');
+    if(sheetTitle) sheetTitle.textContent = topic;
+  }
+  state._sheetPendingTitle = null;
   state._sheetDomDirty = false;
   state._sheetUserEdited = false;
   cancelSheetQuietSave_();

@@ -4,12 +4,12 @@ var PLANNER_CACHE = 'planner-static-v433';
 function isPlannerStaticRequest(url){
   if(!url || url.origin !== self.location.origin) return false;
   var path = url.pathname || '';
-  return /\/(planner\.(css|js)|planner-field-sync\.js|planner-thumbs\.js|planner-sync-config\.js|planner-sync-supabase\.js|planner-sync-rules\.js|planner-import\.js|ops-naver-kw-seed\.js)(\?.*)?$/.test(path);
+  return /\/(planner\.(css|js)|planner-field-sync\.js|planner-thumbs\.js|planner-sync-config\.js|planner-banned-words\.js|planner-sync-supabase\.js|planner-sync-rules\.js|planner-import\.js|ops-naver-kw-seed\.js)(\?.*)?$/.test(path);
 }
 
 function isPlannerJsRequest(url){
   if(!url || url.origin !== self.location.origin) return false;
-  return /\/(planner\.js|planner-field-sync\.js|planner-thumbs\.js|planner-sync-config\.js|planner-sync-supabase\.js|planner-sync-rules\.js|planner-import\.js)(\?.*)?$/.test(url.pathname || '');
+  return /\/(planner\.js|planner-field-sync\.js|planner-thumbs\.js|planner-sync-config\.js|planner-banned-words\.js|planner-sync-supabase\.js|planner-sync-rules\.js|planner-import\.js)(\?.*)?$/.test(url.pathname || '');
 }
 
 self.addEventListener('install', function(event){

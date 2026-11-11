@@ -13905,8 +13905,12 @@ function closeTopmostPlannerOverlay_(){
     closePlanWorkshop_();
     return true;
   }
+  if(plannerOverlayIsOpen_('sheet-leave-overlay')){
+    sheetLeaveCancel_();
+    return true;
+  }
   if(plannerOverlayIsOpen_('detail-overlay')){
-    closeSheet();
+    requestCloseSheet_();
     return true;
   }
   return false;
@@ -35225,7 +35229,10 @@ function onPlannerHashChange_(){
   var m = h.match(/^open\/([^/]+)\/(\d+)(?:\/([a-z]+))?$/);
   if(!m){
     var ov = document.getElementById('detail-overlay');
-    if(ov && ov.classList.contains('open')) closeSheetUiOnly_();
+    if(ov && ov.classList.contains('open')){
+      // 뒤로가기·해시 제거도 저장 확인과 같은 규칙
+      requestCloseSheet_({ fromHash: true });
+    }
     return;
   }
   var draftId = decodeURIComponent(m[1]);
@@ -41476,16 +41483,20 @@ function openDetail(draftId, catId, tab, opts) {
     state.activeTab = normalizeSheetTabForCategory_(tab, catId) || state.activeTab;
   }
   state._sheetUserEdited = false;
+  state._sheetDomDirty = false;
   const content = getDraftContent_(draftId);
   document.getElementById('sheet-title').textContent = stripClinicBlogTitlePrefix_(draft.topic);
   if(content){
-    rememberDraftContentFp_(draftId, content);
+    captureSheetBaseline_(draftId);
     var viewContent = content;
     try { viewContent = JSON.parse(JSON.stringify(content)); } catch(eView){}
     normalizeContentImages_(viewContent, catId);
     renderSheetContent(viewContent);
   }
-  else { renderSheetEmpty(draft, cat); }
+  else {
+    captureSheetBaseline_(draftId);
+    renderSheetEmpty(draft, cat);
+  }
   // 닫기 애니메이션 중 재오픈이면 예약된 unlock을 무효화
   _detailCloseGen_ += 1;
   var detailOv = document.getElementById('detail-overlay');
@@ -41767,11 +41778,11 @@ function renderSheetContent(content, opts) {
     ? '<button type="button" class="btn-save-draft" onpointerdown="holdSheetSavePush_()" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' + PlannerSocial.actionsHTML(tab)
     : blogPlanTab
       ? '<button type="button" class="btn-save-draft" onpointerdown="holdSheetSavePush_()" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
-        '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
+        '<button type="button" class="btn-sheet-close-action" onclick="requestCloseSheet_()">닫기</button>' +
         blogScheduleButtonHTML_() +
         '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">지금 올리기</button>'
       : '<button type="button" class="btn-save-draft" onpointerdown="holdSheetSavePush_()" onclick="onSheetDraftSave_()" title="발행하지 않고 초안만 저장·서버 업로드">저장</button>' +
-        '<button type="button" class="btn-sheet-close-action" onclick="closeSheet()">닫기</button>' +
+        '<button type="button" class="btn-sheet-close-action" onclick="requestCloseSheet_()">닫기</button>' +
         (isDailyImages ? '' : '<button type="button" class="btn-pub"' + pubTitle + ' onclick="onSheetPublishComplete()">발행완료</button>')
   );
   if(typeof PlannerSocial !== 'undefined' && document.querySelector('#sheet-body [data-social-slot]')) PlannerSocial.hydrate();
@@ -43076,16 +43087,16 @@ function noteSheetDraftActivity_(){
   pushCardRevision_(state.selectedId);
 }
 function scheduleSheetQuietSave_(){
-  if(_sheetQuietSaveTimer_) clearTimeout(_sheetQuietSaveTimer_);
-  _sheetQuietSaveTimer_ = setTimeout(flushSheetQuietSave_, 1000);
+  // 자동 저장하지 않는다. 닫을 때 「저장 / 저장 안 함 / 취소」로만 반영.
+  // 타이머는 쓰지 않고 dirty 표시만 남긴다.
+  if(_sheetQuietSaveTimer_){
+    clearTimeout(_sheetQuietSaveTimer_);
+    _sheetQuietSaveTimer_ = 0;
+  }
 }
 function flushSheetQuietSave_(){
+  // 이전 자동 저장 경로. 닫기·명시적 「저장」 전에는 디스크에 쓰지 않는다.
   _sheetQuietSaveTimer_ = 0;
-  if(sheetQuietSaving_) return;
-  if(!state._sheetDomDirty) return;
-  sheetQuietSaving_ = true;
-  try { flushSheetQuietSaveBody_(); }
-  finally { sheetQuietSaving_ = false; }
 }
 function flushSheetQuietSaveBody_(){
   if(!state._sheetDomDirty) return;
@@ -43137,12 +43148,17 @@ function clearSheetSaveHold_(){
 window.onSheetFieldBlur_ = function(ev){
   var next = ev && ev.relatedTarget;
   if(next && next.closest && next.closest('.btn-save-draft')) holdSheetSavePush_();
-  if(sheetQuietSaving_ || sheetSectionPainting_) return;
-  if(_sheetQuietSaveTimer_){
-    clearTimeout(_sheetQuietSaveTimer_);
-    _sheetQuietSaveTimer_ = 0;
+  // 닫기·바깥 클릭으로 포커스가 빠질 때 자동 저장하지 않는다.
+  if(next && next.closest && (
+    next.closest('.sheet-close') ||
+    next.closest('.btn-sheet-close-action') ||
+    next.closest('#sheet-leave-overlay')
+  )){
+    cancelSheetQuietSave_();
+    return;
   }
-  flushSheetQuietSave_();
+  if(sheetQuietSaving_ || sheetSectionPainting_) return;
+  cancelSheetQuietSave_();
 };
 function updateSheetFieldPolishBtn_(ta){
   if(!ta || !ta.id) return;
@@ -44218,7 +44234,7 @@ function instaExtraFieldsHTML_(ig){
 /** 화면에 보이는(또는 현재 포맷의) 칸만 점검한다. 숨은 draft·말미 고정문 오탐 방지. */
 function contentLintVisibleFields_(content){
   var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(state.selectedId);
-  var visible = { blog: [], insta: [], threads: [], reel: [] };
+  var visible = { blog: [], insta: [], threads: [], reel: [], news: [] };
   var blogMap = [
     ['sheet-blog-title', 'title'], ['sheet-blog-problem', 'problem'], ['sheet-blog-selfcare', 'selfCare'],
     ['sheet-blog-explanation', 'explanation'], ['sheet-blog-hook', 'hook'], ['sheet-blog-outline', 'outline'],
@@ -44252,6 +44268,19 @@ function contentLintVisibleFields_(content){
     visible.threads = ['body', 'comment'];
   }
   if(document.getElementById('sheet-reel-caption')) visible.reel = ['caption'];
+  var newsCh = typeof getNewsChannel_ === 'function' ? getNewsChannel_() : 'naver';
+  [
+    ['sheet-news-title', newsCh + '.title'],
+    ['sheet-news-body', newsCh + '.body'],
+    ['sheet-news-cta', newsCh + '.cta']
+  ].forEach(function(pair){
+    if(document.getElementById(pair[0])) visible.news.push(pair[1]);
+  });
+  if(!visible.news.length && content && content.news){
+    ['naver', 'kakao', 'karrot'].forEach(function(ch){
+      visible.news.push(ch + '.title', ch + '.body', ch + '.cta');
+    });
+  }
   return visible;
 }
 function contentLintHTML_(content){
@@ -44270,12 +44299,21 @@ function contentLintHTML_(content){
     if(bodyEl) th.body = sheetFieldText_(bodyEl);
     if(commentEl) th.comment = sheetFieldText_(commentEl);
   }
+  var news = content.news ? JSON.parse(JSON.stringify(content.news)) : null;
+  if(news && document.getElementById('sheet-news-title')){
+    var newsChLive = typeof getNewsChannel_ === 'function' ? getNewsChannel_() : 'naver';
+    if(!news[newsChLive]) news[newsChLive] = { title: '', body: '', cta: '' };
+    news[newsChLive].title = sheetFieldText_(document.getElementById('sheet-news-title'));
+    news[newsChLive].body = sheetFieldText_(document.getElementById('sheet-news-body'));
+    news[newsChLive].cta = sheetFieldText_(document.getElementById('sheet-news-cta'));
+  }
   var visible = contentLintVisibleFields_(content);
   var issues = PlannerSyncRules.plannerLintContent({
     catId: catId,
     blog: blog,
     insta: ig,
     threads: th,
+    news: news,
     expectedComments: 4,
     visible: visible
   });
@@ -44287,17 +44325,30 @@ function contentLintHTML_(content){
     }).forEach(function(x){ x.channel = 'reel'; x.field = 'caption'; issues.push(x); });
   }
   if(!issues.length) return '<div style="font-size:12px;color:#047857;padding:6px 0;">자동 점검: 걸리는 곳이 없어요.</div>';
-  var chLabel = { blog: '블로그', insta: '인스타', threads: '쓰레드', reel: '릴스' };
-  return '<div style="font-size:12px;color:#B45309;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 10px;margin:8px 0;line-height:1.55;">' +
-    '<strong>자동 점검 ' + issues.length + '건</strong> (저장은 막지 않아요 · 누르면 위치로)<ul style="margin:4px 0 0 16px;padding:0;">' +
-    issues.slice(0, 12).map(function(x, idx){
-      var label = (chLabel[x.channel] || x.channel) + ' · ' + x.field + ': ' + x.msg;
-      var excerpt = x.excerpt ? (' — 「' + x.excerpt + '」') : '';
-      return '<li style="margin:2px 0;"><button type="button" class="content-lint-jump" onclick="jumpContentLintIssue_(\'' +
-        jsAttrString_(x.channel || '') + '\',\'' + jsAttrString_(x.field || '') + '\',\'' + jsAttrString_(x.excerpt || '') + '\')" style="all:unset;cursor:pointer;color:#B45309;text-decoration:underline;text-underline-offset:2px;">' +
-        escapeHtml(label + excerpt) + '</button></li>';
-    }).join('') +
-    '</ul></div>';
+  var chLabel = { blog: '블로그', insta: '인스타', threads: '쓰레드', reel: '릴스', news: '소식', ads: '광고' };
+  var hard = issues.filter(function(x){ return x.code !== 'caution'; });
+  var soft = issues.filter(function(x){ return x.code === 'caution'; });
+  function lintItemHtml_(x, color){
+    var label = (chLabel[x.channel] || x.channel) + ' · ' + x.field + ': ' + x.msg;
+    var excerpt = x.excerpt ? (' — 「' + x.excerpt + '」') : '';
+    return '<li style="margin:2px 0;"><button type="button" class="content-lint-jump" onclick="jumpContentLintIssue_(\'' +
+      jsAttrString_(x.channel || '') + '\',\'' + jsAttrString_(x.field || '') + '\',\'' + jsAttrString_(x.excerpt || '') + '\')" style="all:unset;cursor:pointer;color:' + color + ';text-decoration:underline;text-underline-offset:2px;">' +
+      escapeHtml(label + excerpt) + '</button></li>';
+  }
+  var html = '';
+  if(hard.length){
+    html += '<div style="font-size:12px;color:#B45309;background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 10px;margin:8px 0;line-height:1.55;">' +
+      '<strong>자동 점검 ' + hard.length + '건</strong> (저장은 막지 않아요 · 누르면 위치로)<ul style="margin:4px 0 0 16px;padding:0;">' +
+      hard.slice(0, 12).map(function(x){ return lintItemHtml_(x, '#B45309'); }).join('') +
+      '</ul></div>';
+  }
+  if(soft.length){
+    html += '<div style="font-size:12px;color:#92400E;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:8px 10px;margin:8px 0;line-height:1.55;">' +
+      '<strong>주의 ' + soft.length + '건</strong> (오류 아님 · 광고·소식 표현 점검)<ul style="margin:4px 0 0 16px;padding:0;">' +
+      soft.slice(0, 8).map(function(x){ return lintItemHtml_(x, '#C2410C'); }).join('') +
+      '</ul></div>';
+  }
+  return html;
 }
 window.jumpContentLintIssue_ = function(channel, field, excerpt){
   var idMap = {
@@ -44316,9 +44367,18 @@ window.jumpContentLintIssue_ = function(channel, field, excerpt){
     'insta.hashtags': 'sheet-insta-hashtags',
     'threads.body': 'sheet-threads-body',
     'threads.comment': 'sheet-threads-comment',
-    'reel.caption': 'sheet-reel-caption'
+    'reel.caption': 'sheet-reel-caption',
+    'news.naver.title': 'sheet-news-title',
+    'news.naver.body': 'sheet-news-body',
+    'news.naver.cta': 'sheet-news-cta',
+    'news.kakao.title': 'sheet-news-title',
+    'news.kakao.body': 'sheet-news-body',
+    'news.kakao.cta': 'sheet-news-cta',
+    'news.karrot.title': 'sheet-news-title',
+    'news.karrot.body': 'sheet-news-body',
+    'news.karrot.cta': 'sheet-news-cta'
   };
-  var tabMap = { blog: 'blog', insta: 'insta', threads: 'threads', reel: 'insta' };
+  var tabMap = { blog: 'blog', insta: 'insta', threads: 'threads', reel: 'insta', news: 'news' };
   var wantTab = tabMap[channel] || '';
   var fieldId = idMap[String(channel || '') + '.' + String(field || '')] || '';
   function focusField(){
@@ -44986,6 +45046,7 @@ window.onSheetDraftSave_ = function(){
   photoFromBlog = tab === 'blog' && refreshTopicPhotoPromptFromBlog_(content, draftId, state.selectedCatId);
   if(isDailyShareCategory(state.selectedCatId)) persistSheetDailyFactsToDraft_();
   persistDraftContent_(draftId, content);
+  captureSheetBaseline_(draftId);
   try { schedulePlannerGasPush_(true); } catch(eOnePush){}
   if(sectionChanged) paintSheetAfterSectionSplit_(content);
   if(isDailyShareCategory(state.selectedCatId) && tab === 'images'){
@@ -45337,17 +45398,21 @@ window.switchTab = function(t){
     if(t === 'community' || t === 'thread') t = 'blog';
     if(t !== 'blog' && t !== 'insta' && t !== 'threads' && t !== 'images' && t !== 'news') return;
   }
-  if(state.activeTab !== t && state._sheetUserEdited){
+  // 탭만 바꿀 때는 저장·수정일·발행 상태를 바꾸지 않는다. 화면 값은 메모리에만 반영.
+  var keepDirty = !!(state._sheetUserEdited || state._sheetDomDirty);
+  if(state.activeTab !== t && keepDirty){
     var c0 = getDraftContent_(state.selectedId);
     if(c0){
-      applySheetEditsForTab_(c0, state.activeTab);
-      persistDraftContent_(state.selectedId, c0, { userEdited: true });
+      try { applySheetEditsForTab_(c0, state.activeTab); } catch(eTabMem){}
     }
   }
-  state._sheetUserEdited = false;
   state.activeTab = t;
   const content = getDraftContent_(state.selectedId);
   if(content) renderSheetContent(content);
+  if(keepDirty){
+    state._sheetUserEdited = true;
+    state._sheetDomDirty = true;
+  }
   if(state.selectedId && state.selectedCatId != null){
     setOpenDetailHash_(state.selectedId, state.selectedCatId, t);
   }
@@ -45356,25 +45421,155 @@ window.switchTab = function(t){
 window.switchNewsChannel_ = function(ch){
   ch = normalizeNewsChannel_(ch);
   var content = getDraftContent_(state.selectedId);
-  if(content && state.activeTab === 'news' && state._sheetUserEdited){
-    applySheetNewsEdits_(content);
-    persistDraftContent_(state.selectedId, content, { userEdited: true });
+  var keepDirty = !!(state._sheetUserEdited || state._sheetDomDirty);
+  // 소식 채널 칩만 바꿀 때도 저장하지 않는다.
+  if(content && state.activeTab === 'news' && keepDirty){
+    try { applySheetNewsEdits_(content); } catch(eNewsMem){}
   }
-  state._sheetUserEdited = false;
   state.newsChannel = ch;
   if(content) renderSheetContent(content);
+  if(keepDirty){
+    state._sheetUserEdited = true;
+    state._sheetDomDirty = true;
+  }
 };
 
 function setSheetActionsHtml_(inner){
   document.getElementById('sheet-actions').innerHTML = inner || '';
   scheduleAppToastLift_();
 }
-function closeSheet(){
+function closeSheet(opts){
+  opts = opts || {};
+  if(!opts.force){
+    requestCloseSheet_(opts);
+    return;
+  }
   var ov = document.getElementById('detail-overlay');
   var wasOpen = !!(ov && ov.classList.contains('open'));
+  hideSheetLeaveDialog_();
+  cancelSheetQuietSave_();
+  state._sheetDomDirty = false;
+  state._sheetUserEdited = false;
+  state._sheetBaselineContent = null;
+  state._sheetBaselineDraftId = null;
+  state._sheetCloseFromHash_ = false;
   closeSheetUiOnly_();
   if(wasOpen) clearOpenDetailHash_();
 }
+function cancelSheetQuietSave_(){
+  if(_sheetQuietSaveTimer_){
+    clearTimeout(_sheetQuietSaveTimer_);
+    _sheetQuietSaveTimer_ = 0;
+  }
+}
+function captureSheetBaseline_(draftId){
+  draftId = draftId || state.selectedId;
+  if(!draftId) return;
+  var content = getDraftContent_(draftId);
+  try {
+    state._sheetBaselineContent = content ? JSON.parse(JSON.stringify(content)) : null;
+  } catch(eSnap){
+    state._sheetBaselineContent = null;
+  }
+  state._sheetBaselineDraftId = draftId;
+  if(!state._draftContentFp) state._draftContentFp = {};
+  if(content) state._draftContentFp[draftId] = draftContentFp_(content);
+  state._sheetDomDirty = false;
+  state._sheetUserEdited = false;
+  cancelSheetQuietSave_();
+}
+function sheetWorkingContentClone_(){
+  var draftId = state.selectedId;
+  if(!draftId) return null;
+  var live = getDraftContent_(draftId);
+  if(!live) return null;
+  var clone;
+  try { clone = JSON.parse(JSON.stringify(live)); } catch(eCl){ return null; }
+  try { applySheetEditsForTab_(clone, state.activeTab); } catch(eEd){}
+  return clone;
+}
+function sheetHasUnsavedChanges_(){
+  if(!state.selectedId) return false;
+  if(state._sheetDomDirty || state._sheetUserEdited){
+    var working = sheetWorkingContentClone_();
+    if(!working) return !!(state._sheetDomDirty || state._sheetUserEdited);
+    var nowFp = draftContentFp_(working);
+    var baseFp = '';
+    if(state._sheetBaselineDraftId === state.selectedId && state._sheetBaselineContent){
+      baseFp = draftContentFp_(state._sheetBaselineContent);
+    } else if(state._draftContentFp){
+      baseFp = state._draftContentFp[state.selectedId] || '';
+    }
+    if(baseFp && nowFp) return baseFp !== nowFp;
+    return true;
+  }
+  return false;
+}
+function showSheetLeaveDialog_(){
+  openScrollLockedOverlayEl_(document.getElementById('sheet-leave-overlay'));
+}
+function hideSheetLeaveDialog_(){
+  closeScrollLockedOverlayEl_(document.getElementById('sheet-leave-overlay'));
+}
+window.requestCloseSheet_ = function(opts){
+  opts = opts || {};
+  if(opts.force){
+    closeSheet({ force: true });
+    return;
+  }
+  var ov = document.getElementById('detail-overlay');
+  if(!(ov && ov.classList.contains('open'))) return;
+  cancelSheetQuietSave_();
+  if(!sheetHasUnsavedChanges_()){
+    closeSheet({ force: true });
+    return;
+  }
+  state._sheetCloseFromHash_ = !!opts.fromHash;
+  showSheetLeaveDialog_();
+};
+window.onDetailOverlayClick_ = function(ev){
+  if(!ev || ev.target !== document.getElementById('detail-overlay')) return;
+  requestCloseSheet_();
+};
+window.sheetLeaveCancel_ = function(ev){
+  if(ev && ev.target && ev.currentTarget && ev.target !== ev.currentTarget) return;
+  hideSheetLeaveDialog_();
+  if(state._sheetCloseFromHash_ && state.selectedId != null && state.selectedCatId != null){
+    try { setOpenDetailHash_(state.selectedId, state.selectedCatId, state.activeTab); } catch(eHash){}
+  }
+  state._sheetCloseFromHash_ = false;
+};
+window.sheetLeaveDiscard_ = function(){
+  hideSheetLeaveDialog_();
+  var draftId = state.selectedId;
+  if(draftId && state._sheetBaselineDraftId === draftId && state._sheetBaselineContent){
+    try {
+      var restored = JSON.parse(JSON.stringify(state._sheetBaselineContent));
+      if(!state.published[draftId]) state.published[draftId] = {};
+      state.published[draftId].content = restored;
+      state.generatedOnly[draftId] = restored;
+      if(!state._draftContentFp) state._draftContentFp = {};
+      state._draftContentFp[draftId] = draftContentFp_(restored);
+    } catch(eRest){}
+  }
+  state._sheetDomDirty = false;
+  state._sheetUserEdited = false;
+  cancelSheetQuietSave_();
+  closeSheet({ force: true });
+};
+window.sheetLeaveSave_ = function(){
+  hideSheetLeaveDialog_();
+  try {
+    if(typeof onSheetDraftSave_ === 'function') onSheetDraftSave_();
+  } catch(eSave){
+    if(typeof setAppToast === 'function'){
+      setAppToast('저장하지 못했어요. ' + ((eSave && eSave.message) || eSave), { duration: 4200, variant: 'err' });
+    }
+    return;
+  }
+  captureSheetBaseline_(state.selectedId);
+  closeSheet({ force: true });
+};
 
 // planner-detail-publish.js — 브랜딩 플래너 detail
 function getCatIdFromDraftId_(draftId){

@@ -1056,12 +1056,14 @@ var PlannerSyncRules = (function(){
   /**
    * 생성 뒤 자동 검사. 고칠 곳 목록을 돌려준다(빈 배열 = 문제 없음).
    * input.visible 이 있으면 그 채널·칸만 본다(숨은 draft·예전 칸·말미 고정문 오탐 방지).
+   * 금지어 목록은 planner-banned-words.js (PlannerBannedWords) 한곳.
    */
   function plannerLintContent(input){
     input = input || {};
     var catId = parseInt(input.catId, 10);
     var issues = [];
     var visible = input.visible || null;
+    var BW = (typeof PlannerBannedWords !== 'undefined') ? PlannerBannedWords : null;
     function fieldVisible(channel, field){
       if(!visible) return true;
       var list = visible[channel];
@@ -1073,19 +1075,12 @@ var PlannerSyncRules = (function(){
       if(excerpt) row.excerpt = String(excerpt).replace(/\s+/g, ' ').trim().slice(0, 120);
       issues.push(row);
     }
-    var FORBID = ['한 번에', '끝내기', '페이스리프트', '펴는', '완치', '진료', '더웰니스', '경락'];
-    // 지침상 적신호는 「병원 진료」로 쓰므로, 그 구절 안의 「진료」는 금지어로 치지 않는다.
-    var FORBID_ALLOW = { '진료': ['병원 진료'] };
+    var FORBID = BW && BW.forbiddenList ? BW.forbiddenList()
+      : ['한 번에', '끝내기', '페이스리프트', '펴는', '완치', '진료', '더웰니스', '경락'];
+    var CAUTION = BW && BW.cautionList ? BW.cautionList()
+      : [{ word: '치료', channels: ['news', 'ads'] }];
     function eachLine(text, fn){
       String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n').forEach(fn);
-    }
-    function stripAllowedPhrases_(text, word){
-      var src = String(text == null ? '' : text);
-      (FORBID_ALLOW[word] || []).forEach(function(phrase){
-        if(!phrase) return;
-        src = src.split(phrase).join('');
-      });
-      return src;
     }
     function findExcerpt_(text, needle){
       var src = String(text == null ? '' : text).replace(/\r\n?/g, '\n');
@@ -1103,14 +1098,21 @@ var PlannerSyncRules = (function(){
       var t = String(text == null ? '' : text);
       if(!t.trim()) return;
       eachLine(t, function(line){
-        if(/교정/.test(line) && !/(과정|학회)/.test(line)){
-          add(channel, field, 'forbidden', '「교정」은 과정명·학회명에서만 써요', line);
-        }
+        var bare = BW && BW.isBareGyojung ? BW.isBareGyojung(line) : (/교정/.test(line) && !/(과정|학회)/.test(line));
+        if(bare) add(channel, field, 'forbidden', '「교정」은 과정명·학회명에서만 써요', line);
       });
+      // 「진료」 포함 금지어는 예외 없이 모두 잡는다(병원 진료도 포함).
       FORBID.forEach(function(w){
-        if(stripAllowedPhrases_(t, w).indexOf(w) >= 0){
-          add(channel, field, 'forbidden', '금지어 「' + w + '」', findExcerpt_(t, w));
-        }
+        if(t.indexOf(w) >= 0) add(channel, field, 'forbidden', '금지어 「' + w + '」', findExcerpt_(t, w));
+      });
+      CAUTION.forEach(function(entry){
+        var word = entry && entry.word;
+        if(!word || t.indexOf(word) < 0) return;
+        var okCh = BW && BW.channelAllowsCaution
+          ? BW.channelAllowsCaution(channel, entry)
+          : ((entry.channels || []).indexOf(channel) >= 0);
+        if(!okCh) return;
+        add(channel, field, 'caution', '주의 「' + word + '」(광고·소식에서는 피하세요)', findExcerpt_(t, word));
       });
       eachLine(t, function(line){
         if(/대부분|반드시/.test(line) || (/항상/.test(line) && !/시작은 항상 나로부터/.test(line))){
@@ -1165,6 +1167,22 @@ var PlannerSyncRules = (function(){
       if(fieldVisible('threads', 'body') && String(th.body || '').trim() && String(th.body).trim().split('\n').filter(function(x){ return x.trim(); }).length > 1){
         add('threads', 'body', 'body-lines', '본문은 한 줄이어야 해요', String(th.body).trim().slice(0, 80));
       }
+    }
+    var news = input.news;
+    if(news && typeof news === 'object'){
+      ['naver', 'kakao', 'karrot'].forEach(function(ch){
+        var item = news[ch];
+        if(!item || typeof item !== 'object') return;
+        ['title', 'body', 'cta'].forEach(function(k){
+          if(typeof item[k] === 'string') checkText('news', ch + '.' + k, item[k]);
+        });
+      });
+    }
+    if(typeof input.ads === 'string') checkText('ads', 'copy', input.ads);
+    else if(input.ads && typeof input.ads === 'object'){
+      Object.keys(input.ads).forEach(function(k){
+        if(typeof input.ads[k] === 'string') checkText('ads', k, input.ads[k]);
+      });
     }
     return issues;
   }

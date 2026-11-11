@@ -4207,7 +4207,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .schedule-row {
   display: grid;
-  grid-template-columns: minmax(72px, 88px) minmax(52px, 78px) minmax(0, 1fr) minmax(64px, 96px);
+  grid-template-columns: minmax(110px, 140px) minmax(52px, 78px) minmax(0, 1fr) minmax(64px, 96px);
   gap: 8px 10px;
   align-items: start;
   width: 100%;
@@ -4226,9 +4226,10 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   outline: none;
 }
 .schedule-row-date {
-  font-size: 12px; font-weight: 700; color: #92400E; line-height: 1.35;
-  word-break: keep-all;
+  font-size: 11px; font-weight: 700; color: #92400E; line-height: 1.4;
+  word-break: keep-all; white-space: pre-line;
 }
+.schedule-row.is-unscheduled .schedule-row-date { color: #9CA3AF; font-weight: 600; }
 .schedule-row-cat {
   font-size: 11px; font-weight: 700; color: #6B7280; line-height: 1.35;
   word-break: keep-all;
@@ -4249,7 +4250,7 @@ white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 @media (max-width: 560px) {
   .schedule-row {
-    grid-template-columns: minmax(64px, 78px) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(96px, 120px) minmax(0, 1fr) auto;
     grid-template-areas:
       "date title status"
       "cat title status";

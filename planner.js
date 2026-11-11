@@ -26421,7 +26421,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=428').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=429').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -30297,20 +30297,22 @@ function openOpsPlanDay_(ymd){
 }
 window.openOpsPlanDay_ = openOpsPlanDay_;
 
-/** 예약 현황 목록용 날짜 표시 — 예약 시각이 있으면 같이 보여 준다 */
+/** 예약 현황 — 채널 예약 일시(날짜+시간). 카드 생성·발행일과 섞지 않는다. */
 function formatPublishScheduleDateLabel_(iso){
   var dt = new Date(iso);
-  if(isNaN(dt.getTime())) return '일정 없음';
+  if(isNaN(dt.getTime())) return '예약 없음';
   var y = dt.getFullYear();
   var m = dt.getMonth() + 1;
   var d = dt.getDate();
-  var label = y + '.' + m + '.' + d;
-  var hh = dt.getHours();
-  var mm = dt.getMinutes();
-  if(hh || mm){
-    label += ' ' + String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
-  }
-  return label;
+  var hh = String(dt.getHours()).padStart(2, '0');
+  var mm = String(dt.getMinutes()).padStart(2, '0');
+  return y + '.' + m + '.' + d + ' ' + hh + ':' + mm;
+}
+function formatChannelReservationLine_(channelKey, iso){
+  var name = getPublishChannelBadgeLabel_(channelKey);
+  var when = formatPublishScheduleDateLabel_(iso);
+  if(when === '예약 없음') return '';
+  return (name ? name + ' ' : '') + when;
 }
 function publishScheduleStatusLabel_(draftId, catId, pendingKeys){
   if(draftIsFullyPublished_(draftId, catId)) return '발행완료';
@@ -30331,8 +30333,10 @@ function publishScheduleStatusLabel_(draftId, catId, pendingKeys){
   return '미발행';
 }
 /**
- * 모든 카테고리 카드의 발행·예약 일정을 읽기만 한다. 저장·상태 변경 없음.
- * includePast=false 이면 오늘(로컬 자정) 이후만.
+ * 모든 카테고리 카드. 날짜·정렬은 채널 예약(channelPlan.at)만 쓴다.
+ * 카드 날짜(생성·수정·발행일)와 다르면 예약을 우선. 예약 없으면 '예약 없음'.
+ * includePast=false 이면 지난 예약만 있는 카드는 숨긴다(예약 없음은 포함).
+ * 읽기만 — 저장·상태 변경 없음.
  */
 function collectPublishScheduleRows_(opts){
   opts = opts || {};
@@ -30341,9 +30345,8 @@ function collectPublishScheduleRows_(opts){
   start.setHours(0, 0, 0, 0);
   var startMs = start.getTime();
   var rows = [];
-  var i, j, cat, draft, pub, plan, key, planMs, doneAt, doneMs;
-  var pendingKeys, pendingMs, pendingIso, doneMsBest, doneIso;
-  var catLabel, title, atMs, atIso, isPast;
+  var channelOrder = ['blog', 'insta', 'threads', 'community', 'thread', 'news', 'newsNaver', 'newsKakao', 'newsKarrot'];
+  var i, j, cat, draft, pub, plan, catLabel, title;
   for(i = 0; i < CATEGORIES.length; i++){
     cat = CATEGORIES[i];
     if(!cat || !cat.drafts || !cat.drafts.length) continue;
@@ -30353,61 +30356,41 @@ function collectPublishScheduleRows_(opts){
       if(!draft || !draft.id) continue;
       pub = state.published && state.published[draft.id];
       plan = pub && pub.channelPlan;
-      pendingKeys = [];
-      pendingMs = NaN;
-      pendingIso = '';
-      doneMsBest = NaN;
-      doneIso = '';
+      var reservations = [];
       if(plan){
         Object.keys(plan).forEach(function(channelKey){
           var item = plan[channelKey];
           if(!item || !item.at) return;
-          planMs = Date.parse(item.at);
+          // 이미 그 채널을 발행 완료했으면 예약 목록에서는 빼 둔다
+          if(pub && pub.tabPublished && pub.tabPublished[channelKey]) return;
+          var planMs = Date.parse(item.at);
           if(isNaN(planMs)) return;
-          if(pub && pub.tabPublished && pub.tabPublished[channelKey]){
-            if(isNaN(doneMsBest) || planMs < doneMsBest){
-              doneMsBest = planMs;
-              doneIso = item.at;
-            }
-            return;
-          }
-          pendingKeys.push(channelKey);
-          if(isNaN(pendingMs) || planMs < pendingMs){
-            pendingMs = planMs;
-            pendingIso = item.at;
-          }
+          reservations.push({
+            key: channelKey,
+            at: item.at,
+            ms: planMs,
+            line: formatChannelReservationLine_(channelKey, item.at)
+          });
         });
       }
-      if(pub && pub.tabPublished){
-        Object.keys(pub.tabPublished).forEach(function(channelKey){
-          doneAt = pub.tabPublished[channelKey];
-          if(!doneAt || doneAt === true) return;
-          doneMs = Date.parse(doneAt);
-          if(isNaN(doneMs)) return;
-          if(isNaN(doneMsBest) || doneMs < doneMsBest){
-            doneMsBest = doneMs;
-            doneIso = doneAt;
-          }
-        });
-      }
-      if(pub && pub.date && isNaN(doneMsBest)){
-        doneMs = Date.parse(String(pub.date).slice(0, 10));
-        if(!isNaN(doneMs)){
-          doneMsBest = doneMs;
-          doneIso = String(pub.date);
-        }
-      }
-      if(!isNaN(pendingMs)){
-        atMs = pendingMs;
-        atIso = pendingIso;
-      } else if(!isNaN(doneMsBest)){
-        atMs = doneMsBest;
-        atIso = doneIso;
-      } else {
-        continue;
-      }
-      isPast = atMs < startMs;
-      if(!includePast && isPast) continue;
+      reservations.sort(function(a, b){
+        if(a.ms !== b.ms) return a.ms - b.ms;
+        var ai = channelOrder.indexOf(a.key);
+        var bi = channelOrder.indexOf(b.key);
+        if(ai < 0) ai = 99;
+        if(bi < 0) bi = 99;
+        if(ai !== bi) return ai - bi;
+        return String(a.key).localeCompare(String(b.key));
+      });
+      var pendingKeys = reservations.map(function(r){ return r.key; });
+      var hasReservation = reservations.length > 0;
+      var atMs = hasReservation ? reservations[0].ms : Number.POSITIVE_INFINITY;
+      var hasUpcoming = reservations.some(function(r){ return r.ms >= startMs; });
+      var onlyPast = hasReservation && !hasUpcoming;
+      if(!includePast && onlyPast) continue;
+      var dateLabel = hasReservation
+        ? reservations.map(function(r){ return r.line; }).filter(Boolean).join('\n')
+        : '예약 없음';
       title = '';
       try {
         title = stripClinicBlogTitlePrefix_(blogTitleOfContent_(getDraftContent_(draft.id)) || draft.topic);
@@ -30421,14 +30404,17 @@ function collectPublishScheduleRows_(opts){
         catLabel: catLabel,
         title: title,
         atMs: atMs,
-        atIso: atIso,
-        dateLabel: formatPublishScheduleDateLabel_(atIso),
+        hasReservation: hasReservation,
+        dateLabel: dateLabel,
         statusLabel: publishScheduleStatusLabel_(draft.id, cat.id, pendingKeys),
-        isPast: isPast
+        isPast: onlyPast,
+        isUnscheduled: !hasReservation
       });
     }
   }
   rows.sort(function(a, b){
+    // 예약 있는 카드 먼저(일시 오름차순), 예약 없음은 맨 뒤
+    if(a.hasReservation !== b.hasReservation) return a.hasReservation ? -1 : 1;
     if(a.atMs !== b.atMs) return a.atMs - b.atMs;
     if(a.catId !== b.catId) return a.catId - b.catId;
     return String(a.title).localeCompare(String(b.title), 'ko');
@@ -30443,12 +30429,15 @@ function renderPublishScheduleList_(){
   var rows = collectPublishScheduleRows_({ includePast: includePast });
   if(!rows.length){
     listEl.innerHTML = '<div class="schedule-list-empty">' +
-      (includePast ? '예약·발행 일정이 없어요.' : '오늘 이후 일정이 없어요. 지난 일정도 보기 로 확인할 수 있어요.') +
+      (includePast ? '표시할 카드가 없어요.' : '오늘 이후 예약이 없어요. 지난 일정도 보기 로 확인할 수 있어요.') +
       '</div>';
     return;
   }
   listEl.innerHTML = rows.map(function(row){
-    return '<button type="button" class="schedule-row' + (row.isPast ? ' is-past' : '') + '" role="listitem"' +
+    var rowClass = 'schedule-row' +
+      (row.isPast ? ' is-past' : '') +
+      (row.isUnscheduled ? ' is-unscheduled' : '');
+    return '<button type="button" class="' + rowClass + '" role="listitem"' +
       ' data-draft-id="' + escapeHtml(row.draftId) + '"' +
       ' onclick="openPublishScheduleRow_(\'' + jsAttrString_(row.draftId) + '\')">' +
       '<span class="schedule-row-date">' + escapeHtml(row.dateLabel) + '</span>' +

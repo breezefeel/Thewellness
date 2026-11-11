@@ -999,6 +999,36 @@ var PlannerSyncRules = (function(){
     return lines.join('\n\n');
   }
 
+  /** 필드 재생성 JSON value → 칸에 넣을 값. 비어 있으면 null(기존 글 유지). */
+  function plannerNormalizeSheetFieldRegenValue(meta, rawVal){
+    if(!meta) return null;
+    if(meta.array){
+      var arr = Array.isArray(rawVal) ? rawVal : String(rawVal == null ? '' : rawVal).split(/[\s,#]+/);
+      arr = arr.map(function(t){ return String(t).replace(/^#/, '').trim(); }).filter(Boolean);
+      return arr.length ? arr : null;
+    }
+    if(meta.arrayLines){
+      var arr2 = Array.isArray(rawVal) ? rawVal : String(rawVal == null ? '' : rawVal).split('\n');
+      arr2 = arr2.map(function(s){ return String(s).replace(/^\d+[.)]\s*/, '').trim(); }).filter(Boolean);
+      return arr2.length ? arr2 : null;
+    }
+    var text = String(rawVal == null ? '' : rawVal).trim();
+    return text ? text : null;
+  }
+
+  /** 파싱된 AI 객체에서 쓸 값을 고른다. value 없음·빈 배열·빈 문자열이면 ok:false. */
+  function plannerAcceptSheetFieldRegenResult(meta, parsedObj){
+    if(!parsedObj || typeof parsedObj !== 'object'){
+      return { ok: false, reason: 'parse', value: null };
+    }
+    if(!Object.prototype.hasOwnProperty.call(parsedObj, 'value')){
+      return { ok: false, reason: 'missing', value: null };
+    }
+    var next = plannerNormalizeSheetFieldRegenValue(meta, parsedObj.value);
+    if(next == null) return { ok: false, reason: 'empty', value: null };
+    return { ok: true, reason: '', value: next };
+  }
+
   /** 「회원」→「환자」. 조사도 같이 맞춘다(회원이→환자가, 회원은→환자는, 회원과→환자와, 회원이에요→환자예요). */
   function plannerMemberToPatient(text){
     var src = String(text == null ? '' : text);
@@ -1289,6 +1319,8 @@ var PlannerSyncRules = (function(){
     plannerOutlineFromText: plannerOutlineFromText,
     plannerOutlineDisplayText: plannerOutlineDisplayText,
     plannerOutlineCopyText: plannerOutlineCopyText,
+    plannerNormalizeSheetFieldRegenValue: plannerNormalizeSheetFieldRegenValue,
+    plannerAcceptSheetFieldRegenResult: plannerAcceptSheetFieldRegenResult,
     plannerMergeDuplicateGroup: plannerMergeDuplicateGroup,
     plannerRetargetDuplicateRefs: plannerRetargetDuplicateRefs,
     PLANNER_SYNC_BLOB_MAX_CHARS: PLANNER_SYNC_BLOB_MAX_CHARS,

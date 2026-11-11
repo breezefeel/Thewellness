@@ -16567,7 +16567,34 @@ function isAddFormOpen_(){
   return !!(state && state.showAdd);
 }
 
+var sheetFieldRegenHoldCount_ = 0;
+var sheetFieldRegenToastUntil_ = 0;
+function isSheetFieldRegenHoldActive_(){
+  return sheetFieldRegenHoldCount_ > 0;
+}
+function beginSheetFieldRegenHold_(){
+  sheetFieldRegenHoldCount_++;
+  try { clearPlannerGasRetry_(); } catch(eClrRegen){}
+  try {
+    if(plannerGasPushTimer){
+      clearTimeout(plannerGasPushTimer);
+      plannerGasPushTimer = null;
+    }
+  } catch(ePushClr){}
+  _syncPushAgain_ = false;
+}
+function endSheetFieldRegenHold_(){
+  sheetFieldRegenHoldCount_ = Math.max(0, sheetFieldRegenHoldCount_ - 1);
+  if(sheetFieldRegenHoldCount_ > 0) return;
+  try {
+    if(hasPendingLocalSyncChanges_() && plannerSyncBootstrapReady_ && !plannerSyncConflictPending_){
+      schedulePlannerGasPush_(false);
+    }
+  } catch(eResumePush){}
+}
+
 function shouldProtectComposeUi_(){
+  if(isSheetFieldRegenHoldActive_()) return true;
   if(isImeComposing_()) return true;
   if(isEditableTextFieldFocused_()) return true;
   if(isAddFormOpen_() && plannerAddFormTypedAt_ && (Date.now() - plannerAddFormTypedAt_ < 12000)) return true;
@@ -16687,6 +16714,14 @@ function setAppToast(message, options) {
   options = options || {};
   var duration = options.duration !== undefined ? options.duration : 4200;
   var variant = options.variant || '';
+  var msg = String(message == null ? '' : message);
+  // 필드 재생성 성공·실패 토스트는 「나눠 저장 중…」 같은 동기화 안내가 덮어쓰지 않게 한다.
+  if(!options.protect && Date.now() < sheetFieldRegenToastUntil_){
+    if(msg.indexOf('나눠 저장 중') === 0 || msg.indexOf('남은 ') === 0) return;
+  }
+  if(options.protect){
+    sheetFieldRegenToastUntil_ = Date.now() + Math.max(duration, 0) + 400;
+  }
   var el = document.getElementById('app-toast');
   if (!el) return;
   // 카드 닫기 확인(저장/저장 안 함/취소)이 열려 있으면 버튼을 가리지 않도록 토스트를 숨긴다.
@@ -16705,7 +16740,7 @@ function setAppToast(message, options) {
   el.classList.remove('app-toast--ok', 'app-toast--err');
   if (variant === 'ok') el.classList.add('app-toast--ok');
   else if (variant === 'err') el.classList.add('app-toast--err');
-  el.textContent = message;
+  el.textContent = msg;
   el.classList.add('show');
   if(!wasTyping) scheduleAppToastLift_();
   else if(focusSnap){
@@ -20034,15 +20069,17 @@ async function plannerGasPushNow_(){
         }
         prevLeftKeys = leftKeys.slice();
         var stillQueued = eligibleOutbox.length;
-        // 남은 건수가 지난 안내보다 줄지 않았으면 안내를 거둔다(같은 숫자가 계속 보이지 않게)
+        // 남은 건수가 지난 안내보다 줄었을 때만 다시 알린다. 줄지 않았는데 last 를 비우면 같은 숫자가 반복된다.
         var queueShrank = (typeof dividedToastLast_ !== 'number') || stillQueued < dividedToastLast_;
         if(stillQueued > mutations.length && queueShrank && typeof setAppToast === 'function'){
           dividedToastLast_ = stillQueued;
-          setAppToast(
-            '나눠 저장 중이에요. 남은 ' + stillQueued + '건…',
-            { duration: 2800, variant: 'ok' }
-          );
-        } else {
+          if(!isSheetFieldRegenHoldActive_()){
+            setAppToast(
+              '나눠 저장 중이에요. 남은 ' + stillQueued + '건…',
+              { duration: 2800, variant: 'ok' }
+            );
+          }
+        } else if(stillQueued <= mutations.length){
           clearDividedSaveToast_();
         }
       }
@@ -41688,6 +41725,8 @@ function renderSheetEmpty(draft, cat) {
 
 function renderSheetContent(content, opts) {
   opts = opts || {};
+  // 필드 재생성 중 동기화·백그라운드 반영이 시트를 다시 그려 칸을 비우지 않게 한다.
+  if(isSheetFieldRegenHoldActive_() && !opts.allowDuringFieldRegen) return;
   const tab = state.activeTab;
   var sheetBox = document.getElementById('sheet-body');
   var keepScroll = sheetBox ? sheetBox.scrollTop : 0;
@@ -43285,9 +43324,38 @@ window.regenSheetField_ = async function(key, btn){
   var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
   var content = getDraftContent_(draftId);
   if(!content){ setAppToast('먼저 초안을 생성해 주세요.', { duration: 3500, variant: 'err' }); return; }
-  applySheetEditsForTab_(content, state.activeTab);
+  // 확인 직후·AI 호출 전에 카운트다운·동기화 홀드를 시작한다(plannerClaude와 plannerSyncPatch 동시 호출 방지).
+  if(btn){
+    startButtonCountdown_(btn, {
+      estimateSec: SHEET_FIELD_REGEN_ESTIMATE_SEC,
+      busyLabel: '재생성 중',
+      idleText: '재생성'
+    });
+  }
+  beginSheetFieldRegenHold_();
   var newsCh = null;
-  var block;
+  var block = null;
+  var fieldBackup = null;
+  var outlineTextBackup = undefined;
+  var restored = false;
+  function restoreFieldBackup_(){
+    if(!block || restored) return;
+    restored = true;
+    if(meta.array || meta.arrayLines){
+      block[meta.__field] = Array.isArray(fieldBackup) ? fieldBackup.slice() : fieldBackup;
+    } else {
+      block[meta.__field] = fieldBackup;
+    }
+    if(meta.__field === 'outline'){
+      if(outlineTextBackup !== undefined){
+        if(outlineTextBackup == null) delete block.outlineText;
+        else block.outlineText = outlineTextBackup;
+      }
+    }
+    if(meta.block === 'threads' && meta.__field === 'body') block.text = block.body || '';
+  }
+  try {
+  applySheetEditsForTab_(content, state.activeTab);
   if(meta.block === 'news'){
     ensureNewsBlock_(content);
     newsCh = getNewsChannel_();
@@ -43295,6 +43363,11 @@ window.regenSheetField_ = async function(key, btn){
   } else {
     block = content[meta.block] || (content[meta.block] = {});
   }
+  // 실패·빈 결과 때 되돌릴 기존 칸 내용
+  fieldBackup = (meta.array || meta.arrayLines)
+    ? (Array.isArray(block[meta.__field]) ? block[meta.__field].slice() : [])
+    : block[meta.__field];
+  if(meta.__field === 'outline') outlineTextBackup = block.outlineText;
   var cat = CATEGORIES[catId];
   var draft = cat && cat.drafts.find(function(d){ return d.id === draftId; });
 
@@ -43348,27 +43421,43 @@ window.regenSheetField_ = async function(key, btn){
     outputGuide
   ].filter(function(l){ return l != null; }).join('\n');
 
-  var origHtml = btn ? btn.innerHTML : '';
-  if(btn){
-    startButtonCountdown_(btn, { estimateSec: SHEET_FIELD_REGEN_ESTIMATE_SEC, busyLabel: (meta.label || '필드') + ' 재생성 중', idleText: '재생성' });
-  }
-  try {
     var text = await callClaudePlanner_(prompt, { maxTokens: 1800 });
-    var obj = parsePlannerAiJsonObject_(text);
-    var val = obj.value;
-    if(meta.array){
-      var arr = Array.isArray(val) ? val : String(val || '').split(/[\s,#]+/);
-      block[meta.__field] = arr.map(function(t){ return String(t).replace(/^#/, '').trim(); }).filter(Boolean);
-    } else if(meta.arrayLines){
-      var arr2 = Array.isArray(val) ? val : String(val || '').split('\n');
-      block[meta.__field] = arr2.map(function(s){ return String(s).replace(/^\d+[.)]\s*/, '').trim(); }).filter(Boolean);
-      if(meta.__field === 'outline' && block.outlineText != null) delete block.outlineText;
-    } else {
-      block[meta.__field] = String(val || '').trim();
+    var obj;
+    try {
+      obj = parsePlannerAiJsonObject_(text);
+    } catch(parseErr){
+      restoreFieldBackup_();
+      setAppToast('재생성을 읽지 못했어요. 기존 「' + meta.label + '」은 그대로 두었어요.', {
+        duration: 5200, variant: 'err', protect: true
+      });
+      return;
     }
+    var accepted = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerAcceptSheetFieldRegenResult)
+      ? PlannerSyncRules.plannerAcceptSheetFieldRegenResult(meta, obj)
+      : { ok: !!(obj && obj.value != null && String(obj.value).trim()), value: obj && obj.value, reason: 'fallback' };
+    if(!accepted || !accepted.ok){
+      restoreFieldBackup_();
+      setAppToast('재생성 결과가 비어 있어요. 기존 「' + meta.label + '」은 그대로 두었어요.', {
+        duration: 5200, variant: 'err', protect: true
+      });
+      return;
+    }
+    block[meta.__field] = accepted.value;
+    if(meta.__field === 'outline' && block.outlineText != null) delete block.outlineText;
     if(isNonManualBannedWordChannel_(catId)){
       block[meta.__field] = scrubNonManualPainWordInValue_(block[meta.__field], catId);
       if(meta.block === 'threads' && meta.__field === 'body') block.text = block.body || '';
+      var scrubbed = (typeof PlannerSyncRules !== 'undefined' && PlannerSyncRules.plannerAcceptSheetFieldRegenResult)
+        ? PlannerSyncRules.plannerAcceptSheetFieldRegenResult(meta, { value: block[meta.__field] })
+        : { ok: true, value: block[meta.__field] };
+      if(!scrubbed.ok){
+        restoreFieldBackup_();
+        setAppToast('재생성 결과가 비어 있어요. 기존 「' + meta.label + '」은 그대로 두었어요.', {
+          duration: 5200, variant: 'err', protect: true
+        });
+        return;
+      }
+      block[meta.__field] = scrubbed.value;
     }
     if(meta.block === 'blog') applyBlogWordRulesToBlock_(block, catId);
     if(meta.block === 'news' && newsCh){
@@ -43384,12 +43473,16 @@ window.regenSheetField_ = async function(key, btn){
       syncDraftTopicFromTitle_(block[meta.__field], { draftId: draftId, save: false, auto: true });
     }
     persistDraftContent_(draftId, content);
-    renderSheetContent(content);
-    setAppToast('「' + meta.label + '」을 다시 생성했어요.', { duration: 3000, variant: 'ok' });
+    renderSheetContent(content, { allowDuringFieldRegen: true });
+    setAppToast('「' + meta.label + '」을 다시 생성했어요.', { duration: 3000, variant: 'ok', protect: true });
   } catch(e){
-    setAppToast('재생성에 실패했어요: ' + ((e && e.message) || String(e)), { duration: 6000, variant: 'err' });
+    restoreFieldBackup_();
+    setAppToast('재생성에 실패했어요: ' + ((e && e.message) || String(e)), {
+      duration: 6000, variant: 'err', protect: true
+    });
     if(btn) stopButtonCountdown_(btn);
   } finally {
+    endSheetFieldRegenHold_();
     if(btn && document.body.contains(btn)) stopButtonCountdown_(btn);
   }
 };

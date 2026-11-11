@@ -26421,7 +26421,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=430').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=431').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -30297,10 +30297,10 @@ function openOpsPlanDay_(ymd){
 }
 window.openOpsPlanDay_ = openOpsPlanDay_;
 
-/** 예약 현황 — 채널 예약 일시(날짜+시간). 카드 생성·발행일과 섞지 않는다. */
+/** 예약 현황 — 채널 예약 일시. 카드 생성·발행일과 섞지 않는다. */
 function formatPublishScheduleDateLabel_(iso){
   var dt = new Date(iso);
-  if(isNaN(dt.getTime())) return '예약 없음';
+  if(isNaN(dt.getTime())) return '';
   var y = dt.getFullYear();
   var m = dt.getMonth() + 1;
   var d = dt.getDate();
@@ -30308,34 +30308,38 @@ function formatPublishScheduleDateLabel_(iso){
   var mm = String(dt.getMinutes()).padStart(2, '0');
   return y + '.' + m + '.' + d + ' ' + hh + ':' + mm;
 }
-function formatChannelReservationLine_(channelKey, iso){
-  var name = getPublishChannelBadgeLabel_(channelKey);
-  var when = formatPublishScheduleDateLabel_(iso);
-  if(when === '예약 없음') return '';
-  return (name ? name + ' ' : '') + when;
+/** 배지 안용 짧은 예약 일시 (날짜+시간) */
+function formatScheduleBadgeDate_(iso){
+  var dt = new Date(iso);
+  if(isNaN(dt.getTime())) return '';
+  var hh = String(dt.getHours()).padStart(2, '0');
+  var mm = String(dt.getMinutes()).padStart(2, '0');
+  return (dt.getMonth() + 1) + '.' + dt.getDate() + ' ' + hh + ':' + mm;
 }
-function publishScheduleStatusLabel_(draftId, catId, pendingKeys){
-  if(draftIsFullyPublished_(draftId, catId)) return '발행완료';
-  var pending = (pendingKeys || []).map(getPublishChannelBadgeLabel_).filter(Boolean);
-  if(pending.length) return '예약 · ' + pending.join('/');
-  if(draftHasPartialPublish_(draftId, catId)){
-    var done = getDraftPublishedChannelLabels_(draftId, catId);
-    return done.length ? done.join(' · ') : '부분 발행';
-  }
-  if(typeof draftIsPendingPublish_ === 'function'){
-    var draft = null;
-    try {
-      var cat = CATEGORIES[catId];
-      draft = cat && cat.drafts && cat.drafts.find(function(row){ return row && row.id === draftId; });
-    } catch(eDraft){}
-    if(draft && draftIsPendingPublish_(draft)) return '초안';
-  }
-  return '미발행';
+function scheduleChannelBadgeKey_(channelKey){
+  var k = String(channelKey || '');
+  if(k === 'news' || k === 'newsNaver' || k === 'newsKakao' || k === 'newsKarrot' || k === 'sonsik') return 'news';
+  if(k === 'instagram') return 'insta';
+  return k;
+}
+function scheduleChannelBadgeLabel_(channelKey){
+  var map = {
+    blog: '블로그',
+    insta: '인스타',
+    threads: '쓰레드',
+    news: '소식',
+    newsNaver: '소식',
+    newsKakao: '소식',
+    newsKarrot: '소식',
+    sonsik: '소식',
+    community: '게시판',
+    thread: '일상'
+  };
+  return map[channelKey] || getPublishChannelBadgeLabel_(channelKey) || channelKey;
 }
 /**
- * 예약된 글만. 날짜·정렬은 채널 예약(channelPlan.at)만 쓴다.
- * 카드 날짜(생성·수정·발행일)와 다르면 예약을 우선. 예약 없는 카드는 목록에 넣지 않는다.
- * includePast=false 이면 지난 예약만 있는 카드는 숨긴다.
+ * 예약된 글만. 정렬은 채널 예약(channelPlan.at) 기준.
+ * 행: 카테고리 / 주제 / 채널 예약 배지(날짜 포함) / 최근 수정일
  * 읽기만 — 저장·상태 변경 없음.
  */
 function collectPublishScheduleRows_(opts){
@@ -30345,7 +30349,7 @@ function collectPublishScheduleRows_(opts){
   start.setHours(0, 0, 0, 0);
   var startMs = start.getTime();
   var rows = [];
-  var channelOrder = ['blog', 'insta', 'threads', 'community', 'thread', 'news', 'newsNaver', 'newsKakao', 'newsKarrot'];
+  var channelOrder = ['blog', 'insta', 'threads', 'news', 'newsNaver', 'newsKakao', 'newsKarrot', 'sonsik', 'community', 'thread'];
   var i, j, cat, draft, pub, plan, catLabel, title;
   for(i = 0; i < CATEGORIES.length; i++){
     cat = CATEGORIES[i];
@@ -30361,15 +30365,18 @@ function collectPublishScheduleRows_(opts){
         Object.keys(plan).forEach(function(channelKey){
           var item = plan[channelKey];
           if(!item || !item.at) return;
-          // 이미 그 채널을 발행 완료했으면 예약 목록에서는 빼 둔다
           if(pub && pub.tabPublished && pub.tabPublished[channelKey]) return;
           var planMs = Date.parse(item.at);
           if(isNaN(planMs)) return;
+          var whenShort = formatScheduleBadgeDate_(item.at);
+          if(!whenShort) return;
           reservations.push({
             key: channelKey,
+            badgeKey: scheduleChannelBadgeKey_(channelKey),
+            label: scheduleChannelBadgeLabel_(channelKey),
             at: item.at,
             ms: planMs,
-            line: formatChannelReservationLine_(channelKey, item.at)
+            whenShort: whenShort
           });
         });
       }
@@ -30383,13 +30390,10 @@ function collectPublishScheduleRows_(opts){
         if(ai !== bi) return ai - bi;
         return String(a.key).localeCompare(String(b.key));
       });
-      var pendingKeys = reservations.map(function(r){ return r.key; });
       var atMs = reservations[0].ms;
       var hasUpcoming = reservations.some(function(r){ return r.ms >= startMs; });
       var onlyPast = !hasUpcoming;
       if(!includePast && onlyPast) continue;
-      var dateLabel = reservations.map(function(r){ return r.line; }).filter(Boolean).join('\n');
-      if(!dateLabel) continue;
       title = '';
       try {
         title = stripClinicBlogTitlePrefix_(blogTitleOfContent_(getDraftContent_(draft.id)) || draft.topic);
@@ -30397,6 +30401,8 @@ function collectPublishScheduleRows_(opts){
         title = draft.topic || '';
       }
       title = String(title || '').replace(/\s+/g, ' ').trim() || '(제목 없음)';
+      var editedInfo = { label: '-', edited: false };
+      try { editedInfo = getDraftListDateInfo_(draft) || editedInfo; } catch(eDate){}
       rows.push({
         draftId: draft.id,
         catId: cat.id,
@@ -30404,10 +30410,10 @@ function collectPublishScheduleRows_(opts){
         title: title,
         atMs: atMs,
         hasReservation: true,
-        dateLabel: dateLabel,
-        statusLabel: publishScheduleStatusLabel_(draft.id, cat.id, pendingKeys),
-        isPast: onlyPast,
-        isUnscheduled: false
+        badges: reservations,
+        editedLabel: editedInfo.label || '-',
+        editedIsUpdate: !!editedInfo.edited,
+        isPast: onlyPast
       });
     }
   }
@@ -30417,6 +30423,15 @@ function collectPublishScheduleRows_(opts){
     return String(a.title).localeCompare(String(b.title), 'ko');
   });
   return rows;
+}
+function renderScheduleReservationBadgesHTML_(badges){
+  return (badges || []).map(function(b){
+    var cls = 'schedule-res-badge schedule-res-' + escapeHtml(b.badgeKey || b.key || 'etc');
+    return '<span class="' + cls + '">' +
+      '<span class="schedule-res-name">' + escapeHtml(b.label || '') + '</span>' +
+      '<span class="schedule-res-when">' + escapeHtml(b.whenShort || '') + '</span>' +
+      '</span>';
+  }).join('');
 }
 function renderPublishScheduleList_(){
   var listEl = document.getElementById('schedule-modal-list');
@@ -30432,13 +30447,14 @@ function renderPublishScheduleList_(){
   }
   listEl.innerHTML = rows.map(function(row){
     var rowClass = 'schedule-row' + (row.isPast ? ' is-past' : '');
+    var editedTitle = row.editedIsUpdate ? '최근 수정' : '생성·수정';
     return '<button type="button" class="' + rowClass + '" role="listitem"' +
       ' data-draft-id="' + escapeHtml(row.draftId) + '"' +
       ' onclick="openPublishScheduleRow_(\'' + jsAttrString_(row.draftId) + '\')">' +
-      '<span class="schedule-row-date">' + escapeHtml(row.dateLabel) + '</span>' +
       '<span class="schedule-row-cat">' + escapeHtml(row.catLabel) + '</span>' +
       '<span class="schedule-row-title">' + escapeHtml(row.title) + '</span>' +
-      '<span class="schedule-row-status">' + escapeHtml(row.statusLabel) + '</span>' +
+      '<span class="schedule-row-badges">' + renderScheduleReservationBadgesHTML_(row.badges) + '</span>' +
+      '<span class="schedule-row-edited" title="' + escapeHtml(editedTitle) + '">' + escapeHtml(row.editedLabel || '-') + '</span>' +
       '</button>';
   }).join('');
 }

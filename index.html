@@ -71,8 +71,8 @@
 })();
 </script>
 <!-- CSS는 비차단 로드 — 렌더 막지 않음 -->
-<link rel="stylesheet" href="planner.css?v=419" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="planner.css?v=419"></noscript>
+<link rel="stylesheet" href="planner.css?v=420" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="planner.css?v=420"></noscript>
 <!-- 서비스워커는 head에서 등록하지 않음 — 문서 이동이 SW 대기(수십 초)에 걸리지 않게 함 -->
 </head>
 <body>
@@ -337,7 +337,7 @@
       <div class="modal-title" style="margin:0;">예약 현황</div>
       <button type="button" class="prompt-modal-close" onclick="closePublishScheduleModal_()" aria-label="닫기">×</button>
     </div>
-    <div class="modal-desc" style="font-size:12px;margin-bottom:10px;">예약된 글만 모읍니다. 날짜는 채널 예약 일시(블로그·인스타 등)입니다. 항목을 누르면 초안이 열리며 목록만으로는 저장되지 않습니다.</div>
+    <div class="modal-desc" style="font-size:12px;margin-bottom:10px;">예약된 글만 모읍니다. 카테고리 · 주제 · 채널 예약 배지 · 최근 수정일입니다. 항목을 누르면 초안이 열리며 목록만으로는 저장되지 않습니다.</div>
     <label class="schedule-past-toggle">
       <input type="checkbox" id="schedule-include-past" onchange="renderPublishScheduleList_()">
       <span>지난 일정도 보기</span>
@@ -503,7 +503,7 @@
 <script src="planner-import.js?v=405"></script>
 <script src="planner-sync-supabase.js?v=399"></script>
 <script src="planner-field-sync.js?v=11"></script>
-<script src="planner.js?v=437" defer></script>
+<script src="planner.js?v=438" defer></script>
 <script src="planner-thumbs.js?v=399" defer></script>
 <script src="planner-social.js?v=10" defer></script>
 <script>

@@ -43285,6 +43285,15 @@ window.regenSheetField_ = async function(key, btn){
   var catId = state.selectedCatId != null ? state.selectedCatId : getCatIdFromDraftId_(draftId);
   var content = getDraftContent_(draftId);
   if(!content){ setAppToast('먼저 초안을 생성해 주세요.', { duration: 3500, variant: 'err' }); return; }
+  // 확인창 OK 직후·프롬프트 조립 전에 카운트다운을 시작해 「재생성 중 · 약 N초」가 바로 보이게 한다.
+  if(btn){
+    startButtonCountdown_(btn, {
+      estimateSec: SHEET_FIELD_REGEN_ESTIMATE_SEC,
+      busyLabel: '재생성 중',
+      idleText: '재생성'
+    });
+  }
+  try {
   applySheetEditsForTab_(content, state.activeTab);
   var newsCh = null;
   var block;
@@ -43348,11 +43357,6 @@ window.regenSheetField_ = async function(key, btn){
     outputGuide
   ].filter(function(l){ return l != null; }).join('\n');
 
-  var origHtml = btn ? btn.innerHTML : '';
-  if(btn){
-    startButtonCountdown_(btn, { estimateSec: SHEET_FIELD_REGEN_ESTIMATE_SEC, busyLabel: (meta.label || '필드') + ' 재생성 중', idleText: '재생성' });
-  }
-  try {
     var text = await callClaudePlanner_(prompt, { maxTokens: 1800 });
     var obj = parsePlannerAiJsonObject_(text);
     var val = obj.value;

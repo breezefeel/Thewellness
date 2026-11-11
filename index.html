@@ -71,8 +71,8 @@
 })();
 </script>
 <!-- CSS는 비차단 로드 — 렌더 막지 않음 -->
-<link rel="stylesheet" href="planner.css?v=420" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="planner.css?v=420"></noscript>
+<link rel="stylesheet" href="planner.css?v=421" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="planner.css?v=421"></noscript>
 <!-- 서비스워커는 head에서 등록하지 않음 — 문서 이동이 SW 대기(수십 초)에 걸리지 않게 함 -->
 </head>
 <body>
@@ -334,7 +334,7 @@
 <div class="modal-overlay" id="schedule-modal-overlay" onclick="closePublishScheduleModal_(event)">
   <div class="modal-box schedule-modal-box" onclick="event.stopPropagation()">
     <div class="modal-header" style="margin-bottom:8px;">
-      <div class="modal-title" style="margin:0;">예약 현황</div>
+      <div class="modal-title" id="schedule-modal-title" style="margin:0;">예약 현황</div>
       <button type="button" class="prompt-modal-close" onclick="closePublishScheduleModal_()" aria-label="닫기">×</button>
     </div>
     <div class="modal-desc" style="font-size:12px;margin-bottom:10px;">예약된 글만 모읍니다. 카테고리 · 주제 · 채널 예약 배지 · 최근 수정일입니다. 항목을 누르면 초안이 열리며 목록만으로는 저장되지 않습니다.</div>
@@ -342,6 +342,8 @@
       <input type="checkbox" id="schedule-include-past" onchange="renderPublishScheduleList_()">
       <span>지난 일정도 보기</span>
     </label>
+    <div id="schedule-filter-cats" class="schedule-filter-row" aria-label="카테고리 필터"></div>
+    <div id="schedule-filter-channels" class="schedule-filter-row" aria-label="채널 필터"></div>
     <div id="schedule-modal-list" class="schedule-modal-list" role="list"></div>
   </div>
 </div>
@@ -465,7 +467,7 @@
     </div>
   </div>
   <div class="planner-head-right">
-    <button type="button" class="btn-schedule" id="btn-schedule" onclick="openPublishScheduleModal_()" title="예약 현황" aria-label="예약 현황"><span class="btn-schedule-label">예약 현황</span><span class="btn-schedule-label-short" aria-hidden="true">예약</span></button>
+    <button type="button" class="btn-schedule" id="btn-schedule" onclick="openPublishScheduleModal_()" title="예약 현황" aria-label="예약 현황"><span class="btn-schedule-label">예약 현황<span class="btn-schedule-count" id="schedule-btn-count" hidden></span></span><span class="btn-schedule-label-short" aria-hidden="true">예약<span class="btn-schedule-count" id="schedule-btn-count-short" hidden></span></span></button>
     <button type="button" class="btn-sync-status" id="btn-sync-status" onclick="openSyncStatusModal_()" title="동기화 및 설정" aria-label="동기화 및 설정">
       <span class="sync-btn-main"><span class="sync-dot" id="sync-dot"></span><span id="sync-status-label">동기화</span></span>
       <span class="sync-btn-sub" id="sync-btn-sub">확인</span>
@@ -503,7 +505,7 @@
 <script src="planner-import.js?v=405"></script>
 <script src="planner-sync-supabase.js?v=399"></script>
 <script src="planner-field-sync.js?v=11"></script>
-<script src="planner.js?v=438" defer></script>
+<script src="planner.js?v=439" defer></script>
 <script src="planner-thumbs.js?v=399" defer></script>
 <script src="planner-social.js?v=10" defer></script>
 <script>

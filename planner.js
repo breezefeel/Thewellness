@@ -21219,6 +21219,8 @@ function updateSyncStatusUI_(){
   try { refreshSyncStatusBodyHtml_(info); } catch(eBody){}
   try { armSyncProgressTicker_(info); } catch(eTickArm){}
   try { kickPendingSyncIfIdle_(info); } catch(eKickUi){}
+  // 동기화·상태 갱신 뒤 예약 현황 건수/열린 목록을 맞춘다 (저장은 하지 않음)
+  try { refreshPublishScheduleIfOpen_(); } catch(eSchedUi){}
 }
 function teamSyncLoginHtml_(){
   var ready = typeof PlannerSyncSupabase !== 'undefined' && PlannerSyncSupabase.configured();
@@ -26421,7 +26423,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=431').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=432').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -30297,17 +30299,15 @@ function openOpsPlanDay_(ymd){
 }
 window.openOpsPlanDay_ = openOpsPlanDay_;
 
-/** 예약 현황 — 채널 예약 일시. 카드 생성·발행일과 섞지 않는다. */
-function formatPublishScheduleDateLabel_(iso){
-  var dt = new Date(iso);
-  if(isNaN(dt.getTime())) return '';
-  var y = dt.getFullYear();
-  var m = dt.getMonth() + 1;
-  var d = dt.getDate();
-  var hh = String(dt.getHours()).padStart(2, '0');
-  var mm = String(dt.getMinutes()).padStart(2, '0');
-  return y + '.' + m + '.' + d + ' ' + hh + ':' + mm;
-}
+var scheduleFilterCatId_ = null; // null = 전체
+var scheduleFilterChannel_ = ''; // '' = 전체, blog|insta|threads|news
+var SCHEDULE_FILTER_CHANNELS_ = [
+  { key: 'blog', label: '블로그' },
+  { key: 'insta', label: '인스타' },
+  { key: 'threads', label: '쓰레드' },
+  { key: 'news', label: '소식' }
+];
+
 /** 배지 안용 짧은 예약 일시 (날짜+시간) */
 function formatScheduleBadgeDate_(iso){
   var dt = new Date(iso);
@@ -30337,6 +30337,19 @@ function scheduleChannelBadgeLabel_(channelKey){
   };
   return map[channelKey] || getPublishChannelBadgeLabel_(channelKey) || channelKey;
 }
+/** 오늘 / 확인 필요(지난 예약) 표시 */
+function scheduleBadgeTimingNote_(iso){
+  var ymd = typeof opsPlanYmd_ === 'function' ? opsPlanYmd_(iso) : '';
+  var today = typeof opsPlanYmd_ === 'function' ? opsPlanYmd_(new Date()) : '';
+  if(!ymd || !today) return '';
+  if(ymd === today) return '오늘';
+  if(ymd < today) return '확인 필요';
+  return '';
+}
+function isPublishScheduleModalOpen_(){
+  var o = document.getElementById('schedule-modal-overlay');
+  return !!(o && o.classList.contains('open'));
+}
 /**
  * 예약된 글만. 정렬은 채널 예약(channelPlan.at) 기준.
  * 행: 카테고리 / 주제 / 채널 예약 배지(날짜 포함) / 최근 수정일
@@ -30345,6 +30358,8 @@ function scheduleChannelBadgeLabel_(channelKey){
 function collectPublishScheduleRows_(opts){
   opts = opts || {};
   var includePast = !!opts.includePast;
+  var filterCatId = opts.catId != null ? opts.catId : null;
+  var filterChannel = opts.channel ? scheduleChannelBadgeKey_(opts.channel) : '';
   var start = new Date();
   start.setHours(0, 0, 0, 0);
   var startMs = start.getTime();
@@ -30354,6 +30369,7 @@ function collectPublishScheduleRows_(opts){
   for(i = 0; i < CATEGORIES.length; i++){
     cat = CATEGORIES[i];
     if(!cat || !cat.drafts || !cat.drafts.length) continue;
+    if(filterCatId != null && cat.id !== filterCatId) continue;
     catLabel = (CAT_TAB_SHORT && CAT_TAB_SHORT[cat.id] != null) ? CAT_TAB_SHORT[cat.id] : (cat.name || ('#' + cat.id));
     for(j = 0; j < cat.drafts.length; j++){
       draft = cat.drafts[j];
@@ -30370,13 +30386,19 @@ function collectPublishScheduleRows_(opts){
           if(isNaN(planMs)) return;
           var whenShort = formatScheduleBadgeDate_(item.at);
           if(!whenShort) return;
+          var badgeKey = scheduleChannelBadgeKey_(channelKey);
+          if(filterChannel && badgeKey !== filterChannel) return;
+          var note = scheduleBadgeTimingNote_(item.at);
           reservations.push({
             key: channelKey,
-            badgeKey: scheduleChannelBadgeKey_(channelKey),
+            badgeKey: badgeKey,
             label: scheduleChannelBadgeLabel_(channelKey),
             at: item.at,
             ms: planMs,
-            whenShort: whenShort
+            whenShort: whenShort,
+            note: note,
+            isToday: note === '오늘',
+            needsConfirm: note === '확인 필요'
           });
         });
       }
@@ -30424,24 +30446,141 @@ function collectPublishScheduleRows_(opts){
   });
   return rows;
 }
+function countUpcomingPublishScheduleRows_(){
+  try {
+    return collectPublishScheduleRows_({ includePast: false, catId: null, channel: '' }).length;
+  } catch(eCount){
+    return 0;
+  }
+}
+function updatePublishScheduleHeaderCount_(){
+  var n = 0;
+  try { n = countUpcomingPublishScheduleRows_(); } catch(eN){ n = 0; }
+  var text = n > 0 ? (' · ' + n) : '';
+  ['schedule-btn-count', 'schedule-btn-count-short'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el) return;
+    if(text){
+      el.textContent = text;
+      el.hidden = false;
+    } else {
+      el.textContent = '';
+      el.hidden = true;
+    }
+  });
+  var btn = document.getElementById('btn-schedule');
+  if(btn){
+    var label = n > 0 ? ('예약 현황 · ' + n) : '예약 현황';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+  }
+}
+function updatePublishScheduleModalTitle_(count){
+  var title = document.getElementById('schedule-modal-title');
+  if(!title) return;
+  title.textContent = (count > 0) ? ('예약 현황 · ' + count) : '예약 현황';
+}
 function renderScheduleReservationBadgesHTML_(badges){
   return (badges || []).map(function(b){
-    var cls = 'schedule-res-badge schedule-res-' + escapeHtml(b.badgeKey || b.key || 'etc');
+    var extra = '';
+    if(b.isToday) extra += ' is-today';
+    if(b.needsConfirm) extra += ' needs-confirm';
+    var cls = 'schedule-res-badge schedule-res-' + escapeHtml(b.badgeKey || b.key || 'etc') + extra;
+    var noteHtml = b.note
+      ? '<span class="schedule-res-note">' + escapeHtml(b.note) + '</span>'
+      : '';
     return '<span class="' + cls + '">' +
       '<span class="schedule-res-name">' + escapeHtml(b.label || '') + '</span>' +
       '<span class="schedule-res-when">' + escapeHtml(b.whenShort || '') + '</span>' +
+      noteHtml +
       '</span>';
   }).join('');
+}
+function scheduleFilterChipHTML_(opts){
+  opts = opts || {};
+  var on = opts.on ? ' on' : '';
+  return '<button type="button" class="schedule-filter-chip' + on + '" data-kind="' +
+    escapeHtml(opts.kind || '') + '" data-value="' + escapeHtml(String(opts.value == null ? '' : opts.value)) + '"' +
+    ' onclick="event.stopPropagation();setPublishScheduleFilter_(\'' +
+    jsAttrString_(opts.kind || '') + '\',\'' + jsAttrString_(String(opts.value == null ? '' : opts.value)) + '\')">' +
+    escapeHtml(opts.label || '') + '</button>';
+}
+function renderPublishScheduleFilters_(baseRows){
+  var catEl = document.getElementById('schedule-filter-cats');
+  var chEl = document.getElementById('schedule-filter-channels');
+  if(!catEl || !chEl) return;
+  var catSeen = {};
+  var catList = [];
+  var chSeen = {};
+  (baseRows || []).forEach(function(row){
+    if(!catSeen[row.catId]){
+      catSeen[row.catId] = true;
+      catList.push({ id: row.catId, label: row.catLabel });
+    }
+    (row.badges || []).forEach(function(b){
+      chSeen[b.badgeKey || b.key] = true;
+    });
+  });
+  var navOrder = [];
+  try {
+    navOrder = (CAT_TAB_NAV_ROWS[0] || []).concat(CAT_TAB_NAV_ROWS[1] || []);
+  } catch(eNav){ navOrder = []; }
+  catList.sort(function(a, b){
+    var ai = navOrder.indexOf(a.id);
+    var bi = navOrder.indexOf(b.id);
+    if(ai < 0) ai = 99;
+    if(bi < 0) bi = 99;
+    if(ai !== bi) return ai - bi;
+    return a.id - b.id;
+  });
+  var catHtml = scheduleFilterChipHTML_({ kind: 'cat', value: '', label: '전체', on: scheduleFilterCatId_ == null });
+  catList.forEach(function(c){
+    catHtml += scheduleFilterChipHTML_({
+      kind: 'cat',
+      value: String(c.id),
+      label: c.label,
+      on: scheduleFilterCatId_ != null && Number(scheduleFilterCatId_) === Number(c.id)
+    });
+  });
+  catEl.innerHTML = catHtml;
+  var chHtml = scheduleFilterChipHTML_({ kind: 'channel', value: '', label: '전체 채널', on: !scheduleFilterChannel_ });
+  SCHEDULE_FILTER_CHANNELS_.forEach(function(ch){
+    if(!chSeen[ch.key] && scheduleFilterChannel_ !== ch.key) return;
+    chHtml += scheduleFilterChipHTML_({
+      kind: 'channel',
+      value: ch.key,
+      label: ch.label,
+      on: scheduleFilterChannel_ === ch.key
+    });
+  });
+  chEl.innerHTML = chHtml;
+}
+function setPublishScheduleFilter_(kind, value){
+  if(kind === 'cat'){
+    scheduleFilterCatId_ = (value === '' || value == null) ? null : parseInt(value, 10);
+    if(isNaN(scheduleFilterCatId_)) scheduleFilterCatId_ = null;
+  } else if(kind === 'channel'){
+    scheduleFilterChannel_ = value ? scheduleChannelBadgeKey_(value) : '';
+  }
+  renderPublishScheduleList_();
 }
 function renderPublishScheduleList_(){
   var listEl = document.getElementById('schedule-modal-list');
   if(!listEl) return;
   var pastEl = document.getElementById('schedule-include-past');
   var includePast = !!(pastEl && pastEl.checked);
-  var rows = collectPublishScheduleRows_({ includePast: includePast });
+  var baseRows = collectPublishScheduleRows_({ includePast: includePast, catId: null, channel: '' });
+  renderPublishScheduleFilters_(baseRows);
+  var rows = collectPublishScheduleRows_({
+    includePast: includePast,
+    catId: scheduleFilterCatId_,
+    channel: scheduleFilterChannel_
+  });
+  updatePublishScheduleModalTitle_(rows.length);
+  updatePublishScheduleHeaderCount_();
   if(!rows.length){
     listEl.innerHTML = '<div class="schedule-list-empty">' +
-      (includePast ? '예약된 글이 없어요.' : '오늘 이후 예약이 없어요. 지난 일정도 보기 로 확인할 수 있어요.') +
+      (includePast ? '조건에 맞는 예약이 없어요.' : '오늘 이후 예약이 없어요. 지난 일정도 보기 로 확인할 수 있어요.') +
       '</div>';
     return;
   }
@@ -30457,6 +30596,11 @@ function renderPublishScheduleList_(){
       '<span class="schedule-row-edited" title="' + escapeHtml(editedTitle) + '">' + escapeHtml(row.editedLabel || '-') + '</span>' +
       '</button>';
   }).join('');
+}
+function refreshPublishScheduleIfOpen_(){
+  updatePublishScheduleHeaderCount_();
+  if(!isPublishScheduleModalOpen_()) return;
+  renderPublishScheduleList_();
 }
 function openPublishScheduleModal_(){
   var o = document.getElementById('schedule-modal-overlay');
@@ -30493,6 +30637,9 @@ window.renderPublishScheduleList_ = renderPublishScheduleList_;
 window.openPublishScheduleModal_ = openPublishScheduleModal_;
 window.closePublishScheduleModal_ = closePublishScheduleModal_;
 window.openPublishScheduleRow_ = openPublishScheduleRow_;
+window.setPublishScheduleFilter_ = setPublishScheduleFilter_;
+window.refreshPublishScheduleIfOpen_ = refreshPublishScheduleIfOpen_;
+window.updatePublishScheduleHeaderCount_ = updatePublishScheduleHeaderCount_;
 
 function openOpsSchedulePicker_(opts){
   opts = opts || {};

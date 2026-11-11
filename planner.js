@@ -26423,7 +26423,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=432').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=433').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -30489,8 +30489,9 @@ function renderScheduleReservationBadgesHTML_(badges){
     var noteHtml = b.note
       ? '<span class="schedule-res-note">' + escapeHtml(b.note) + '</span>'
       : '';
-    return '<span class="' + cls + '">' +
-      '<span class="schedule-res-name">' + escapeHtml(b.label || '') + '</span>' +
+    var aria = String(b.label || '') + ' ' + String(b.whenShort || '') + (b.note ? (' ' + b.note) : '');
+    // 채널 이름은 상단 색상 안내·필터에만 두고, 배지에는 일시(+오늘/확인 필요)만
+    return '<span class="' + cls + '" title="' + escapeHtml(aria.trim()) + '" aria-label="' + escapeHtml(aria.trim()) + '">' +
       '<span class="schedule-res-when">' + escapeHtml(b.whenShort || '') + '</span>' +
       noteHtml +
       '</span>';
@@ -30499,7 +30500,9 @@ function renderScheduleReservationBadgesHTML_(badges){
 function scheduleFilterChipHTML_(opts){
   opts = opts || {};
   var on = opts.on ? ' on' : '';
-  return '<button type="button" class="schedule-filter-chip' + on + '" data-kind="' +
+  var tone = opts.tone ? (' schedule-filter-' + opts.tone) : '';
+  var dim = opts.dim ? ' is-dim' : '';
+  return '<button type="button" class="schedule-filter-chip' + tone + on + dim + '" data-kind="' +
     escapeHtml(opts.kind || '') + '" data-value="' + escapeHtml(String(opts.value == null ? '' : opts.value)) + '"' +
     ' onclick="event.stopPropagation();setPublishScheduleFilter_(\'' +
     jsAttrString_(opts.kind || '') + '\',\'' + jsAttrString_(String(opts.value == null ? '' : opts.value)) + '\')">' +
@@ -30543,17 +30546,21 @@ function renderPublishScheduleFilters_(baseRows){
     });
   });
   catEl.innerHTML = catHtml;
+  // 상단 채널 칩이 색상 안내 + 필터를 겸한다 (없는 채널도 안내로 항상 표시)
   var chHtml = scheduleFilterChipHTML_({ kind: 'channel', value: '', label: '전체 채널', on: !scheduleFilterChannel_ });
   SCHEDULE_FILTER_CHANNELS_.forEach(function(ch){
-    if(!chSeen[ch.key] && scheduleFilterChannel_ !== ch.key) return;
+    var has = !!chSeen[ch.key];
     chHtml += scheduleFilterChipHTML_({
       kind: 'channel',
       value: ch.key,
       label: ch.label,
-      on: scheduleFilterChannel_ === ch.key
+      tone: ch.key,
+      on: scheduleFilterChannel_ === ch.key,
+      dim: !has && scheduleFilterChannel_ !== ch.key
     });
   });
   chEl.innerHTML = chHtml;
+  chEl.setAttribute('aria-label', '채널 색상 안내 및 필터');
 }
 function setPublishScheduleFilter_(kind, value){
   if(kind === 'cat'){

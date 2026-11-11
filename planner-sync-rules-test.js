@@ -543,6 +543,9 @@ assert(!/blog:strong.*title/.test(JSON.stringify(lint.filter(function(i){ return
 var clean = R.plannerLintContent({ catId: 5, insta: { hook: '스트레칭 시 회원이 긴장해요 🤲', caption: '본문입니다.', hashtags: ['1','2','3','4','5','6','7','8','9'] }, threads: { body: '한 줄?', comment: 'a\n\nb\n\nc\n\nd' } });
 assert(clean.length === 0, 'clean content has no issues (got ' + JSON.stringify(clean) + ')');
 assert(R.plannerLintContent({ catId: 0, blog: { draft: '회원이 아파요' } }).some(function(i){ return i.code === 'honorific'; }), 'CMT/도수 flags 회원');
+assert(!R.plannerLintContent({ catId: 2, blog: { selfCare: '적신호면 병원 진료를 먼저 받으세요.', draft: '숨은 칸에 진료가 있어도' }, visible: { blog: ['title', 'problem', 'selfCare', 'explanation', 'cta'] } }).some(function(i){ return /진료/.test(i.msg || ''); }), '병원 진료 is allowed and hidden draft is skipped');
+assert(R.plannerLintContent({ catId: 2, blog: { selfCare: '혼자 진료하지 마세요' }, visible: { blog: ['selfCare'] } }).some(function(i){ return /진료/.test(i.msg || ''); }), 'bare 진료 is still flagged');
+assert((R.plannerLintContent({ catId: 2, blog: { selfCare: '혼자 진료하지 마세요' }, visible: { blog: ['selfCare'] } })[0] || {}).excerpt, 'lint includes excerpt for jump');
 
 // 카드 정보 날짜·제목: 새로고침(서버 행 → 목록 카드)에서 빠지지 않는다.
 var metaTarget = R.plannerKeepDraftCardMeta({ id: 'd5-c1794226751677' }, { dateOverride: '2026-11-10', topicLocked: true });

@@ -1053,38 +1053,79 @@ var PlannerSyncRules = (function(){
     return words.filter(function(w){ return src.indexOf(w) >= 0; });
   }
 
-  /** 생성 뒤 자동 검사. 고칠 곳 목록을 돌려준다(빈 배열 = 문제 없음). */
+  /**
+   * 생성 뒤 자동 검사. 고칠 곳 목록을 돌려준다(빈 배열 = 문제 없음).
+   * input.visible 이 있으면 그 채널·칸만 본다(숨은 draft·예전 칸·말미 고정문 오탐 방지).
+   */
   function plannerLintContent(input){
     input = input || {};
     var catId = parseInt(input.catId, 10);
     var issues = [];
-    function add(channel, field, code, msg){ issues.push({ channel: channel, field: field, code: code, msg: msg }); }
+    var visible = input.visible || null;
+    function fieldVisible(channel, field){
+      if(!visible) return true;
+      var list = visible[channel];
+      if(!list) return false;
+      return list.indexOf(field) >= 0;
+    }
+    function add(channel, field, code, msg, excerpt){
+      var row = { channel: channel, field: field, code: code, msg: msg };
+      if(excerpt) row.excerpt = String(excerpt).replace(/\s+/g, ' ').trim().slice(0, 120);
+      issues.push(row);
+    }
     var FORBID = ['한 번에', '끝내기', '페이스리프트', '펴는', '완치', '진료', '더웰니스', '경락'];
+    // 지침상 적신호는 「병원 진료」로 쓰므로, 그 구절 안의 「진료」는 금지어로 치지 않는다.
+    var FORBID_ALLOW = { '진료': ['병원 진료'] };
     function eachLine(text, fn){
       String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n').forEach(fn);
     }
+    function stripAllowedPhrases_(text, word){
+      var src = String(text == null ? '' : text);
+      (FORBID_ALLOW[word] || []).forEach(function(phrase){
+        if(!phrase) return;
+        src = src.split(phrase).join('');
+      });
+      return src;
+    }
+    function findExcerpt_(text, needle){
+      var src = String(text == null ? '' : text).replace(/\r\n?/g, '\n');
+      var idx = src.indexOf(needle);
+      if(idx < 0) return '';
+      var lineStart = src.lastIndexOf('\n', idx);
+      var lineEnd = src.indexOf('\n', idx);
+      if(lineStart < 0) lineStart = 0; else lineStart += 1;
+      if(lineEnd < 0) lineEnd = src.length;
+      return src.slice(lineStart, lineEnd).trim();
+    }
     function checkText(channel, field, text, o){
       o = o || {};
+      if(!fieldVisible(channel, field)) return;
       var t = String(text == null ? '' : text);
       if(!t.trim()) return;
       eachLine(t, function(line){
-        if(/교정/.test(line) && !/(과정|학회)/.test(line)) add(channel, field, 'forbidden', '「교정」은 과정명·학회명에서만 써요');
-      });
-      FORBID.forEach(function(w){ if(t.indexOf(w) >= 0) add(channel, field, 'forbidden', '금지어 「' + w + '」'); });
-      eachLine(t, function(line){
-        if(/대부분|반드시/.test(line) || (/항상/.test(line) && !/시작은 항상 나로부터/.test(line))){
-          add(channel, field, 'strong', '근거를 단정하는 말(대부분·반드시·항상)');
+        if(/교정/.test(line) && !/(과정|학회)/.test(line)){
+          add(channel, field, 'forbidden', '「교정」은 과정명·학회명에서만 써요', line);
         }
       });
-      if(!o.allowUrl && /https?:\/\//i.test(t)) add(channel, field, 'url', '본문에 URL이 있어요(링크는 말미 링크 칸에만)');
+      FORBID.forEach(function(w){
+        if(stripAllowedPhrases_(t, w).indexOf(w) >= 0){
+          add(channel, field, 'forbidden', '금지어 「' + w + '」', findExcerpt_(t, w));
+        }
+      });
+      eachLine(t, function(line){
+        if(/대부분|반드시/.test(line) || (/항상/.test(line) && !/시작은 항상 나로부터/.test(line))){
+          add(channel, field, 'strong', '근거를 단정하는 말(대부분·반드시·항상)', line);
+        }
+      });
+      if(!o.allowUrl && /https?:\/\//i.test(t)) add(channel, field, 'url', '본문에 URL이 있어요(링크는 말미 링크 칸에만)', findExcerpt_(t, 'http'));
       if(!o.allowEmoji){
         var em = t.match(/\p{Extended_Pictographic}/gu);
-        if(em && em.length) add(channel, field, 'emoji', '이모지가 있어요(인스타 훅 끝 1개만 허용)');
+        if(em && em.length) add(channel, field, 'emoji', '이모지가 있어요(인스타 훅 끝 1개만 허용)', t.slice(0, 80));
       }
       if(catId === 0 || catId === 3){
-        if(/회원/.test(t)) add(channel, field, 'honorific', '이 카테고리는 「환자」를 써요(「회원」이 남아 있어요)');
+        if(/회원/.test(t)) add(channel, field, 'honorific', '이 카테고리는 「환자」를 써요(「회원」이 남아 있어요)', findExcerpt_(t, '회원'));
       } else if(catId === 1 || catId === 2 || catId === 4 || catId === 5){
-        if(/환자/.test(t)) add(channel, field, 'honorific', '이 카테고리는 「회원」을 써요(「환자」가 남아 있어요)');
+        if(/환자/.test(t)) add(channel, field, 'honorific', '이 카테고리는 「회원」을 써요(「환자」가 남아 있어요)', findExcerpt_(t, '환자'));
       }
     }
     var b = input.blog;
@@ -1099,14 +1140,18 @@ var PlannerSyncRules = (function(){
     if(ig){
       var hook = String(ig.hook || '').trim();
       var hookEm = hook.match(/\p{Extended_Pictographic}/gu) || [];
-      if(hookEm.length > 1) add('insta', 'hook', 'emoji', '훅의 이모지는 끝에 1개만 넣어요');
-      else if(hookEm.length === 1 && !/\p{Extended_Pictographic}️?\s*$/u.test(hook)) add('insta', 'hook', 'emoji', '훅의 이모지는 맨 끝에 와야 해요');
+      if(fieldVisible('insta', 'hook')){
+        if(hookEm.length > 1) add('insta', 'hook', 'emoji', '훅의 이모지는 끝에 1개만 넣어요', hook);
+        else if(hookEm.length === 1 && !/\p{Extended_Pictographic}️?\s*$/u.test(hook)) add('insta', 'hook', 'emoji', '훅의 이모지는 맨 끝에 와야 해요', hook);
+      }
       checkText('insta', 'hook', hook.replace(/\p{Extended_Pictographic}️?\s*$/u, ''), {});
       checkText('insta', 'caption', ig.caption, {});
-      var tags = Array.isArray(ig.hashtags) ? ig.hashtags.filter(Boolean) : [];
-      var inline = (String(ig.caption || '').match(/#[^\s#]+/g) || []);
-      if(!tags.length && !inline.length) add('insta', 'hashtags', 'hashtag', '해시태그(#)가 없어요');
-      else if(Math.max(tags.length, inline.length) < 7) add('insta', 'hashtags', 'hashtag', '해시태그가 9개 안팎이어야 해요(지금 ' + Math.max(tags.length, inline.length) + '개)');
+      if(fieldVisible('insta', 'hashtags')){
+        var tags = Array.isArray(ig.hashtags) ? ig.hashtags.filter(Boolean) : [];
+        var inline = (String(ig.caption || '').match(/#[^\s#]+/g) || []);
+        if(!tags.length && !inline.length) add('insta', 'hashtags', 'hashtag', '해시태그(#)가 없어요');
+        else if(Math.max(tags.length, inline.length) < 7) add('insta', 'hashtags', 'hashtag', '해시태그가 9개 안팎이어야 해요(지금 ' + Math.max(tags.length, inline.length) + '개)');
+      }
     }
     var th = input.threads;
     if(th){
@@ -1114,9 +1159,11 @@ var PlannerSyncRules = (function(){
       checkText('threads', 'comment', th.comment, {});
       var expected = parseInt(input.expectedComments, 10) || 4;
       var n = String(th.comment || '').split(/\n\s*\n/).filter(function(x){ return x.trim(); }).length;
-      if(String(th.comment || '').trim() && n !== expected) add('threads', 'comment', 'count', '댓글이 ' + expected + '개여야 하는데 ' + n + '개예요');
-      if(String(th.body || '').trim() && String(th.body).trim().split('\n').filter(function(x){ return x.trim(); }).length > 1){
-        add('threads', 'body', 'body-lines', '본문은 한 줄이어야 해요');
+      if(fieldVisible('threads', 'comment') && String(th.comment || '').trim() && n !== expected){
+        add('threads', 'comment', 'count', '댓글이 ' + expected + '개여야 하는데 ' + n + '개예요');
+      }
+      if(fieldVisible('threads', 'body') && String(th.body || '').trim() && String(th.body).trim().split('\n').filter(function(x){ return x.trim(); }).length > 1){
+        add('threads', 'body', 'body-lines', '본문은 한 줄이어야 해요', String(th.body).trim().slice(0, 80));
       }
     }
     return issues;

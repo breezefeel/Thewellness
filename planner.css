@@ -4077,16 +4077,23 @@ body.planner-quota-fab-visible .app-toast.show {
   bottom: calc(88px + env(safe-area-inset-bottom, 0px));
 }
 
-/* 백그라운드 생성 안내 토스트 */
+/* 백그라운드 생성 안내 토스트
+   left:50%만 쓰면 shrink-to-fit 폭이 ~195px(390뷰포트)로 줄어 3줄이 된다.
+   left/right 여백 + width:max-content 로 max-width(358px@390)까지 쓴다. */
 .app-toast {
 position: fixed;
 bottom: calc(22px + env(safe-area-inset-bottom, 0px));
-left: 50%;
-transform: translateX(-50%) translateY(120%);
+left: 16px;
+right: 16px;
+width: max-content;
 max-width: min(420px, calc(100vw - 32px));
+margin-left: auto;
+margin-right: auto;
+transform: translateY(120%);
 max-height: min(38vh, 168px);
 overflow-y: auto;
 -webkit-overflow-scrolling: touch;
+box-sizing: border-box;
 z-index: 320;
 background: #1A1A1A;
 color: #fff;
@@ -4103,7 +4110,7 @@ text-align: center;
 white-space: pre-line;
 }
 .app-toast.show {
-transform: translateX(-50%) translateY(0);
+transform: translateY(0);
 opacity: 1;
 pointer-events: none;
 }
@@ -4117,7 +4124,7 @@ body:has(#sheet-leave-overlay.open) .app-toast,
 body:has(#plan-ws-leave-overlay.open) .app-toast {
   opacity: 0 !important;
   pointer-events: none !important;
-  transform: translateX(-50%) translateY(120%) !important;
+  transform: translateY(120%) !important;
 }
 @media (max-width: 768px) {
 body:has(#detail-sheet.open) .app-toast.show,

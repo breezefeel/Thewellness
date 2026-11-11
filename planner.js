@@ -26421,7 +26421,7 @@ function setupPlannerServiceWorker_(){
   } catch(eOff){}
   // 첫 화면 이후에만 등록 — URL 이동 자체가 SW에 막히지 않게
   var registerLater_ = function(){
-    navigator.serviceWorker.register('planner-sw.js?v=429').then(function(reg){
+    navigator.serviceWorker.register('planner-sw.js?v=430').then(function(reg){
       try { reg.update(); } catch(eUp){}
       if(reg.waiting) suggestPlannerSwRefresh_('waiting');
       reg.addEventListener('updatefound', function(){
@@ -30333,9 +30333,9 @@ function publishScheduleStatusLabel_(draftId, catId, pendingKeys){
   return '미발행';
 }
 /**
- * 모든 카테고리 카드. 날짜·정렬은 채널 예약(channelPlan.at)만 쓴다.
- * 카드 날짜(생성·수정·발행일)와 다르면 예약을 우선. 예약 없으면 '예약 없음'.
- * includePast=false 이면 지난 예약만 있는 카드는 숨긴다(예약 없음은 포함).
+ * 예약된 글만. 날짜·정렬은 채널 예약(channelPlan.at)만 쓴다.
+ * 카드 날짜(생성·수정·발행일)와 다르면 예약을 우선. 예약 없는 카드는 목록에 넣지 않는다.
+ * includePast=false 이면 지난 예약만 있는 카드는 숨긴다.
  * 읽기만 — 저장·상태 변경 없음.
  */
 function collectPublishScheduleRows_(opts){
@@ -30373,6 +30373,7 @@ function collectPublishScheduleRows_(opts){
           });
         });
       }
+      if(!reservations.length) continue;
       reservations.sort(function(a, b){
         if(a.ms !== b.ms) return a.ms - b.ms;
         var ai = channelOrder.indexOf(a.key);
@@ -30383,14 +30384,12 @@ function collectPublishScheduleRows_(opts){
         return String(a.key).localeCompare(String(b.key));
       });
       var pendingKeys = reservations.map(function(r){ return r.key; });
-      var hasReservation = reservations.length > 0;
-      var atMs = hasReservation ? reservations[0].ms : Number.POSITIVE_INFINITY;
+      var atMs = reservations[0].ms;
       var hasUpcoming = reservations.some(function(r){ return r.ms >= startMs; });
-      var onlyPast = hasReservation && !hasUpcoming;
+      var onlyPast = !hasUpcoming;
       if(!includePast && onlyPast) continue;
-      var dateLabel = hasReservation
-        ? reservations.map(function(r){ return r.line; }).filter(Boolean).join('\n')
-        : '예약 없음';
+      var dateLabel = reservations.map(function(r){ return r.line; }).filter(Boolean).join('\n');
+      if(!dateLabel) continue;
       title = '';
       try {
         title = stripClinicBlogTitlePrefix_(blogTitleOfContent_(getDraftContent_(draft.id)) || draft.topic);
@@ -30404,17 +30403,15 @@ function collectPublishScheduleRows_(opts){
         catLabel: catLabel,
         title: title,
         atMs: atMs,
-        hasReservation: hasReservation,
+        hasReservation: true,
         dateLabel: dateLabel,
         statusLabel: publishScheduleStatusLabel_(draft.id, cat.id, pendingKeys),
         isPast: onlyPast,
-        isUnscheduled: !hasReservation
+        isUnscheduled: false
       });
     }
   }
   rows.sort(function(a, b){
-    // 예약 있는 카드 먼저(일시 오름차순), 예약 없음은 맨 뒤
-    if(a.hasReservation !== b.hasReservation) return a.hasReservation ? -1 : 1;
     if(a.atMs !== b.atMs) return a.atMs - b.atMs;
     if(a.catId !== b.catId) return a.catId - b.catId;
     return String(a.title).localeCompare(String(b.title), 'ko');
@@ -30429,14 +30426,12 @@ function renderPublishScheduleList_(){
   var rows = collectPublishScheduleRows_({ includePast: includePast });
   if(!rows.length){
     listEl.innerHTML = '<div class="schedule-list-empty">' +
-      (includePast ? '표시할 카드가 없어요.' : '오늘 이후 예약이 없어요. 지난 일정도 보기 로 확인할 수 있어요.') +
+      (includePast ? '예약된 글이 없어요.' : '오늘 이후 예약이 없어요. 지난 일정도 보기 로 확인할 수 있어요.') +
       '</div>';
     return;
   }
   listEl.innerHTML = rows.map(function(row){
-    var rowClass = 'schedule-row' +
-      (row.isPast ? ' is-past' : '') +
-      (row.isUnscheduled ? ' is-unscheduled' : '');
+    var rowClass = 'schedule-row' + (row.isPast ? ' is-past' : '');
     return '<button type="button" class="' + rowClass + '" role="listitem"' +
       ' data-draft-id="' + escapeHtml(row.draftId) + '"' +
       ' onclick="openPublishScheduleRow_(\'' + jsAttrString_(row.draftId) + '\')">' +

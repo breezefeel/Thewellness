@@ -22,6 +22,7 @@ var stubs = 'var state = { deletedDraftIds: {} };' +
   'var CATEGORIES = []; for(var i=0;i<8;i++) CATEGORIES.push({ id: i, drafts: [] });';
 vm.runInContext(stubs + ['isUserAddedDraftId_', 'userAddedDraftTimestamp_', 'normalizeDraftRowForSync_', 'collectExtraDrafts', 'mergeExtraDrafts'].map(grab).join('\n'), ctx);
 var cases = [
+  { id: 'd1-c1783678521226', cat: 1, ymd: '2026-11-13' },
   { id: 'd5-c1794226751677', cat: 5, ymd: '2026-11-10' },
   { id: 'd7-c1794227530433', cat: 7, ymd: '2026-11-11' }
 ];

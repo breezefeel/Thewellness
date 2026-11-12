@@ -2454,6 +2454,37 @@ white-space: normal; overflow: visible; text-overflow: clip; max-width: 100%;
 
 /* 상단 전체 복사 바 */
 .sheet-fullcopy-bar { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; flex-wrap: wrap; }
+.sheet-fullcopy-btn.sheet-fullcopy-html { background: #374151; }
+.blog-markup-preview {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border: 1px dashed #D1D5DB;
+  border-radius: 8px;
+  background: #F9FAFB;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #374151;
+}
+.blog-markup-preview-title {
+  font-size: 10px;
+  font-weight: 800;
+  color: #9CA3AF;
+  letter-spacing: .04em;
+  margin-bottom: 6px;
+}
+.blog-markup-preview-body p { margin: 0 0 8px; }
+.blog-markup-preview-body blockquote {
+  margin: 0 0 8px;
+  padding: 4px 8px;
+  border-left: 3px solid #D1D5DB;
+  color: #4B5563;
+}
+.blog-markup-preview-body hr {
+  border: none;
+  border-top: 1px solid #E5E7EB;
+  margin: 8px 0;
+}
+.blog-markup-preview-body strong { font-weight: 800; }
 .sheet-fullcopy-btn {
 font-family: inherit; font-size: 12px; font-weight: 700;
 border: 1px solid #111827; background: #111827; color: #fff;

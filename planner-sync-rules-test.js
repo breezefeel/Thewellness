@@ -543,12 +543,20 @@ assert(/threads:count/.test(codes), 'lint finds 3 comments instead of 4');
 assert(!/blog:strong.*title/.test(JSON.stringify(lint.filter(function(i){ return i.field === 'closing'; }))), 'fixed slogan 시작은 항상 나로부터 is not flagged');
 var clean = R.plannerLintContent({ catId: 5, insta: { hook: '스트레칭 시 회원이 긴장해요 🤲', caption: '본문입니다.', hashtags: ['1','2','3','4','5','6','7','8','9'] }, threads: { body: '한 줄?', comment: 'a\n\nb\n\nc\n\nd' } });
 assert(clean.length === 0, 'clean content has no issues (got ' + JSON.stringify(clean) + ')');
+assert(R.plannerLintContent({ catId: 5, insta: { hook: '훅', caption: '본문', hashtags: ['1','2','3','4','5','6','7','8'] }, visible: { insta: ['hashtags'] } }).some(function(i){ return i.code === 'hashtag'; }), '8 hashtags still flags below 9');
 assert(R.plannerLintContent({ catId: 0, blog: { draft: '회원이 아파요' } }).some(function(i){ return i.code === 'honorific'; }), 'CMT/도수 flags 회원');
 assert(R.plannerLintContent({ catId: 2, blog: { selfCare: '적신호면 병원 진료를 먼저 받으세요.' }, visible: { blog: ['selfCare'] } }).some(function(i){ return i.code === 'forbidden' && /진료/.test(i.msg || ''); }), '병원 진료 still flags 진료');
 assert(!R.plannerLintContent({ catId: 2, blog: { selfCare: '괜찮아요', draft: '숨은 칸에 진료' }, visible: { blog: ['title', 'problem', 'selfCare', 'explanation', 'cta'] } }).some(function(i){ return /진료/.test(i.msg || ''); }), 'hidden draft is skipped');
 assert((R.plannerLintContent({ catId: 2, blog: { selfCare: '혼자 진료하지 마세요' }, visible: { blog: ['selfCare'] } })[0] || {}).excerpt, 'lint includes excerpt for jump');
 assert(R.plannerLintContent({ catId: 2, news: { naver: { body: '통증 치료 안내' } }, visible: { news: ['naver.body'] } }).some(function(i){ return i.code === 'caution' && /치료/.test(i.msg || ''); }), '치료 is caution in 소식');
 assert(!R.plannerLintContent({ catId: 2, blog: { cta: '통증 치료 안내' }, visible: { blog: ['cta'] } }).some(function(i){ return /치료/.test(i.msg || ''); }), '치료 is not flagged in blog');
+// 최소 마크업: 표기 기호는 금지어 점검에서 빼고, HTML·plain 변환을 맞춘다.
+assert(R.plannerStripBlogMarkup('**진료**는 피하세요') === '진료는 피하세요', 'strip bold markers');
+assert(R.plannerStripBlogMarkup('> 인용문\n---\n본문') === '인용문\n\n본문', 'strip quote and hr markers');
+assert(!R.plannerLintContent({ catId: 2, blog: { draft: '**괜찮아요**\n> 한 줄\n---\n본문' }, visible: { blog: ['draft'] } }).some(function(i){ return i.code === 'forbidden'; }), 'markup markers alone are not forbidden');
+assert(R.plannerLintContent({ catId: 2, blog: { draft: '**진료**는 피하세요' }, visible: { blog: ['draft'] } }).some(function(i){ return i.code === 'forbidden' && /진료/.test(i.msg || ''); }), 'forbidden words still flag after stripping markup');
+var htmlMark = R.plannerBlogMarkupToHtml('**굵게**\n\n> 인용\n\n---\n\n끝');
+assert(/<strong>굵게<\/strong>/.test(htmlMark) && /<blockquote>인용<\/blockquote>/.test(htmlMark) && /<hr>/.test(htmlMark), 'markup becomes strong/blockquote/hr');
 
 // 카드 정보 날짜·제목: 새로고침(서버 행 → 목록 카드)에서 빠지지 않는다.
 var metaTarget = R.plannerKeepDraftCardMeta({ id: 'd5-c1794226751677' }, { dateOverride: '2026-11-10', topicLocked: true });
@@ -584,21 +592,31 @@ vm.createContext(rtCtx);
 ['isUserAddedDraftId_', 'userAddedDraftTimestamp_', 'normalizeDraftRowForSync_', 'collectExtraDrafts', 'mergeExtraDrafts'].forEach(function(n){
   vm.runInContext(extractFn(plannerSrc, n), rtCtx);
 });
+rtCtx.CATEGORIES[1].drafts.push({ id: 'd1-c1783678521226', topic: '리얼무브먼트 날짜 테스트', topicLocked: true, createdAt: '2026-07-10T10:15:21.226Z', dateOverride: '2026-11-13', roadmapStepId: 's1' });
 rtCtx.CATEGORIES[5].drafts.push({ id: 'd5-c1794226751677', topic: '힘 적게 쓰는 패시브 스트레칭', topicLocked: true, createdAt: '2026-11-09T03:00:00.000Z', dateOverride: '2026-11-10', roadmapStepId: 's1' });
 rtCtx.CATEGORIES[7].drafts.push({ id: 'd7-c1794227530433', topic: '추워지면 왜 몸이 더 뻐근할까요?', createdAt: '2026-11-09T04:00:00.000Z', dateOverride: '2026-11-11', roadmapStepId: 's1' });
 var saved = JSON.parse(JSON.stringify(vm.runInContext('collectExtraDrafts()', rtCtx)));
+assert(saved[1][0].dateOverride === '2026-11-13' && saved[1][0].topicLocked === true, 'd1 saved row keeps dateOverride');
 assert(saved[5][0].dateOverride === '2026-11-10' && saved[5][0].topicLocked === true, 'saved row keeps dateOverride and topicLocked');
 rtCtx.CATEGORIES.forEach(function(c){ c.drafts = []; });
 rtCtx.__saved = saved;
 vm.runInContext('mergeExtraDrafts(__saved)', rtCtx);
+var back1 = rtCtx.CATEGORIES[1].drafts[0];
 var back5 = rtCtx.CATEGORIES[5].drafts[0];
 var back7 = rtCtx.CATEGORIES[7].drafts[0];
+assert(back1 && back1.dateOverride === '2026-11-13', 'reload keeps 11/13 on d1 (got ' + (back1 && back1.dateOverride) + ')');
 assert(back5 && back5.dateOverride === '2026-11-10', 'reload keeps 11/10 on d5 (got ' + (back5 && back5.dateOverride) + ')');
 assert(back5 && back5.topicLocked === true && back5.topic === '힘 적게 쓰는 패시브 스트레칭', 'reload keeps the locked card title');
 assert(back7 && back7.dateOverride === '2026-11-11', 'reload keeps 11/11 on d7');
+assert(back1 && R.plannerDraftListDate(back1).label === '11.13.', 'list date after reload is 11.13. on d1 (got ' + (back1 && R.plannerDraftListDate(back1).label) + ')');
 assert(back5 && R.plannerDraftListDate(back5).label === '11.10.', 'list date after reload is 11.10. (got ' + (back5 && R.plannerDraftListDate(back5).label) + ')');
 assert(back7 && !back7.topicLocked, 'cards never edited in 카드 정보 stay unlocked');
 assert(/draft\.topicLocked = true;\n    if\(ymd\) draft\.dateOverride/.test(plannerSrc), 'card info editor locks the title it saves');
+assert(/mergeIncomingDraftEntity_/.test(plannerSrc) && /plannerKeepDraftCardMeta\(row/.test(plannerSrc), 'incoming draft merge keeps card date meta');
+assert(/isExplicitTabPublished_/.test(plannerSrc) && /getDraftPublishedChannelKeys_/.test(plannerSrc), 'publish badges use explicit tabPublished only');
+assert(plannerSrc.indexOf('pub.tabPublished[key] = stamp || true') < 0, 'legacy publish migrate does not invent boolean true marks');
+assert(/if\(pub\.tabPublished\[k\] === true\)/.test(plannerSrc), 'boolean true publish marks from bad migrate are cleared');
+assert(/해시태그 정확히 9개/.test(plannerSrc) && !/해시태그 6~8개/.test(plannerSrc), 'hashtag prompts ask for exactly 9');
 // 카드 제목 필드 입력은 저장 전까지 previewOnly. auto:true 는 재생성 경로만.
 assert((plannerSrc.match(/syncDraftTopicFromTitle_\([^)]*auto: true \}\)/g) || []).length === 2, 'regen title auto paths pass auto: true');
 assert(/previewOnly:\s*true/.test(plannerSrc) && /commitSheetTitleIfNeeded_/.test(plannerSrc), 'title edits stay preview until save');

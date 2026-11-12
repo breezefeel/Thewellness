@@ -958,6 +958,105 @@ var PlannerSyncRules = (function(){
     };
   }
 
+  /**
+   * 초안 최소 마크업을 일반 텍스트로 푼다.
+   * **굵게** → 굵게 / 줄 앞 "> " → 내용만 / 한 줄 "---" → 빈 줄
+   */
+  function plannerStripBlogMarkup(text){
+    var lines = String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n');
+    var out = [];
+    for(var i = 0; i < lines.length; i++){
+      var line = lines[i];
+      if(/^\s*---\s*$/.test(line)){
+        if(out.length && out[out.length - 1] !== '') out.push('');
+        continue;
+      }
+      var m = /^(\s*)>\s?(.*)$/.exec(line);
+      if(m) line = m[1] + m[2];
+      line = line.replace(/\*\*([^*]+)\*\*/g, '$1');
+      out.push(line);
+    }
+    return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  /**
+   * 초안 최소 마크업 → HTML.
+   * **굵게** → <strong> / 줄 앞 "> " → <blockquote> / 한 줄 "---" → <hr>
+   * escapeHtmlFn 이 있으면 본문을 이스케이프한다(없으면 호출측에서 이미 안전한 글만 넘긴다).
+   */
+  function plannerBlogMarkupToHtml(text, escapeHtmlFn){
+    var esc = typeof escapeHtmlFn === 'function'
+      ? escapeHtmlFn
+      : function(s){
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      };
+    var lines = String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n');
+    var html = [];
+    var para = [];
+    var quote = [];
+    function flushPara(){
+      if(!para.length) return;
+      var body = para.join('\n').replace(/^\n+|\n+$/g, '');
+      para = [];
+      if(!body.trim()) return;
+      html.push('<p>' + inlineMarkup_(body).replace(/\n/g, '<br/>') + '</p>');
+    }
+    function flushQuote(){
+      if(!quote.length) return;
+      var body = quote.join('\n').replace(/^\n+|\n+$/g, '');
+      quote = [];
+      if(!body.trim()) return;
+      html.push('<blockquote>' + inlineMarkup_(body).replace(/\n/g, '<br/>') + '</blockquote>');
+    }
+    function inlineMarkup_(chunk){
+      var parts = [];
+      var s = String(chunk || '');
+      var re = /\*\*([^*]+)\*\*/g;
+      var last = 0;
+      var m;
+      while((m = re.exec(s))){
+        if(m.index > last) parts.push(esc(s.slice(last, m.index)));
+        parts.push('<strong>' + esc(m[1]) + '</strong>');
+        last = m.index + m[0].length;
+      }
+      if(last < s.length) parts.push(esc(s.slice(last)));
+      return parts.join('');
+    }
+    for(var i = 0; i < lines.length; i++){
+      var line = lines[i];
+      if(/^\s*---\s*$/.test(line)){
+        flushQuote();
+        flushPara();
+        html.push('<hr>');
+        continue;
+      }
+      var qm = /^(\s*)>\s?(.*)$/.exec(line);
+      if(qm){
+        flushPara();
+        quote.push(qm[2]);
+        continue;
+      }
+      flushQuote();
+      if(!String(line).trim()){
+        flushPara();
+        continue;
+      }
+      para.push(line);
+    }
+    flushQuote();
+    flushPara();
+    return html.join('');
+  }
+
+  /** 미리보기용: 블록 HTML을 작은 미리보기 마크업으로 감싼다. */
+  function plannerBlogMarkupPreviewHtml(text, escapeHtmlFn){
+    var inner = plannerBlogMarkupToHtml(text, escapeHtmlFn);
+    if(!inner) return '';
+    return '<div class="blog-markup-preview-body">' + inner + '</div>';
+  }
+
   /** 블로그 복사 본문에서 메타 줄([블로그], 제목:, ##해시태그 줄)을 뺀다. 제목 글자는 첫 줄에 남긴다. */
   function plannerCleanBlogCopyText(text){
     var lines = String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n');
@@ -1124,7 +1223,8 @@ var PlannerSyncRules = (function(){
     function checkText(channel, field, text, o){
       o = o || {};
       if(!fieldVisible(channel, field)) return;
-      var t = String(text == null ? '' : text);
+      // 금지어·어투 점검은 표기 기호(**, > , ---)를 뺀 본문 기준
+      var t = plannerStripBlogMarkup(String(text == null ? '' : text));
       if(!t.trim()) return;
       eachLine(t, function(line){
         var bare = BW && BW.isBareGyojung ? BW.isBareGyojung(line) : (/교정/.test(line) && !/(과정|학회)/.test(line));
@@ -1181,7 +1281,7 @@ var PlannerSyncRules = (function(){
         var tags = Array.isArray(ig.hashtags) ? ig.hashtags.filter(Boolean) : [];
         var inline = (String(ig.caption || '').match(/#[^\s#]+/g) || []);
         if(!tags.length && !inline.length) add('insta', 'hashtags', 'hashtag', '해시태그(#)가 없어요');
-        else if(Math.max(tags.length, inline.length) < 7) add('insta', 'hashtags', 'hashtag', '해시태그가 9개 안팎이어야 해요(지금 ' + Math.max(tags.length, inline.length) + '개)');
+        else if(Math.max(tags.length, inline.length) < 9) add('insta', 'hashtags', 'hashtag', '해시태그가 9개여야 해요(지금 ' + Math.max(tags.length, inline.length) + '개)');
       }
     }
     var th = input.threads;
@@ -1309,6 +1409,9 @@ var PlannerSyncRules = (function(){
     plannerSameKeyList: plannerSameKeyList,
     plannerStripClinicTitlePrefix: plannerStripClinicTitlePrefix,
     plannerCleanBlogCopyText: plannerCleanBlogCopyText,
+    plannerStripBlogMarkup: plannerStripBlogMarkup,
+    plannerBlogMarkupToHtml: plannerBlogMarkupToHtml,
+    plannerBlogMarkupPreviewHtml: plannerBlogMarkupPreviewHtml,
     plannerMemberToPatient: plannerMemberToPatient,
     plannerStripBodyUrls: plannerStripBodyUrls,
     plannerNaverTag: plannerNaverTag,

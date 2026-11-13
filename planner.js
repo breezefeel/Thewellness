@@ -3590,11 +3590,11 @@ const CAT_IMAGE_BAND_COLOR_EN = {
 /** 썸네일 중앙 비주얼 힌트 (영문) */
 const CAT_IMAGE_THUMBNAIL_SCENE_EN = {
   0: 'close-up neck shoulder or lower back, gentle hands-on demonstration, documentary wellness clinic, natural shadows, visible skin texture',
-  1: 'single exercise pose on yoga mat side view, movement studio, clear body alignment, athletic modest clothing',
+  1: 'single exercise pose on a treatment bed side view, movement studio, clear body alignment, athletic modest clothing',
   2: 'face jawline and neck close-up near window, natural skin texture, lifestyle editorial not beauty ad',
   3: 'hands-on palpation or joint mobilization demo, seminar room or clinic table, professional modest attire',
   4: 'cervical jaw assessment hand placement, clinical studio, structural approach not spa massage',
-  5: 'P-ROM or functional movement demo on mat, education classroom, practitioner demonstrating',
+  5: 'P-ROM or functional movement demo on a treatment bed, education classroom, practitioner demonstrating',
   6: 'everyday slice of life coffee window rain walking shoes, no medical diagram, phone-photo realism',
   7: 'Korean apartment hallway or living room, relatable resident mood, not a sales ad'
 };
@@ -3967,8 +3967,8 @@ const CATEGORY_THREE_MONTH_OUTCOME = {
   '0': '통증을 부위가 아니라 구조·연부조직으로 이해하고, 치료·운동 순서(why first)를 납득한다.',
   '1': 'PAR·Position으로 스스로 움직임·자세를 조절하고, 일상 동작·보행에 연결한다.',
   '2': '얼굴·비대칭을 경축·골격 구조로 이해하고, 기대치를 현실적으로 잡는다.',
-  '3': 'CMT를 Philosophy(컨셉)·Science(평가)·Practice(연부조직·관절, Passive 메뉴얼)로 나눠 설명한다.',
-  '4': 'IFC를 Philosophy(컨셉)·Science(평가·얼굴 해부학)·Practice(수기·운동·고주파·괄사, Passive 메뉴얼)로 나눠 설명한다.',
+  '3': 'CMT를 Philosophy(컨셉)·Science(평가)·Practice(연부조직·관절, Passive 매뉴얼)로 나눠 설명한다.',
+  '4': 'IFC를 Philosophy(컨셉)·Science(평가·얼굴 해부학)·Practice(수기·운동·고주파·괄사, Passive 매뉴얼)로 나눠 설명한다.',
   '5': 'Re:Al을 Philosophy(컨셉)·Science(평가)·Practice(패시브 움직임→Assisted Active→Resistive, 생활습관·기능운동)로 나눠 설명한다.',
   '6': '전문 강의·홍보 없이도 「믿을 만한 사람·공감되는 전문가」로 기억된다.',
   '7': '입주민이 부담 없이 P-스트레칭·자세·가벼운 기능을 일상에 붙인다.'
@@ -4009,32 +4009,32 @@ const PROGRAM_INITIAL_PLAN_DRAFTS = {
   },
   '3': {
     pspLayout: 'v1',
-    brandProfile: 'CMT는 Passive 안의 메뉴얼을 가르치는 전문가 과정입니다. 글은 Philosophy(왜 이 순서인지), Science(골반·허리·흉추·경추 평가), Practice(연부조직, 관절 테크닉) 중 하나를 고릅니다. 테크닉은 손으로 조직과 관절을 다루는 단계이고, 움직임 이후는 Re:Al이 맡습니다.',
-    strategyGuide: '기준:\n- Philosophy는 컨셉, Science는 이론과 평가, Practice는 테크닉이다.\n- 평가는 History·Inspection·Movement·Palpation 한 칸이다. 보는 곳은 골반·허리·흉추·경추.\n- Practice는 연부조직, 그다음 관절 테크닉. 둘 다 Passive 메뉴얼이다.\n- 한 글은 알리고 싶은 카테고리 하나에만 둔다. 다른 칸도 닿으면 각도에만 적고, 같은 주제를 복제하지 않는다.\n\n의도:\n- 수강생이 기법 나열 대신, 이번 글이 컨셉인지 평가인지 손기술인지 알게 한다.',
+    brandProfile: 'CMT는 Passive 안의 매뉴얼을 가르치는 전문가 과정입니다. 글은 Philosophy(왜 이 순서인지), Science(골반·허리·흉추·경추 평가), Practice(연부조직, 관절 테크닉) 중 하나를 고릅니다. 테크닉은 손으로 조직과 관절을 다루는 단계이고, 움직임 이후는 Re:Al이 맡습니다.',
+    strategyGuide: '기준:\n- Philosophy는 컨셉, Science는 이론과 평가, Practice는 테크닉이다.\n- 평가는 History·Inspection·Movement·Palpation 한 칸이다. 보는 곳은 골반·허리·흉추·경추.\n- Practice는 연부조직, 그다음 관절 테크닉. 둘 다 Passive 매뉴얼이다.\n- 한 글은 알리고 싶은 카테고리 하나에만 둔다. 다른 칸도 닿으면 각도에만 적고, 같은 주제를 복제하지 않는다.\n\n의도:\n- 수강생이 기법 나열 대신, 이번 글이 컨셉인지 평가인지 손기술인지 알게 한다.',
     steps: [
-      { id: '1', layer: 'philosophy', title: '메뉴얼을 먼저 가르치는 이유', summary: 'CMT가 움직임보다 손의 판단부터 시작하는 컨셉', rationale: '왜 평가와 메뉴얼이 움직임보다 앞인지가 과정의 첫인상입니다.' },
+      { id: '1', layer: 'philosophy', title: '매뉴얼을 먼저 가르치는 이유', summary: 'CMT가 움직임보다 손의 판단부터 시작하는 컨셉', rationale: '왜 평가와 매뉴얼이 움직임보다 앞인지가 과정의 첫인상입니다.' },
       { id: '2', layer: 'science', title: '평가', summary: '골반·허리·흉추·경추를 History·Inspection·Movement·Palpation으로 좁힌다', rationale: '네 가지 평가는 테크닉 선택이 아니라, 어디를 볼지 정하는 이론입니다.' },
-      { id: '3', layer: 'practice', title: '연부조직', summary: '근막에서 근육으로, Passive 메뉴얼의 첫 손', rationale: '관절을 움직이기 전에 연부조직을 다루는 순서입니다.' },
-      { id: '4', layer: 'practice', title: '관절 테크닉', summary: '연부조직 다음의 관절 접근. Passive 메뉴얼', rationale: '관절 테크닉은 연부조직 소견이 있을 때 고릅니다.' }
+      { id: '3', layer: 'practice', title: '연부조직', summary: '근막에서 근육으로, Passive 매뉴얼의 첫 손', rationale: '관절을 움직이기 전에 연부조직을 다루는 순서입니다.' },
+      { id: '4', layer: 'practice', title: '관절 테크닉', summary: '연부조직 다음의 관절 접근. Passive 매뉴얼', rationale: '관절 테크닉은 연부조직 소견이 있을 때 고릅니다.' }
     ]
   },
   '4': {
     pspLayout: 'v1',
-    brandProfile: 'IFC는 얼굴의 Passive 메뉴얼을 가르치는 전문가 과정입니다. 글은 Philosophy(왜 구조로 보는지), Science(얼굴 비대칭·윤곽 평가, 얼굴 해부학), Practice(얼굴 수기·얼굴 운동·고주파·괄사) 중 하나를 고릅니다. 움직임 훈련의 Passive 이후 단계는 Re:Al이 맡습니다.',
-    strategyGuide: '기준:\n- Philosophy는 컨셉, Science는 평가와 얼굴 해부학, Practice는 테크닉이다.\n- 평가는 History·Inspection·Movement·Palpation. 보는 것은 얼굴 비대칭·윤곽.\n- Practice는 얼굴 수기, 얼굴 운동, 고주파, 괄사. 메뉴얼 단계다.\n- 한 글은 알리고 싶은 카테고리 하나에만 둔다. 다른 칸도 닿으면 각도에만 적고, 같은 주제를 복제하지 않는다.\n\n의도:\n- 수강생이 표면 마사지와 IFC를 가르고, 이번 글이 설명인지 손기술인지 알게 한다.',
+    brandProfile: 'IFC는 얼굴의 Passive 매뉴얼을 가르치는 전문가 과정입니다. 글은 Philosophy(왜 구조로 보는지), Science(얼굴 비대칭·윤곽 평가, 얼굴 해부학), Practice(얼굴 수기·얼굴 운동·고주파·괄사) 중 하나를 고릅니다. 움직임 훈련의 Passive 이후 단계는 Re:Al이 맡습니다.',
+    strategyGuide: '기준:\n- Philosophy는 컨셉, Science는 평가와 얼굴 해부학, Practice는 테크닉이다.\n- 평가는 History·Inspection·Movement·Palpation. 보는 것은 얼굴 비대칭·윤곽.\n- Practice는 얼굴 수기, 얼굴 운동, 고주파, 괄사. 매뉴얼 단계다.\n- 한 글은 알리고 싶은 카테고리 하나에만 둔다. 다른 칸도 닿으면 각도에만 적고, 같은 주제를 복제하지 않는다.\n\n의도:\n- 수강생이 표면 마사지와 IFC를 가르고, 이번 글이 설명인지 손기술인지 알게 한다.',
     steps: [
       { id: '1', layer: 'philosophy', title: '구조로 얼굴을 보는 이유', summary: '표면 마사지가 아닌 IFC의 컨셉', rationale: '무엇을 약속하지 않는지가 과정의 첫 설명입니다.' },
       { id: '2', layer: 'science', title: '평가', summary: '얼굴 비대칭·윤곽을 History·Inspection·Movement·Palpation으로 좁힌다', rationale: '평가는 시술 선택이 아니라, 어디가 다른지 정하는 이론입니다.' },
       { id: '3', layer: 'science', title: '얼굴 해부학', summary: '수기 전에 층과 연결을 설명한다', rationale: '해부학은 테크닉이 아니라, 손이 닿는 이유를 밝히는 이론입니다.' },
-      { id: '4', layer: 'practice', title: '얼굴 수기', summary: '손으로 조직에 닿는 Passive 메뉴얼', rationale: '수기는 평가와 해부가 정해진 뒤에 고릅니다.' },
-      { id: '5', layer: 'practice', title: '얼굴 운동', summary: '수기 다음, 얼굴에서 직접 쓰는 움직임', rationale: '운동은 손을 대신하는 단계가 아니라, 수기 뒤에 붙는 메뉴얼입니다.' },
-      { id: '6', layer: 'practice', title: '고주파', summary: '기기와 손의 순서. Passive 메뉴얼', rationale: '고주파는 손의 순서를 바꿀 때가 아니라, 그 순서 안의 도구입니다.' },
-      { id: '7', layer: 'practice', title: '괄사', summary: '도구로 조직을 다루는 Passive 메뉴얼', rationale: '괄사는 평가된 쪽과 방향이 있을 때 씁니다.' }
+      { id: '4', layer: 'practice', title: '얼굴 수기', summary: '손으로 조직에 닿는 Passive 매뉴얼', rationale: '수기는 평가와 해부가 정해진 뒤에 고릅니다.' },
+      { id: '5', layer: 'practice', title: '얼굴 운동', summary: '수기 다음, 얼굴에서 직접 쓰는 움직임', rationale: '운동은 손을 대신하는 단계가 아니라, 수기 뒤에 붙는 매뉴얼입니다.' },
+      { id: '6', layer: 'practice', title: '고주파', summary: '기기와 손의 순서. Passive 매뉴얼', rationale: '고주파는 손의 순서를 바꿀 때가 아니라, 그 순서 안의 도구입니다.' },
+      { id: '7', layer: 'practice', title: '괄사', summary: '도구로 조직을 다루는 Passive 매뉴얼', rationale: '괄사는 평가된 쪽과 방향이 있을 때 씁니다.' }
     ]
   },
   '5': {
     pspLayout: 'v1',
-    brandProfile: 'Re:Al은 Passive 움직임부터 Active(Assisted Active), Resistive까지를 가르치는 전문가 과정입니다. 글은 Philosophy(왜 이 순서인지), Science(통증·가동범위, 그 자세에서 움직일 수 있는지), Practice(패시브 스트레칭, 액티브 스트레칭, 생활습관, 기능운동) 중 하나를 고릅니다. 손의 메뉴얼은 CMT·IFC가 맡습니다.',
+    brandProfile: 'Re:Al은 Passive 움직임부터 Active(Assisted Active), Resistive까지를 가르치는 전문가 과정입니다. 글은 Philosophy(왜 이 순서인지), Science(통증·가동범위, 그 자세에서 움직일 수 있는지), Practice(패시브 스트레칭, 액티브 스트레칭, 생활습관, 기능운동) 중 하나를 고릅니다. 손의 매뉴얼은 CMT·IFC가 맡습니다.',
     strategyGuide: '기준:\n- Philosophy는 컨셉, Science는 이론과 평가, Practice는 테크닉이다.\n- 평가는 History·Inspection·Movement·Palpation. 보는 것은 통증·가동범위와, 그 자세에서 움직일 수 있는지.\n- Practice 순서는 패시브 스트레칭(Passive 움직임) → 액티브 스트레칭(Assisted Active) → 기능운동(Resistive). 생활습관은 그 사이를 일상에 붙이는 칸이다.\n- 한 글은 알리고 싶은 카테고리 하나에만 둔다. 다른 칸도 닿으면 각도에만 적고, 같은 주제를 복제하지 않는다.\n\n의도:\n- 수강생이 지금 움직임이 어느 단계인지 말하고, 그 단계만 가르치게 한다.',
     steps: [
       { id: '1', layer: 'philosophy', title: '움직임을 순서로 쌓는 이유', summary: 'Passive 움직임에서 Resistive로 가는 컨셉', rationale: '왜 힘을 넣기 전에 움직여 주는 단계가 있는지 설명하는 칸입니다.' },
@@ -4182,7 +4182,7 @@ const PROGRAM_INITIAL_STEP_TOPICS = {
   },
   '3': {
     '1': [
-      { topic: 'CMT는 왜 움직임보다 메뉴얼부터 가르치나', angle: 'Philosophy · Passive 메뉴얼이 먼저인 컨셉' },
+      { topic: 'CMT는 왜 움직임보다 매뉴얼부터 가르치나', angle: 'Philosophy · Passive 매뉴얼이 먼저인 컨셉' },
       { topic: '테크닉을 잘 보여주는 수업과, 판단을 설명하는 수업', angle: 'Philosophy · 손이 아니라 이유' },
       { topic: '교과서 순서를 임상 순서로 바꾸는 기준', angle: 'Philosophy · 교육의 컨셉' }
     ],
@@ -4192,12 +4192,12 @@ const PROGRAM_INITIAL_STEP_TOPICS = {
       { topic: 'Palpation은 왜 세 검사 다음인가', angle: 'Science · 평가. 네 가지를 한 칸에서' }
     ],
     '3': [
-      { topic: '연부조직, 근막에서 근육으로 가는 손', angle: 'Practice · Passive 메뉴얼' },
+      { topic: '연부조직, 근막에서 근육으로 가는 손', angle: 'Practice · Passive 매뉴얼' },
       { topic: '관절 전에 연부조직을 끝내는 기준', angle: 'Practice · 연부조직. 함께: 관절 테크닉' },
       { topic: '촉진에서 연부조직 선택을 한 문장으로', angle: 'Practice · 연부조직. 함께: 평가' }
     ],
     '4': [
-      { topic: '관절 테크닉은 연부조직 다음에 고른다', angle: 'Practice · Passive 메뉴얼' },
+      { topic: '관절 테크닉은 연부조직 다음에 고른다', angle: 'Practice · Passive 매뉴얼' },
       { topic: 'HVLA와 가동술, 오늘 무엇을 보류하나', angle: 'Practice · 관절 테크닉' },
       { topic: '관절에 손을 대기 전 멈추는 선', angle: 'Practice · 관절 테크닉. 함께: 평가' }
     ]
@@ -4219,7 +4219,7 @@ const PROGRAM_INITIAL_STEP_TOPICS = {
       { topic: '표면과 심부, 수업에서 어디까지 설명하나', angle: 'Science · 얼굴 해부학' }
     ],
     '4': [
-      { topic: '얼굴 수기, 어느 층에 손이 머물나', angle: 'Practice · Passive 메뉴얼' },
+      { topic: '얼굴 수기, 어느 층에 손이 머물나', angle: 'Practice · Passive 매뉴얼' },
       { topic: '비대칭 쪽에서 손을 시작하는 순서', angle: 'Practice · 얼굴 수기. 함께: 평가' },
       { topic: '수기를 멈추는 통증과 저항의 선', angle: 'Practice · 얼굴 수기' }
     ],
@@ -4243,7 +4243,7 @@ const PROGRAM_INITIAL_STEP_TOPICS = {
     '1': [
       { topic: '힘을 넣기 전에 움직여 주는 이유', angle: 'Philosophy · Passive 움직임이 먼저인 컨셉' },
       { topic: 'PAR을 네 단계가 아니라 세 칸으로 말하는 법', angle: 'Philosophy · Passive 움직임, Assisted Active, Resistive' },
-      { topic: '도수 장면을 이 수업의 주인공으로 두지 않는 이유', angle: 'Philosophy · 메뉴얼은 CMT·IFC' }
+      { topic: '도수 장면을 이 수업의 주인공으로 두지 않는 이유', angle: 'Philosophy · 매뉴얼은 CMT·IFC' }
     ],
     '2': [
       { topic: '통증과 가동범위, 평가에서 먼저 나누는 것', angle: 'Science · 평가' },
@@ -4392,7 +4392,7 @@ function expertPspHomeStepId_(catId, blob){
   if(id === 3){
     if(has('hvla', 'lvla', '관절', '가동술', 'joint')) return 's4';
     if(has('연부', '근막', '근육', 'fascia')) return 's3';
-    if(has('먼저인 이유', '철학', '컨셉', '메뉴얼부터', '메뉴얼을 먼저')) return 's1';
+    if(has('먼저인 이유', '철학', '컨셉', '매뉴얼부터', '매뉴얼을 먼저')) return 's1';
     if(has('history', 'inspection', 'palpation', '촉진', '문진', '평가', '골반', '흉추')) return 's2';
     return '';
   }
@@ -9214,7 +9214,7 @@ window.generateStepTopicSuggest_ = async function(){
         (sug.pspRule ? sug.pspRule + '\n' : '') +
         '\n프로그램 「' + cat.name + '」의 이 카테고리만 알리는 주제 5개를 추천하세요.\n' +
         '- Philosophy는 컨셉, Science는 이론(평가는 여기), Practice는 테크닉.\n' +
-        '- CMT·IFC 테크닉은 Passive 메뉴얼. Re:Al 테크닉은 Passive 움직임 → Assisted Active → Resistive.\n' +
+        '- CMT·IFC 테크닉은 Passive 매뉴얼. Re:Al 테크닉은 Passive 움직임 → Assisted Active → Resistive.\n' +
         '- 다른 카테고리도 닿으면 angle 끝에 「함께: 그 카테고리」만 적고, 그 칸용 주제를 따로 만들지 마세요.\n' +
         '- topic은 글 제목, angle은 각도 한 줄, rationale은 왜 이 칸인지 한 문장.\n' +
         'JSON: {"topics":[{"topic":"…","angle":"…","rationale":"…"}]}')
@@ -13149,7 +13149,7 @@ let state = {
   generatedOnly: {},
   localSavedAt: '',
   showAdd: false,
-  newItem: { date:'', topic:'', catId:0, dailyShareKind:'scene', dailyThought:'', dailyWho:'', dailyWhat:'', dailyBody:'', articleKind:'', articleKindLocked:false, refImages:[], refImage:null, refNote:'', imageAnalyzing:false, imageAnalysisWait:null, flowProposals:[], selectedFlowIdx:0, flowProposalsLoading:false, flowProposalsReady:false, cachedYoutubeAnalysis:'', _cachedFlowYoutubeUrl:'', mediaStudioOpen:false, mediaStudioFocus:'', mediaStudioMode:'' },
+  newItem: { date:'', topic:'', cardTitle:'', cardDate:'', titleChoice:'', catId:0, dailyShareKind:'scene', dailyThought:'', dailyWho:'', dailyWhat:'', dailyBody:'', articleKind:'', articleKindLocked:false, refImages:[], refImage:null, refNote:'', imageAnalyzing:false, imageAnalysisWait:null, flowProposals:[], selectedFlowIdx:0, flowProposalsLoading:false, flowProposalsReady:false, cachedYoutubeAnalysis:'', _cachedFlowYoutubeUrl:'', mediaStudioOpen:false, mediaStudioFocus:'', mediaStudioMode:'' },
   apiKey: '',
   plannerClaudeEnabled: false,
   geminiYoutubeEnabled: false,
@@ -13570,12 +13570,12 @@ var BLOG_SELFCARE_ORDER_TEXT_ = '자극(도수·셀프 자극) → 스트레칭 
 function getBlogCallToActionRuleText_(catId){
   var id = parseInt(catId, 10);
   if(id === 3 || id === 4 || id === 5){
-    var course = id === 3 ? 'CMT 임상 도수치료 과정' : (id === 4 ? 'IFC 얼굴교정 과정' : 'Re:Al 움직임 과정');
-    return '- 끝 링크는 「' + course + '」 신청 링크 하나만. 앱이 글 끝에 붙이니 본문에는 URL을 쓰지 말고, 과정 신청으로 이어지는 한두 문장만 쓰세요. 예약·온라인 문진·프로필 링크 문구는 쓰지 마세요.';
+    return '- 끝 행동은 과정 신청 하나. CTA는 「과정 신청은 글 끝의 신청 링크에서 이어집니다.」 신청 링크는 앱이 글 끝에 붙입니다. URL·온라인 문진·프로필 링크·지점 예약 문구는 쓰지 마세요.';
   }
-  if(id === 1) return '- 끝 링크는 지점 예약 링크(리얼무브먼트 약수점·인천점)만. 앱이 글 끝에 붙이니 본문에는 URL을 쓰지 말고, 예약으로 이어지는 한두 문장만 쓰세요. 프로필 링크 문진·증상 허브 URL은 쓰지 마세요.';
-  if(id === 2) return '- 끝 링크는 리얼무브먼트 인천점 예약 링크 하나만. 앱이 글 끝에 붙이니 본문에는 URL을 쓰지 말고, 예약으로 이어지는 한두 문장만 쓰세요. 프로필 링크 문진·증상 허브 URL은 쓰지 마세요.';
-  return '- CTA 본문에는 URL을 쓰지 마세요.';
+  if(id === 2) return '- 끝 행동은 네이버 예약 하나. CTA는 「네이버 예약에서 인천점 시간을 잡아 보세요.」 약수 링크·온라인 문진·프로필 링크는 쓰지 마세요. URL은 앱이 붙입니다.';
+  if(id === 0) return '- 끝 행동은 리얼무브먼트 평가 예약 하나. CTA는 「리얼무브먼트 평가가 필요하면 네이버 예약에서 약수점·인천점 시간을 잡아 보세요.」 온라인 문진·프로필 링크·도수 시술 안내는 쓰지 마세요. URL은 앱이 붙입니다.';
+  if(id === 1) return '- 끝 행동은 네이버 예약 하나. CTA는 「네이버 예약에서 약수점·인천점 시간을 잡아 보세요.」 온라인 문진·프로필 링크는 쓰지 마세요. URL은 앱이 붙입니다.';
+  return '- CTA는 하나. URL·온라인 문진은 쓰지 마세요.';
 }
 /** 모든 글 프롬프트 앞에 붙이는 공통 규칙(CONTENT_RULES_V2). 저장된 프롬프트·학습 결과가 덮어쓰지 못하게 생성할 때마다 덧붙인다. */
 function getContentRulesV2Text_(catId){
@@ -13591,12 +13591,21 @@ function getContentRulesV2Text_(catId){
     '5. 호칭: ' + (clinical ? '이 카테고리는 임상(CMT·도수치료)이므로 「환자」를 씁니다. 「회원」은 쓰지 마세요.' : '이 카테고리는 「회원」을 씁니다. 「환자」는 쓰지 마세요.') + ' 호칭을 바꿀 때는 조사까지 맞춥니다(회원이/환자가, 회원을/환자를, 회원과/환자와).',
     instructorPost
       ? '6. 강사 대상 글에는 안전 문구(「불편하면 멈추세요」 등)와 부가 효익(허리 부담 감소 등)을 넣지 않습니다.'
-      : '6. 안전 문구는 셀프 케어에 한 줄만 둡니다.',
+      : '6. 일반인 셀프 케어는 인스타·소식에 「하다가 불편하면 바로 멈추세요」, 쓰레드에 「멈춰」를 둡니다. 블로그 적신호는 「이럴 땐 병원에 가 보세요」 한 줄입니다.',
     '7. 본문·캡션에 URL을 넣지 않습니다. 링크는 말미 링크 칸에만 있습니다.',
     '8. **, ---, > 금지. 이모지는 인스타 훅 끝 1개만 허용하고 그 밖에는 쓰지 않습니다.',
     '9. 덜어내기: 「현장에서 자주 봅니다」류 반복, 과정 홍보 문장 반복(본문 1회까지)을 쓰지 않습니다.',
     '10. 용어 통일: 한 글 안에서 같은 개념은 한 단어로 씁니다(기술/테크닉 혼용 금지 → 「테크닉」). 훅·쓰레드 본문은 상황(「스트레칭 시」)을 맨 앞에 둡니다.',
-    '11. 인과 고리: 원인은 「강사의 긴장(상태)」, 전달 대상은 「회원에게/회원 근육」입니다. 「자극」「몸이」처럼 흐린 주어 대신 사람과 긴장을 밝힙니다.'
+    '11. 인과 고리: 원인은 「강사의 긴장(상태)」, 전달 대상은 「회원에게/회원 근육」입니다. 「자극」「몸이」처럼 흐린 주어 대신 사람과 긴장을 밝힙니다.',
+    '12. 문장: 「~가 아닙니다」「~하면 안 됩니다」 대신, 할 수 있는 행동을 긍정문으로 씁니다.',
+    '13. 글 흐름 단계(「~짚는다」「~정리한다」「~밝힌다」)는 작성 지시입니다. 본문 문장으로 출력하지 마세요.',
+    '14. 표기: 본문에는 「리얼무브먼트」「리얼페이스」를 붙여 씁니다. 「메뉴얼」은 「매뉴얼」로 씁니다.',
+    '15. 👉 를 쓰지 마세요. 이모지는 인스타 훅 끝 1개만 허용합니다.',
+    '16. 세션은 침대입니다. 매트라고 쓰지 마세요.',
+    '17. 적신호는 블로그에만 「이럴 땐 병원에 가 보세요」 한 줄. 「진료」는 어떤 채널에도 쓰지 마세요.',
+    id === 0
+      ? '18. 도수치료 탭: 이 센터는 지금 도수치료를 하지 않습니다. 「도수치료에서는」「치료 방향」「교정」, 태그 도수치료·계양도수·약수역도수·자세교정을 쓰지 마세요. 일반 건강 정보로 쓰고, 다음 행동은 리얼무브먼트 평가 예약입니다.'
+      : '18. 끝 행동은 채널당 하나. 인스타는 DM, 네이버 소식은 톡톡, 당근은 채팅, 블로그는 예약 또는 과정 신청. 소식에는 URL이 없습니다.'
   ];
   return lines.join('\n');
 }
@@ -13608,7 +13617,13 @@ function getBlogStructureRulesText_(catId){
     lines.push('- 셀프 케어(따라하기) 순서는 항상 ' + BLOG_SELFCARE_ORDER_TEXT_ + '. 3~4단계면 앞에서부터 이 순서대로 고르고, 순서를 바꾸거나 다른 종류를 앞에 두지 마세요. 「자세→숨→목·머리→등」 순서는 쓰지 않습니다.');
     lines.push('- 셀프 케어 다음에는 충분히 긴 원리 설명을 둡니다(짧게 끝내지 말고 여러 문단). 원리 설명에는 네 가지가 모두 들어가야 합니다: ① 왜 아픈지(불편한지) ② 서로 연결된 구조 ③ 왜 이 순서(' + BLOG_SELFCARE_ORDER_TEXT_ + ')로 하는지 ④ 생활 속 원인. 원리 설명이 끝난 뒤에 CTA를 둡니다. CTA 뒤에 새 설명을 붙이지 마세요.');
     lines.push('- 분량: 본문(문제 제기·셀프 케어·원리 설명·CTA) 합쳐 공백 포함 **1,900자 안팎**(1,700~2,100자). 제목·태그·참고 문헌·끝 링크는 세지 않습니다.');
-    lines.push('- 안전 문구(예: 「하다가 불편하면 바로 멈추세요.」)는 셀프 케어에 한 줄 넣습니다.');
+    lines.push('- 안전 문구 「하다가 불편하면 바로 멈추세요」는 인스타·소식에 두고, 쓰레드는 「멈춰」만 둡니다. 블로그 셀프 케어 맨 끝은 「이럴 땐 병원에 가 보세요」 한 줄입니다. 「진료」는 쓰지 마세요.');
+    if(id === 1 || id === 2){
+      lines.push('- 셀프 케어는 4단계만 씁니다: ①자극 ②스트레칭 ③자세·생활습관 ④기능운동. 각 동작은 【부위 — 동작명】, 다음 줄 설명, 빈 줄, ⏱ 유지·횟수, 바로 다음 줄에 팁. 【동작】 블록 사이는 빈 줄. 👉 는 쓰지 마세요.');
+    }
+    if(id === 0){
+      lines.push('- 도수치료를 제공하는 글처럼 쓰지 마세요. 일반 건강 정보입니다. 「도수치료에서는」「치료 방향」「교정」과 태그 도수치료·계양도수·약수역도수·자세교정은 금지입니다.');
+    }
   } else {
     lines.push('- 분량: 본문 전체 약 1,900자(공백 포함, ±10%). 근거가 없는 내용으로 채우지 마세요.');
     lines.push('- 안전 문구(「하다가 불편하면 바로 멈추세요.」 같은 문장)는 넣지 않습니다.');
@@ -13660,6 +13675,47 @@ function applyBlogWordRulesToBlock_(blog, catId){
     blog.hashtags = blog.hashtags.map(PlannerSyncRules.plannerNaverTag).filter(Boolean);
   }
   return blog;
+}
+/** 생성·재생성 직후에만 호출. 카드를 열거나 탭을 바꿀 때는 호출하지 않는다. */
+function polishGeneratedContent_(content, catId, draft, extra){
+  if(typeof PlannerDraftPolish === 'undefined' || !PlannerDraftPolish.polishContent || !content) return content;
+  extra = extra || {};
+  var hookSource = extra.hookSource || '';
+  if(!hookSource && content.blog) hookSource = content.blog.title || content.blog.hook || content.blog.problem || '';
+  if(!hookSource && draft) hookSource = draft.topic || '';
+  return PlannerDraftPolish.polishContent(content, {
+    catId: catId,
+    draftTopic: draft && draft.topic,
+    forceTitle: !!extra.forceTitle,
+    flowSteps: (draft && draft.articleFlow && draft.articleFlow.steps) || [],
+    hookSource: hookSource
+  });
+}
+/** 한 칸만 다시 쓴 뒤에는 그 칸만 고친다. 다른 칸의 기존 글은 그대로 둔다. */
+function polishRegenBlock_(content, blockName, newsCh, catId, draftId, field){
+  if(!content || !blockName) return;
+  var draft = typeof findDraftByIdAnywhere_ === 'function' ? findDraftByIdAnywhere_(draftId) : null;
+  if(blockName === 'news' && newsCh && content.news && content.news[newsCh]){
+    var item = content.news[newsCh];
+    var only = {};
+    if(field && typeof item[field] !== 'undefined') only[field] = item[field];
+    else ['title', 'body', 'cta'].forEach(function(k){ if(typeof item[k] !== 'undefined') only[k] = item[k]; });
+    var newsShell = { news: {} };
+    newsShell.news[newsCh] = only;
+    polishGeneratedContent_(newsShell, catId, draft, { forceTitle: false });
+    Object.keys(only).forEach(function(k){ item[k] = newsShell.news[newsCh][k]; });
+    return;
+  }
+  var block = content[blockName];
+  if(!block || typeof block !== 'object') return;
+  if(blockName !== 'blog' && blockName !== 'insta' && blockName !== 'threads' && blockName !== 'community') return;
+  var slice = {};
+  if(field && typeof block[field] !== 'undefined') slice[field] = block[field];
+  else slice = block;
+  var shell = {};
+  shell[blockName] = slice;
+  polishGeneratedContent_(shell, catId, draft, { forceTitle: false });
+  if(field) block[field] = slice[field];
 }
 /** 참고 문헌: 마무리 문장 뒤, 태그 앞. 링크 없이 한 줄씩 */
 function blogReferencesCopyText_(b){
@@ -13952,17 +14008,17 @@ function formatNewsChannelText_(item, ch){
 var DEFAULT_NEWS_CHANNELS_PROMPT = `목소리는 기본 지침의 [목소리와 원칙]을 따른다. 여기에는 이 채널의 형식과 본보기만 둔다.
 
 [소식 형식]
-같은 소재를 세 채널로. 존댓말. URL은 넣지 않는다. 끝 행동은 예약 또는 「프로필 링크에서 온라인 문진」 하나.
+같은 소재를 세 채널로. 존댓말. URL은 넣지 않는다. 끝 행동은 하나. 네이버·카카오는 「톡톡으로 문의해 주세요.」, 당근은 「채팅으로 문의해 주세요.」
 신규는 맞는 사람과 다음 행동. 기존은 다음 수업. 원데이는 날짜·가격·오는 길을 앞에. 정규·교육은 적합성을 앞에, 가격은 말미.
 1) naver: 제목 + 본문 4~7문장 + CTA
-2) kakao: 본문 3~5문장 + 톡으로 묻는 CTA
-3) karrot: 본문 3~6문장. 근처·이번. 판매 톤을 올리지 않음
-약수 소식은 약수역 3분. 인천 소식은 작전역 2분. 리얼페이스는 인천만 쓰고 약수역을 넣지 않는다.
+2) kakao: 본문 3~5문장 + 톡톡 CTA
+3) karrot: 본문 3~6문장. 근처·이번. 판매 톤을 올리지 않음. CTA는 채팅
+지점 줄은 본문에 그대로 「약수역 3분 · 작전역 2분 · 1:1 예약제」. 쉼표 문장으로 풀어 쓰지 않는다. 리얼페이스는 「작전역 2분 · 1:1 예약제」만. 일반인 셀프 케어는 「하다가 불편하면 바로 멈추세요」. 병원·진료 문장은 넣지 않는다.
 
 [소식 본보기]
 제목: 같은 의자인데 목이 편한 앉기
-본문: 살만 느껴지면 좌골이 앞으로 빠진 상태예요. 숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완해 보세요. 약수역에서 3분, 작전역에서 2분입니다.
-cta: 프로필 링크에서 온라인 문진으로 지금 자세를 먼저 확인해 보세요.`;
+본문: 살만 느껴지면 좌골이 앞으로 빠진 상태예요. 숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완해 보세요.\n\n하다가 불편하면 바로 멈추세요\n\n약수역 3분 · 작전역 2분 · 1:1 예약제
+cta: 톡톡으로 문의해 주세요.`;
 
 /** 본문 삽입용 사진 슬롯 수 (일반·전문가 3장 / 힐자계 2장 / 일상 0) */
 function getImageSlotCount(catId){
@@ -14307,12 +14363,12 @@ function stripTrailingBranchFooter_(body){
 /** 리얼무브먼트는 예약 링크 두 개, 리얼페이스는 인천 링크 하나 */
 function isBranchBookingBlogCategory_(catId){
   var id = Number(catId);
-  return id === 1 || id === 2;
+  return id === 0 || id === 1 || id === 2;
 }
 function getBranchBlogFooterText_(catId){
   var id = Number(catId);
-  if(id === 1) return getRealMovementBlogFooterText_();
   if(id === 2) return getRealFaceBlogFooterText_();
+  if(id === 0 || id === 1) return getRealMovementBlogFooterText_();
   return '';
 }
 function withRealMovementBlogFooter_(text, catId){
@@ -15841,9 +15897,11 @@ const VOICE_AND_PRINCIPLES = `${VOICE_CORE_MARKER}
 서비스: 브랜드 이름을 넣고, 실제로 하는 일만. 불편이 반복되지 않게 생활습관과 바른 자세를 같이 코칭한다. 「10분 순서를 남겨 드립니다」처럼 없는 약속, 메모에 없는 일화·회원·숫자·오늘 세션은 만들지 않는다. 포스터 틀의 예시 문장을 초안에 가져오지 않는다.
 단어: 도수·CMT가 아니면 통증·메디컬·재활·치료를 쓰지 않는다. 불편·뻐근함. 우리가 치료했다는 서술 금지. 도수·CMT만 임상 서술이 가능하다. 「완치」「처방」「수술 대신」 금지.
 의료법: 완치나 효과 보장, 비교·최상급, 환자 후기를 만들지 않는다.
-끝 행동: 하나. 저장·공유·팔로우 금지. 일반 신규는 「프로필 링크에서 온라인 문진」. 예약은 네이버 예약. 블로그 말미 링크는 시스템이 붙인다.
-지점: 약수역 3분, 작전역 2분, 1:1 예약제. 리얼무브먼트·도수는 두 지점. 리얼페이스는 인천만(작전역 2분). 없는 지점 태그를 만들지 않는다.
-적신호: 병원 안내는 블로그 셀프 케어 맨 끝 한 줄만. 인스타·쓰레드·릴스·소식에는 넣지 않는다.
+끝 행동: 하나. 저장·공유·팔로우 금지. 인스타는 DM. 네이버 소식은 톡톡, 당근은 채팅(소식에 URL 없음). 블로그는 네이버 예약(일반은 약수·인천, 리얼페이스는 인천만, 교육은 과정 신청). 블로그 말미 링크는 시스템이 붙인다. 「프로필 링크에서 온라인 문진」은 쓰지 않는다.
+지점: 지점 줄은 그대로 「약수역 3분 · 작전역 2분 · 1:1 예약제」. 리얼페이스는 「작전역 2분 · 1:1 예약제」만. 쉼표 문장으로 풀어 쓰지 않는다.
+적신호: 블로그에만 「이럴 땐 병원에 가 보세요」. 「진료」는 쓰지 않는다. 인스타·쓰레드·릴스·소식에는 넣지 않는다.
+안전: 일반인 셀프 케어의 인스타·소식은 「하다가 불편하면 바로 멈추세요」, 쓰레드는 「멈춰」. 전문가·교육 글에는 넣지 않는다.
+문장: 「~가 아닙니다」「~하면 안 됩니다」 대신 긍정문. 「대부분」 금지. 본문은 리얼무브먼트·리얼페이스(띄어쓰기 없음). 매뉴얼. 👉 금지. 세션은 침대. 흐름 지시(짚는다·정리한다)는 본문에 쓰지 않는다.
 예외: 일상 공유와 힐자계는 홍보가 아니다. 예약·문진·센터 이름을 넣지 않는다.`;
 const BLOG_CONTENT_VOICE_RULE = VOICE_AND_PRINCIPLES;
 function promptHasVoiceCore_(text){
@@ -15860,8 +15918,8 @@ const MEDICAL_COMPLIANCE_RULE = `[의료법·포지셔닝 — 필수]
   - **허용 예**: 「치료를 해도 반복되는 건 자세·움직임 문제다」— 치료해도 남는 문제를 자세/움직임으로 설명하는 일반 맥락.
   - **금지 예**: 「치료한 결과」「원인과 결과를 바꿔 치료한」「치료했어요」「시술하고 나니」— 치료·시술 수행 암시.
 - **도수·CMT 외 채널 컬러(필수)**: **보건의료 배경의 임상가**가 인체(근골격·움직임)를 바탕으로 지도하는 **기능재활·움직임 센터** 톤. 도수치료·카이로프랙틱·관절음·시술·병원 임상 장면을 **이 채널의 주인공처럼 부각하지 말 것**(마이너스). DC·PT·임상 경험은 「인체를 아는 임상가·지도자」로만 짧게 연결.
-- **병원 진료 안내는 셀프 케어(selfCare)에 한 문장만** 넣으세요. problem·explanation·cta·FAQ에는 병원·진료·병원 상담을 반복하지 마세요.
-- 적신호(마비, 대소변 장애, 발열·체중감소 동반, 사고 직후 급격한 악화 등)도 **그 한 문장**에만 녹이세요.
+- **적신호는 블로그 셀프 케어 맨 끝에 「이럴 땐 병원에 가 보세요」 한 문장만** 넣으세요. 「진료」는 쓰지 마세요. problem·explanation·cta·FAQ·인스타·쓰레드·소식에는 병원 문장을 넣지 마세요.
+- 적신호(마비, 대소변 장애, 발열·체중감소 동반, 사고 직후 급격한 악화 등)도 **그 한 문장**으로만 적으세요.
 - **[금지어 — 비도수 채널]** 도수치료·CMT Academy가 아니면, 독자 문장에 **메디컬·재활·치료·통증**을 쓰지 마세요. **불편·뻐근함**으로 쓰세요. 지침 속 「기능재활」은 채널 설명이지 본문에 베끼지 마세요. 적신호는 「병원 진료」로만 쓰세요.`;
 
 /** 도수·CMT 외 — 기능재활운동센터 컬러 */
@@ -15914,33 +15972,52 @@ problem:
 같은 의자인데 오후만 되면 목이 무거우신가요?
 
 selfCare:
-👉 먼저 확인: 손을 엉덩이 아래에 넣어 보세요. 뼈 끝이 닿나요?
+먼저 확인: 손을 엉덩이 아래에 넣어 보세요. 뼈 끝이 닿나요?
 
-1) 두 발을 바닥에 두고 골반을 세워, 좌골이 의자 가운데 오게 합니다.
+① 자극
+【골반 — 좌골 세우기】
+두 발을 바닥에 두고 골반을 세워, 좌골이 의자 가운데 오게 합니다.
 
-2) 숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완하는게 중요합니다.
+⏱ 10초 · 2회
+살만 느껴지면 그 자리가 기준입니다.
 
-3) 정수리를 천장 쪽으로 보내 목이 어깨 위에 놓이게 합니다.
+② 스트레칭
+【허리 — 긴 날숨】
+숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완하는게 중요합니다.
 
-시원하다 싶으면 거기서 멈추세요.
+⏱ 6초 · 3회
+시원한 지점에서 멈춥니다.
 
-✕ 혼자 할 때 실수: 목만 당긴다. 숨을 참는다. 허리를 억지로 젖힌다.
-✕ 팔이 저리거나 힘이 빠지면 운동보다 병원 진료가 먼저입니다.
+③ 자세·생활습관
+【목 — 정수리】
+정수리를 천장 쪽으로 보내 목이 어깨 위에 놓이게 합니다.
+
+⏱ 5초 · 3회
+목과 어깨가 한 줄로 길어집니다.
+
+④ 기능운동
+【앉기 — 같은 의자】
+같은 의자에서 좌골이 가운데에 남는지 한 번 더 확인합니다.
+
+⏱ 10초 · 1회
+유지되면 그 자세로 일을 이어갑니다.
+
+이럴 땐 병원에 가 보세요.
 
 explanation:
 살만 느껴진다면 좌골이 앞으로 빠진 상태예요. 바른 자세의 출발점은 아래입니다. 그래서 목만 늘리면 유지가 잘 안 됩니다.
 
 cta:
-리얼무브먼트에서는 불편함이 반복되지 않도록, 생활습관 및 바른 자세도 함께 코칭해드리고 있습니다. 프로필 링크에서 온라인 문진으로 지금 자세를 먼저 확인해 보세요.`;
+리얼무브먼트에서는 불편함이 반복되지 않도록, 생활습관과 바른 자세를 함께 코칭합니다. 네이버 예약에서 약수점·인천점 시간을 잡아 보세요.`;
 
 const DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW = `${VOICE_CORE_POINTER}
 
 [블로그 형식]
 존댓말. **, ---, > 금지. 문단 사이 빈 줄. 같은 결론을 칸마다 반복하지 않는다.
 1. problem: 일상 장면 2~4문장. 자가 점검·병원 안내 없음.
-2. selfCare: 👉 먼저 확인(자가 점검 한 문장) → 1) 2) 3) (4)) 3~4단계(자극→스트레칭→자세·생활습관→기능운동 순서). 번호는 「1)」 형식이고 앞에 👉를 붙이지 않는다. 각 단계는 동작과 이유를 한 절에, 초·회를 포함한다. 항목(먼저 확인·번호 단계) 사이마다 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 주의·실수·적신호 줄은 모두 「✕ 」로 시작한다(예: ✕ 목만 당긴다). 맨 끝 한 줄만 적신호면 병원. 「1단계 —」 표기 금지.
-3. explanation: 충분히 길게(여러 문단). 왜 아픈지 · 연결된 구조 · 이 순서로 하는 이유 · 생활 속 원인을 모두 담는다. 맨 앞 1~2문장이 핵심. 병원·자가 점검 반복 없음.
-4. cta: 원리 설명 뒤에 둔다. 한두 문장, URL 없음(끝 링크는 앱이 지점 예약 링크로 붙인다). 병원 문구 없음.
+2. selfCare: 리얼무브먼트·리얼페이스는 ①자극 ②스트레칭 ③자세·생활습관 ④기능운동. 각 동작은 【부위 — 동작명】, 설명, 빈 줄, ⏱ 유지·횟수, 바로 다음 줄 팁. 【동작】 사이는 빈 줄. 👉 금지. 맨 끝은 「이럴 땐 병원에 가 보세요」. 「진료」 금지.
+3. explanation: 충분히 길게(여러 문단). 왜 불편한지 · 연결된 구조 · 이 순서로 하는 이유 · 생활 속 원인. 맨 앞 1~2문장이 핵심. 병원·자가 점검 반복 없음. 흐름 지시문(짚는다·정리한다)을 문단으로 쓰지 않음.
+4. cta: 원리 설명 뒤에 행동 하나. URL 없음(끝 링크는 앱이 붙인다). 온라인 문진·병원 문구 없음.
 5. title: 궁금증 한 줄, 35자 내외. hashtags 정확히 9개.
 
 ${CHANNEL_BLOG_FEWSHOT}`;
@@ -15968,7 +16045,7 @@ function buildExpertCourseBlogPrompt_(opts){
     '- hook: 강사가 겪는 장면 2~3문장, 문장 사이 빈 줄. 「기술을 바꾸기 전에 먼저 확인할 것이 있습니다」처럼 멈춥니다. 자막 조각·제작 과정 금지\n' +
     '- outline: 3줄. ① 원인(강사 상태→회원 반응) ② 방법 두 가지를 한 문장에 ③ (선택) 과정 연결. 각 줄 완전한 문장\n' +
     '- draft: 순서 고정 — 현장 장면 → 원리(문헌 근거, 완화 어미) → 방법 1·방법 2(각각 구체 장면: 자세·발 위치·호흡 박자) → 손대기 전 자가 확인 3가지 → 과정 단계(Passive→Assisted Active→Resistive) 연결 1단락. outline을 다시 풀지 말 것\n' +
-    '- cta(마무리): 대구형 결론 1문장 + 고정 슬로건. 수강·등록·시청·댓글 유도 금지. 예) 강사가 먼저 이완되어야 회원도 이완합니다. 시작은 항상 나로부터!\n' +
+    '- cta(마무리): 행동 하나. 「과정 신청은 글 끝의 신청 링크에서 이어집니다.」 슬로건은 그 앞에 한 줄까지. 온라인 문진·지점 예약·URL 금지. 흐름 단계 문장(짚는다·정리한다)을 본문에 쓰지 마세요.\n' +
     '- references: 마무리 다음. 「저자 (연도). 제목. 저널.」 형식, 링크·DOI 금지. **검증된 근거 목록에 있는 논문만**, 본문에 실제 쓴 것만. 목록이 비면 빈 문자열. 없는 논문을 만들지 말 것\n' +
     '- hashtags: 정확히 9개. 네이버용이므로 특수문자 제거(Re:Al→ReAl). 브랜드·주제·대상 위주' +
     (programBlock ? '\n\n' + programBlock : '');
@@ -15985,7 +16062,7 @@ function buildExpertCourseInstaPrompt_(opts){
     '- ' + roleReaders + '에게 말하듯. 존댓말\n' +
     '- 공유한 **영상·사진에서 다룬 테크닉**과 **원리 한 줄**이 드러나게. 범위 밖 추가 금지\n\n' +
     '[형식]\n' +
-    '- hook: 「[상황] 시 회원이 [현상]하는 건 테크닉 문제가 아닐 수 있습니다 🤲」 틀. 상황(예: 스트레칭 시)을 맨 앞에, 끝에 이모지 1개. 「기술」 대신 「테크닉」\n' +
+    '- hook: 블로그 주제와 본문에서 이번 글만의 한 줄을 만듭니다. 「테크닉 문제가 아닐 수 있습니다」 같은 고정 틀은 쓰지 마세요. 끝에 이모지 1개. 「기술」 대신 「테크닉」\n' +
     '- caption: hook 제외 500~750자, 빈 줄로 나눈 블록. 1) 질문형 상황 1문장 2) 원리 3문장(강사가 긴장한 채로 회원에게 접촉하면 그 긴장이 회원 근육에 전달) 3) 방법 두 가지: • 불릿 2개, 각 불릿 = 방법 이름 → 구체 동작 2문장 → 회원이 얻는 결과 1문장. 불릿 사이 빈 줄 4) 손을 대기 전 확인할 것 셋 5) 원리로 닫는 1문장. 슬로건·CTA·프로필 링크 문구 없음\n' +
     '- hashtags: # 붙여 정확히 9개. 브랜드 → 주제 → 대상·분야 → 원리 → 과정 순. 강사 교육 글은 지역 태그와 온라인 문진·지점 문구를 쓰지 않습니다\n' +
     '- postTime: 추천 게시 시각 1개(KST)' +
@@ -16046,17 +16123,22 @@ const DEFAULT_REAL_MOVEMENT_EXPERT_THREADS_PROMPT = buildExpertCourseThreadsProm
   programBlock: '[Re:Al] 강사/회원 호칭. 직군 좁히지 말 것. 기능재활·PAR·Position은 참고 범위 안만.'
 });
 
-const CHANNEL_INSTA_FEWSHOT = `[인스타 본보기 — 존댓말. 모양만 따르고 주제의 사실만 바꾼다. 불릿 사이에 빈 줄 없음. 닫는 네 블록 사이에는 빈 줄]
+const CHANNEL_INSTA_FEWSHOT = `[인스타 본보기 — 존댓말. 모양만 따르고 주제의 사실만 바꾼다. 불릿 사이에 빈 줄. 닫는 블록 사이에도 빈 줄]
 의자에 앉아 손을 엉덩이 아래에 넣어 보세요. 살만 느껴진다면 좌골이 앞으로 빠진 상태예요.
+
 • 두 발을 바닥에 두고 골반을 세워, 좌골이 의자 가운데 오게 합니다
+
 • 숨을 6초 길게 내쉬면서 허리 근육 긴장을 이완하는게 중요합니다
+
 • 정수리를 천장 쪽으로 보내 목이 어깨 위에 놓이게 합니다
 
-같은 의자에서 앉는 자세만 바꿨는데, 목과 어깨가 엄청 편해집니다
+같은 의자에서 앉는 자세만 바꿨는데, 목과 어깨가 편해집니다
 
-리얼무브먼트에서는 불편함이 반복되지 않도록, 생활습관 및 바른 자세도 함께 코칭해드리고 있습니다
+리얼무브먼트에서는 불편함이 반복되지 않도록, 생활습관과 바른 자세를 함께 코칭합니다
 
-프로필 링크에서 온라인 문진으로 지금 자세를 먼저 확인해 보세요
+하다가 불편하면 바로 멈추세요
+
+DM으로 지금 상태를 알려 주세요.
 
 약수역 3분 · 작전역 2분 · 1:1 예약제`;
 
@@ -16064,10 +16146,11 @@ const CHANNEL_INSTA_FORMAT = `${VOICE_CORE_POINTER}
 
 [인스타 형식]
 존댓말. 캐러셀 없음.
-hook: 흔한 방법과 같은 자리 비교 한 줄.
-caption: 자가 점검으로 시작. • 3개(동작+이유). 불릿 사이에 빈 줄 없음. 그 다음 빈 줄로만 나눈 네 블록 — 느껴지는 변화 / 브랜드가 실제로 하는 코칭 / 프로필 링크에서 온라인 문진 / 지점 줄.
-지점 줄: 리얼무브먼트·도수는 「약수역 3분 · 작전역 2분 · 1:1 예약제」. 리얼페이스는 「작전역 2분 · 1:1 예약제」만.
-해시태그 정확히 9개. 리얼무브먼트·도수는 약수역운동, 작전역운동. 리얼페이스는 작전역운동 등 인천. 약수역 태그 없음. 적신호·병원 문장 없음.
+hook: 그 글의 주제·본문에서 만든 한 줄. 고정 틀 「테크닉 문제가 아닐 수 있습니다」는 쓰지 않는다.
+caption: 자가 점검으로 시작. • 3개(동작+이유). 불릿 사이에 빈 줄. 그 다음 빈 줄로 나눈 블록 — 느껴지는 변화 / 브랜드가 실제로 하는 코칭 / 하다가 불편하면 바로 멈추세요 / DM 한 줄 / 지점 줄.
+끝 행동은 DM 하나. 온라인 문진은 쓰지 않는다.
+지점 줄: 리얼무브먼트·일반 글은 「약수역 3분 · 작전역 2분 · 1:1 예약제」. 리얼페이스는 「작전역 2분 · 1:1 예약제」만. 이 문장을 쉼표 문장으로 바꾸지 않는다.
+해시태그 정확히 9개. 리얼무브먼트는 약수역운동, 작전역운동. 리얼페이스는 작전역운동 등 인천. 약수역 태그 없음. 적신호·병원·진료 문장 없음. 도수 태그(도수치료·계양도수·약수역도수·자세교정) 없음.
 
 ${CHANNEL_INSTA_FEWSHOT}`;
 
@@ -16085,8 +16168,8 @@ ${BLOG_CONTENT_VOICE_RULE}
 표기: 「리얼무브먼트」붙여 쓰기. 「리얼 페이스」. 「리:얼」 금지. 영문 Re:Al / Re:Al Face는 유지.` + DEFAULT_PSP_CLINICAL_FRAMEWORK,
   categories: {
     0: { // 도수치료
-      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[도수치료] 평가 → 연부·관절 → 수동 움직임 → 생활습관. 이 채널만 임상·통증 단어를 쓸 수 있다. 지점 줄은 약수·인천.`,
-      insta: CHANNEL_INSTA_FORMAT + '\n\n[도수치료] 지점 줄은 약수역 3분 · 작전역 2분 · 1:1 예약제. 해시태그에 약수역운동, 작전역운동.',
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[도수치료] 지금은 도수치료를 하지 않습니다. 일반 건강 정보로 쓰고 「도수치료에서는」「치료 방향」「교정」과 태그 도수치료·계양도수·약수역도수·자세교정은 쓰지 마세요. 끝은 「이럴 땐 병원에 가 보세요」와 리얼무브먼트 평가 예약.`,
+      insta: CHANNEL_INSTA_FORMAT + '\n\n[도수치료] 시술 안내가 아니라 일반 건강 정보. 지점 줄은 약수역 3분 · 작전역 2분 · 1:1 예약제. 끝 행동은 DM 하나. 해시태그에 도수치료·계양도수·약수역도수·자세교정을 넣지 마세요.',
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
@@ -16097,8 +16180,8 @@ ${BLOG_CONTENT_VOICE_RULE}
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
     2: { // 리얼 페이스
-      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[리얼 페이스] 얼굴·목·자세를 같이 보는 가벼운 습관. 표기 「리얼 페이스」. 효과 보장·작은얼굴 단정 금지.\n[말미 링크] 인천 예약 URL 하나만 시스템이 붙인다. 약수 링크를 쓰지 않는다.`,
-      insta: CHANNEL_INSTA_FORMAT + '\n\n[리얼 페이스] 지점 줄은 「작전역 2분 · 1:1 예약제」만. 약수역 문장·태그 없음. 해시태그는 작전역운동 등 인천.',
+      blog: `${DEFAULT_BLOG_TITLE_HOOK_RULE}\n${DEFAULT_GENERAL_AUDIENCE_BLOG_FLOW}\n\n[리얼페이스] 얼굴·목·자세를 같이 보는 가벼운 습관. 본문 표기는 「리얼페이스」(띄어 쓰지 않음). 효과 보장·작은얼굴 단정 금지. 셀프 케어는 ①자극 ②스트레칭 ③자세·생활습관 ④기능운동.\n[말미 링크] 인천 예약 URL 하나만 시스템이 붙인다. 약수 링크를 쓰지 않는다.`,
+      insta: CHANNEL_INSTA_FORMAT + '\n\n[리얼페이스] 본문 표기는 「리얼페이스」. 지점 줄은 「작전역 2분 · 1:1 예약제」만. 약수역 문장·태그 없음. 해시태그는 작전역운동 등 인천. 끝 행동은 DM 하나.',
       image: DEFAULT_BLOG_INSTA_IMAGE_PROMPT,
       threads: DEFAULT_THREADS_SNS_PROMPT
     },
@@ -16787,6 +16870,8 @@ function flushNewItemFieldsFromDom_(){
     state.newItem[key] = el.value;
   }
   take_('new-item-topic-input', 'topic');
+  take_('new-item-card-title', 'cardTitle');
+  take_('new-item-card-date', 'cardDate');
   take_('new-item-ref-note-input', 'refNote');
   take_('new-item-daily-thought', 'dailyThought');
   take_('new-item-daily-who', 'dailyWho');
@@ -31957,7 +32042,7 @@ function newItemHasRefImages_(){
 function createEmptyNewItem_(catId){
   try { if(typeof ReelMaker !== 'undefined' && ReelMaker && typeof ReelMaker.reset === 'function') ReelMaker.reset(); } catch(e) {}
   return {
-    date: '', topic: '', catId: typeof catId === 'number' ? catId : 0,
+    date: '', topic: '', cardTitle: '', cardDate: '', titleChoice: '', catId: typeof catId === 'number' ? catId : 0,
     dailyShareKind: 'scene', dailyThought: '',
     dailyWho: '', dailyWhat: '', dailyBody: '',
     articleKind: '', articleKindLocked: false, stepId: '',
@@ -32556,11 +32641,14 @@ function buildSelectedFlowLockBlock_(draft){
   var steps = Array.isArray(af.steps) ? af.steps.map(function(s){ return String(s || '').trim(); }).filter(Boolean) : [];
   if(!title && !angle && !steps.length) return '';
   var lines = [
-    '[선택한 글 흐름 — 제목과 내용을 초안에 유지]',
-    '추가 화면에서 고른 제목·각도·전개가 초안의 뼈대입니다. 작성 지침의 제목 공식·문장 예시보다 이 블록이 우선합니다.',
+    '[선택한 글 흐름 — 전개만 초안에 유지]',
+    '추가 화면에서 고른 각도·전개가 본문 순서입니다. 제목은 카드에 확정된 문장을 쓰고, 흐름 제목으로 바꾸지 마세요.',
     '글의 성격(복기·안내·모집의 시제)은 유지하고, 각 칸에 넣을 내용은 아래 전개를 따릅니다.'
   ];
-  if(title) lines.push('- 제목은 「' + title + '」의 말과 주장을 최대한 그대로 씁니다. 40자 안이면 그대로 두고, 더 길면 같은 주장만 줄이세요. 다른 후킹·다른 주장으로 바꾸지 마세요.');
+  var cardTitle = draft && String(draft.topic || '').trim();
+  if(cardTitle) lines.push('- 제목은 카드에 확정된 「' + cardTitle + '」를 그대로 씁니다. 흐름 제목으로 바꾸지 마세요.');
+  else if(title) lines.push('- 제목은 「' + title + '」의 말과 주장을 최대한 그대로 씁니다. 40자 안이면 그대로 두고, 더 길면 같은 주장만 줄이세요. 다른 후킹·다른 주장으로 바꾸지 마세요.');
+  lines.push('- 전개 문장(「~짚는다」「~정리한다」)은 지시입니다. 본문 문단으로 베끼지 마세요.');
   if(angle) lines.push('- 각도 「' + angle + '」가 본문의 핵심 주장입니다. 빼거나 다른 결론으로 바꾸지 마세요.');
   if(steps.length){
     lines.push('- 전개 순서. 3단계면 앞에서부터 맥락(hook·problem) → 핵심 포인트(outline·selfCare) → 원리(draft·explanation)에 그 뜻을 넣습니다. 단계 수가 달라도 순서는 유지하고, 빼거나 다른 소재로 바꾸지 마세요.');
@@ -32589,10 +32677,10 @@ function appendDraftVoiceLocks_(prompt, draft){
   return String(prompt || '') + '\n\n' + extra;
 }
 function flowJsonTitleHint_(draft, fallback){
-  var title = draft && draft.articleFlow && String(draft.articleFlow.title || '').trim();
-  if(!title && draft && draft.topic) title = String(draft.topic).trim();
+  var title = draft && String(draft.topic || '').trim();
+  if(!title && draft && draft.articleFlow) title = String(draft.articleFlow.title || '').trim();
   if(!title) return fallback;
-  return '카드 주제를 제목으로 그대로: 「' + title.replace(/"/g, "'") + '」. 다른 주장·다른 후킹으로 바꾸지 말 것';
+  return '카드에 확정된 제목을 그대로: 「' + title.replace(/"/g, "'") + '」. 흐름 제목이나 다른 후킹으로 바꾸지 말 것';
 }
 
 function appendDraftReferenceToPrompt_(prompt, draft, catId){
@@ -33014,10 +33102,32 @@ kindStepLine + '\n\n' +
     }
   }
   var kindOpts = articleKindNormalizeOpts_(articleKind, catId);
-  var normalized = flows.slice(0, 3).map(function(f, i){ return normalizeFlowProposal_(f, i, kindOpts); })
-    .filter(function(f){ return f && isUsableFlowTitle_(f.title); });
+  function usableFlows_(list){
+    return (list || []).slice(0, 3).map(function(f, i){ return normalizeFlowProposal_(f, i, kindOpts); })
+      .filter(function(f){ return f && isUsableFlowTitle_(f.title); });
+  }
+  function flowsArePlaceholder_(list){
+    if(typeof PlannerDraftPolish === 'undefined' || !PlannerDraftPolish.isPlaceholderFlow) return false;
+    return (list || []).some(function(f){ return PlannerDraftPolish.isPlaceholderFlow(f); });
+  }
+  var normalized = usableFlows_(flows);
+  var guard = 0;
+  while(guard < 2 && (normalized.length < 3 || flowsArePlaceholder_(normalized))){
+    guard++;
+    var placeholderRetry = prompt +
+      '\n\n[재시도] 안내 문장을 흐름으로 출력하지 마세요. 「카테고리·참고 자료 기반 흐름」「입력에 적힌 순서」「빠진 칸은 만들지 않음」「시제·의도를 유지」는 금지입니다. 입력한 소재로 실제 제목·각도·전개 문장 3개만 JSON으로 다시 쓰세요.';
+    try {
+      text = await callFlowAi_(placeholderRetry, false);
+      flows = parseArticleFlowProposalsFromText_(text);
+      normalized = usableFlows_(flows);
+    } catch(retryErr2){
+      if(!normalized.length) throw retryErr2;
+      break;
+    }
+  }
+  normalized = normalized.filter(function(f){ return !flowsArePlaceholder_( [f] ); });
   if(normalized.length < 3){
-    throw new Error('글 흐름 제안이 3개가 아니에요. 키워드·분석 내용을 조금 다듬고 다시 시도해 주세요.');
+    throw new Error('글 흐름 제안이 안내 문장으로만 왔어요. 키워드를 조금 구체적으로 적고 다시 시도해 주세요.');
   }
   return normalized;
 }
@@ -33764,6 +33874,25 @@ window.pasteYoutubeUrlToRefNote_ = async function(){
   markPlannerComposeActivity_();
 };
 
+function confirmedNewItemTitle_(){
+  var card = String((state.newItem && state.newItem.cardTitle) || '').trim();
+  if(card) return card;
+  var kw = String((state.newItem && state.newItem.topic) || '').trim();
+  if(kw && kw.indexOf('\n') < 0 && kw.length <= 80) return kw;
+  return '';
+}
+window.onNewItemCardTitleInput_ = function(el){
+  if(!state.newItem) return;
+  state.newItem.cardTitle = el ? el.value : '';
+};
+window.onNewItemCardDateInput_ = function(el){
+  if(!state.newItem) return;
+  state.newItem.cardDate = el ? el.value : '';
+};
+window.setNewItemTitleChoice_ = function(choice){
+  if(!state.newItem) return;
+  state.newItem.titleChoice = choice === 'flow' ? 'flow' : 'card';
+};
 function renderAddFormFlowSectionHTML_(){
   var flows = state.newItem.flowProposals || [];
   var selIdx = typeof state.newItem.selectedFlowIdx === 'number' ? state.newItem.selectedFlowIdx : 0;
@@ -33800,11 +33929,22 @@ function renderAddFormFlowSectionHTML_(){
       '<textarea class="form-input add-flow-steps-input" id="new-item-flow-steps-' + i + '" rows="4" placeholder="글 전개 3단계" oninput="updateNewItemFlowSteps(' + i + ',this.value);autoGrowTextarea_(this)" onclick="event.stopPropagation();">' + escapeHtml(flowStepsToText_(flow.steps)) + '</textarea>' +
       '</div></div></label>';
   }).join('');
+  var confirmedTitle = confirmedNewItemTitle_();
+  var selectedFlowTitle = String((flows[selIdx] && flows[selIdx].title) || '').trim();
+  var titleChoiceHtml = '';
+  if(confirmedTitle && selectedFlowTitle && confirmedTitle !== selectedFlowTitle){
+    var titleChoice = state.newItem.titleChoice === 'flow' ? 'flow' : 'card';
+    titleChoiceHtml = '<div class="add-title-choice" style="margin-top:10px;padding:10px 12px;border:1px solid #E5E7EB;border-radius:10px;background:#fff;">' +
+      '<div class="form-label" style="margin-bottom:6px;">초안에 쓸 제목</div>' +
+      '<label style="display:block;margin:4px 0;font-size:13px;"><input type="radio" name="new-item-title-choice" ' + (titleChoice !== 'flow' ? 'checked' : '') + ' onchange="setNewItemTitleChoice_(\'card\')"> 확정한 주제: ' + escapeHtml(confirmedTitle) + '</label>' +
+      '<label style="display:block;margin:4px 0;font-size:13px;"><input type="radio" name="new-item-title-choice" ' + (titleChoice === 'flow' ? 'checked' : '') + ' onchange="setNewItemTitleChoice_(\'flow\')"> 흐름 제목: ' + escapeHtml(selectedFlowTitle) + '</label>' +
+      '</div>';
+  }
   return '<div class="add-flow-section">' + header +
     '<p class="add-flow-guide">' + (isDailyThoughtNewItem_()
       ? '하나를 고르고 제목·부제·전개 순서를 수정할 수 있어요. 원문 뜻을 유지한 채 공감하게 푸는 흐름입니다.'
-      : '하나를 고르고 제목·부제·전개 순서를 수정할 수 있어요. 참고영상 메모·키워드 아이디어·카테고리 컨셉을 함께 반영한 흐름입니다.') + '</p>' +
-    cards + '</div>';
+      : '하나를 고르고 제목·부제·전개 순서를 수정할 수 있어요. 참고영상 메모·키워드 아이디어·카테고리 컨셉을 함께 반영한 흐름입니다. 확정한 주제 문장이 있으면 카드 제목은 그 문장을 유지합니다.') + '</p>' +
+    cards + titleChoiceHtml + '</div>';
 }
 
 function renderAddForm(){
@@ -33876,7 +34016,7 @@ function renderAddForm(){
       '<input type="text" class="form-input" id="new-item-daily-who" value="' + escapeHtml(state.newItem.dailyWho || '') + '" oninput="onNewItemDailyField_(\'dailyWho\', this)" placeholder="예: 혼자, 가족과, 입주민 분">' +
       '</div>' +
       '<div class="form-field"><label class="form-label">무엇을</label>' +
-      '<textarea id="new-item-daily-what" class="form-input form-textarea" rows="2" oninput="onNewItemDailyField_(\'dailyWhat\', this)" placeholder="예: 폼롤러로 옆구리 풀었다, 매트에 누워 쉬었다">' + escapeHtml(state.newItem.dailyWhat || '') + '</textarea>' +
+      '<textarea id="new-item-daily-what" class="form-input form-textarea" rows="2" oninput="onNewItemDailyField_(\'dailyWhat\', this)" placeholder="예: 폼롤러로 옆구리 풀었다, 침대에 누워 쉬었다">' + escapeHtml(state.newItem.dailyWhat || '') + '</textarea>' +
       '</div>' +
       '<div class="form-field"><label class="form-label">오늘 몸 느낌</label>' +
       '<textarea id="new-item-daily-body" class="form-input form-textarea" rows="2" oninput="onNewItemDailyField_(\'dailyBody\', this)" placeholder="예: 나도 이쪽이 굳더라">' + escapeHtml(state.newItem.dailyBody || '') + '</textarea>' +
@@ -33996,6 +34136,16 @@ function renderAddForm(){
       </div>
     </div>
     <div style="font-size:11px;color:#9CA3AF;margin:-6px 0 14px;">독자: <strong>${getProgramAudienceLine_(catId)}</strong> (카테고리에 맞게 자동)</div>
+    <div class="form-field">
+      <label class="form-label">제목</label>
+      <input id="new-item-card-title" class="form-input" type="text" value="${escapeHtml(state.newItem.cardTitle || '')}" oninput="onNewItemCardTitleInput_(this)" placeholder="확정한 주제 문장. 비우면 흐름 제목을 고를 수 있어요.">
+      <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">초안 제목은 이 문장을 유지합니다. 흐름 제목으로 바꾸려면 아래에서 고르세요.</div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">날짜</label>
+      <input id="new-item-card-date" class="form-input" type="date" value="${escapeHtml(state.newItem.cardDate || '')}" oninput="onNewItemCardDateInput_(this)">
+      <div style="font-size:11px;color:#9CA3AF;margin-top:4px;">목록에 보이는 날짜입니다. 비우면 만든 날을 씁니다.</div>
+    </div>
     ${(!isDaily && !isThought) ? articleKindToggleHtml_(catId) : ''}
     ${dailyKindHtml}
     ${dailyFactsHtml}
@@ -34429,12 +34579,19 @@ window.addDraft = async function(){
       }
     }
     var gen;
+    var resolvedTitle = null;
     if(hasFlow){
       var selected = selectedFlow;
-      // 사용자가 직접 적은 한 줄 주제가 있으면 그대로 카드 제목으로 둔다. 흐름 제안 제목은 articleFlow.title에만 남는다.
-      var typedTopic = (!isDaily && keywords && keywords.indexOf('\n') < 0 && keywords.length <= 80) ? String(keywords).trim() : '';
+      resolvedTitle = (typeof PlannerDraftPolish !== 'undefined' && PlannerDraftPolish.resolveDraftTitle)
+        ? PlannerDraftPolish.resolveDraftTitle({
+            cardTitle: state.newItem.cardTitle,
+            keywordLine: keywords,
+            flowTitle: selected.title,
+            choice: state.newItem.titleChoice
+          })
+        : { topic: String(selected.title || '').trim(), locked: false };
       gen = {
-        topic: typedTopic || String(selected.title || '').trim(),
+        topic: resolvedTitle.topic,
         angle: String(selected.angle || '').trim() || (CATEGORIES[state.newItem.catId].audience + ' 관점'),
         series: getDefaultSeriesForCat_(state.newItem.catId),
         pillar: getDefaultPillarForCat_(state.newItem.catId),
@@ -34446,6 +34603,9 @@ window.addDraft = async function(){
     var cat = CATEGORIES[state.newItem.catId];
     var id = 'd' + state.newItem.catId + '-c' + Date.now();
     var draft = { id: id, topic: gen.topic, angle: gen.angle, createdAt: new Date().toISOString() };
+    if(resolvedTitle && resolvedTitle.locked) draft.topicLocked = true;
+    var cardDate = String(state.newItem.cardDate || '').trim();
+    if(/^\d{4}-\d{2}-\d{2}$/.test(cardDate)) draft.dateOverride = cardDate;
     if(isDaily) draft.shareMonth = getCurrentShareMonthKey_();
     applyTopicFieldsToDraft_(draft, gen, state.newItem.catId);
     if(hasFlow){
@@ -43014,8 +43174,10 @@ async function generateThreadsFromInsta_(catId, insta, topic){
 
   var text = await callClaudePlanner_(prompt, { maxTokens: 2800, timeoutMs: THREADS_BG_TIMEOUT_MS });
   var parsed = parsePlannerAiJsonObject_(text);
-  var block = parsed.threads || parsed;
-  return scrubNonManualPainWordInValue_(normalizeThreadsSnsBlock_(block), catId);
+  var block = scrubNonManualPainWordInValue_(normalizeThreadsSnsBlock_(parsed.threads || parsed), catId);
+  var shell = { threads: block };
+  polishGeneratedContent_(shell, catId, { topic: topic || '' }, { forceTitle: false, hookSource: topic || '' });
+  return shell.threads;
 }
 function enqueueThreadsFromInsta_(draftId, catId, topic, insta, opts){
   opts = opts || {};
@@ -43486,7 +43648,7 @@ var SHEET_FIELD_META_ = {
   'blog.problem':     { block: 'blog', label: '문제 제기', instr: '맨 앞 두 문장은 짧게, 문장 사이 빈 줄. 이어서 구체 장면 하나만. 번호·불릿 금지. 원리 설명과 같은 결론을 반복하지 말 것. 존댓말(해요체). 강조는 **이렇게**, 인용은 줄 앞 "> ", 구분선은 한 줄에 --- 만.' },
   'blog.selfCare':    { block: 'blog', label: '셀프 케어', step: true, instr: '👉 먼저 확인 한 문장. 👉 1.~4. 3~4단계. 순서는 자극(도수·셀프 자극)→스트레칭→자세·생활습관→기능운동. 각 단계는 동작과 이유를 한 절에, 초·회 포함. 단계 사이만 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 맨 끝 한 줄만 적신호면 병원. 방향 추측 금지. 존댓말.' },
   'blog.explanation': { block: 'blog', label: '원리 설명', instr: '충분히 길게 쓰고 왜 아픈지·연결된 구조·이 순서로 하는 이유·생활 속 원인을 모두 담기. 문제 제기의 장면을 다시 쓰지 말 것. 맨 앞 1~2문장만 핵심, 그 뒤는 새 이유. 마침표마다 빈 줄. 아주 짧은 문장은 다음 문장과 한 단락 가능. 존댓말(해요체). 강조는 **이렇게**, 인용은 줄 앞 "> ", 구분선은 한 줄에 --- 만.' },
-  'blog.cta':         { block: 'blog', label: '마무리 CTA', instr: '원리 설명 뒤 한두 문장. 끝 행동은 하나. 저장·공유 금지. URL·프로필 링크 문구 쓰지 말 것(끝 링크는 앱이 붙임). 브랜드가 실제로 하는 코칭만. 없는 약속·병원 문구 금지. 존댓말 2~3문장.' },
+  'blog.cta':         { block: 'blog', label: '마무리 CTA', instr: '끝 행동은 하나. 일반 글은 「네이버 예약에서 약수점·인천점 시간을 잡아 보세요.」 리얼페이스는 인천점만. 도수는 리얼무브먼트 평가 예약. 교육 글은 「과정 신청은 글 끝의 신청 링크에서 이어집니다.」 온라인 문진·URL·저장·공유 금지. 존댓말.' },
   'blog.hashtags':    { block: 'blog', label: '해시태그', array: true, instr: '증상·지역·브랜드와 관련된 해시태그 정확히 9개.' },
   'blog.hook':        { block: 'blog', label: '영상·사진 맥락', instr: '인용으로 쓸 두 문장. 문장 사이 빈 줄. 본문에서 같은 말을 길게 다시 풀지 말 것. 전문어는 처음 한 번 괄호로 풀기. 존댓말. 강조는 **이렇게**, 인용은 줄 앞 "> ", 구분선은 한 줄에 --- 만.' },
   'blog.outline':     { block: 'blog', label: '시연·핵심 포인트', arrayLines: true, instr: '본문 장면 다음에 둘 짧은 줄. 한 줄에 완전한 문장 하나. 본문과 같은 설명을 반복하지 말 것. 존댓말.' },
@@ -43496,7 +43658,7 @@ var SHEET_FIELD_META_ = {
   'community.selfCare':    { block: 'community', label: '셀프 케어', step: true, instr: '집에서 따라 할 수 있는 셀프 케어를 단계별로. 각 단계는 새 줄에서 "👉"로 시작하고 동작·초/회/세트를 앞쪽에 명시하세요. 단계 사이에는 빈 줄을 넣으세요.' },
   'community.explanation': { block: 'community', label: '원리 설명', instr: '왜 그런지 원리를 쉬운 말로, 단정적인 인과 문장으로 설명하세요.' },
   'insta.hook':     { block: 'insta', label: '첫 줄 후킹', instr: '스크롤을 멈추게 하는 인스타 첫 줄 후킹 한 문장. **존댓말(해요체)**.' },
-  'insta.caption':  { block: 'insta', label: '캡션', instr: '자가 점검으로 시작. • 3개(동작+이유, 불릿 사이 빈 줄 없음). 빈 줄로 나눈 네 블록: 느껴지는 변화 / 브랜드 코칭 / 프로필 링크에서 온라인 문진 / 지점 줄. 리얼페이스 지점 줄은 작전역 2분만. 그 외는 약수역 3분 · 작전역 2분 · 1:1 예약제. 방향 추측·없는 약속·저장·공유·적신호 금지. 존댓말.' },
+  'insta.caption':  { block: 'insta', label: '캡션', instr: '자가 점검으로 시작. • 3개(동작+이유, 불릿 사이 빈 줄). 빈 줄로 나눈 블록: 느껴지는 변화 / 브랜드 코칭 / 하다가 불편하면 바로 멈추세요 / DM 한 줄 / 지점 줄. 리얼페이스 지점 줄은 작전역 2분 · 1:1 예약제만. 그 외는 약수역 3분 · 작전역 2분 · 1:1 예약제. 온라인 문진·저장·공유·적신호 금지. 존댓말.' },
   'insta.hashtags': { block: 'insta', label: '해시태그', array: true, instr: '해시태그 정확히 9개. 리얼무브먼트·도수는 약수역운동·작전역운동 포함. 리얼페이스는 작전역운동 등 인천. 약수 태그는 넣지 말 것.' },
   'threads.body':    { block: 'threads', label: '본문 (한 줄)', instr: '한 줄만. 「[상황] 시 회원이 [현상]하는 이유, 테크닉의 문제일까?」처럼 상황을 맨 앞에. 일반인 글은 자가 점검 질문으로 끝내 댓글을 유도. 해설·근거는 쓰지 마세요. **반말(구어체)**.' },
   'threads.comment': { block: 'threads', label: '댓글 (4개)', instr: '정확히 4개, 빈 줄로 나눈다. 각 1~2문장, 주어(강사/회원)를 밝힌다. 1 원리 2 방법1(동작→회원이 얻는 결과) 3 방법2(방법 이름 먼저→권유→동작) 4 자가 확인 3가지. 슬로건·CTA·링크 금지. 적신호·병원·시간 약속 댓글 금지. 반말.' },
@@ -43504,7 +43666,7 @@ var SHEET_FIELD_META_ = {
   'thread.summary':    { block: 'thread', label: '본문 (일상 나눔)', threadNorm: true, instr: '관찰 → 핵심 한 가지 → (선택) 짧은 감탄·철학 1문장. 담백·구어체. 과한 감성·설교 금지.' },
   'news.title': { block: 'news', label: '제목 · 첫 줄', instr: '소식용 제목 한 줄. 존댓말·질문형 권장. 과장 금지. 원데이면 일정 힌트, 정규면 적합성·변화 힌트.' },
   'news.body':  { block: 'news', label: '본문', instr: '현재 채널 톤. 신규=확신, 기존=이어짐. 원데이=일정·가격 먼저, 정규=가치·적합성 먼저. 네이버=정보·신뢰, 카카오=짧고 친근, 당근=동네·생활형. 존댓말.' },
-  'news.cta':   { block: 'news', label: 'CTA', instr: '끝 행동 하나. 예약 또는 「프로필 링크에서 온라인 문진」. URL 없음. 약수는 약수역 3분, 인천은 작전역 2분, 리얼페이스는 인천만. 존댓말.' }
+  'news.cta':   { block: 'news', label: 'CTA', instr: '끝 행동 하나. 네이버·카카오는 「톡톡으로 문의해 주세요.」, 당근은 「채팅으로 문의해 주세요.」 URL 없음. 지점 줄은 본문에 「약수역 3분 · 작전역 2분 · 1:1 예약제」(리얼페이스는 작전역 2분 · 1:1 예약제만). 존댓말.' }
 };
 function fieldValueToString_(meta, block){
   if(!block) return '';
@@ -43829,6 +43991,7 @@ window.regenSheetField_ = async function(key, btn){
     } else {
       content[meta.block] = block;
     }
+    polishRegenBlock_(content, meta.block, newsCh, catId, draftId, meta.__field);
     if(meta.block === 'threads' && meta.__field === 'body') block.text = block.body || '';
     if(meta.threadNorm){ content.thread = normalizeThreadBlock(block) || block; }
     if(key === 'blog.title' || key === 'community.title'){
@@ -43895,7 +44058,7 @@ window.polishSheetField_ = async function(key, btn){
     '당신은 한국어 교정 편집자입니다. 「' + meta.label + '」 글만 가볍게 다듬으세요.',
     '',
     '[절대 지킬 것]',
-    '- 의미·정보·사실·숫자·순서·불릿 개수·👉 단계 구조를 바꾸지 마세요.',
+    '- 의미·정보·사실·숫자·순서·불릿 개수를 바꾸지 마세요. 👉 는 넣지 마세요.',
     '- 새 내용을 추가하거나 문단을 통째로 다시 쓰지 마세요.',
     '- 오타·띄어쓰기·맞춤법·어색한 표현만 고치고, 문장을 조금 더 자연스럽게만 만드세요.',
     '- 존댓말/반말 톤은 원문과 같게 유지하세요.',
@@ -43933,6 +44096,7 @@ window.polishSheetField_ = async function(key, btn){
     } else {
       content[meta.block] = block;
     }
+    polishRegenBlock_(content, meta.block, newsCh, catId, draftId, meta.__field);
     if(meta.block === 'threads' && meta.__field === 'body') block.text = block.body || '';
     if(meta.threadNorm){ content.thread = normalizeThreadBlock(block) || block; }
     if(key === 'blog.title' || key === 'community.title'){
@@ -45459,10 +45623,10 @@ function fieldInstrForCat_(meta, catId){
     return '해시태그 정확히 9개. 브랜드(리얼무브먼트, ReAl) → 주제 → 대상·분야 → 원리 → 과정 순. 지역 태그 금지.';
   }
   if(key === 'insta.hook'){
-    return '「[상황] 시 회원이 [현상]하는 건 테크닉 문제가 아닐 수 있습니다 🤲」 틀. 상황을 맨 앞에, 끝에 이모지 1개. 「기술」 대신 「테크닉」. 존댓말.';
+    return '블로그 주제·본문에서 이번 글만의 첫 줄을 만드세요. 「테크닉 문제가 아닐 수 있습니다」 고정 틀은 쓰지 마세요. 끝에 이모지 1개. 「기술」 대신 「테크닉」. 존댓말.';
   }
   if(key === 'news.cta'){
-    return '끝 행동 하나. 「프로필 링크/예약」 한 줄. URL·온라인 문진·지점 줄 금지.';
+    return '끝 행동 하나. 「과정 신청으로 이어가 주세요.」 URL·온라인 문진·지점 줄 금지.';
   }
   return base;
 }
@@ -45474,7 +45638,7 @@ function getSnsV2SpecificRules_(catId, channel){
   if(expert) lines.push('[강사 교육 글] 온라인 문진·프로필 링크·지점 문구와 지역 태그(약수역운동·작전역운동 등)를 쓰지 않습니다.');
   if(id === 5 && channel === 'insta'){
     lines.push('[인스타 구조 — Re:Al]');
-    lines.push('- 훅: 「[상황] 시 회원이 [현상]하는 건 테크닉 문제가 아닐 수 있습니다 🤲」. 이모지는 훅 끝에 하나만.');
+    lines.push('- 훅: 블로그 주제·본문에서 이번 글만의 한 줄. 「테크닉 문제가 아닐 수 있습니다」 고정 틀은 쓰지 않습니다. 이모지는 훅 끝에 하나만.');
     lines.push('- 캡션 블록 순서(빈 줄로 구분): 1) 질문형 상황 1문장(주어는 「회원이」, 「긴장」) 2) 원리 3문장(강사가 긴장한 채로 회원에게 접촉하면 → 그 긴장이 회원 근육에 저항 신호로 → 근방추 → 회원이 의도적으로 버티는 게 아니라 강사의 긴장 상태에 회원 몸이 먼저 반응) 3) 「강사가 힘을 빼는 방법은 두 가지입니다.」 + • 불릿 2개(방법 이름 → 구체 동작 2문장 → 회원이 얻는 결과 1문장, 불릿 사이 빈 줄) 4) 「손을 대기 전에 확인할 것은 셋입니다.」 3가지 + 해당 시 행동 1문장 5) 원리로 닫는 1문장.');
     lines.push('- 원인 단어는 끝까지 「긴장/긴장 상태」. 슬로건·CTA·프로필 링크 문구를 넣지 않습니다(슬로건은 블로그에만).');
     lines.push('- 해시태그 정확히 9개: 브랜드(리얼무브먼트, ReAl) → 주제(패시브스트레칭) → 대상·분야(움직임지도, 강사교육, 움직임전문가) → 원리(스트레칭원리, 근방추) → 과정(움직임과정).');
@@ -45482,7 +45646,7 @@ function getSnsV2SpecificRules_(catId, channel){
   if(id === 5 && channel === 'threads'){
     lines.push('[쓰레드 구조 — Re:Al, 반말]');
     lines.push('- 처음부터 끝까지 반말. 존댓말을 섞지 않습니다.');
-    lines.push('- body: 한 줄. 「[상황] 시 회원이 [현상]하는 이유, 테크닉의 문제일까?」 — 인스타 훅과 같은 상황·같은 용어. 해설 금지.');
+    lines.push('- body: 한 줄. 이번 글의 상황만. 「테크닉의 문제일까」 고정 틀은 쓰지 마세요. 해설 금지.');
     lines.push('- comments: 정확히 4개. 1) 원리(근방추 + 강사가 긴장한 채로 접촉하면 회원 몸이 먼저 저항 신호로 받게 되는 것) 2) 방법1(호흡): 동작 → 회원이 얻는 결과까지 3) 방법2(체중): 방법 이름 먼저(「강사가 체중을 이용하는 방법,」) → 권유(~고려해봐) → 동작(뒷발→앞발, 팔은 연결만) 4) 자가 확인 3가지(「손 대기 전에 확인해.」).');
     lines.push('- 슬로건·CTA·링크 없음.');
   }
@@ -45511,13 +45675,13 @@ async function generateInstaFromBlog_(catId, blog, topic){
     '아래는 **확정·수정된 블로그 글**입니다. 블로그 전체를 옮기지 말고, **현장 리포트** 톤의 짧은 인스타 한 포스트로 만드세요.\n' + expertScope + generalHint + expertHint + '\n' +
     '요구사항:\n' +
     (isGeneralAudienceCategory(catId)
-      ? '- hook: 흔한 방법 vs 같은 자리 비교 한 줄 (25자 내외). 회원·세션 일화 금지\n' +
-        '- caption: 자가 점검으로 시작. • 3개(동작+이유, 불릿 사이 빈 줄 없음). 빈 줄로 나눈 네 블록: 느껴지는 변화 / 브랜드가 실제로 하는 코칭 / 프로필 링크에서 온라인 문진 / 지점 줄. ' +
+      ? '- hook: 블로그 주제·본문에서 만든 한 줄 (25자 내외). 고정 틀을 반복하지 마세요. 회원·세션 일화 금지\n' +
+        '- caption: 자가 점검으로 시작. • 3개(동작+이유, 불릿 사이 빈 줄). 빈 줄로 나눈 블록: 느껴지는 변화 / 브랜드가 실제로 하는 코칭 / 하다가 불편하면 바로 멈추세요 / DM 한 줄 / 지점 줄. ' +
         (parseInt(catId, 10) === 2
           ? '지점 줄은 「작전역 2분 · 1:1 예약제」만.'
           : '지점 줄은 「약수역 3분 · 작전역 2분 · 1:1 예약제」.') +
         ' 저장·공유·팔로우·적신호 금지. hook 제외 180~380자\n'
-      : '- hook: 「[상황] 시 회원이 [현상]하는 건 테크닉 문제가 아닐 수 있습니다 🤲」 틀. 상황을 맨 앞에, 끝에 이모지 1개. 「기술」은 「테크닉」으로 통일\n' +
+      : '- hook: 블로그 제목·본문에서 이번 글만의 한 줄. 「테크닉 문제가 아닐 수 있습니다」 고정 틀은 쓰지 마세요. 끝에 이모지 1개. 「기술」은 「테크닉」으로 통일\n' +
         '- caption: hook 제외 **500~750자**. 블로그·영상 범위 안에서 새 주장 없이. 없는 성과·사례·숫자 금지\n') +
     '- 입력·블로그·메모에 없는 일화·회원 사례·숫자·「오늘 세션에서 물어봤어요」 장면을 만들지 마세요\n' +
     '- 과정·철학·통념 뒤집기는 인스타가 아니라 쓰레드용 — 인스타는 **결과·장면**에 집중\n' +
@@ -45535,8 +45699,13 @@ async function generateInstaFromBlog_(catId, blog, topic){
 
   var text = await callClaudePlanner_(prompt, { maxTokens: 2200, timeoutMs: INSTA_BG_TIMEOUT_MS });
   var parsed = parsePlannerAiJsonObject_(text);
-  var ig = parsed.insta || parsed;
-  return scrubNonManualPainWordInValue_(normalizeInstaBlock_(ig), catId);
+  var ig = scrubNonManualPainWordInValue_(normalizeInstaBlock_(parsed.insta || parsed), catId);
+  var shell = { insta: ig, blog: blog || null };
+  polishGeneratedContent_(shell, catId, { topic: topic || '', articleFlow: null }, {
+    forceTitle: false,
+    hookSource: (blog && (blog.title || blog.hook || blog.problem)) || topic || ''
+  });
+  return shell.insta;
 }
 
 async function generateMangoBriefFromBlog_(catId, blog, topic, draft){
@@ -47673,13 +47842,13 @@ ${hjImgGuide}
 "community": {
 "title": "${flowJsonTitleHint_(draft, '🌿 질문형·공감형 한 줄')}",
 "problem": "문제 제기 2~4문장. 불릿·번호 없이 자연스럽게. 문장(문단) 사이 빈 줄. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스",
-"selfCare": "👉 로 시작. 동작·자세·초·회·분을 앞쪽에. '시원한 지점에서 멈추기' 뉘앙스",
+"selfCare": "동작·자세·초·회·분을 앞쪽에. 👉 금지. '시원한 지점에서 멈추기' 뉘앙스",
 "explanation": "원리 설명 2~5문장. 문단 사이 빈 줄. 왜 도움이 되는지+비유+복잡하지 않다는 마무리. 옆집 이웃 톤"
 },
 ${heiljagyaeImgJsonTail}
 }
 
-community에는 인사말·고정 마무리 넣지 말 것. 글 흐름은 **문제 제기 → selfCare(해결책) → explanation(원리)** 순. selfCare는 👉로 시작.
+community에는 인사말·고정 마무리 넣지 말 것. 글 흐름은 **문제 제기 → selfCare(해결책) → explanation(원리)** 순. selfCare에 👉 를 쓰지 마세요.
 
 images.gptVisuals는 **정확히 2개**(상황 컷 + 따라하기 컷). 각 prompt는 **한글** 장면 문장. 따라하기 컷에 selfCare 핵심 동작이 보이게. 영문-only·mangoBrief 금지.`;
 } else if(isGeneralAudienceCategory(catId)){
@@ -47707,16 +47876,16 @@ ${getBlogStructureRulesText_(catId)}
 "blog": {
 "title": "${flowJsonTitleHint_(draft, '호기심·질문형 한 줄. 증상형이면 증상+지역·프로그램 키워드를 자연스럽게 (35자 내외, 과장 금지)')}",
 "problem": "문제 제기 2~4문장. 불릿·번호 없이. 문장(문단) 사이 빈 줄. 마지막에 짧은 시간·일상 공간으로 해결 가능하다는 뉘앙스. 자가 점검 문장은 넣지 말 것",
-"selfCare": "👉 먼저 확인: 자가 점검 한 문장. 빈 줄. 👉 1.~👉 4. 3~4단계(자극(도수·셀프 자극)→스트레칭→자세·생활습관→기능운동 순서). 각 단계는 동작과 이유를 한 절에, 초·회 포함. 단계 사이만 빈 줄. 시원하다에서 멈추기. 실수 2~3개. 맨 끝 한 줄만 적신호면 병원",
-"explanation": "충분히 긴 원리 설명(여러 문단). 왜 아픈지 · 연결된 구조 · 이 순서로 하는 이유 · 생활 속 원인을 모두 담기. 맨 앞 1~2문장이 핵심. 방향 단어를 추측하지 말 것. 문단 사이 빈 줄. 병원·자가 점검 반복 금지",
-"cta": "원리 설명 뒤 한두 문장. 끝 행동 하나. 저장·공유 금지. URL·프로필 링크 문구 쓰지 말 것(끝 링크는 앱이 붙임). 없는 약속·병원 문구 금지",
+"selfCare": "👉 금지. 리얼무브먼트·리얼페이스는 ①자극 ②스트레칭 ③자세·생활습관 ④기능운동. 각 동작은 【부위 — 동작명】, 설명, 빈 줄, ⏱ 유지·횟수, 바로 다음 줄 팁. 【동작】 사이 빈 줄. 도수 탭은 일반 건강 정보(도수치료에서는·치료 방향·교정 금지). 맨 끝 한 줄만 「이럴 땐 병원에 가 보세요」. 진료 금지",
+"explanation": "충분히 긴 원리 설명(여러 문단). 왜 불편한지 · 연결된 구조 · 이 순서로 하는 이유 · 생활 속 원인을 모두 담기. 맨 앞 1~2문장이 핵심. 방향 단어를 추측하지 말 것. 문단 사이 빈 줄. 병원·자가 점검 반복 금지. 흐름 지시문(짚는다·정리한다)을 문단으로 쓰지 말 것",
+"cta": "원리 설명 뒤 끝 행동 하나. 저장·공유·온라인 문진 금지. URL은 넣지 말 것(끝 링크는 앱이 붙임). 일반은 네이버 예약(약수·인천), 리얼페이스는 인천만, 도수는 리얼무브먼트 평가 예약",
 "references": "참고한 논문이 입력 메모에 있을 때만. 한 줄에 하나: 저자, 연도, 논문 제목, 학술지. 링크 금지. 없으면 빈 문자열",
 "hashtags": ["태그1","태그2","태그3","태그4","태그5","태그6"]
 },
 ${generalImgJsonTail}
 }
 
-글 흐름은 **문제 제기 → selfCare → 원리 설명(explanation, 충분히 길게) → cta** 순. selfCare는 👉 먼저 확인으로 시작하고, 👉 1.~4. 3~4단계(각 단계 초·회)와 실수 2~3개를 넣으세요. 동작 1개로 끝내지 마세요. "N단계 —" 표기 금지.
+글 흐름은 **문제 제기 → selfCare → 원리 설명(explanation, 충분히 길게) → cta** 순. 리얼무브먼트·리얼페이스 selfCare는 4단계(①자극 ②스트레칭 ③자세·생활습관 ④기능운동)와 【동작】 형식. 👉 금지. 적신호는 「이럴 땐 병원에 가 보세요」 한 줄. "N단계 —" 표기 금지. 흐름 지시문을 본문으로 쓰지 마세요.
 
 images.gptVisuals는 **한글 실사 프롬프트 3장**. 영문만인 문장 금지. mangoBrief는 선택이며, 비우면 null. 채울 때만 소개란용 한글(장별 헤드+짧은 불릿, 블로그 원문 붙여넣기 금지).`;
 } else if(isExpertCourseCategory(catId)){
@@ -47755,7 +47924,7 @@ JSON만 응답:
 "hook": "끝이 아니라는 점과, 누가 어디서 멈추는지 2~3문장. 자막 조각·제작 과정 금지",
 "outline": ["읽을 항목을 한 줄에 하나. 각 줄은 완전한 문장","위·아래·왼쪽·오른쪽·모양·방향을 묶지 말 것"],
 "draft": "원리 설명(본문 중심). 현장 장면 → 원리(근거, 완화 어미) → 방법 1·방법 2(구체 장면) → 손대기 전 자가 확인 3가지 → 과정 단계 연결. 본문 전체 약 1,900자. 참고·영상·사진 범위 안만. outline을 다시 풀지 말 것",
-"cta": "마무리: 대구형 결론 1문장 + 고정 슬로건. 수강·등록 유도·URL 금지",
+"cta": "마무리: 결론 1문장 + 「과정 신청은 글 끝의 신청 링크에서 이어집니다.」 URL·온라인 문진 금지. 흐름 지시문을 본문에 쓰지 말 것",
 "references": "검증된 근거 목록에 있는 논문만. 본문에 실제 쓴 것만. 한 줄에 하나: 저자 (연도). 제목. 저널. 링크·DOI 금지. 목록이 비면 빈 문자열",
 "evidenceFlags": ["근거보다 강한 표현이 남은 문장(없으면 빈 배열)"],
 "hashtags": ["태그1","태그2","태그3","태그4","태그5"]
@@ -47844,6 +48013,7 @@ if(beforeCleanup && typeof PlannerFieldSync !== 'undefined'){
 
 scrubNonManualPainWordInValue_(content, catId);
 if(content.blog) applyBlogWordRulesToBlock_(content.blog, catId);
+polishGeneratedContent_(content, catId, draft, { forceTitle: !!String(draft && draft.topic || '').trim() });
 if(isExpertCourseCategory(catId) && content.blog) applyVerifiedEvidenceReferences_(content, draft);
 
 if(!state.published[jobDraftId]) state.published[jobDraftId]={};
@@ -47950,10 +48120,10 @@ window.genContent = async function(ev){
       '',
       blogSrc ? ('[참고 블로그 초안 — 같은 소재를 소식용으로 압축·변형]\n' + blogSrc + '\n') : '',
       isExpertCourseCategory(parseInt(catId, 10))
-        ? '강사 교육 소식입니다. 클리닉 온라인 문진·증상 문구·지점 줄을 쓰지 마세요. 원데이 모집이면 일정·장소·정원을 먼저 쓰고, 끝 행동은 「프로필 링크/예약」 한 줄(URL 없음).'
+        ? '강사 교육 소식입니다. 안전 문구·지점 줄·온라인 문진을 쓰지 마세요. 끝 행동은 「과정 신청으로 이어가 주세요.」 한 줄(URL 없음).'
         : ((parseInt(catId, 10) === 2)
-          ? '리얼페이스 소식은 인천만. 약수역·약수 일정을 넣지 마세요.'
-          : '약수 소식은 약수역 3분, 인천 소식은 작전역 2분. 끝 행동은 하나.'),
+          ? '리얼페이스 소식은 인천만. 지점 줄은 그대로 「작전역 2분 · 1:1 예약제」. 약수역 문장·태그를 넣지 마세요. 일반 셀프 케어면 「하다가 불편하면 바로 멈추세요」. 네이버·카카오 CTA는 톡톡, 당근 CTA는 채팅. URL 없음.'
+          : '지점 줄은 그대로 「약수역 3분 · 작전역 2분 · 1:1 예약제」. 쉼표 문장으로 바꾸지 마세요. 일반 셀프 케어면 「하다가 불편하면 바로 멈추세요」. 네이버·카카오 CTA는 톡톡, 당근 CTA는 채팅. URL 없음.'),
       '',
       getContentRulesV2Text_(catId),
       '네이버 태그는 특수문자를 제거합니다. 소식은 title 1줄 + body 3~5문장(문제 → 방법 두 가지 요약 → 과정 연결) + cta 1줄입니다.',
@@ -47981,6 +48151,7 @@ window.genContent = async function(ev){
           cta: String(it.cta || '').trim()
         }, catId);
       });
+      polishGeneratedContent_(newsContent, catId, draftN, { forceTitle: false });
       persistDraftContent_(draftId, newsContent);
       renderSheetContent(newsContent);
       setAppToast('네이버·카카오·당근 소식을 만들었어요. 칩으로 채널을 바꿔 확인하세요.', { duration: 4500, variant: 'ok' });
